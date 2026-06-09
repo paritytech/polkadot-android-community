@@ -1,0 +1,18 @@
+{
+  "version": 0,
+  "descriptorPath": ".papi/descriptors",
+  "entries": {
+    "pop": {
+      "wsUrl": "wss://previewnet.example/people",
+      "metadata": ".papi/metadata/pop.scale",
+      "genesis": "0x3389bc9179d3be32568c67278bd080d05631ac71982d28a3fe545421147b311e",
+      "codeHash": "0x39cb1b8b283ca6d9e05636ffc6236b82ab78c7f3bfddcde49acf37a073f1a208"
+    },
+    "assetHub": {
+      "wsUrl": "wss://previewnet.example/asset-hub",
+      "metadata": ".papi/metadata/assetHub.scale",
+      "genesis": "0x29f7b15e6227f86b90bf5199b5c872c28649a30e5f15fae6dd8fa9d5d48d6fbb",
+      "codeHash": "0x3521279624c17a7e210faacec28ca938bfa37500ef440374ef3361433006b91e"
+    }
+  }
+}
