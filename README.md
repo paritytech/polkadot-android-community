@@ -103,7 +103,7 @@ Polkadot Android is a self-custodial superapp: your keys are created on your pho
 
 ### What it doesn't do
 
-- It does **not** hold your keys or your money — there is no custodian, and nobody (including the developers) can freeze, recover, or move your account. If you lose your device and have no backup, the account is gone.
+- It does **not** act as a custodian of your keys or your money — the keys are stored only on your device, and nobody (including the developers) can freeze, recover, or move your funds. If you lose your device and have no cloud/written backup, the associated accounts are gone.
 - It does **not** route your chats and calls through company messaging servers — messages travel through the public chain, calls go peer-to-peer.
 - It is **not** a production-hardened product — treat it as a reference implementation (see the warning at the top).
 
