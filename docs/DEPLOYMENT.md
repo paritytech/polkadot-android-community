@@ -5,9 +5,7 @@ Community application, and **which environment variables / secrets** you need to
 configure.
 
 It is intentionally **generic**. This repository does **not** ship a concrete
-release pipeline — the previous CI was tied to a specific private infrastructure
-(self-hosted runners, a managed secret store, an object-storage bucket, a Firebase
-project, chat/notification bots). All of that has been removed. Instead, this guide
+release pipeline. Instead, this guide
 describes the *building blocks* so that anyone (the original team, a fork, or a
 community deployment) can wire up their own publishing flow with their own
 credentials.
