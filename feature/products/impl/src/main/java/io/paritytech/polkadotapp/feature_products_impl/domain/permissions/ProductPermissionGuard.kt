@@ -1,0 +1,111 @@
+package io.paritytech.polkadotapp.feature_products_impl.domain.permissions
+
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.AccountAccessPermissionHandler
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.BalanceAccessPermissionHandler
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.DeviceCapabilityPermissionHandler
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.RemotePermissionHandler
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.UserIdentityAccessPermissionHandler
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.PermissionDecision
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission.RemotePermission
+import javax.inject.Inject
+
+interface ProductPermissionGuard {
+    /**
+     * Requests the given permission from the user.
+     * If the permission is already permanently granted, returns true immediately.
+     * Otherwise, prompts the user for a decision (AllowOnce, AllowAlways, Deny).
+     *
+     * Use this for host API calls that explicitly request a permission (e.g. `host_device_permission`).
+     * One-time grants issued here can later be consumed by [consumePermission].
+     */
+    suspend fun requestPermission(productId: ProductId, permission: ProductPermission): Boolean
+
+    suspend fun requestPermissionsBatched(productId: ProductId, permissions: List<RemotePermission>): Boolean
+
+    /**
+     * Consumes a previously issued one-time grant, or falls back to [requestPermission] if none exists.
+     *
+     * Use this for host API calls that require a permission to perform an action (e.g. `host_push_notification`).
+     * The expected flow is: the product first calls a permission-request API (which issues a one-time grant via
+     * [requestPermission]), then calls the action API (which consumes it here without re-prompting the user).
+     * If no one-time grant is available, the user is prompted as a fallback.
+     */
+    suspend fun consumePermission(productId: ProductId, permission: ProductPermission): Boolean
+
+    /**
+     * Read-only query: returns whether the permission is currently granted, either via an
+     * unconsumed one-time grant or a permanent grant. Never prompts the user and never
+     * consumes a one-time grant.
+     *
+     * Use this to silently gate behaviour; use [requestPermission] / [consumePermission]
+     * when a missing permission should trigger a prompt.
+     */
+    suspend fun check(productId: ProductId, permission: ProductPermission): Boolean
+}
+
+class RealProductPermissionGuard @Inject constructor(
+    private val remotePermissionHandler: RemotePermissionHandler,
+    private val accountAccessHandler: AccountAccessPermissionHandler,
+    private val balanceAccessHandler: BalanceAccessPermissionHandler,
+    private val deviceCapabilityHandler: DeviceCapabilityPermissionHandler,
+    private val userIdentityAccessHandler: UserIdentityAccessPermissionHandler,
+    private val repository: ProductPermissionRepository,
+    private val requester: ProductPermissionRequester,
+) : ProductPermissionGuard {
+    override suspend fun requestPermission(productId: ProductId, permission: ProductPermission): Boolean {
+        if (check(productId, permission)) return true
+
+        return when (permission) {
+            is RemotePermission -> remotePermissionHandler.request(productId, permission)
+            is ProductPermission.AccountAccess -> accountAccessHandler.request(productId, permission)
+            is ProductPermission.BalanceAccess -> balanceAccessHandler.request(productId, permission)
+            is ProductPermission.DeviceCapability -> deviceCapabilityHandler.request(productId, permission)
+            is ProductPermission.UserIdentityAccess -> userIdentityAccessHandler.request(productId, permission)
+        }
+    }
+
+    override suspend fun requestPermissionsBatched(
+        productId: ProductId,
+        permissions: List<RemotePermission>,
+    ): Boolean {
+        if (permissions.isEmpty()) return true
+
+        val notYetGranted = permissions.filterNot { check(productId, it) }.distinct()
+        if (notYetGranted.isEmpty()) return true
+
+        return when (requester.promptBatched(productId, notYetGranted)) {
+            PermissionDecision.AllowAlways -> {
+                notYetGranted.forEach { repository.grant(productId, it) }
+                true
+            }
+            PermissionDecision.AllowOnce -> {
+                notYetGranted.forEach { repository.grantOneTime(productId, it) }
+                true
+            }
+            PermissionDecision.Deny -> false
+        }
+    }
+
+    override suspend fun consumePermission(productId: ProductId, permission: ProductPermission): Boolean {
+        if (repository.consumeOneTimeGrant(productId, permission)) return true
+
+        return requestPermission(productId, permission).also {
+            // Consume a one-time permission that requestPermission might have just granted
+            repository.consumeOneTimeGrant(productId, permission)
+        }
+    }
+
+    override suspend fun check(productId: ProductId, permission: ProductPermission): Boolean {
+        if (repository.hasOneTimeGrant(productId, permission)) return true
+
+        return when (permission) {
+            is RemotePermission -> remotePermissionHandler.isGranted(productId, permission)
+            is ProductPermission.AccountAccess -> accountAccessHandler.isGranted(productId, permission)
+            is ProductPermission.BalanceAccess -> balanceAccessHandler.isGranted(productId, permission)
+            is ProductPermission.DeviceCapability -> deviceCapabilityHandler.isGranted(productId, permission)
+            is ProductPermission.UserIdentityAccess -> userIdentityAccessHandler.isGranted(productId, permission)
+        }
+    }
+}

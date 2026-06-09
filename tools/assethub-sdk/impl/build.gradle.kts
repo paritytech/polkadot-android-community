@@ -1,0 +1,17 @@
+plugins {
+    alias(libs.plugins.kotlin.serialization)
+}
+
+android {
+    namespace = "io.paritytech.polkadotapp.tools_assethub_sdk_impl"
+}
+
+dependencies {
+    api(project(":tools:assethub-sdk:api"))
+
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.android.compiler)
+
+    implementation(project(":feature:balances:api"))
+    implementation(project(":feature:xcm:api"))
+}
