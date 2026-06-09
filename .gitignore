@@ -3,6 +3,9 @@
 .kotlin/
 build/
 
+# Rust build outputs
+target/
+
 # Local configuration file (sdk path, etc)
 local.properties
 .DS_Store
@@ -50,6 +53,8 @@ node_modules
 
 # Secrets
 token*
+.env*
+!.env.example
 # Claude Code: share docs, skills, hooks, and settings; keep local-only state out
 /.claude/*
 !/.claude/docs/
