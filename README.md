@@ -12,6 +12,8 @@
 [![Kotlin](https://img.shields.io/badge/kotlin-2.2-7F52FF?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Polkadot](https://img.shields.io/badge/polkadot-ecosystem-E6007A?style=flat-square&logo=polkadot)](https://polkadot.com)
 
+<img src="docs/screenshots/hero-banner.png" alt="Polkadot Android — self-custodial superapp showing the chats list and identity card on a phone" width="800">
+
 </div>
 
 ## Features
