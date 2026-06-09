@@ -70,6 +70,10 @@ Signing keys, `google-services.json`, and feature API keys are read from
 
 Select the **gp** flavor with a debug build type and an Android 10+ device or emulator, then build and run.
 
+The app talks to Polkadot system chains (People Chain, Asset Hub, Bulletin Chain); the chain set is
+delivered via remote config, and development and nightly builds are exercised against Polkadot's
+[Paseo](https://github.com/paseo-network) testnet contour.
+
 ### Build and test from the command line
 
 ```bash
@@ -119,7 +123,14 @@ Issues and pull requests are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) 
 
 ## Security
 
-Report vulnerabilities responsibly as described in [SECURITY.md](./SECURITY.md). Do not open public issues for security reports.
+Before deploying this for real use cases, you are responsible for:
+
+- Reviewing the code yourself — we publish a reference, not a hardened production build.
+- Checking that the dependencies are up to date and free of known vulnerabilities.
+- Securing your own fork or deployment environment (keys, secrets, network configuration).
+- Tracking the latest commits for security fixes; older revisions are not backported.
+
+Report vulnerabilities responsibly following [Parity's security policy](https://github.com/paritytech/.github/blob/main/SECURITY.md) — do not open public issues for security reports. For Parity's disclosure process and Bug Bounty programme, see [parity.io/bug-bounty](https://parity.io/bug-bounty).
 
 ## License
 

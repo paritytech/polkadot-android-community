@@ -4,8 +4,6 @@ Thanks for your interest in contributing! This project welcomes issues and pull
 requests. This guide explains how to get set up, what we expect in a
 contribution, and how changes get reviewed and merged.
 
-By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
-
 ## Ways to Contribute
 
 - **Report a bug** — open a [GitHub issue](../../issues) describing what you
@@ -15,7 +13,8 @@ By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md
 - **Submit a fix or improvement** — open a pull request (see below).
 
 For **security vulnerabilities, do not open a public issue.** Follow the
-reporting process described in [SECURITY.md](SECURITY.md).
+reporting process described in
+[Parity's security policy](https://github.com/paritytech/.github/blob/main/SECURITY.md).
 
 ## Getting Set Up
 
