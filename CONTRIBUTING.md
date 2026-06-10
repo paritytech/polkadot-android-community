@@ -22,7 +22,7 @@ This is an Android application built with Gradle and Kotlin.
 
 Requirements:
 
-- JDK 17
+- JDK 21
 - Android Studio (latest stable) or the Android SDK + command-line tools
 - A `local.properties` pointing at your Android SDK (`sdk.dir=...`)
 
