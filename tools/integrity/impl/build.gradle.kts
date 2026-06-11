@@ -8,19 +8,21 @@ android {
     namespace = "io.paritytech.polkadotapp.tools_integrity_impl"
     val localProperties = gradleLocalProperties(rootDir, providers)
 
-    defaultConfig {
-        buildConfigField(
-            "long",
-            "GOOGLE_PROJECT_ID",
-            localProperties.readSecret("GOOGLE_PROJECT_ID")
-        )
-    }
-
     flavorDimensions += "distribution"
 
     productFlavors {
-        create("gp") { dimension = "distribution" }
-        create("vanilla") { dimension = "distribution" }
+        create("gp") {
+            dimension = "distribution"
+            buildConfigField(
+                "long",
+                "GOOGLE_PROJECT_ID",
+                localProperties.readSecret("GOOGLE_PROJECT_ID")
+            )
+        }
+        create("vanilla") {
+            dimension = "distribution"
+            buildConfigField("long", "GOOGLE_PROJECT_ID", "0L")
+        }
     }
 }
 

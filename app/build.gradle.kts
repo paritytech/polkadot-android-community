@@ -154,9 +154,9 @@ dependencies {
     implementation(project(":tools:media-connection:api"))
     // Endregion tools
 
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.analytics)
+    "gpImplementation"(platform(libs.firebase.bom))
+    "gpImplementation"(libs.firebase.crashlytics)
+    "gpImplementation"(libs.firebase.analytics)
 }
 
 
