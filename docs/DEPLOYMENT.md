@@ -24,12 +24,33 @@ one or more channels. The app is built with Gradle, has native Rust components
 environment variables (see §5). The typical flow is:
 
 1. Provision the toolchain (§2).
-2. Provide a signing keystore (§3) and a Firebase `google-services.json` (§4).
+2. Provide a signing keystore (§3). For the `gp` edition also provide a Firebase `google-services.json` (§4); `vanilla` does not require it.
 3. Set the required environment variables / secrets (§5).
-4. Build the variant you want to ship (§6).
+4. Build the edition you want to ship (§6).
 5. Deliver the artifact through a channel of your choice (§7):
    Google Play, Firebase App Distribution, GitHub Releases, object storage, or a
    direct APK link.
+
+### Distribution editions
+
+The app ships two parallel distribution tracks:
+
+| Edition | Target | Services | Channel |
+|---------|--------|----------|---------|
+| `gp` | Standard Android / Google Play | Google Mobile Services (GMS), Firebase, Play Integrity | Google Play Store (AAB/APK) |
+| `vanilla` | **GrapheneOS** and other GMS-free environments | No Google services | Sideloadable APK (GitHub Releases, direct link, etc.) |
+
+The `vanilla` edition is a first-class release track aimed at privacy-focused users
+running [GrapheneOS](https://grapheneos.org/). It carries the same core app
+functionality and is fully operational without Google Play Services. Google Sign-In,
+Firebase Auth, Firebase Analytics, and Firebase Crashlytics are excluded from the
+`vanilla` APK. Firebase Messaging and Firebase App Check remain as compile-time
+transitive dependencies (from `tools/push-notifications:impl` and
+`tools/integrity:impl`) but are not initialized at runtime — no `google-services.json`
+is provided for `vanilla` variants, so Firebase auto-initialization skips silently.
+
+The `vanilla` edition is distributed as a standalone APK alongside, not instead of,
+the Google Play version.
 
 ---
 
@@ -109,18 +130,29 @@ Provided via the signing environment variables in §5
 
 ## 4. `google-services.json` (Firebase)
 
-The app applies the Google Services + Firebase Crashlytics/Analytics plugins, so a
-`google-services.json` must be present for each built variant source set:
+> **`gp` edition only.** The `vanilla`/GrapheneOS build does not use Firebase or any
+> Google services and therefore does **not** require `google-services.json`. Skip this
+> section if you are building only `vanilla` builds.
+
+The `gp` edition applies the Google Services + Firebase Crashlytics/Analytics plugins,
+so a `google-services.json` must be present in the `gp` flavor source set:
 
 ```
-app/src/debug/google-services.json
-app/src/nightly/google-services.json
-app/src/release/google-services.json
+app/src/gp/google-services.json
 ```
+
+Placing it in the flavor source set (rather than per-build-type) means a single file
+covers all `gp` build types (`gpDebug`, `gpNightly`, `gpRelease`). For `vanilla`
+variants the Google Services plugin finds no JSON file and skips processing silently
+(plugin 4.3.3+ behavior).
 
 Obtain it from **your own** Firebase project (Project settings → Your apps →
-Android app → download `google-services.json`). In CI it is typically stored
-base64-encoded and decoded into the three locations before the build.
+Android app → download `google-services.json`). In CI decode it into this path
+before the build:
+
+```bash
+echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/src/gp/google-services.json
+```
 
 ---
 
@@ -154,16 +186,16 @@ returns `null` and lets the build fall back to a default (optional / org-overrid
 
 ### 5.2 App API keys (consumed by the build via `buildConfigField`)
 
-| Variable           | Used by (module)                          | Required | Description                          |
-|--------------------|-------------------------------------------|----------|--------------------------------------|
-| `GOOGLE_OAUTH_ID`  | `tools/auth/impl`                         | yes*     | Google OAuth client id (Sign-In)     |
-| `GOOGLE_PROJECT_ID`| `tools/integrity/impl`                    | yes*     | Google Cloud project id (Play Integrity) |
-| `W3S_AUTH_KEY`     | `feature/web3summit/impl`                 | yes*     | Web3 Summit auth keypair seed        |
+| Variable           | Used by (module)                          | Required (`gp`) | Required (`vanilla`) | Description                          |
+|--------------------|-------------------------------------------|-----------------|----------------------|--------------------------------------|
+| `GOOGLE_OAUTH_ID`  | `tools/auth/impl` `gp` source set        | yes*            | no                   | Google OAuth client id (Sign-In)     |
+| `GOOGLE_PROJECT_ID`| `tools/integrity/impl` `gp` product flavor| yes*           | no                   | Google Cloud project id (Play Integrity) |
+| `W3S_AUTH_KEY`     | `feature/web3summit/impl`                 | yes*            | yes*                 | Web3 Summit auth keypair seed        |
 
-`*` These are read with the throwing `readSecret`, so a build of the modules that
-reference them **fails if absent**. For a fork that does not use a given
-integration, you can supply a dummy value or adjust the corresponding module's
-`build.gradle.kts`.
+`*` Read with the throwing `readSecret` — the build **fails** if the variable is absent
+for the edition that requires it. Both `GOOGLE_OAUTH_ID` and `GOOGLE_PROJECT_ID` are
+scoped to the `gp` product flavor in their respective modules, so they are **not
+evaluated** during `vanilla` builds.
 
 #### 5.2.1 App endpoints / values (optional — placeholder defaults)
 
@@ -230,8 +262,13 @@ step of whatever channel you choose:
 
 ## 6. Building
 
-Product flavors: `gp` (Google services) and `vanilla`. Build types: `debug`,
-`nightly`, `release`.
+Distribution editions: `gp` (Google services — Google Play) and `vanilla` (no GMS —
+GrapheneOS / sideload). Build types: `debug`, `nightly`, `release`.
+
+### 6.1 `gp` edition (Google Play)
+
+Standard builds for devices with Google Play Services. Requires `google-services.json`
+at `app/src/gp/google-services.json` (§4) and all secrets in §5.
 
 ```bash
 # Debug (dev signing)
@@ -244,7 +281,37 @@ Product flavors: `gp` (Google services) and `vanilla`. Build types: `debug`,
 ./gradlew assembleGpRelease
 ```
 
-Outputs land in `app/build/outputs/apk/<flavor>/<buildType>/`.
+Outputs land in `app/build/outputs/apk/gp/<buildType>/`.
+
+### 6.2 `vanilla` edition (GrapheneOS / GMS-free)
+
+The `vanilla` edition produces an APK with **no Google services dependency**: no
+Firebase, no Play Integrity, no GMS-backed Sign-In. It is designed to run correctly
+on [GrapheneOS](https://grapheneos.org/) and any other Android distribution that
+does not ship Google Play Services.
+
+Prerequisites that differ from the `gp` edition:
+
+- **No `google-services.json` required** — skip §4.
+- **`GOOGLE_OAUTH_ID` not required** — `tools/auth/impl` uses a no-op implementation for `vanilla`.
+- **`GOOGLE_PROJECT_ID` not required** — scoped to the `gp` flavor in `tools/integrity/impl`.
+- All other secrets (signing, `W3S_AUTH_KEY`, Sentry, optional endpoint variables) apply identically.
+
+```bash
+# Debug (dev signing)
+./gradlew assembleVanillaDebug
+
+# Nightly (dev signing)
+./gradlew assembleVanillaNightly
+
+# Release (release signing) — requires the release keystore + secrets
+./gradlew assembleVanillaRelease
+```
+
+Outputs land in `app/build/outputs/apk/vanilla/<buildType>/`.
+
+The release APK (`app-vanilla-release.apk`) is the artifact distributed to
+GrapheneOS users (see §7 → *GrapheneOS / direct APK sideload*).
 
 ### Version management
 
@@ -282,16 +349,20 @@ typically wired so you can implement it on your own infrastructure.
 
 ### GitHub Releases
 
-- Tag the commit and attach the APK:
+Build both editions first, then create a single release attaching both APKs:
 
 ```bash
 gh release create "v$VERSION" \
   --title "$VERSION" \
   --notes "release notes" \
-  app/build/outputs/apk/gp/release/app-gp-release.apk
+  app/build/outputs/apk/gp/release/app-gp-release.apk \
+  app/build/outputs/apk/vanilla/release/app-vanilla-release.apk
 ```
 
-`gh` uses the automatically-provided `GITHUB_TOKEN` in Actions.
+`gh` uses the automatically-provided `GITHUB_TOKEN` in Actions. Users on Google Play
+receive the `gp` APK through the store; GrapheneOS users download and sideload
+`app-vanilla-release.apk` directly (via the Files app, `adb install`, or the
+[GrapheneOS App Store](https://github.com/GrapheneOS/Apps) as a longer-term channel).
 
 ### Object storage / direct APK
 
@@ -331,8 +402,12 @@ jobs:
       # ... install Android SDK, NDK r29, Rust + targets, Clang, Node, Python (see §2)
       - run: |
           echo "${{ secrets.DEV_KEYSTORE_BASE64 }}" | base64 --decode > develop_key.jks
-          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > app/src/debug/google-services.json
+          # gp edition only — vanilla builds do not require google-services.json
+          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > app/src/gp/google-services.json
       - run: ./gradlew assembleGpDebug --no-daemon --stacktrace
+      # To build the vanilla edition instead, omit GOOGLE_SERVICES_JSON_BASE64,
+      # GOOGLE_OAUTH_ID, and GOOGLE_PROJECT_ID, then run:
+      # - run: ./gradlew assembleVanillaDebug --no-daemon --stacktrace
 ```
 
 Add a publishing job (§7) only on the events/branches you want to ship from.
