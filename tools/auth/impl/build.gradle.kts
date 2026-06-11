@@ -8,12 +8,21 @@ android {
     namespace = "io.paritytech.polkadotapp.tools_auth_impl"
     val localProperties = gradleLocalProperties(rootDir, providers)
 
-    defaultConfig {
-        buildConfigField(
-            "String",
-            "GOOGLE_OAUTH_ID",
-            localProperties.readStringSecret("GOOGLE_OAUTH_ID")
-        )
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("gp") {
+            dimension = "distribution"
+            buildConfigField(
+                "String",
+                "GOOGLE_OAUTH_ID",
+                localProperties.readStringSecret("GOOGLE_OAUTH_ID")
+            )
+        }
+        create("vanilla") {
+            dimension = "distribution"
+            buildConfigField("String", "GOOGLE_OAUTH_ID", "\"\"")
+        }
     }
 }
 
@@ -25,10 +34,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
 
-    implementation(libs.google.api.client)
-    implementation(libs.google.play.services.auth)
-
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
-
+    "gpImplementation"(libs.google.api.client)
+    "gpImplementation"(libs.google.play.services.auth)
+    "gpImplementation"(platform(libs.firebase.bom))
+    "gpImplementation"(libs.firebase.auth)
 }
