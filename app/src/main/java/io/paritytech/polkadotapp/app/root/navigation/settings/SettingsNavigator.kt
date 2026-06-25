@@ -42,6 +42,10 @@ class SettingsNavigator @Inject constructor(
         performNavigation(R.id.action_global_to_debug_menu)
     }
 
+    override fun openPrinterDiagnostics() {
+        performNavigation(R.id.action_global_to_printerDiagnosticsFragment)
+    }
+
     override fun openCurrency() {
         performNavigation(R.id.action_global_to_change_currency)
     }

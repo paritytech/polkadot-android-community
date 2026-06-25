@@ -16,6 +16,8 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.util.wssNodes
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.domain.printing.PrintDocument
+import io.paritytech.polkadotapp.common.domain.printing.ReceiptPrinter
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flowOfAll
@@ -101,9 +103,22 @@ class HostApiInteractor @Inject constructor(
     private val preimageSubmitSponsoring: PreimageSubmitSponsoring,
     private val statementStoreSubmissionSponsoring: StatementStoreSubmissionSponsoring,
     private val appThemeSelector: AppThemeSelector,
+    private val receiptPrinter: ReceiptPrinter,
 ) {
     fun subscribeTheme(): Flow<ProductTheme> {
         return appThemeSelector.selectedTheme.map(PolkadotAppTheme::toProductTheme)
+    }
+
+    fun isPrinterAvailable(): Boolean {
+        return receiptPrinter.isAvailable()
+    }
+
+    suspend fun print(callingProductId: ProductId, document: PrintDocument): Result<Unit> {
+        if (!receiptPrinter.isAvailable()) {
+            return Result.failure(PrinterUnavailableException)
+        }
+
+        return receiptPrinter.print(document)
     }
 
     suspend fun accountGet(callingProductId: ProductId, productAccountId: ProductAccountId): Result<ProductAccountResult> {
@@ -420,6 +435,8 @@ private val Color.isLight: Boolean
 object InsufficientBalanceException : RuntimeException("insufficient balance")
 
 object PaymentRejectedException : RuntimeException("payment rejected")
+
+object PrinterUnavailableException : RuntimeException("PrinterUnavailable")
 
 class AllowanceDeniedException(val kind: AllowanceResourceKind) :
     RuntimeException("allowance allocation rejected by user for $kind")

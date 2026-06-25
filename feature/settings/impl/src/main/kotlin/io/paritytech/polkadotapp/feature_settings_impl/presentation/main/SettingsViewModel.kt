@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.paritytech.polkadotapp.common.domain.printing.ReceiptPrinter
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.design.theme.AppThemeSelector
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
@@ -17,8 +18,11 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     interactor: SettingsInteractor,
     appThemeSelector: AppThemeSelector,
+    private val receiptPrinter: ReceiptPrinter,
     private val router: SettingsRouter
 ) : BaseViewModel() {
+    private val isPrinterTestAvailable = receiptPrinter.isAvailable()
+
     val state: StateFlow<SettingsUiState> = combine(
         interactor.observeBackupExists(),
         interactor.subscribeHasBlockedContacts(),
@@ -28,7 +32,8 @@ class SettingsViewModel @Inject constructor(
             isDebug = BuildConfig.DEBUG,
             selectedTheme = selectedTheme,
             isBackupMissing = !backupExists,
-            hasBlockedUsers = hasBlockedUsers
+            hasBlockedUsers = hasBlockedUsers,
+            isPrinterTestAvailable = isPrinterTestAvailable
         )
     }
         .stateIn(
@@ -38,7 +43,8 @@ class SettingsViewModel @Inject constructor(
                 isDebug = BuildConfig.DEBUG,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
                 isBackupMissing = false,
-                hasBlockedUsers = false
+                hasBlockedUsers = false,
+                isPrinterTestAvailable = isPrinterTestAvailable
             )
         )
 
@@ -80,5 +86,9 @@ class SettingsViewModel @Inject constructor(
 
     fun onDebugMenuClick() {
         router.openDebugMenu()
+    }
+
+    fun onPrinterClick() {
+        router.openPrinterDiagnostics()
     }
 }

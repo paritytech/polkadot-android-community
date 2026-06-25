@@ -6,6 +6,39 @@ import { createWsJsonRpcProvider } from '@novasamatech/host-substrate-chain-conn
 type PausableJsonRpcProvider = ReturnType<typeof createWsJsonRpcProvider>;
 import { createNativeTransport } from './native-transport';
 
+type PrinterPaperWidth = 'Mm58' | 'Mm80';
+type PrintDocumentKind = 'CustomerReceipt' | 'XReport' | 'ZReport';
+
+interface PrintLine {
+  label: string;
+  value?: string;
+}
+
+interface PrintItem {
+  name: string;
+  quantity?: string;
+  total?: string;
+}
+
+interface PrintQr {
+  data: string;
+  label?: string;
+  moduleSize?: number;
+}
+
+interface PrintDocument {
+  kind: PrintDocumentKind;
+  paperWidth?: PrinterPaperWidth;
+  title: string;
+  subtitle?: string;
+  header?: PrintLine[];
+  body?: PrintLine[];
+  items?: PrintItem[];
+  totals?: PrintLine[];
+  qr?: PrintQr;
+  footer?: string[];
+}
+
 // =============================================================================
 // Isolation: Capture private refs BEFORE locking down globals.
 // The container IIFE closure keeps these inaccessible to product scripts.
@@ -98,6 +131,46 @@ const { callNative, subscribeNative } = createNativeTransport((message) => {
   const json = JSON.stringify(message);
   (window as any).Android.call('__container__', json);
 });
+
+const printerExtension = Object.freeze({
+  async isAvailable(): Promise<boolean> {
+    const result = await callNative('printerIsAvailable', {});
+    return Boolean(result?.available);
+  },
+  async print(document: PrintDocument): Promise<void> {
+    await callNative('printerPrint', document);
+  },
+});
+
+const nfcExtension = Object.freeze({
+  async present(uri: string): Promise<void> {
+    await callNative('nfcPresent', { uri });
+  },
+  async clear(): Promise<void> {
+    await callNative('nfcClear', {});
+  },
+});
+
+const filesExtension = Object.freeze({
+  // Save a generated file (base64 bytes) to the device Downloads folder. The host
+  // writes via MediaStore so it works inside the WebView (which silently drops blob:
+  // downloads) and inside kiosk Lock Task. Returns the saved display name.
+  async save(name: string, base64: string, mime: string): Promise<{ savedAs: string }> {
+    return await callNative('filesSave', { name, base64, mime });
+  },
+});
+
+const existingHost = (window as any).host ?? {};
+const existingExt = existingHost.ext ?? {};
+freezeValue(window, 'host', Object.freeze({
+  ...existingHost,
+  ext: Object.freeze({
+    ...existingExt,
+    printer: printerExtension,
+    nfc: nfcExtension,
+    files: filesExtension,
+  }),
+}));
 
 const { port1, port2 } = new MessageChannel();
 

@@ -27,6 +27,10 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <queries>
+        <package android:name="woyou.aidlservice.jiuiv5" />
+    </queries>
+
     <application
         android:name="io.paritytech.polkadotapp.app.App"
         android:allowBackup="true"
@@ -70,6 +74,19 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="pay"
+                    android:scheme="polkadotapp" />
+            </intent-filter>
+
+            <!-- NFC tap: an NDEF tag carrying a pay deeplink (e.g. a POS terminal's HCE
+                 emitting polkadotapp://pay/cheque...). Mirrors the VIEW filter above so an
+                 NFC tap opens the same handler as scanning the payment QR. -->
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+
+                <category android:name="android.intent.category.DEFAULT" />
 
                 <data
                     android:host="pay"
@@ -174,6 +191,49 @@
             android:name="io.paritytech.polkadotapp.feature_videogame_impl.service.VideoGameService"
             android:exported="false"
             android:foregroundServiceType="camera" />
+
+        <receiver
+            android:name="io.paritytech.polkadotapp.app.kiosk.KioskDeviceAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_policies" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name="io.paritytech.polkadotapp.app.nfc.PaymentHceService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter>
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.cardemulation.host_apdu_service"
+                android:resource="@xml/nfc_payment_apduservice" />
+        </service>
+
+        <receiver
+            android:name="io.paritytech.polkadotapp.app.nfc.NfcTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.paritytech.polkadotapp.nfc.PRESENT" />
+                <action android:name="io.paritytech.polkadotapp.nfc.CLEAR" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Debug-only: lets the app drop its own Device Owner status over adb so it can be
+             uninstalled / wiped (adb cannot remove a non-test device owner). Inert in release. -->
+        <receiver
+            android:name="io.paritytech.polkadotapp.app.kiosk.DeviceOwnerTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.paritytech.polkadotapp.kiosk.CLEAR_OWNER" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

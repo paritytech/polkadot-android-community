@@ -1,5 +1,7 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.hostApi
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ProductLocalStorage
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.ProductsBotApi
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.AccountHostCalls
@@ -7,12 +9,15 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGro
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.ChainHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.ChatHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.EntropyHostCalls
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.FilesHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.HostCallHandlerGroup
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.NavigationHostCalls
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.NfcHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.NotificationHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.PaymentHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.PermissionHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.PreimageHostCalls
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.PrintingHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.SigningHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.StatementHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.StorageHostCalls
@@ -30,6 +35,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class HostCallGroupFactory @Inject constructor(
+    @param:ApplicationContext private val appContext: Context,
     private val productLocalStorage: ProductLocalStorage,
 ) {
     /**
@@ -54,6 +60,9 @@ class HostCallGroupFactory @Inject constructor(
         UserIdHostCalls(botApi, productIdProvider),
         AllowanceHostCalls(botApi, productIdProvider),
         ThemeHostCalls(botApi),
+        PrintingHostCalls(botApi, productIdProvider),
+        NfcHostCalls(),
+        FilesHostCalls(appContext),
     )
 
     /**

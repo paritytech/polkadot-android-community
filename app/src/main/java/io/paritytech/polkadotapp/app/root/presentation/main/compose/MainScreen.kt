@@ -113,10 +113,10 @@ private fun MainScreenInternal(
                 .navigationBarsPadding()
         ) {
             PolkadotNavigationBar(
-                selectedIndex = currentTab.ordinal,
-                itemCount = BottomTab.entries.size
+                selectedIndex = BottomTab.visibleEntries.indexOf(currentTab).coerceAtLeast(0),
+                itemCount = BottomTab.visibleEntries.size
             ) {
-                BottomTab.entries.fastForEach {
+                BottomTab.visibleEntries.fastForEach {
                     PolkadotNavigationBarItem(
                         selected = it == currentTab,
                         onClick = { onTabSelected(it) },

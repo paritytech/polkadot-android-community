@@ -36,7 +36,7 @@ class MainViewModel @Inject constructor(
         )
 
     val currentTab: StateFlow<BottomTab>
-        field = MutableStateFlow(BottomTab.CHATS)
+        field = MutableStateFlow(BottomTab.visibleEntries.first())
 
     init {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&

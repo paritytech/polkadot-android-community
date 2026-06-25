@@ -636,6 +636,12 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="spa_browser_menu_open_chat">Open Chat</string>
     <string name="spa_browser_menu_refresh">Refresh</string>
     <string name="spa_browser_menu_share">Share</string>
+    <string name="spa_browser_menu_kiosk_mode">Kiosk mode</string>
+    <string name="kiosk_set_pin_title">Set a 4-digit PIN to lock the screen</string>
+    <string name="kiosk_enter_pin_title">Enter PIN to exit kiosk mode</string>
+    <string name="kiosk_wrong_pin">Incorrect PIN. Try again.</string>
+    <string name="nfc_payment_service_desc">Polkadot payment over NFC</string>
+    <string name="nfc_payment_aid_group_desc">Polkadot payment tag</string>
     <string name="debug_menu_enable_retro_mode">Enable retro mode</string>
     <string name="debug_menu_disable_retro_mode">Disable retro mode</string>
     <string name="debug_menu_randomize_account">Randomize account (Test Dev Reset)</string>
@@ -1213,6 +1219,15 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_android_version">Android: %1$s (API %2$d)</string>
     <string name="settings_device_model">Device: %s</string>
     <string name="settings_debug_menu">Debug menu</string>
+    <string name="settings_printer">Printer</string>
+    <string name="settings_printer_status">Status</string>
+    <string name="settings_printer_available">Available</string>
+    <string name="settings_printer_unavailable">Unavailable</string>
+    <string name="settings_print_test">Print test receipt</string>
+    <string name="settings_print_test_in_progress">Printing...</string>
+    <string name="settings_print_test_success">Test receipt sent to printer</string>
+    <string name="settings_print_test_failed">Printer test failed: %1$s</string>
+    <string name="settings_print_test_unknown_error">Unknown error</string>
 
     <string name="products_toolbar_title">Apps</string>
     <string name="products_empty_state_message">No products found</string>

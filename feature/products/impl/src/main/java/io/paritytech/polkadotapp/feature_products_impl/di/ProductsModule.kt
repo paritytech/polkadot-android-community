@@ -26,6 +26,8 @@ import io.paritytech.polkadotapp.feature_products_impl.data.storage.AssetContain
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ContainerScriptProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ProductLocalStorage
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.RealProductLocalStorage
+import io.paritytech.polkadotapp.feature_products_impl.data.storage.kiosk.KioskPinStorage
+import io.paritytech.polkadotapp.feature_products_impl.data.storage.kiosk.RealKioskPinStorage
 import io.paritytech.polkadotapp.feature_products_impl.domain.ProductAccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.accountsProtocol.RealAccountsProtocol
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.external.ProductExternalExtensionProvider
@@ -132,6 +134,9 @@ internal interface ProductsModule {
 
     @Binds
     fun bindSpaBrowserInteractor(impl: RealSpaBrowserInteractor): SpaBrowserInteractor
+
+    @Binds
+    fun bindKioskPinStorage(impl: RealKioskPinStorage): KioskPinStorage
 
     @Binds
     fun bindProductChatMenuInteractor(impl: RealProductChatMenuInteractor): ProductChatMenuInteractor

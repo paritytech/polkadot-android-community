@@ -9,4 +9,5 @@ data class SettingsUiState(
     val selectedTheme: PolkadotAppTheme,
     val isBackupMissing: Boolean = false,
     val hasBlockedUsers: Boolean = false,
+    val isPrinterTestAvailable: Boolean = false,
 )

@@ -18,6 +18,7 @@ import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextBu
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ChatFilled
+import io.paritytech.polkadotapp.design.components.icon.vectors.Lock
 import io.paritytech.polkadotapp.design.components.icon.vectors.Retry
 import io.paritytech.polkadotapp.design.components.icon.vectors.Share
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
@@ -32,6 +33,7 @@ fun BrowserMenuContent(
     onOpenChatClick: () -> Unit,
     onRefreshClick: () -> Unit,
     onShareClick: () -> Unit,
+    onKioskModeClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -60,6 +62,13 @@ fun BrowserMenuContent(
             icon = NovaIcons.Share,
             color = PolkadotTheme.colors.fg.primary,
             onClick = onShareClick,
+        )
+
+        BrowserMenuOption(
+            text = stringResource(RCommon.string.spa_browser_menu_kiosk_mode),
+            icon = NovaIcons.Lock,
+            color = PolkadotTheme.colors.fg.primary,
+            onClick = onKioskModeClick,
         )
 
         VerticalSpacer { mediumIncreased }

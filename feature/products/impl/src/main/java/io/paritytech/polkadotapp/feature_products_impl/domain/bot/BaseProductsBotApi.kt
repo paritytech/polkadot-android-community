@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.ContextualAlias
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.GenesisHash
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.printing.PrintDocument
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentStatus
@@ -145,6 +146,14 @@ abstract class BaseProductsBotApi(
 
     override fun subscribeTheme(): Flow<ProductTheme> {
         return hostApiInteractor.subscribeTheme()
+    }
+
+    override fun isPrinterAvailable(): Boolean {
+        return hostApiInteractor.isPrinterAvailable()
+    }
+
+    override suspend fun print(callingProductId: ProductId, document: PrintDocument): Result<Unit> {
+        return hostApiInteractor.print(callingProductId, document)
     }
 
     override suspend fun chainNodes(genesisHash: GenesisHash): Result<List<String>> {

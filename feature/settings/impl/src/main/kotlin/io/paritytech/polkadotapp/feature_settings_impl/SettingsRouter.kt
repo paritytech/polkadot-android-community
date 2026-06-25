@@ -9,6 +9,7 @@ interface SettingsRouter : ReturnableRouter {
     fun openMnemonic()
     fun openBackupConflict(payload: BackupConflictPayload)
     fun openDebugMenu()
+    fun openPrinterDiagnostics()
     fun openCurrency()
     fun openLanguage()
     fun openProductSettings()

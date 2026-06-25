@@ -12,6 +12,11 @@ interface SpaBrowserContract {
     fun onRefreshClick()
     fun onShareClick()
     fun onBackPressed()
+    fun onKioskModeClicked()
+    fun onKioskPinDigit(digit: Int)
+    fun onKioskPinBackspace()
+    fun onKioskExitTap()
+    fun onKioskPinDismissed()
 }
 
 data class SpaBrowserUiState(
@@ -19,4 +24,23 @@ data class SpaBrowserUiState(
     val subtitle: String? = "",
     val isMoreMenuVisible: Boolean = false,
     val canOpenChat: Boolean = false,
+    val kiosk: KioskUiState = KioskUiState(),
 )
+
+sealed interface KioskPhase {
+    data object Inactive : KioskPhase
+    data object SettingPin : KioskPhase
+    data object Active : KioskPhase
+    data object Unlocking : KioskPhase
+}
+
+data class KioskUiState(
+    val phase: KioskPhase = KioskPhase.Inactive,
+    val enteredDigits: Int = 0,
+    val hasError: Boolean = false,
+) {
+    val isEngaged: Boolean get() = phase == KioskPhase.Active || phase == KioskPhase.Unlocking
+    val isPromptVisible: Boolean get() = phase == KioskPhase.SettingPin || phase == KioskPhase.Unlocking
+    val isSettingPin: Boolean get() = phase == KioskPhase.SettingPin
+    val showExitHotspot: Boolean get() = phase == KioskPhase.Active
+}

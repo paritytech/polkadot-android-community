@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.ContextualAlias
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.GenesisHash
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.printing.PrintDocument
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
@@ -125,4 +126,8 @@ interface ProductsBotApi {
     fun subscribeChatRooms(): Flow<List<ProductChatRoom>>
 
     fun subscribeTheme(): Flow<ProductTheme>
+
+    fun isPrinterAvailable(): Boolean
+
+    suspend fun print(callingProductId: ProductId, document: PrintDocument): Result<Unit>
 }

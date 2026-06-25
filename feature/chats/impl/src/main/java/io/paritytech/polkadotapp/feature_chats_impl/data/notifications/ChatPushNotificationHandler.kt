@@ -5,6 +5,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.novasama.substrate_sdk_android.extensions.fromHex
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
+import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.common.data.app.AppLifecycleState
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.presentation.AppLifecycleObserver
@@ -169,6 +170,11 @@ internal class ChatPushNotificationHandler @Inject constructor(
         chatMessage: ChatMessage,
         displayName: String
     ) {
+        // Enterprise POS builds (CHAT_ENABLED = false) suppress person-to-person chat message
+        // notifications. Incoming voice/video calls are initiated separately via CallController
+        // (handleIncomingCallOffer) and are unaffected.
+        if (!BuildConfig.CHAT_ENABLED) return
+
         val appState = appLifecycleObserver.getCurrentState()
         val activeChatId = chatActiveTracker.getActive()
 

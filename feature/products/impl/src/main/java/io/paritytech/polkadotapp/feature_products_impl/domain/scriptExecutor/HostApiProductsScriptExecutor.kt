@@ -5,6 +5,7 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.chains.util.scaleEncodeBinary
+import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.HexString
 import io.paritytech.polkadotapp.common.utils.logFailure
@@ -68,8 +69,13 @@ class HostApiProductsScriptExecutor @AssistedInject constructor(
             val navigationPolicy = NavigationPolicy.Disabled
 
             val sharedGroups = hostCallGroupFactory.createShared(botApi, webViewProvider.callingProductIdProvider, navigationPolicy)
-            val chatGroup = hostCallGroupFactory.createChatGroup(botApi)
-            val allGroups: List<HostCallHandlerGroup> = sharedGroups + chatGroup + chatRenderWidgetHostCalls
+            // Chat host-APIs (chatCreateRoom/chatSendTextMessage/chatRenderWidget/...) are exposed to products
+            // only when chat is enabled. Enterprise POS builds (CHAT_ENABLED = false) omit them entirely.
+            val allGroups: List<HostCallHandlerGroup> = if (BuildConfig.CHAT_ENABLED) {
+                sharedGroups + hostCallGroupFactory.createChatGroup(botApi) + chatRenderWidgetHostCalls
+            } else {
+                sharedGroups
+            }
 
             val environment = HostApiEnvironment(
                 navigationPolicy = navigationPolicy,

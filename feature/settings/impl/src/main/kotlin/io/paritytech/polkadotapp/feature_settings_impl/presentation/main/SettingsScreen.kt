@@ -15,6 +15,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
+import io.paritytech.polkadotapp.design.components.icon.vectors.Barcode
 import io.paritytech.polkadotapp.design.components.icon.vectors.BlockOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.FileOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.GridOutlined
@@ -52,7 +53,8 @@ fun SettingsScreen() {
         onForceReclaimClick = viewModel::onForceReclaimClick,
         onPrivacyPolicyClick = viewModel::onPrivacyPolicyClick,
         onTermsOfUseClick = viewModel::onTermsOfUseClick,
-        onDebugMenuClick = viewModel::onDebugMenuClick
+        onDebugMenuClick = viewModel::onDebugMenuClick,
+        onPrinterClick = viewModel::onPrinterClick,
     )
 }
 
@@ -68,7 +70,8 @@ private fun SettingsScreenInternal(
     onForceReclaimClick: () -> Unit,
     onPrivacyPolicyClick: () -> Unit,
     onTermsOfUseClick: () -> Unit,
-    onDebugMenuClick: () -> Unit
+    onDebugMenuClick: () -> Unit,
+    onPrinterClick: () -> Unit,
 ) {
     PolkadotSurface {
         Column(
@@ -163,15 +166,28 @@ private fun SettingsScreenInternal(
 
                 VerticalSpacer { large }
 
-                if (state.isDebug) {
+                if (state.isDebug || state.isPrinterTestAvailable) {
                     PolkadotMenuList(
-                        headerText = stringResource(RCommon.string.settings_section_debug)
+                        headerText = if (state.isDebug) {
+                            stringResource(RCommon.string.settings_section_debug)
+                        } else {
+                            null
+                        }
                     ) {
-                        SettingsMenuItem(
-                            icon = NovaIcons.Settings,
-                            title = stringResource(RCommon.string.settings_debug_menu),
-                            onClick = onDebugMenuClick
-                        )
+                        if (state.isDebug) {
+                            SettingsMenuItem(
+                                icon = NovaIcons.Settings,
+                                title = stringResource(RCommon.string.settings_debug_menu),
+                                onClick = onDebugMenuClick
+                            )
+                        }
+                        if (state.isPrinterTestAvailable) {
+                            SettingsMenuItem(
+                                icon = NovaIcons.Barcode,
+                                title = stringResource(RCommon.string.settings_printer),
+                                onClick = onPrinterClick
+                            )
+                        }
                     }
 
                     VerticalSpacer { large }
@@ -203,7 +219,8 @@ private fun SettingsScreenPreview() {
             onForceReclaimClick = {},
             onPrivacyPolicyClick = {},
             onTermsOfUseClick = {},
-            onDebugMenuClick = {}
+            onDebugMenuClick = {},
+            onPrinterClick = {}
         )
     }
 }

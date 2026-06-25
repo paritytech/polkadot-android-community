@@ -6,6 +6,10 @@ plugins {
 android {
     namespace = "io.paritytech.polkadotapp.common"
 
+    buildFeatures {
+        aidl = true
+    }
+
     defaultConfig {
         buildConfigField("String", "TESTNET_ENVIRONMENT", "\"TESTNET\"")
         buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "true")
@@ -16,6 +20,7 @@ android {
         buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "SAMPLE_BOT", "true")
+        buildConfigField("boolean", "CHAT_ENABLED", "true")
     }
 
     buildTypes {
@@ -30,6 +35,7 @@ android {
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
+            buildConfigField("boolean", "CHAT_ENABLED", "false")
         }
         getByName("nightly") {
             buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
@@ -37,6 +43,7 @@ android {
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
+            buildConfigField("boolean", "CHAT_ENABLED", "false")
         }
     }
 }

@@ -65,6 +65,11 @@
         android:label="DebugMenuFragment" />
 
     <fragment
+        android:id="@+id/printerDiagnosticsFragment"
+        android:name="io.paritytech.polkadotapp.feature_settings_impl.presentation.printer.PrinterDiagnosticsFragment"
+        android:label="PrinterDiagnosticsFragment" />
+
+    <fragment
         android:id="@+id/productBotManagementFragment"
         android:name="io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductBotManagementFragment"
         android:label="ProductBotManagementFragment" />
@@ -168,6 +173,10 @@
         android:id="@+id/action_global_to_chatFeedFragment"
         app:destination="@id/chatFeedFragment"
         app:popUpTo="@id/mainFragment" />
+
+    <action
+        android:id="@+id/action_global_to_printerDiagnosticsFragment"
+        app:destination="@id/printerDiagnosticsFragment" />
 
     <action
         android:id="@+id/action_global_to_addContactFragment"

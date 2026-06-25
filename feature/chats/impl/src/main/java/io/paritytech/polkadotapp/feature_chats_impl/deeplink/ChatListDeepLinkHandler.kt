@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_chats_impl.deeplink
 
 import android.net.Uri
+import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
@@ -17,7 +18,8 @@ internal class ChatListDeepLinkHandler @Inject constructor(
     private val chatsRouter: ChatsRouter,
 ) : DeepLinkHandler {
     override fun canHandle(data: Uri) =
-        data.scheme == DeepLinkHandler.APP_SCHEME && data.host == CHAT_LIST_HOST
+        BuildConfig.CHAT_ENABLED &&
+            data.scheme == DeepLinkHandler.APP_SCHEME && data.host == CHAT_LIST_HOST
 
     context(ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> = runCatching {

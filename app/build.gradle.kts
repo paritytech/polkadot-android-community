@@ -26,6 +26,10 @@ android {
             "LOG_COLLECTION_EMAIL",
             "\"${localProperties.readSecretOrNull("LOG_COLLECTION_EMAIL") ?: "logs@example.com"}\""
         )
+
+        // Kiosk device-owner Lock Task. Disable for shareable/test builds: -PkioskLockdown=false
+        val kioskLockdown = (project.findProperty("kioskLockdown") as? String)?.toBooleanStrictOrNull() ?: true
+        buildConfigField("boolean", "KIOSK_LOCKDOWN_ENABLED", kioskLockdown.toString())
     }
 
     signingConfigs {
