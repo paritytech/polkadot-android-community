@@ -11,12 +11,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.res.stringResource
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.AudioFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.CallEndFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.CallFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.MicOffFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.VideocamFilled
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.feature_calls_impl.media.CallAudioDeviceType
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.models.CallUiState
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -24,7 +24,7 @@ import io.paritytech.polkadotapp.common.R as RCommon
 fun CallControlsRow(
     state: CallUiState,
     onAccept: () -> Unit,
-    onToggleSpeaker: () -> Unit,
+    onAudioClick: () -> Unit,
     onToggleCamera: () -> Unit,
     onToggleMicrophone: () -> Unit,
     onEndCall: () -> Unit,
@@ -50,11 +50,13 @@ fun CallControlsRow(
         }
 
         if (inProgress != null) {
+            val selectedAudioType = inProgress.audioDevices.firstOrNull { it.isSelected }?.type
+
             CallControlButton(
-                onClick = onToggleSpeaker,
+                onClick = onAudioClick,
                 text = stringResource(RCommon.string.call_speaker),
-                icon = NovaIcons.AudioFilled,
-                active = inProgress.speakerOn,
+                icon = audioDeviceIcon(selectedAudioType),
+                active = selectedAudioType != null && selectedAudioType != CallAudioDeviceType.Earpiece,
             )
 
             CallControlButton(

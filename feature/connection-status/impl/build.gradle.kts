@@ -1,5 +1,6 @@
 plugins {
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.hilt")
 }
 
 android {
@@ -9,6 +10,4 @@ android {
 dependencies {
     api(project(":feature:connection-status:api"))
 
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 }

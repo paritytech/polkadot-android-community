@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.util.Modules
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.asDisplayString
 import io.paritytech.polkadotapp.feature_balances_api.data.type.TokenBalanceTypeRegistry
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasChainAssetProvider
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasClaimSpec
@@ -58,10 +59,10 @@ class SponsorReviveCallsWithPgas @Inject constructor(
                 return@mapCatching
             }
 
-            Timber.i("balance ${balance.transferable} < threshold $threshold; allocating SmartContract(${account.derivationIndex})")
+            Timber.i("balance ${balance.transferable} < threshold $threshold; allocating SmartContract(${account.index.asDisplayString()})")
             val outcome = accountsProtocol.requestResourceAllocation(
                 callingProduct = ProductId.fromStoredValue(account.productId),
-                resource = ApAllocatableResource.SmartContractAllowance(account.derivationIndex),
+                resource = ApAllocatableResource.SmartContractAllowance(account.index),
                 onExisting = OnExistingAllowancePolicy.INCREASE,
             )
             when (outcome) {

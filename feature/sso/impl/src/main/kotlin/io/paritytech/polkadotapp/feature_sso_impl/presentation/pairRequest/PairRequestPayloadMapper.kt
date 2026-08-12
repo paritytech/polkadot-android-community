@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_sso_impl.presentation.pairRequest
 
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.feature_sso_api.domain.model.HandshakeDevice
 import io.paritytech.polkadotapp.feature_sso_api.domain.model.HandshakeMetadata
 import io.paritytech.polkadotapp.feature_sso_api.domain.model.HandshakeOffer
@@ -9,7 +9,7 @@ import io.paritytech.polkadotapp.feature_sso_api.domain.model.HandshakeOffer
 fun HandshakeOffer.toPayload(): PairRequestPayload {
     return PairRequestPayload(
         statementAccountId = device.statementAccountId.value,
-        encryptionPublicKey = device.encryptionPublicKey.value,
+        encryptionPublicKey = device.encryptionPublicKey.bytes.value,
         metadata = metadata.entries.mapKeys { (key, _) -> key.toPayload() },
     )
 }
@@ -18,7 +18,7 @@ fun PairRequestPayload.toDomain(): HandshakeOffer {
     return HandshakeOffer(
         device = HandshakeDevice(
             statementAccountId = statementAccountId.intoAccountId(),
-            encryptionPublicKey = EncodedPublicKey(encryptionPublicKey),
+            encryptionPublicKey = encryptionPublicKey.requireX25519PublicKey(),
         ),
         metadata = HandshakeMetadata(
             entries = metadata.mapKeys { (key, _) -> key.toDomain() },

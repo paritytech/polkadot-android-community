@@ -20,6 +20,7 @@ import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.common.compose.com
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm.ConfirmMnemonicContract
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm.compose.components.MnemonicConfirmation
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm.models.ConfirmationState
+import kotlinx.collections.immutable.toImmutableList
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -83,8 +84,8 @@ private fun ConfirmMnemonicScreenPreview() {
         ConfirmMnemonicScreenInternal(
             onBackAction = {},
             confirmationState = ConfirmationState(
-                addedWords = List(3) { Word(it, "word$it") },
-                allWords = List(12) { Word(it, "word$it") },
+                addedWords = List(3) { Word(it, "word$it") }.toImmutableList(),
+                allWords = List(12) { Word(it, "word$it") }.toImmutableList(),
             ),
             onContinueAction = {},
             onAdd = {},

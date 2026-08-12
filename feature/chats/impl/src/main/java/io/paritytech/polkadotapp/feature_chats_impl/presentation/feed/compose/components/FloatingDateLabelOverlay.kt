@@ -7,8 +7,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,10 +31,13 @@ internal data class StickyHeaderInfo(
 
 @Composable
 internal fun BoxScope.FloatingDateLabelOverlay(
-    stickyHeaderInfo: StickyHeaderInfo?,
-    isScrolling: Boolean,
+    stickyHeaderInfo: State<StickyHeaderInfo?>,
+    lazyListState: LazyListState,
     style: ChatDateSeparatorStyle? = null,
 ) {
+    val info = stickyHeaderInfo.value
+    val isScrolling = lazyListState.isScrollInProgress
+
     var stickyHeaderVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(isScrolling) {
@@ -50,12 +55,12 @@ internal fun BoxScope.FloatingDateLabelOverlay(
             .padding(top = PolkadotTheme.spacings.small)
     ) {
         AnimatedVisibility(
-            visible = stickyHeaderVisible && stickyHeaderInfo != null,
+            visible = stickyHeaderVisible && info != null,
             enter = fadeIn(animationSpec = tween(200)),
             exit = fadeOut(animationSpec = tween(200))
         ) {
-            stickyHeaderInfo?.let { info ->
-                FloatingDateLabel(date = info.formattedDate, style = style)
+            info?.let { stickyHeader ->
+                FloatingDateLabel(date = stickyHeader.formattedDate, style = style)
             }
         }
     }

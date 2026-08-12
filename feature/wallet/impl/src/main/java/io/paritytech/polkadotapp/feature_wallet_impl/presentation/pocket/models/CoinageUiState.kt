@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
+import kotlinx.collections.immutable.ImmutableList
 
 @Immutable
 data class CoinageUiState(
@@ -20,7 +21,7 @@ data class CoinageUiState(
         val spendableSecuredBalance: TokenAmountModel,
         val spendableDegradedBalance: TokenAmountModel,
         val pendingBalance: TokenAmountModel,
-        val coinList: List<Coin>,
-        val voucherList: List<RecyclerVoucher>
+        val coinList: ImmutableList<Coin>,
+        val voucherList: ImmutableList<RecyclerVoucher>
     )
 }

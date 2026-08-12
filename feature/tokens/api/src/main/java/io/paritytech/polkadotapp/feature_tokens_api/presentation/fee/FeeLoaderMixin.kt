@@ -38,7 +38,7 @@ fun FeeLoaderMixin.feeAmount() = status
 fun AvailableBalanceProvider.deductFee(feeLoaderMixin: FeeLoaderMixin) =
     deduct(feeLoaderMixin.feeAmount())
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun <I> FeeLoaderMixin.connectWith(
     inputSource: Flow<I>,
     feeConstructor: suspend (input: I) -> Result<Fee>,
@@ -51,5 +51,5 @@ fun <I> FeeLoaderMixin.connectWith(
             }
         }
         .inBackground()
-        .launchIn(this@ComputationalScope)
+        .launchIn(scope)
 }

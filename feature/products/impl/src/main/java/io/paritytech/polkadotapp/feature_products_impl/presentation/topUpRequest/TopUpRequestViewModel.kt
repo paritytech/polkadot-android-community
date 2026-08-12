@@ -3,24 +3,18 @@ package io.paritytech.polkadotapp.feature_products_impl.presentation.topUpReques
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
+import io.paritytech.polkadotapp.common.presentation.loading.asLoaded
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
-import io.paritytech.polkadotapp.common.utils.flowOf
-import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.launchUnit
-import io.paritytech.polkadotapp.common.utils.shareInBackground
-import io.paritytech.polkadotapp.common.utils.withLoading
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpAcknowledgement
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpRequestContext
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpRequestContextHolder
-import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpRequestInteractor
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
@@ -30,45 +24,18 @@ class TopUpRequestViewModel @Inject constructor(
     private val holder: TopUpRequestContextHolder,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val tokenAmountMapper: TokenAmountMapper,
-    private val interactor: TopUpRequestInteractor,
-) : BaseViewModel(), TopUpRequestContract {
-    private val claiming = MutableStateFlow(false)
-
-    // Set when a Coins top-up's detected on-chain amount differs from the amount the product stated.
-    private val amountMismatch = MutableStateFlow(false)
-
-    private val amountFlow = flowOf {
-        val asset = chainAssetProvider.asset()
-        tokenAmountMapper.mapFrom(asset.withAmount(context.amount))
-    }.shareInBackground()
+) : BaseViewModel() {
+    val state: StateFlow<LoadingState<TopUpRequestUiState>>
+        field = MutableStateFlow<LoadingState<TopUpRequestUiState>>(LoadingState.Loading)
 
     init {
         launchUnit {
-            amountMismatch.value = interactor.isAmountMismatched(context.source, context.amount)
+            state.value = mapAcknowledgement(context.acknowledgement).asLoaded()
         }
     }
 
-    override val state: StateFlow<LoadingState<TopUpRequestUiState>> =
-        combine(amountFlow, claiming, amountMismatch) { amount, isClaiming, mismatch ->
-            TopUpRequestUiState(
-                productId = context.productId.value,
-                amount = amount,
-                claiming = isClaiming,
-                amountMismatch = mismatch,
-            )
-        }
-            .inBackground()
-            .withLoading()
-            .stateIn(this, SharingStarted.Eagerly, LoadingState.Loading)
-
-    override fun onClaimClicked() = launchUnit {
-        if (claiming.value) return@launchUnit
-        claiming.value = true
-
-        interactor.claim(context.source, context.amount).fold(
-            onSuccess = { context.deliverClaimed() },
-            onFailure = { context.deliverFailed(it) },
-        )
+    fun onDismissClicked() = launchUnit {
+        context.deliverDismissed()
         router.back()
     }
 
@@ -76,4 +43,21 @@ class TopUpRequestViewModel @Inject constructor(
         super.onCleared()
         holder.clear()
     }
+
+    private suspend fun mapAcknowledgement(acknowledgement: TopUpAcknowledgement): TopUpRequestUiState =
+        when (acknowledgement) {
+            is TopUpAcknowledgement.Failure -> TopUpRequestUiState.Failure(
+                productId = acknowledgement.productId.value,
+                errorMessage = acknowledgement.message,
+            )
+
+            is TopUpAcknowledgement.PartialPayment -> {
+                val asset = chainAssetProvider.asset()
+                TopUpRequestUiState.PartialPayment(
+                    productId = acknowledgement.productId.value,
+                    requestedAmount = tokenAmountMapper.mapFrom(asset.withAmount(acknowledgement.requested)),
+                    creditedAmount = tokenAmountMapper.mapFrom(asset.withAmount(acknowledgement.credited)),
+                )
+            }
+        }
 }

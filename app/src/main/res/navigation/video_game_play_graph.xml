@@ -26,9 +26,9 @@
             app:destination="@id/gameResultsFragment"
             app:popUpTo="@id/video_game_play_graph"
             app:popUpToInclusive="true"
-            app:enterAnim="@anim/prize_slide_in_bottom"
+            app:enterAnim="@anim/slide_in_bottom"
             app:exitAnim="@anim/no_op"
             app:popEnterAnim="@anim/no_op"
-            app:popExitAnim="@anim/prize_slide_out_bottom" />
+            app:popExitAnim="@anim/slide_out_bottom" />
     </fragment>
 </navigation>

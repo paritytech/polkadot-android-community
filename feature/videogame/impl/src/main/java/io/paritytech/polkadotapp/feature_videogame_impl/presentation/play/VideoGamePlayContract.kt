@@ -17,6 +17,7 @@ interface VideoGamePlayContract {
     val sugarLevel: StateFlow<Float>
 
     val votingTooltipVisible: StateFlow<Boolean>
+    val noHostTooltipVisible: StateFlow<Boolean>
     val tutorialState: StateFlow<VideoGameTutorialState>
 
     fun collapse()

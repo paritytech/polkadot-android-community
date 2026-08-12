@@ -15,7 +15,7 @@ fun XcmContext.localViewOf(location: AbsoluteMultiLocation): RelativeMultiLocati
     return location.fromPointOfViewOf(currentLocation.location)
 }
 
-context(XcmContext)
+context(xcmContext: XcmContext)
 fun AbsoluteMultiLocation.relativeToLocal(): RelativeMultiLocation {
-    return localViewOf(this)
+    return xcmContext.localViewOf(this)
 }

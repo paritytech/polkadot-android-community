@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.domain.requireDisplayOf
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.AssetPayload
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.toFullChainAssetId
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -96,7 +97,7 @@ class FundViewModel @Inject constructor(
                         from = tokenAmountMapper.mapFrom(conversion.sampleFrom()),
                         to = tokenAmountMapper.mapFrom(conversion.sampleTo())
                     ),
-                    operations = operations.values.toList()
+                    operations = operations.values.toImmutableList()
                 )
             }
         }

@@ -20,18 +20,17 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 @JvmInline
 value class SystemRuntimeApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.system: SystemRuntimeApi
     get() = SystemRuntimeApi(module(Modules.SYSTEM))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val SystemRuntimeApi.number: QueryableStorageEntry0<BlockNumber>
     get() = storage0("Number", binding = ::bindBlockNumber)
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val SystemRuntimeApi.account: QueryableStorageEntry1<AccountId, AccountInfo>
     get() = storage1("Account")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val SystemRuntimeApi.events: QueryableStorageEntry0<List<EventRecord>>
     get() = storage0("Events", binding = ::bindEventRecords)

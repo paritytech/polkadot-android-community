@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerChannelSignaling
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerConnectionLogger
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaConfiguration
+import io.paritytech.polkadotapp.tools_media_connection_impl.WebRtcCore
 import io.paritytech.polkadotapp.tools_media_connection_impl.media.MediaTrackProvider
 import io.paritytech.polkadotapp.tools_media_connection_impl.models.ExternalRtcConfig
 import io.paritytech.polkadotapp.tools_media_connection_impl.models.PeerConnectionSignal
@@ -18,16 +19,13 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.webrtc.DataChannel
-import org.webrtc.EglBase
-import org.webrtc.PeerConnectionFactory
 import org.webrtc.SessionDescription
 
 internal class AcceptorConnection(
     signaling: PeerChannelSignaling,
     mediaConfiguration: MediaConfiguration,
     mediaTrackProvider: MediaTrackProvider,
-    peerConnectionFactory: PeerConnectionFactory,
-    eglBase: EglBase,
+    webRtcCore: WebRtcCore,
     externalRtcConfig: ExternalRtcConfig,
     scope: CoroutineScope,
     logger: PeerConnectionLogger,
@@ -35,8 +33,7 @@ internal class AcceptorConnection(
     signaling = signaling,
     mediaConfiguration = mediaConfiguration,
     mediaTrackProvider = mediaTrackProvider,
-    peerConnectionFactory = peerConnectionFactory,
-    eglBase = eglBase,
+    webRtcCore = webRtcCore,
     externalRtcConfig = externalRtcConfig,
     scope = scope,
     logger = logger
@@ -100,6 +97,8 @@ internal class AcceptorConnection(
 
         val mediaAnswer = connection.createAnswer()
         connection.setLocalDescription(mediaAnswer)
+        applyVideoSenderParams()
+        logNegotiatedVideoCodec(mediaAnswer)
         logger.log("Created and set local description for media answer")
 
         sendSignal(PeerConnectionSignal.Answer(mediaAnswer.description))

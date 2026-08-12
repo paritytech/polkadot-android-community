@@ -15,22 +15,21 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.mo
 @JvmInline
 value class StatementStoreResourcesApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.statementStoreResources: StatementStoreResourcesApi
     get() = StatementStoreResourcesApi(resources())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val StatementStoreResourcesApi.stmtStoreSlotsPerPeriod: UInt
     get() = constant("StmtStoreSlotsPerPeriod")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val StatementStoreResourcesApi.liteStmtStoreSlotsPerPeriod: UInt
     get() = constant("LiteStmtStoreSlotsPerPeriod")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val StatementStoreResourcesApi.stmtStoreReplacementCooldown: UInt
     get() = constant("StmtStoreReplacementCooldown")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val StatementStoreResourcesApi.statementStoreAllowances: QueryableStorageEntry2<BigEndianU32Scale, BandersnatchAlias, StmtStoreAllowanceEntry>
     get() = storage2("StatementStoreAllowances")

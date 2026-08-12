@@ -33,7 +33,7 @@ fun Type.Orml.currencyIdOrNull(runtime: RuntimeSnapshot): UntypedOrmlCurrencyId?
         ?.let(::UntypedOrmlCurrencyId)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun Type.Orml.currencyId(): UntypedOrmlCurrencyId {
-    return currencyId(runtime)
+    return currencyId(withRuntime.runtime)
 }

@@ -9,6 +9,7 @@ internal fun ProductLocal.toProduct(): Product {
         id = ProductId.fromStoredValue(id),
         name = name,
         scriptUrl = scriptUrl,
-        contentHash = contentHash
+        contentHash = contentHash,
+        iconUrl = iconUrl
     )
 }

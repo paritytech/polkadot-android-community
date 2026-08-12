@@ -29,6 +29,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Local
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.AssetDisplay
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
+import kotlinx.collections.immutable.persistentMapOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private const val IconContentId = "ebff3334"
@@ -60,7 +61,7 @@ fun NotEnoughDepositFooter(
         val basicText = stringResource(RCommon.string.tattoo_families_not_enough_deposit_footer, amountWithIcon)
 
         val inlineContent = remember {
-            mapOf(
+            persistentMapOf(
                 IconContentId to InlineTextContent(
                     placeholder = Placeholder(24.sp, 24.sp, PlaceholderVerticalAlign.TextCenter),
                     children = {

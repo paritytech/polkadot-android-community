@@ -31,7 +31,7 @@ internal class PayDeepLinkHandler @Inject constructor(
         return data.scheme == DeepLinkHandler.APP_SCHEME && data.host == PAY_HOST && data.path.isNullOrEmpty()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> = withContext(coroutineDispatchers.io) {
         runCancellableCatching {
             accountRepository.awaitAccountsInitialized()

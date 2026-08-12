@@ -17,22 +17,21 @@ import java.math.BigInteger
 @JvmInline
 value class ResourcesApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.resources: ResourcesApi
     get() = ResourcesApi(resources())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ResourcesApi.consumers: QueryableStorageEntry1<AccountId, OnChainConsumerInfo>
     get() = storage1("Consumers")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ResourcesApi.usernameOwnerOf: QueryableStorageEntry1<String, AccountId>
     get() = storage1("UsernameOwnerOf")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ResourcesApi.usernameReservationQueue: QueryableStorageEntry1<String, List<OnChainReservationQueueEntry>>
     get() = storage1("UsernameReservationQueue")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ResourcesApi.reservationDuration: QueryableStorageEntry0<BigInteger>
     get() = storage0("UsernameReservationDuration")

@@ -27,7 +27,7 @@ class VoucherRingMembersService @Inject constructor(
         private const val MIN_RING_MEMBERS = 10
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun start() {
         val chainId = chainAssetProvider.chainId()
 
@@ -62,6 +62,6 @@ class VoucherRingMembersService @Inject constructor(
                     voucherRepository.updateRingMemberStatuses(updates)
                 }
             }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 }

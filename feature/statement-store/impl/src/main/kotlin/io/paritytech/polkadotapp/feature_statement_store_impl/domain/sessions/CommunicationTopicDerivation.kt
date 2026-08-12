@@ -17,7 +17,7 @@ fun generateSharedSessionValue(
     salt: ByteArray,
     params: ByteArray,
     encryption: CommunicationEncryption,
-): ByteArray = (salt + params).blake2b256(encryption.sharedSecret)
+): ByteArray = (salt + params).blake2b256(encryption.sharedSecret.bytes.value)
 
 fun deriveCommunicationTopic(
     sender: SessionAccount,

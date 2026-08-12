@@ -10,7 +10,7 @@ public class BandersnatchCrypto {
 
     public static native byte[] derive_member_key(byte[] entropy);
 
-    public static native byte[] create_proof(
+    public static native CreateProofResult create_proof(
         byte[] entropy,
         List<byte[]> members,
         byte[] context,

@@ -13,10 +13,9 @@ import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.model.Tr
 @JvmInline
 value class TransactionStorageApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.transactionStorage: TransactionStorageApi
     get() = TransactionStorageApi(transactionStorage())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val TransactionStorageApi.authorizations: QueryableStorageEntry1<TransactionStorageAuthorizationScope, TransactionStorageAuthorization>
     get() = storage1("Authorizations")

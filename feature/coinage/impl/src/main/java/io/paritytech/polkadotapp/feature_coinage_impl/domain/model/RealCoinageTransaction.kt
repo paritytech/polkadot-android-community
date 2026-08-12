@@ -9,8 +9,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction.Stage
 
 // TODO: ensureActive throws, migrate all methods to Result
@@ -61,7 +61,7 @@ class RealCoinageTransaction(
 
     override suspend fun commit() {
         ensureActive()
-        coinageLogD("CoinageTransaction committing operations:${operations.describe()}")
+        coinageLogI("CoinageTransaction committing operations:${operations.describe()}")
         operations.forEach { it.commit() }
         concluded = true
     }
@@ -91,7 +91,9 @@ class RealCoinageTransaction(
 
         override suspend fun commit() = Unit
 
-        override suspend fun rollback(stage: Stage) = coinAllocator.deallocate(indices)
+        // Retire rather than delete: keeping the row preserves derivation-index monotonicity, so a freed
+        // index is never reused by a later transfer (which would let a stale memo claim the wrong coins).
+        override suspend fun rollback(stage: Stage) = coinRepository.setSpentStateByDerivationIndices(indices, Coin.SpentState.SPENT_LOCALLY)
     }
 
     private inner class MintVoucherOperation(private val indices: List<RingVrfIndex>) : Operation {
@@ -99,7 +101,7 @@ class RealCoinageTransaction(
 
         override suspend fun commit() = Unit
 
-        override suspend fun rollback(stage: Stage) = voucherAllocator.deallocate(indices)
+        override suspend fun rollback(stage: Stage) = voucherRepository.setUsageStateByRingVrfKeyIndices(indices, RecyclerVoucher.UsageState.USED_LOCALLY)
     }
 
     private inner class ConsumeOperation(private val indices: List<DerivationIndex>) : Operation {

@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.common
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.CoinKeypairDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.getDerivedAccountId
@@ -50,10 +49,6 @@ class RealCoinAllocator @Inject constructor(
 
                 coins
             }
-    }
-
-    override suspend fun deallocate(coinIndices: List<DerivationIndex>) {
-        coinRepository.removeCoins(coinIndices)
     }
 
     private suspend fun createCoin(

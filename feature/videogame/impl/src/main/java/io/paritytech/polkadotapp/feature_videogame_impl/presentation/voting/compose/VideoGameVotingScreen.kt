@@ -31,6 +31,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.presentation.voting.comp
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.voting.compose.components.Header
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.voting.compose.components.PlayerVotingCell
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.voting.models.PlayerVotingUiModel
+import kotlinx.collections.immutable.ImmutableList
 
 private const val GridColumns = 2
 
@@ -47,7 +48,7 @@ fun VideoGameVotingScreen(contract: VideoGameVotingContract) {
 
 @Composable
 private fun VideoGameVotingScreenInternal(
-    players: List<PlayerVotingUiModel>,
+    players: ImmutableList<PlayerVotingUiModel>,
     inProgress: Boolean,
     autoConfirm: Boolean,
     onPlayerVoteToggle: (PlayerVotingUiModel) -> Unit,

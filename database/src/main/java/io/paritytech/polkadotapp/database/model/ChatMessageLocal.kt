@@ -38,7 +38,7 @@ class ChatMessageLocal(
     }
 
     enum class Status {
-        PROCESSING, NEW, IS_SENT, IS_READ
+        PROCESSING, NEW, IS_SENT, IS_READ, DELIVERY_FAILED
     }
 
     enum class Type {
@@ -60,6 +60,8 @@ class ChatMessageLocal(
         CHAT_ACCEPTED,
         CHAT_REQUEST,
         DEVICE_ADDED,
-        DEVICE_REMOVED
+        DEVICE_REMOVED,
+        COMPACTION_COMMIT,
+        COMPACTION_UNAVAILABLE
     }
 }

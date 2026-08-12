@@ -10,17 +10,41 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocal
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
+import kotlin.time.Instant
 
 class FileUploadRepository @Inject constructor(
     private val dao: FileUploadDao
 ) {
+    fun observeActive(): Flow<List<FileUpload>> {
+        return dao.observeActive().map { uploads -> uploads.map { it.toDomain() } }
+    }
+
     suspend fun addUploadToQueue(upload: FileUpload) {
         dao.insert(upload.toLocal())
     }
 
     suspend fun getNextPending(): FileUpload? {
-        return dao.getNextPending()?.toDomain()
+        return dao.getNextPending(System.currentTimeMillis())?.toDomain()
+    }
+
+    suspend fun scheduleRetry(
+        messageId: ChatMessageId,
+        attemptCount: Int,
+        firstFailureAt: Instant,
+        nextAttemptAt: Instant
+    ) {
+        dao.scheduleRetry(messageId, attemptCount, firstFailureAt.toEpochMilliseconds(), nextAttemptAt.toEpochMilliseconds())
+    }
+
+    suspend fun getSoonestNextAttemptAt(): Instant? {
+        return dao.getSoonestNextAttemptAt()?.let(Instant::fromEpochMilliseconds)
+    }
+
+    suspend fun isActive(messageId: ChatMessageId): Boolean {
+        return dao.isInProgress(messageId)
     }
 
     suspend fun markInProgress(messageId: ChatMessageId) {
@@ -58,7 +82,8 @@ private fun FileUpload.toLocal() = FileUploadLocal(
     status = progress.status.toLocal(),
     errorCategory = progress.error?.category?.toLocal(),
     errorCause = progress.error?.cause,
-    createdAt = createdAt
+    createdAt = createdAt,
+    retryState = progress.retryState.toLocal()
 )
 
 private fun FileUploadLocal.toDomain() = FileUpload(
@@ -76,7 +101,8 @@ private fun FileUploadLocal.toDomain() = FileUpload(
         totalChunks = totalChunks,
         uploadedChunks = uploadedChunks,
         uploadedChunkHashes = chunkHashes?.split(",")?.filter { it.isNotEmpty() } ?: emptyList(),
-        error = errorCategory?.let { FileUpload.Error(category = it.toDomain(), cause = errorCause.orEmpty()) }
+        error = errorCategory?.let { FileUpload.Error(category = it.toDomain(), cause = errorCause.orEmpty()) },
+        retryState = retryState.toDomain()
     ),
     createdAt = createdAt
 )

@@ -48,7 +48,6 @@ fun RecyclerVoucher.isReadyToUseSecured(timestamp: Timestamp) =
     // !!! Do not forget to also enabled ignored tests in RealTotalBalanceUseCaseTest and TransferPlannerTest
     isReadyToUse() && canBeUnloadedAt(timestamp) && ringHasEnoughRingMembersToWithdraw
 
-fun List<RecyclerVoucher>.filterReadyNowSecured(): List<RecyclerVoucher> {
-    val now = System.currentTimeMillis()
-    return filter { it.isReadyToUseSecured(now) }
+fun List<RecyclerVoucher>.filterIsReadyToUse(): List<RecyclerVoucher> {
+    return filter { it.isReadyToUse() }
 }

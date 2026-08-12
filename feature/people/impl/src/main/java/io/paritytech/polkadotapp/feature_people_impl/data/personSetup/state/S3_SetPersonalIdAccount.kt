@@ -13,11 +13,11 @@ class SetPersonalIdAccountState(
 
     override val id = ID
 
-    context(PersonSetupState.Transition)
+    context(transition: PersonSetupState.Transition)
     override suspend fun performNonTerminalTransition(): Result<PersonSetupState> {
-        val personalAccountId = dataSource.candidateAccount.accountIdIn(dataSource.peopleChain)
+        val personalAccountId = transition.dataSource.candidateAccount.accountIdIn(transition.dataSource.peopleChain)
 
-        return dataSource.setPersonalIdAccount(personalAccountId)
+        return transition.dataSource.setPersonalIdAccount(personalAccountId)
             .flattenExecutionFailure()
             .map {
                 becomeCitizenNotificationPublisher.publishBecomeCitizen()

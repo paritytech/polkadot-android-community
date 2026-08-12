@@ -27,4 +27,9 @@ class HopNodeUrlProvider @Inject constructor(
     suspend fun isAllowed(nodeUrl: String): Boolean {
         return availableUrls().any { it == nodeUrl }
     }
+
+    suspend fun allWithSenderPriority(senderNodeUrl: String): List<String> {
+        val available = availableUrls()
+        return listOf(senderNodeUrl) + available.filter { it != senderNodeUrl }
+    }
 }

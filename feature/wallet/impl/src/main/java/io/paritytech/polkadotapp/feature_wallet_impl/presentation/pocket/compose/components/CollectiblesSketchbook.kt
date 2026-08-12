@@ -15,14 +15,21 @@ import androidx.compose.ui.res.stringResource
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.feature_wallet_impl.R
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.LocalCardTilt
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.MotionShineParameters
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.motionShine
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 fun CollectiblesSketchbook(
     modifier: Modifier = Modifier,
     onViewButtonClick: () -> Unit,
-    blackAndWhite: Boolean = false
+    blackAndWhite: Boolean = false,
+    expanded: Boolean = false
 ) {
+    val tiltState = LocalCardTilt.current
+    val shineParameters = remember(expanded) { MotionShineParameters.collectibles(expanded) }
+
     Box(
         modifier = modifier
     ) {
@@ -42,6 +49,12 @@ fun CollectiblesSketchbook(
                     null
                 }
             }
+        )
+
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .motionShine(tiltState, shineParameters)
         )
 
         PolkadotTextButton(

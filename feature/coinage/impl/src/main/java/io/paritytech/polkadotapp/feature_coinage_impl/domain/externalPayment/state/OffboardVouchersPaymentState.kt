@@ -16,7 +16,7 @@ import java.math.BigInteger
  * Offboards a selected subset of recycler vouchers straight into the destination account's
  * external-asset balance. When `surplusPlanks` is positive, the surplus is folded back into
  * freshly-minted vouchers inside the same call via
- * Coinage.unload_recycler_into_external_asset_and_vouchers; otherwise
+ * Coinage.unload_recycler_into_external_asset_and_loaded_coins; otherwise
  * Coinage.unload_recycler_into_external_asset is used.
  */
 class OffboardVouchersPaymentState @AssistedInject constructor(
@@ -39,7 +39,7 @@ class OffboardVouchersPaymentState @AssistedInject constructor(
         ): OffboardVouchersPaymentState
     }
 
-    context(NoContext)
+    context(noContext: NoContext)
     override suspend fun performTransition(): TransitionResult<ExternalPaymentState> = runTransition {
         val activeByIndex = voucherRepository.getActiveVouchers().associateBy { it.ringVrfKeyIndex }
         val vouchers = selected.mapNotNull { activeByIndex[it] }

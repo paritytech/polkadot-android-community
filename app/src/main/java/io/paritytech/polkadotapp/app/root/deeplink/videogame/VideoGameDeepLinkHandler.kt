@@ -25,7 +25,7 @@ class VideoGameDeepLinkHandler @Inject constructor(
         return data.scheme == DeepLinkHandler.APP_SCHEME && data.host == WEEKLY_GAME_HOST
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> = withContext(coroutineDispatchers.io) {
         runCancellableCatching {
             accountRepository.awaitAccountsInitialized()

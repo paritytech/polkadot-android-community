@@ -64,6 +64,6 @@ class PocketInteractor @Inject constructor(
         .filterNotNull()
         .map { it.username.getDisplayUsername() }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun observeRank(): Flow<PocketRank> = gamesProgressUseCase.videoGamesProgressFlow().map { it.toPocketRank() }
 }

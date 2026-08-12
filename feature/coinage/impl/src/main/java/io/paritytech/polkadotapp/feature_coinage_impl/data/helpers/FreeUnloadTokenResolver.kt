@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.getOrEmpty
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.CoinageSigningContextProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -65,60 +66,79 @@ class RealFreeUnloadTokenResolver(
         chainId: ChainId,
         requiredQuantity: Int
     ): List<FreeUnloadTokenResolver.ResolvedUnloadToken> {
-        val constants = unloadTokenResolverSource.getConstants(chainId)
+        val periodDuration = unloadTokenResolverSource.getPeriodDuration(chainId)
 
-        // TODO COINAGE: We have to use only current period.
-        val periods = periodCalculator.validPeriods(constants.periodDuration.seconds)
+        val period = periodCalculator.currentPeriod(periodDuration.seconds)
 
-        val result = mutableListOf<FreeUnloadTokenResolver.ResolvedUnloadToken>()
+        val maxCounter = unloadTokenResolverSource.getFreeUnloadTokenLimit(chainId)
+            .getOrElse { throw IllegalStateException("Failed to determine free unload token limit", it) }
 
-        for (period in periods) {
-            val availableCointers = findAvailableCounters(
-                chainId = chainId,
-                period = period,
-                maxCounter = constants.maxCounter
-            )
+        val availableCounters = findAvailableCounters(
+            chainId = chainId,
+            period = period,
+            maxCounter = maxCounter,
+            requiredQuantity = requiredQuantity
+        )
 
-            val remaining = requiredQuantity - result.size
-            result.addAll(availableCointers.take(remaining))
-
-            if (result.size >= requiredQuantity) break
-        }
-
-        if (result.size < requiredQuantity) {
+        if (availableCounters.size < requiredQuantity) {
             throw IllegalStateException("Free transfer quota exceeded. Quota resets daily")
         }
 
-        return result
+        val selected = availableCounters.take(requiredQuantity)
+
+        coinageLogD(
+            "Resolved $requiredQuantity free unload token(s) for period $period, " +
+                "selected counters ${selected.map { it.counter }}"
+        )
+
+        return selected
     }
 
     private suspend fun findAvailableCounters(
         chainId: ChainId,
         period: Long,
-        maxCounter: Long
+        maxCounter: Long,
+        requiredQuantity: Int
     ): List<FreeUnloadTokenResolver.ResolvedUnloadToken> {
-        if (maxCounter <= 0) return emptyList()
+        if (maxCounter <= 0 || requiredQuantity <= 0) return emptyList()
 
-        val queries = List(maxCounter.toInt()) { counter ->
-            val context = contextProvider.freeUnloadTokenContext(period.toInt(), counter.toInt())
+        val result = mutableListOf<FreeUnloadTokenResolver.ResolvedUnloadToken>()
 
-            val alias = unloadTokenResolverSource.generateAlias(context.value)
+        // Fetch consumed-token keys in batches so we don't query the whole counter
+        // range when the available low indices already cover the required quantity.
+        var batchStart = 0L
+        while (batchStart < maxCounter && result.size < requiredQuantity) {
+            val batchEnd = minOf(batchStart + BATCH_SIZE, maxCounter)
 
-            ConsumedTokenChecker.Query(period, alias.toDataByteArray())
-        }
+            val queries = (batchStart until batchEnd).map { counter ->
+                val context = contextProvider.freeUnloadTokenContext(period.toInt(), counter.toInt())
 
-        val counters = consumedTokenChecker.getNotUsedCounterIndices(chainId, queries)
+                val alias = unloadTokenResolverSource.generateAlias(context.value)
 
-        return counters
-            .getOrEmpty()
-            .map { counter ->
+                ConsumedTokenChecker.Query(period, alias.toDataByteArray())
+            }
+
+            val notUsedIndices = consumedTokenChecker.getNotUsedCounterIndices(chainId, queries).getOrEmpty()
+
+            notUsedIndices.forEach { index ->
+                val counter = batchStart + index
+
                 val counterContext = contextProvider.freeUnloadTokenContext(period.toInt(), counter.toInt())
 
-                FreeUnloadTokenResolver.ResolvedUnloadToken(
+                result += FreeUnloadTokenResolver.ResolvedUnloadToken(
                     period = period,
                     counter = counter,
                     unloadTokenContext = counterContext
                 )
             }
+
+            batchStart = batchEnd
+        }
+
+        return result
+    }
+
+    private companion object {
+        const val BATCH_SIZE = 100L
     }
 }

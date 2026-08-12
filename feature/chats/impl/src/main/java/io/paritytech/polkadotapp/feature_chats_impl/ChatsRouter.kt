@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.Sen
 
 interface ChatsRouter : ReturnableRouter, TabRouter {
     fun openChatFeed(payload: ChatFeedPayload)
+    fun openChatSearch()
     fun openAddContact()
     fun openScan()
     fun openEnterAmount(payload: SendEnterAmountPayload)

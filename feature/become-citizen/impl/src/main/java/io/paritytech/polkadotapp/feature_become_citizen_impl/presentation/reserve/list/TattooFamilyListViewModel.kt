@@ -29,6 +29,7 @@ import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.reserv
 import io.paritytech.polkadotapp.feature_tokens_api.domain.AssetDisplayMapper
 import io.paritytech.polkadotapp.feature_tokens_api.domain.requireDisplayOf
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
@@ -144,7 +145,7 @@ class TattooFamilyListViewModel @Inject constructor(
                         identifier = TattooFamilyUiIdentifier.Merged(merged.map { it.familyIndex }),
                         name = contextManager.applicationContext.getString(RCommon.string.tattoo_families_personal_tattoos_title),
                         totalCount = mergedPreviews.size,
-                        exampleTattoos = mergedPreviews
+                        exampleTattoos = mergedPreviews.toImmutableList()
                     )
                 )
             }
@@ -158,7 +159,7 @@ class TattooFamilyListViewModel @Inject constructor(
                             identifier = TattooFamilyUiIdentifier.Single(it.familyIndex),
                             name = it.metadata.name,
                             totalCount = previews.size,
-                            exampleTattoos = uiModels
+                            exampleTattoos = uiModels.toImmutableList()
                         )
                     } else {
                         null

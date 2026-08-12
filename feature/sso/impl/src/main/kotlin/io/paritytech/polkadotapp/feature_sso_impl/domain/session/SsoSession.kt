@@ -12,7 +12,6 @@ import io.paritytech.polkadotapp.feature_sso_impl.domain.session.model.SsoSessio
 import io.paritytech.polkadotapp.feature_sso_impl.domain.session.model.SsoSessionRequestId
 import io.paritytech.polkadotapp.feature_sso_impl.domain.session.model.SsoSessionResponse
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.CommunicationSessionEvent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import kotlinx.coroutines.CoroutineScope
@@ -51,7 +50,7 @@ class SsoCommunicationSession(
             .onEach { event ->
                 when (event) {
                     is CommunicationSessionEvent.NewMessagesReceived -> {
-                        handleNewMessagesReceived(event.requestId, event.messages)
+                        handleNewMessagesReceived(event.messages)
                     }
 
                     is CommunicationSessionEvent.SessionFailed -> {
@@ -90,7 +89,7 @@ class SsoCommunicationSession(
             }
     }
 
-    private suspend fun handleNewMessagesReceived(requestId: RequestId, messages: List<EncodedMessage>) {
+    private suspend fun handleNewMessagesReceived(messages: List<EncodedMessage>) {
         for (message in messages) {
             message.toSsoSessionRequest(session.id)
                 .onSuccess { request -> _requests.emit(request) }
@@ -98,8 +97,6 @@ class SsoCommunicationSession(
                     Timber.e(error, "Failed to decode SSO message for session ${session.name}")
                 }
         }
-
-        communicationSession.respond(requestId, SSO_RESPONSE_SUCCESS)
     }
 
     suspend fun sendRequestAndAwaitSent(request: SsoSessionRequest): Result<Unit> {
@@ -141,8 +138,4 @@ class SsoCommunicationSession(
         val requestId: SsoSessionRequestId,
         val result: Result<Unit>,
     )
-
-    companion object {
-        private const val SSO_RESPONSE_SUCCESS: UByte = 0u
-    }
 }

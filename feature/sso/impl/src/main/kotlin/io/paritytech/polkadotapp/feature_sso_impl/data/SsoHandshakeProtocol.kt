@@ -6,7 +6,10 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.paritytech.polkadotapp.chains.util.scaleEncodeBinary
 import io.paritytech.polkadotapp.common.domain.model.EncodedPrivateKey
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
+import io.paritytech.polkadotapp.common.domain.model.scale.toScale
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.utils.blake2b256
 import io.paritytech.polkadotapp.feature_sso_api.domain.model.HandshakeDevice
@@ -37,12 +40,12 @@ interface SsoHandshakeProtocol {
 
     fun statementTopic(
         hostStatementStorePublicKey: EncodedPublicKey,
-        hostSharedSecretPublicKey: EncodedPublicKey,
+        hostSharedSecretPublicKey: X25519PublicKey,
     ): ByteArray
 
     fun statementChannel(
         hostStatementStorePublicKey: EncodedPublicKey,
-        hostSharedSecretPublicKey: EncodedPublicKey,
+        hostSharedSecretPublicKey: X25519PublicKey,
     ): ByteArray
 
     fun statementExpiry(): ULong
@@ -58,8 +61,8 @@ class HandshakeSuccessPayload(
     val identityAccountId: ByteArray,
     val rootAccountId: ByteArray,
     val identityChatPrivateKey: EncodedPrivateKey,
-    val ssoEncrPubKey: EncodedPublicKey,
-    val deviceEncPubKey: EncodedPublicKey,
+    val ssoEncrPubKey: X25519PublicKey,
+    val deviceEncPubKey: X25519PublicKey,
     // Per TrUAPI RFC-7 layer 1: blake2b256_keyed(rootAccountSecret, "product-entropy-derivation").
     // The host caches this and uses it as the seed for every product-scoped entropy derivation.
     val rootEntropySource: ByteArray,
@@ -98,8 +101,8 @@ class RealSsoHandshakeProtocol @Inject constructor() : SsoHandshakeProtocol {
                     identityAccountId = response.payload.identityAccountId,
                     rootAccountId = response.payload.rootAccountId,
                     identityChatPrivateKey = response.payload.identityChatPrivateKey.value,
-                    ssoEncrPubKey = response.payload.ssoEncrPubKey.value,
-                    deviceEncPubKey = response.payload.deviceEncPubKey.value,
+                    ssoEncrPubKey = response.payload.ssoEncrPubKey.toScale(),
+                    deviceEncPubKey = response.payload.deviceEncPubKey.toScale(),
                     rootEntropySource = response.payload.rootEntropySource,
                 )
             )
@@ -115,17 +118,17 @@ class RealSsoHandshakeProtocol @Inject constructor() : SsoHandshakeProtocol {
 
     override fun statementTopic(
         hostStatementStorePublicKey: EncodedPublicKey,
-        hostSharedSecretPublicKey: EncodedPublicKey
+        hostSharedSecretPublicKey: X25519PublicKey
     ): ByteArray {
-        val toHash = hostSharedSecretPublicKey.value + TOPIC_PREIMAGE_SUFFIX
+        val toHash = hostSharedSecretPublicKey.bytes.value + TOPIC_PREIMAGE_SUFFIX
         return toHash.blake2b256(hostStatementStorePublicKey.value)
     }
 
     override fun statementChannel(
         hostStatementStorePublicKey: EncodedPublicKey,
-        hostSharedSecretPublicKey: EncodedPublicKey
+        hostSharedSecretPublicKey: X25519PublicKey
     ): ByteArray {
-        val toHash = hostSharedSecretPublicKey.value + CHANNEL_PREIMAGE_SUFFIX
+        val toHash = hostSharedSecretPublicKey.bytes.value + CHANNEL_PREIMAGE_SUFFIX
         return toHash.blake2b256(hostStatementStorePublicKey.value)
     }
 
@@ -137,7 +140,7 @@ class RealSsoHandshakeProtocol @Inject constructor() : SsoHandshakeProtocol {
         return VersionedHandshakeAnswerScale.V2(
             HandshakeAnswerV2Scale(
                 encryptedData = encryptedData,
-                tempSharedEncryptionPublicKey = tempSharedEncryptionPublicKey.value
+                tempSharedEncryptionPublicKey = tempSharedEncryptionPublicKey.toScale()
             )
         )
     }
@@ -152,7 +155,7 @@ class RealSsoHandshakeProtocol @Inject constructor() : SsoHandshakeProtocol {
         return HandshakeOffer(
             device = HandshakeDevice(
                 statementAccountId = device.statementAccountId.intoAccountId(),
-                encryptionPublicKey = EncodedPublicKey(device.encryptionPublicKey),
+                encryptionPublicKey = device.encryptionPublicKey.toDomain().getOrThrow(),
             ),
             metadata = HandshakeMetadata(
                 entries = metadata.associate { it.key.toDomain() to it.value }

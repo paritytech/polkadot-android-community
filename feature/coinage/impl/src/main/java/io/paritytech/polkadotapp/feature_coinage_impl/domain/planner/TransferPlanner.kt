@@ -26,15 +26,17 @@ class TransferPlanner(
         amount: BigDecimal,
         coins: List<Coin>,
         vouchers: List<RecyclerVoucher>
-    ): TransferPlan {
-        breakdownAmount.breakdown(amount)
+    ): Result<TransferPlan> {
+        return runCatching {
+            breakdownAmount.breakdown(amount)
 
-        val strategyType = tryGetExactMatchPlan(amount, coins)
-            ?: tryGetSingleSplitPlan(amount, coins)
-            ?: tryGetCoinsAndUnloadPlan(amount, coins, vouchers)
-            ?: throw InsufficientBalanceException()
+            val strategyType = tryGetExactMatchPlan(amount, coins)
+                ?: tryGetSingleSplitPlan(amount, coins)
+                ?: tryGetCoinsAndUnloadPlan(amount, coins, vouchers)
+                ?: throw InsufficientBalanceException()
 
-        return TransferPlan(strategyType)
+            TransferPlan(strategyType)
+        }
     }
 
     private fun tryGetExactMatchPlan(
@@ -121,9 +123,15 @@ class TransferPlanner(
     }
 
     private fun findMaxCoinCoverage(coins: List<Coin>, targetAmount: BigDecimal): Pair<List<Coin>, BigDecimal> {
-        val sortedCoins = coins.sortedWith(
-            compareByDescending<Coin> { it.valueExponent }.thenByDescending { it.ageOrDefault() }
-        )
+        // Must apply the same spendability filter as findSubsetSum (exact match). Otherwise a
+        // NOT_SPENT but past-recycling-age coin (canBeSpent == false) excluded from exact match
+        // gets included here, can cover the amount exactly, and trips the "restAmount == 0"
+        // invariant in tryGetSingleSplitPlan/tryGetCoinsAndUnloadPlan.
+        val sortedCoins = coins
+            .filter { it.canBeSpent(coinMaxRecyclingAge) }
+            .sortedWith(
+                compareByDescending<Coin> { it.valueExponent }.thenByDescending { it.ageOrDefault() }
+            )
         val selected = mutableListOf<Coin>()
         var covered = BigDecimal.ZERO
 

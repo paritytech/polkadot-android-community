@@ -10,7 +10,7 @@ import io.paritytech.polkadotapp.chains.network.rpc.stateCall
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val LATEST_SUPPORTED_METADATA_VERSION = 15
+private const val LATEST_SUPPORTED_METADATA_VERSION = 16
 
 @Singleton
 class RuntimeMetadataFetcher @Inject constructor() {
@@ -20,7 +20,10 @@ class RuntimeMetadataFetcher @Inject constructor() {
 
     private suspend fun SocketService.fetchNewestMetadata(): RawRuntimeMetadata {
         val availableVersions = getAvailableMetadataVersions()
-        val latestSupported = availableVersions.sorted().last { it <= LATEST_SUPPORTED_METADATA_VERSION }
+        val latestSupported = availableVersions.sorted().lastOrNull { it <= LATEST_SUPPORTED_METADATA_VERSION }
+        requireNotNull(latestSupported) {
+            "Node reports no metadata version we support: $availableVersions"
+        }
 
         return getMetadataAtVersion(latestSupported)
     }

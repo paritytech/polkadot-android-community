@@ -2,18 +2,23 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest
 
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.common.utils.runPolling
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTopic
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTransport
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Service for discovering incoming chat requests.
@@ -40,7 +45,7 @@ class RealChatRequestDiscoveryService @Inject constructor(
     private val processor: IncomingChatRequestProcessor,
 ) : ChatRequestDiscoveryService {
     companion object {
-        private val POLLING_FREQUENCY = 5.seconds
+        private val DAY_CHANGE_CHECK_INTERVAL = 1.minutes
 
         private const val MAX_DAYS_TO_SYNC = 7
     }
@@ -48,7 +53,7 @@ class RealChatRequestDiscoveryService @Inject constructor(
     override suspend fun discoverRequests(metaAccount: MetaAccount, domain: SharedSecretDerivationDomain) {
         performSync(metaAccount, domain)
 
-        performPoll(metaAccount, domain)
+        subscribeNewChatRequests(metaAccount, domain)
     }
 
     private suspend fun performSync(metaAccount: MetaAccount, domain: SharedSecretDerivationDomain) {
@@ -76,15 +81,34 @@ class RealChatRequestDiscoveryService @Inject constructor(
         }
     }
 
-    private suspend fun performPoll(
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun subscribeNewChatRequests(
         metaAccount: MetaAccount,
         domain: SharedSecretDerivationDomain
-    ) = coroutineScope {
-        runPolling(POLLING_FREQUENCY) {
-            val currentDay = ChatRequestTopicDerivation.getCurrentDay()
-            syncFromDayTopic(metaAccount, domain, currentDay)
-        }
+    ) {
+        currentDayTicker()
+            .flatMapLatest { day ->
+                val dayTopic = ChatRequestTopic.Day(acceptor = metaAccount.defaultAccountId(), day)
+
+                chatRequestTransport.subscribeChatRequests(dayTopic, domain).map { result -> day to result }
+            }
+            .collect { (day, result) ->
+                result
+                    .onSuccess { requests ->
+                        processRequests(requests, metaAccount, domain)
+                        chatRequestRepository.updateLastSyncedDay(metaAccount.id, day)
+                    }
+                    .onFailure { warnForAccount("Failed to subscribe to $day day", metaAccount, it) }
+            }
     }
+
+    private fun currentDayTicker(): Flow<Long> = flow {
+        while (true) {
+            emit(ChatRequestTopicDerivation.getCurrentDay())
+
+            delay(DAY_CHANGE_CHECK_INTERVAL)
+        }
+    }.distinctUntilChanged()
 
     private suspend fun syncFromFullTopic(
         metaAccount: MetaAccount,

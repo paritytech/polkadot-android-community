@@ -10,11 +10,11 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import timber.log.Timber
 import kotlin.coroutines.CoroutineContext
 
-open class BaseViewModel : ViewModel(), ComputationalScope {
+open class BaseViewModel : ViewModel(), ComputationalScope, MessageDisplay {
     private val _events = OneShotEventChannel<BaseViewModelEvent>()
     val events = _events.receiveAsFlow()
 
-    protected fun showMessage(text: String) {
+    override fun showMessage(text: String) {
         _events.trySend(BaseViewModelEvent.Message(text))
     }
 

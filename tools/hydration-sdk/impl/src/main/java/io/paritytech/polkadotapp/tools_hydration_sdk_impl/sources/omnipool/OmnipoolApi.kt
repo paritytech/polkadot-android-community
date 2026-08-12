@@ -17,15 +17,13 @@ import io.paritytech.polkadotapp.tools_hydration_sdk_impl.sources.omnipool.model
 @JvmInline
 value class OmnipoolApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 val RuntimeMetadata.omnipoolOrNull: OmnipoolApi?
     get() = omnipoolOrNull()?.let(::OmnipoolApi)
 
-context(StorageQueryContext)
 val RuntimeMetadata.omnipool: OmnipoolApi
     get() = OmnipoolApi(omnipool())
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val OmnipoolApi.assets: QueryableStorageEntry1<HydraDxAssetId, OmnipoolAssetState>
     get() = storage1(
         name = "Assets",

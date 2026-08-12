@@ -23,13 +23,13 @@ class VideoGameNotificationAutoCanceller @Inject constructor(
     private val appLifecycleObserver: AppLifecycleObserver,
     private val videoGameStateReader: VideoGameStateReader
 ) : AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
         // Cancel when the app comes to the foreground.
         appLifecycleObserver.subscribe()
             .filter { it == AppLifecycleState.FOREGROUND }
             .onEach { notificationPublisher.cancelGameStartNotifications() }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
 
         // Cancel once when the user enters a game session (null -> non-null transition only,
         // so subsequent in-game state updates don't re-cancel later notifications).
@@ -38,6 +38,6 @@ class VideoGameNotificationAutoCanceller @Inject constructor(
             .distinctUntilChanged()
             .filter { it }
             .onEach { notificationPublisher.cancelGameStartNotifications() }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 }

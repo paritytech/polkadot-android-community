@@ -39,3 +39,12 @@ fun ByteArray.toDataByteArray() = DataByteArray(this)
 fun String.hexToDataByteArray(): DataByteArray {
     return fromHex().toDataByteArray()
 }
+
+/**
+ * Renders the bytes as UTF-8 text when they form a valid sequence, otherwise as a 0x-prefixed hex string.
+ */
+fun DataByteArray.asUtf8OrHex(): String = runCatching {
+    value.decodeToString(throwOnInvalidSequence = true)
+}.getOrElse {
+    value.toHexString(withPrefix = true)
+}

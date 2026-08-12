@@ -26,14 +26,17 @@ interface VideoGameStateReader {
      * `videoTrack`, `connection`, `isHost`, `isCurrentPlayer`.
      *
      * Outside an active round:
-     *  - [VideoGameProcessState.WaitingRoom] — only the local player.
+     *  - [VideoGameProcessState.WaitingRoom] — the local player only, until the connection
+     *    stage opens (the final [VideoGameTimings.CONNECTION_STAGE_DURATION] before the game
+     *    starts), at which point the round-0 roster (`preConnection.players`, including the
+     *    local player) is surfaced so the connection-stage grid can render.
      *  - [VideoGameProcessState.Reporting] / [VideoGameProcessState.Finished] /
      *    [VideoGameProcessState.Error] — empty.
      *
      * This is narrower than the live peer-channel pool. During the final
-     * [VideoGameTimings.PRE_CONNECTION_TIME] of each round the session manager opens
+     * [VideoGameTimings.PRE_CONNECTION_TIME] of each *round* the session manager opens
      * peer channels for the next round's players ahead of the transition so they are
-     * already connected when the new round begins; those pre-warm peers are
+     * already connected when the new round begins; those in-round pre-warm peers are
      * intentionally excluded from this flow so the UI grid only renders the
      * round-active roster.
      */

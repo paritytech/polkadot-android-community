@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapNotNull
 import io.paritytech.polkadotapp.common.utils.requireNotNull
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
 import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.DotNsContractApi
 import io.paritytech.polkadotapp.feature_dotns_impl.data.ipfs.CarFetcher
@@ -18,6 +19,7 @@ import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.DotNsContentSto
 import io.paritytech.polkadotapp.tools_car_parser.CarParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -33,6 +35,8 @@ internal class RealDotNsResolver @Inject constructor(
     private val dispatchers: CoroutineDispatchers
 ) : DotNsResolver, CoroutineScope {
     override val coroutineContext = dispatchers.io + SupervisorJob()
+
+    private val progressRegistry = DotNsLoadProgressRegistry()
 
     private val localDomainsCache: MapCache<DomainName, Result<Uri>> = MapCache(this) { domainName ->
         Timber.d("resolving content hash for $domainName")
@@ -68,18 +72,35 @@ internal class RealDotNsResolver @Inject constructor(
         val existingDir = contentStorage.getContentDirectory(contentHashHex)
         if (existingDir != null) {
             Timber.d("content $contentHashHex already cached on disk for $dotNsName")
+            progressRegistry.markCompleted(dotNsName)
             return Result.success(Uri.fromFile(existingDir))
         }
 
         Timber.d("content $contentHashHex not cached — fetching CAR for $dotNsName")
-        return carFetcher.fetchCar(contentHash)
-            .flatMap { carBytes -> CarParser.parse(carBytes) }
-            .map { archive ->
-                contentStorage.saveContent(contentHashHex, archive.files)
-                Timber.d("saved content $contentHashHex for $dotNsName")
-                Uri.fromFile(contentStorage.getContentDirectory(contentHashHex)!!)
+        progressRegistry.markResolving(dotNsName)
+        return carFetcher.fetchCarToFile(
+            contentHash = contentHash,
+            onProgress = { downloaded, total -> progressRegistry.markDownloadProgress(dotNsName, downloaded, total) }
+        )
+            .mapCatching { carFile ->
+                progressRegistry.markUnpacking(dotNsName)
+                try {
+                    contentStorage.saveContentStreaming(contentHashHex) { writer ->
+                        CarParser.unpack(carFile) { path, content -> writer.write(path, content) }
+                    }
+                    Timber.d("saved content $contentHashHex for $dotNsName")
+                    Uri.fromFile(contentStorage.getContentDirectory(contentHashHex)!!)
+                } finally {
+                    carFile.delete()
+                }
             }
+            .onSuccess { progressRegistry.markCompleted(dotNsName) }
+            .onFailure { progressRegistry.markFailed(dotNsName, it) }
             .logFailure("failed to parse CAR for $contentHashHex")
+    }
+
+    override fun getProgressByDomain(dotNsName: String): Flow<DotNsLoadProgress> {
+        return progressRegistry.observe(dotNsName)
     }
 
     override suspend fun getMetadataEntry(dotNsName: String, key: String): Result<String?> {
@@ -90,6 +111,7 @@ internal class RealDotNsResolver @Inject constructor(
 
     override suspend fun clearCache() {
         localDomainsCache.clear()
+        progressRegistry.clear()
 
         contentStorage.deleteAll()
     }

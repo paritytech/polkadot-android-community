@@ -3,8 +3,9 @@ package io.paritytech.polkadotapp.feature_chats_api.domain.model
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.data.os.OperatingSystem
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.utils.Identifiable
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushToken
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage.Content
@@ -109,7 +110,7 @@ data class ChatMessage(
          */
         data class DeviceAdded(
             val statementAccountId: AccountId,
-            val encryptionPublicKey: EncodedPublicKey,
+            val encryptionPublicKey: X25519PublicKey,
         ) : Content
 
         /**
@@ -129,6 +130,22 @@ data class ChatMessage(
         ) : Content
 
         /**
+         * Transport container referencing a HOP-uploaded batch of compacted messages.
+         * Never displayed; the receiver claims the batch and expands it back into the originals.
+         */
+        data class CompactionCommit(
+            val claimIdentifier: DataByteArray,
+            val claimTicket: HopTicket,
+            val nodeUrl: String,
+        ) : Content
+
+        /**
+         * Terminal placeholder shown when a compacted batch is permanently unavailable
+         * (gone from the pool and every fallback source) — the contained messages are lost.
+         */
+        object CompactionUnavailable : Content
+
+        /**
          * Custom message content rendered by a [CustomChatMessageRenderer].
          *
          * @param rendererId The ID of the renderer that should handle this content
@@ -138,11 +155,13 @@ data class ChatMessage(
         data class Custom<T>(val rendererId: String, val content: Result<T>) : Content
     }
 
-    enum class Status {
-        PROCESSING,
-        NEW,
-        IS_SENT,
-        IS_READ
+    enum class Status(val deliveryRank: Int) {
+        PROCESSING(0),
+        NEW(1),
+        IS_SENT(2),
+        IS_READ(3),
+
+        DELIVERY_FAILED(1)
     }
 }
 
@@ -234,7 +253,8 @@ fun Content.isInternal(): Boolean {
         this is Content.DataChannelAnswer ||
         this is Content.DataChannelClosed ||
         this is Content.DeviceAdded ||
-        this is Content.DeviceRemoved
+        this is Content.DeviceRemoved ||
+        this is Content.CompactionCommit
 }
 
 inline fun <reified T> ChatMessage.customContentOrNull(): T? {

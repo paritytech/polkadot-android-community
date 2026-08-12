@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model
 import androidx.annotation.Keep
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.EnumIndex
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
+import io.paritytech.polkadotapp.common.domain.model.scale.X25519PublicKeyScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_statement_store_api.data.models.StatementProofRemote
@@ -82,7 +83,7 @@ sealed class VersionedRequestContent {
         companion object {
             fun new(
                 identityProof: IdentityProofScale,
-                deviceEncPubKey: ByteArray,
+                deviceEncPubKey: X25519PublicKeyScale,
                 pushToken: TokenContent?,
                 welcomeMessage: RichTextContent?
             ): V2 {
@@ -108,8 +109,7 @@ class RequestContentV1(
 @Serializable
 class RequestContentV2(
     val identityProof: IdentityProofScale,
-    @FixedLength(65)
-    val deviceEncPubKey: ByteArray,
+    val deviceEncPubKey: X25519PublicKeyScale,
     val pushToken: TokenContent?,
     val welcomeMessage: RichTextContent?
 )

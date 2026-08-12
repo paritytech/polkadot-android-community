@@ -17,7 +17,6 @@ import io.paritytech.polkadotapp.design.components.button.default.PolkadotButton
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.models.UpcomingGameUiState
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.models.VideoGameActionNew
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.theme.NovaPrizesColors
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.theme.NovaGameTypography
@@ -25,7 +24,6 @@ import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 internal fun ActionArea(
-    state: UpcomingGameUiState,
     action: VideoGameActionNew,
     onRegister: () -> Unit,
     onStartPlaying: () -> Unit,

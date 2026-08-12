@@ -98,9 +98,9 @@ class UploadEvidenceStateFactory @Inject constructor(
         return StorePhotoChunkState(storage, stateFactory = this, params)
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     suspend fun storeFirstPhotoChunk(): StorePhotoChunkState {
-        val firstChunkIndex = storage.getFirstChunkIndex(EvidenceType.PHOTO, uploadSession.chunkingConfig.chunkSize)
+        val firstChunkIndex = storage.getFirstChunkIndex(EvidenceType.PHOTO, transition.uploadSession.chunkingConfig.chunkSize)
         val params = StorePhotoChunkState.Params(firstChunkIndex)
 
         return StorePhotoChunkState(storage, stateFactory = this, params = params)
@@ -142,9 +142,9 @@ class UploadEvidenceStateFactory @Inject constructor(
         return StoreVideoChunkState(storage, stateFactory = this, params)
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     suspend fun storeFirstVideoChunk(): StoreVideoChunkState {
-        val firstChunkIndex = storage.getFirstChunkIndex(EvidenceType.VIDEO, uploadSession.chunkingConfig.chunkSize)
+        val firstChunkIndex = storage.getFirstChunkIndex(EvidenceType.VIDEO, transition.uploadSession.chunkingConfig.chunkSize)
         val params = StoreVideoChunkState.Params(firstChunkIndex)
 
         return StoreVideoChunkState(storage, stateFactory = this, params = params)
@@ -191,8 +191,8 @@ class UploadEvidenceStateFactory @Inject constructor(
         return UnrecoverableFailure(retryState, params)
     }
 
-    context(UploadEvidenceState)
+    context(uploadEvidenceState: UploadEvidenceState)
     fun unrecoverableFailureFromCurrent(params: UnrecoverableFailure.Params): UnrecoverableFailure {
-        return UnrecoverableFailure(retryState = this@UploadEvidenceState, params)
+        return UnrecoverableFailure(retryState = uploadEvidenceState, params)
     }
 }

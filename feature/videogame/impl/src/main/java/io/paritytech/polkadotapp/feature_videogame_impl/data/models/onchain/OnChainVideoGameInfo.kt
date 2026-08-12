@@ -12,8 +12,11 @@ class OnChainVideoGameInfo(
     val maxGroupSize: Int,
     val rounds: Int,
     val state: OnChainVideoGameState,
-    val airdropScheduled: Boolean?,
-)
+    val airdropsScheduled: Int
+) {
+    val airdropScheduled: Boolean
+        get() = airdropsScheduled > 0
+}
 
 @Serializable
 sealed class OnChainVideoGameState {

@@ -22,7 +22,7 @@ class PersonAliasesUpdater @Inject constructor(
     private val accountRepository: AccountRepository,
     @SetAliasContext private val assignableContexts: Set<@JvmSuppressWildcards BandersnatchContext>
 ) : MultipleStorageKeyUpdater<MetaAccount>(scope, chainRegistry, storageCache) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKeys(
         scopeValue: MetaAccount,
         chain: Chain
@@ -31,6 +31,6 @@ class PersonAliasesUpdater @Inject constructor(
             accountRepository.getAliasAccount(context).accountIdIn(chain)
         }
         .map { accountId ->
-            runtime.metadata.people.accountToAlias.storageKey(accountId)
+            withRuntime.runtime.metadata.people.accountToAlias.storageKey(accountId)
         }
 }

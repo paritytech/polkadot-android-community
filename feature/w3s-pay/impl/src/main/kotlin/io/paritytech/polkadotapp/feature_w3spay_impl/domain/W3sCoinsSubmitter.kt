@@ -2,7 +2,8 @@ package io.paritytech.polkadotapp.feature_w3spay_impl.domain
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.decodeFromByteArray
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
+import io.paritytech.polkadotapp.common.domain.model.scale.toScale
 import io.paritytech.polkadotapp.common.utils.encodeToByteArrayCatching
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -27,7 +28,7 @@ internal const val W3S_COINS_SUBMITTER_ID = "w3s-pay"
 
 /**
  * Delivers a coinage transfer memo to a W3S merchant: decodes the merchant topic/key/paymentId from
- * the opaque submitter payload, encrypts the payment to the merchant's P256 key using the SSO ECIES
+ * the opaque submitter payload, encrypts the payment to the merchant's X25519 key using the SSO ECIES
  * scheme ([CommunicationEncryption.Factory.createOneTimeUse]) and publishes it as a wallet-signed
  * statement under the merchant topic.
  */
@@ -62,10 +63,10 @@ class W3sCoinsSubmitter @Inject constructor(
 
         return BinaryScale.encodeToByteArrayCatching(paymentData)
             .mapCatching { plaintext ->
-                val encryption = encryptionFactory.createOneTimeUse(EncodedPublicKey(payload.merchantKey))
+                val encryption = encryptionFactory.createOneTimeUse(payload.merchantKey.requireX25519PublicKey())
                 W3sEncryptedPayloadV1(
                     encryptedData = encryption.encrypt(plaintext),
-                    ephemeralPublicKey = encryption.localPublicKey.value,
+                    ephemeralPublicKey = encryption.localPublicKey.toScale(),
                 )
             }
             .flatMap { BinaryScale.encodeToByteArrayCatching(it) }

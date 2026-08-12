@@ -29,6 +29,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Token
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.formatFiat
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 internal fun CoinageStateCard(
@@ -185,8 +186,8 @@ private fun CoinageStateCardPreview() {
                     spendableSecuredBalance = TokenAmountModel.mock,
                     spendableDegradedBalance = TokenAmountModel.mock,
                     pendingBalance = TokenAmountModel.mock,
-                    coinList = emptyList(),
-                    voucherList = emptyList()
+                    coinList = persistentListOf(),
+                    voucherList = persistentListOf()
                 ),
                 onCoinsClick = {},
                 onVouchersClick = {},

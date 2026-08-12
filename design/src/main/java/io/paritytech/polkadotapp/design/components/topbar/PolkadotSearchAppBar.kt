@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.design.components.topbar
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.tooling.preview.Preview
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowLeft
@@ -19,6 +20,7 @@ fun PolkadotSearchAppBar(
     modifier: Modifier = Modifier,
     placeholder: String? = null,
     actions: ImmutableList<TopBarAction> = persistentListOf(),
+    focusRequester: FocusRequester? = null,
 ) {
     PolkadotTopBar(
         modifier = modifier,
@@ -32,6 +34,7 @@ fun PolkadotSearchAppBar(
             placeholder = placeholder,
             leadingIcon = NovaIcons.ArrowLeft,
             onLeadingClick = onBack,
+            focusRequester = focusRequester,
         )
     }
 }

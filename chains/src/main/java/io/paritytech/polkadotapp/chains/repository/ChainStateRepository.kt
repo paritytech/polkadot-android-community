@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.chains.util.numberConstant
 import io.paritytech.polkadotapp.chains.util.optionalNumberConstant
 import io.paritytech.polkadotapp.chains.util.timestampOrNull
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -59,6 +60,10 @@ interface ChainStateRepository {
     suspend fun currentRemoteBlockNumber(chainId: ChainId): BlockNumber
 
     suspend fun getFinalizedBlockHash(chainId: ChainId): BlockHash
+}
+
+suspend fun ChainStateRepository.currentBlockHashCatching(chainId: ChainId): Result<BlockHash> = runCancellableCatching {
+    currentBlockHash(chainId)
 }
 
 suspend fun ChainStateRepository.blockDurationEstimator(chainId: ChainId): BlockDurationEstimator {

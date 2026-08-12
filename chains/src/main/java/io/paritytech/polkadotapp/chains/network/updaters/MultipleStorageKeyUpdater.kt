@@ -19,7 +19,7 @@ abstract class MultipleStorageKeyUpdater<S>(
     /**
      * @return a storage keys to update. Empty in case updater does not want to update anything
      */
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     abstract suspend fun storageKeys(scopeValue: S, chain: Chain): List<String>
 
     override suspend fun listenForUpdates(

@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.common
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.UnloadDelayStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.VoucherAllocator
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
@@ -49,10 +48,6 @@ class RealVoucherAllocator @Inject constructor(
 
                 vouchers
             }
-    }
-
-    override suspend fun deallocate(indexes: List<DerivationIndex>) {
-        voucherRepository.removeVouchers(indexes)
     }
 
     private suspend fun createVoucherForIndex(derivationIndex: Int, valueExponent: ValueExponent): RecyclerVoucher {

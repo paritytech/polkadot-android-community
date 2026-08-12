@@ -51,7 +51,7 @@ class SetAliasState(
         assignableContexts.sortedWith(DataByteArray.compareByBytes(unsigned = true) { it.value })
     }
 
-    context(PersonSetupState.Transition)
+    context(transition: PersonSetupState.Transition)
     override suspend fun performNonTerminalTransition(): Result<PersonSetupState> {
         val personId = personIdRepository.getPersonIdOrThrow()
 
@@ -61,12 +61,12 @@ class SetAliasState(
         )
     }
 
-    context(PersonSetupState.Transition)
+    context(transition: PersonSetupState.Transition)
     private suspend fun assignAlias(
         contextIndex: Int,
         personId: PersonId
     ): Result<PersonSetupState> {
-        val chain = dataSource.peopleChain
+        val chain = transition.dataSource.peopleChain
 
         val context = sortedContexts[contextIndex]
 
@@ -74,13 +74,13 @@ class SetAliasState(
         val aliasAccountId = aliasAccount.accountIdIn(chain)
 
         // Alias is already assigned - we have missed result of previous setAlias. Move to the next state immediately
-        if (dataSource.hasUpToDateAlias(aliasAccountId, personId)) {
+        if (transition.dataSource.hasUpToDateAlias(aliasAccountId, personId)) {
             Timber.d("Found existing up-to-date alias. Skipping set alias for ${context.stringValue}")
 
             return Result.success(createNextState(contextIndex))
         }
 
-        return dataSource.setAlias(context, aliasAccountId)
+        return transition.dataSource.setAlias(context, aliasAccountId)
             .mapCatching { executionResult ->
                 if (executionResult.canContinue()) {
                     createNextState(contextIndex)

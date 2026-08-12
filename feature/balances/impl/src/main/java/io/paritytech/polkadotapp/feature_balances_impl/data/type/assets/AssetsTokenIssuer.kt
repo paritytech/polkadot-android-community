@@ -54,7 +54,7 @@ class AssetsTokenIssuer @AssistedInject constructor(
         }
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private fun composeMint(
         amount: Balance,
         destination: AccountId,
@@ -65,7 +65,7 @@ class AssetsTokenIssuer @AssistedInject constructor(
             callName = "mint",
             arguments = mapOf(
                 "id" to assetId.value,
-                "beneficiary" to AddressInstanceConstructor.constructInstance(runtime.typeRegistry, destination.value),
+                "beneficiary" to AddressInstanceConstructor.constructInstance(withRuntime.runtime.typeRegistry, destination.value),
                 "amount" to amount.value
             )
         )

@@ -16,11 +16,8 @@ interface CommunicationSession {
 
     fun sendMessage(message: EncodedMessage)
 
-    fun respond(requestId: RequestId, code: UByte)
-
     fun encrypt(data: ByteArray): ByteArray
 
     fun generateSharedIncomingSessionValue(salt: ByteArray): ByteArray
     fun generateSharedOutgoingSessionValue(salt: ByteArray): ByteArray
-    suspend fun sendMessageAndAwait(message: EncodedMessage): Result<Unit>
 }

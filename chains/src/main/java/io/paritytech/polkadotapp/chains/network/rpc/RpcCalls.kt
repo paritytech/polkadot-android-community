@@ -204,7 +204,7 @@ fun SocketService.submitAndWatchExtrinsic(extrinsic: String): Flow<ExtrinsicStat
         .map { it.asExtrinsicStatus(hash) }
         .catch {
             if (atLeastOneUpdateReceivedFromNode) {
-                emit(ExtrinsicStatus.Other(hash))
+                emit(ExtrinsicStatus.Other(rawStatus = it.toString(), extrinsicHash = hash))
             } else {
                 emit(ExtrinsicStatus.FailedToSubmit(it))
             }

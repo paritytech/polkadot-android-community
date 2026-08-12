@@ -15,11 +15,10 @@ import io.paritytech.polkadotapp.tools_hydration_sdk_impl.assets.HydraDxAssetId
 @JvmInline
 value class AssetRegistryApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 val RuntimeMetadata.assetRegistry: AssetRegistryApi
     get() = AssetRegistryApi(assetRegistry())
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val AssetRegistryApi.assets: QueryableStorageEntry1<HydraDxAssetId, HydrationAssetMetadata>
     get() = storage1(name = "Assets", binding = ::bindHydrationAssetMetadata)
 

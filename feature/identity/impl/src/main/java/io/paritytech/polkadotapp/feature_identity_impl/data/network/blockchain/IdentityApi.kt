@@ -16,22 +16,21 @@ import io.paritytech.polkadotapp.feature_people_api.domain.models.PersonalAlias
 @JvmInline
 value class IdentityApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.identity: IdentityApi
     get() = IdentityApi(identity())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val IdentityApi.usernameInfoOf: QueryableStorageEntry1<ByteArray, UsernameInformation>
     get() = storage1("UsernameInfoOf", binding = { decoded, _ -> bindUsernameInformation(decoded) })
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val IdentityApi.personIdentities: QueryableStorageEntry1<PersonalAlias, PersonalIdentity>
     get() = storage1(name = "PersonIdentities")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val IdentityApi.identityOf: QueryableStorageEntry1<AccountId, IdentityOf>
     get() = storage1(name = "IdentityOf")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val IdentityApi.usernameOf: QueryableStorageEntry1<ByteArray, String>
     get() = storage1("UsernameOf", binding = { decoded, _ -> bindString(decoded) })

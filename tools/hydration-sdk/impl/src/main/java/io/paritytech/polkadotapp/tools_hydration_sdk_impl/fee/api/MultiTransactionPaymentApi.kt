@@ -17,18 +17,17 @@ import io.paritytech.polkadotapp.tools_hydration_sdk_impl.assets.HydraDxAssetId
 @JvmInline
 value class MultiTransactionPaymentApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 val RuntimeMetadata.multiTransactionPayment: MultiTransactionPaymentApi
     get() = MultiTransactionPaymentApi(multiTransactionPayment())
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val MultiTransactionPaymentApi.acceptedCurrencies: QueryableStorageEntry1<HydraDxAssetId, Fraction>
     get() = storage1(
         name = "AcceptedCurrencies",
         binding = { decoded, _ -> bindPerquintill(decoded) }
     )
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val MultiTransactionPaymentApi.accountCurrencyMap: QueryableStorageEntry1<AccountId, HydraDxAssetId>
     get() = storage1(
         name = "AccountCurrencyMap",

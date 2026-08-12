@@ -1,6 +1,7 @@
 plugins {
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
     alias(libs.plugins.kotlin.parcelize)
-    alias(libs.plugins.kotlin.compose)
 }
 
 android {

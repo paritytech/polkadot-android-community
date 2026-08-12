@@ -28,7 +28,7 @@ class RealUpcomingGameStartUseCase @Inject constructor(
     private val videoGameRepository: VideoGameRepositoryInternal,
     private val gameInfoSyncService: VideoGameInfoSyncService,
 ) : UpcomingGameStartUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribe(): Flow<UpcomingGameStart?> = flowOfAll {
         val chain = chainRegistry.peopleChain()
         val gamePhaseDurations = videoGameRepository.getGamePhaseDurations(chain.id)

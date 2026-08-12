@@ -5,14 +5,24 @@ import io.paritytech.polkadotapp.app.root.navigation.BaseNavigator
 import io.paritytech.polkadotapp.app.root.navigation.NavigationHolder
 import io.paritytech.polkadotapp.app.root.presentation.root.RootRouter
 import io.paritytech.polkadotapp.common.utils.toPayloadBundle
-import io.paritytech.polkadotapp.feature_products_impl.presentation.spaBrowser.SpaBrowserPayload
+import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.gameResults.GameResultsPayload
 import javax.inject.Inject
 
 class RootNavigator @Inject constructor(
     navigationHolder: NavigationHolder,
 ) : BaseNavigator(navigationHolder), RootRouter {
-    override fun openMain() = performNavigation(R.id.action_global_to_main_graph)
+    override fun openMain() {
+        if (isCurrentDestination(R.id.mainFragment)) return
+        performNavigation(R.id.action_global_to_main_graph)
+    }
+
+    override fun openScanner() {
+        if (isCurrentDestination(R.id.scanQrFragment)) return
+        performNavigation(R.id.action_global_to_scan_graph)
+    }
+
+    override fun openActiveProduct() = performNavigation(R.id.action_global_to_spaBrowserFragment)
 
     override fun openClaimUsername() = performNavigation(R.id.action_global_to_claim_username_graph)
 
@@ -22,9 +32,9 @@ class RootNavigator @Inject constructor(
 
     override fun openProductBotsManagement() = performNavigation(R.id.action_global_to_product_bots_management)
 
-    override fun openSpaBrowser(url: String) = performNavigation(
+    override fun openSpaBrowser(payload: SpaBrowserPayload) = performNavigation(
         R.id.action_global_to_spaBrowserFragment,
-        SpaBrowserPayload(url = url).toPayloadBundle(),
+        args = payload.toPayloadBundle(SpaBrowserPayload::class.java.name),
     )
 
     override fun openSimulatedGameResults(payload: GameResultsPayload) = performNavigation(

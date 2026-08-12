@@ -180,22 +180,22 @@ class RealAssetHubSwapSdk(
         }
     }
 
-    context(WithRuntime, ExtrinsicBuilder)
+    context(withRuntime: WithRuntime, builder: ExtrinsicBuilder)
     private suspend fun executeSwap(
         trade: AssetHubSwapEdge,
         swapLimit: SwapLimit,
         sendTo: AccountId
     ) {
-        call(executeSwapCall(trade, swapLimit, sendTo))
+        builder.call(executeSwapCall(trade, swapLimit, sendTo))
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private suspend fun executeSwapCall(
         trade: AssetHubSwapEdge,
         swapLimit: SwapLimit,
         sendTo: AccountId
     ): GenericCall.Instance {
-        val assetIdXcmVersion = xcmVersionDetector.detectAssetIdXcmVersion(chain.id, runtime)
+        val assetIdXcmVersion = xcmVersionDetector.detectAssetIdXcmVersion(chain.id, withRuntime.runtime)
 
         val path = listOf(trade.fromAsset, trade.toAsset)
             .map { asset ->

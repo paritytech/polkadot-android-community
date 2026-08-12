@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.faq.compose.FaqQ
 import io.paritytech.polkadotapp.feature_chats_impl.domain.middleware.bot.polkadotpeer.PolkadotPeerBotInitialMessageProvider
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.polkadotpeerbot.compose.PolkadotPeerBotFooter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.polkadotpeerbot.models.PolkadotChatPeerBotQuestion
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -35,14 +36,14 @@ internal class PolkadotPeerBot @Inject constructor(
     private val chatData = ChatBotData.polkadotPeer()
 
     override val id: ChatExtensionId = chatData.id
-    override val metadata = ChatBotMetadata(chatData.name)
+    override val metadata = ChatBotMetadata(chatData.name, icon = null)
 
     override val customFooterRenderer: CustomChatFooterRenderer = PolkadotPeerCustomFooterRenderer()
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun startBotWork() {
-        scope.launch {
-            setWelcomeMessages { initialMessageProvider.getMessages() }
+        chatBotContext.scope.launch {
+            chatBotContext.setWelcomeMessages { initialMessageProvider.getMessages() }
         }
     }
 
@@ -69,7 +70,7 @@ internal class PolkadotPeerBot @Inject constructor(
                             .fillMaxWidth()
                             .padding(horizontal = PolkadotTheme.spacings.mediumIncreased),
                         botId = id,
-                        allQuestions = PolkadotChatPeerBotQuestion.entries
+                        allQuestions = PolkadotChatPeerBotQuestion.entries.toImmutableList()
                     )
 
                     VerticalSpacer { mediumIncreased }

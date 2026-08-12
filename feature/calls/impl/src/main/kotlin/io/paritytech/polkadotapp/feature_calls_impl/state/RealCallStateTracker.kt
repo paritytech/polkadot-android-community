@@ -19,7 +19,6 @@ class RealCallStateTracker @Inject constructor() : CallStateHolder {
     private val activeCall = MutableStateFlow<ActiveCallState?>(null)
     private val mediaTracks = MutableStateFlow(MediaTracks())
     private val mediaState = MutableStateFlow(MediaState())
-    private val speakerOn = MutableStateFlow(false)
 
     override fun observeActiveCall(): StateFlow<ActiveCallState?> = activeCall.asStateFlow()
     override fun getActiveCall(): ActiveCallState? = activeCall.value
@@ -42,13 +41,9 @@ class RealCallStateTracker @Inject constructor() : CallStateHolder {
     override fun updateMediaState(state: MediaState) { mediaState.value = state }
     override fun observeMediaState(): StateFlow<MediaState> = mediaState.asStateFlow()
 
-    override fun updateSpeakerOn(on: Boolean) { speakerOn.value = on }
-    override fun observeSpeakerOn(): StateFlow<Boolean> = speakerOn.asStateFlow()
-
     override fun clear() {
         activeCall.value = null
         mediaTracks.value = MediaTracks()
         mediaState.value = MediaState()
-        speakerOn.value = false
     }
 }

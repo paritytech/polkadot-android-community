@@ -8,16 +8,18 @@
     "build:prod:minified": "npm run strip-metadata && esbuild src/scripts/*.tsx --bundle --outdir=scripts --format=iife --target=es2020 --jsx=automatic --define:process.env.NODE_ENV=\\\"production\\\" --minify",
     "build:dev": "npm run strip-metadata && esbuild src/scripts/*.tsx --bundle --outdir=scripts --format=iife --target=es2020 --jsx=automatic",
     "build:watch": "npm run build:dev -- --watch",
-    "deploy": "npm run build:prod && node deploy.mjs",
+    "deploy": "node deploy.mjs",
     "typecheck": "tsc --noEmit",
     "postinstall": "npx papi"
   },
   "dependencies": {
-    "@novasamatech/host-api-wrapper": "0.8.4",
-    "@novasamatech/product-react-renderer": "0.8.4",
+    "@novasamatech/host-api": "0.9.4",
+    "@novasamatech/host-api-wrapper": "0.9.4",
+    "@novasamatech/product-react-renderer": "0.9.4",
+    "@novasamatech/scale": "0.9.4",
     "@polkadot-api/descriptors": "file:.papi/descriptors",
-    "@polkadot-api/pjs-signer": "^0.6.19",
     "@polkadot-api/json-rpc-provider": "^0.2.0",
+    "@polkadot-api/pjs-signer": "^0.6.19",
     "polkadot-api": "latest"
   },
   "devDependencies": {

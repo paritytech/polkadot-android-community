@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages
 
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
@@ -10,7 +9,6 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.design.utils.noLocalProvidedFor
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatMessageUiModel
 
-context(BoxScope)
 internal val ChatMessageUiModel.Direction.defaultAlignment: Alignment
     get() = when (this) {
         ChatMessageUiModel.Direction.INCOMING -> Alignment.TopStart

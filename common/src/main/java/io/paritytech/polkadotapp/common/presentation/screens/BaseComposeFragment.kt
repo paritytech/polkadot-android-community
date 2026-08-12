@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -15,10 +16,22 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.LifecycleOwner
 import androidx.navigation.fragment.findNavController
+import io.paritytech.polkadotapp.common.presentation.tabbar.LocalTabBarOffset
+import io.paritytech.polkadotapp.common.presentation.tabbar.LocalTabBarVisibility
+import io.paritytech.polkadotapp.common.presentation.tabbar.TabBarOffsetHolder
+import io.paritytech.polkadotapp.common.presentation.tabbar.TabBarVisibilityHolder
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import javax.inject.Inject
 
 abstract class BaseComposeFragment<T : BaseViewModel> : Fragment() {
     protected abstract val viewModel: T
+
+    // Injected into every @AndroidEntryPoint subclass; expose the tab-bar state to screens.
+    @Inject
+    lateinit var tabBarOffsetHolder: TabBarOffsetHolder
+
+    @Inject
+    lateinit var tabBarVisibilityHolder: TabBarVisibilityHolder
 
     private val delegate = BaseFragmentDelegate(::viewModel)
 
@@ -33,13 +46,18 @@ abstract class BaseComposeFragment<T : BaseViewModel> : Fragment() {
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
 
         setContent {
-            PolkadotTheme {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .semantics { testTagsAsResourceId = true }
-                ) {
-                    Screen()
+            CompositionLocalProvider(
+                LocalTabBarOffset provides tabBarOffsetHolder.offset,
+                LocalTabBarVisibility provides tabBarVisibilityHolder,
+            ) {
+                PolkadotTheme {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .semantics { testTagsAsResourceId = true }
+                    ) {
+                        Screen()
+                    }
                 }
             }
         }

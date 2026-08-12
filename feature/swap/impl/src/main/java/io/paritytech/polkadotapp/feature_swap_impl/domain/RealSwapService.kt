@@ -182,9 +182,9 @@ internal class RealSwapService @Inject constructor(
 ) : SwapService {
     private val debug: Boolean = BuildConfig.DEBUG
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initiateWarmUp() {
-        launch(coroutineDispatchers.io) {
+        scope.launch(coroutineDispatchers.io) {
             // Launch warm up parts concurrently
             launch { warmUpChain(knownChains.assetHub) }
 
@@ -196,12 +196,12 @@ internal class RealSwapService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun warmUpChain(chainId: ChainId) {
         nodeVisitFilter().warmUpChain(chainId)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun sync() {
         exchangeRegistry()
             .allExchanges()
@@ -211,17 +211,17 @@ internal class RealSwapService @Inject constructor(
             }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun assetsAvailableForSwap(): Flow<Set<FullChainAssetId>> {
         return directionsGraph().map { it.vertices() }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun awaitFullyLoadedRouting() {
         directionsGraphState().first { it.fullyLoaded }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun availableSwapDirectionsFor(
         asset: Chain.Asset,
     ): Flow<Set<FullChainAssetId>> {
@@ -233,12 +233,12 @@ internal class RealSwapService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun hasAvailableSwapDirections(asset: Chain.Asset): Flow<Boolean> {
         return directionsGraph().map { it.hasOutcomingDirections(asset.fullId) }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun quote(
         args: SwapQuoteArgs,
     ): Result<SwapQuote> {
@@ -248,7 +248,7 @@ internal class RealSwapService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun estimateFee(feeArgs: SwapFeeArgs): Result<SwapFee> {
         return coroutineScope {
             val atomicOperations = feeArgs.constructAtomicOperations()
@@ -287,7 +287,7 @@ internal class RealSwapService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun swap(calculatedFee: SwapFee): Flow<SwapProgress> {
         val segments = calculatedFee.segments
 
@@ -330,7 +330,7 @@ internal class RealSwapService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun performTransferToRecipient(
         swapExecutionOutcome: SwapExecutionOutcome,
         swapFee: SwapFee
@@ -350,7 +350,7 @@ internal class RealSwapService @Inject constructor(
             .map { SwapExecutionOutcome(actualReceivedAmount = transferArgs.amount) }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun calculateFinalTransferFee(
         finalSwapOperation: AtomicSwapOperation,
         recipient: AccountId,
@@ -548,7 +548,7 @@ internal class RealSwapService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun quoteInternal(
         args: SwapQuoteArgs,
     ): SwapQuote {
@@ -582,7 +582,7 @@ internal class RealSwapService @Inject constructor(
             .map { it.maximumExecutionTime() }
     }
 
-    context(ComputationalScope)
+    context(computationalScope: ComputationalScope)
     override fun runSubscriptions(): Flow<ReQuoteTrigger> {
         return withFlowScope { scope ->
             val exchangeRegistry = exchangeRegistry()
@@ -595,7 +595,7 @@ internal class RealSwapService @Inject constructor(
             .inBackground()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun SwapQuoteArgs.calculatePriceImpact(amountIn: Balance, amountOut: Balance): Fraction {
         val priceAssetIn = getCachedPriceUse.getPrice(assetIn)
         val priceAssetOut = getCachedPriceUse.getPrice(assetOut)
@@ -635,13 +635,13 @@ internal class RealSwapService @Inject constructor(
         return priceImpact.asFraction
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun directionsGraph(): Flow<SwapGraph> {
         return directionsGraphState()
             .map { it.graph }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun directionsGraphState(): Flow<SwapGraphState> {
         return computationalCache.useSharedFlow(ALL_DIRECTIONS_CACHE) {
             val exchangeRegistry = exchangeRegistry()
@@ -691,14 +691,14 @@ internal class RealSwapService @Inject constructor(
         graphDebugger.logGraphDiagram(graph)
     }
 
-    context(ComputationalScope)
+    context(computationalScope: ComputationalScope)
     private suspend fun exchangeRegistry(): ExchangeRegistry {
         return computationalCache.useCache(EXCHANGES_CACHE) { scope ->
             createExchangeRegistry(scope)
         }
     }
 
-    context(ComputationalScope)
+    context(computationalScope: ComputationalScope)
     private suspend fun nodeVisitFilter(): NodeVisitFilter {
         return computationalCache.useCache(NODE_VISIT_FILTER) { scope ->
             NodeVisitFilter(
@@ -757,7 +757,7 @@ internal class RealSwapService @Inject constructor(
             .runningFold(emptyList()) { acc, directions -> acc + directions }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun quoteTrade(
         chainAssetIn: Chain.Asset,
         chainAssetOut: Chain.Asset,
@@ -775,7 +775,7 @@ internal class RealSwapService @Inject constructor(
         return bestPathQuote.bestPath
     }
 
-    context(ComputationalScope)
+    context(computationalScope: ComputationalScope)
     private suspend fun getPathQuoter(): PathQuoter<SwapGraphEdge> {
         return computationalCache.useCache(QUOTER_CACHE) { scope ->
             val graphFlow = directionsGraph()

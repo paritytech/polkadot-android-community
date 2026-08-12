@@ -14,14 +14,12 @@ import io.paritytech.polkadotapp.tools_hydration_sdk_impl.sources.xyk.model.XYKP
 @JvmInline
 value class XYKSwapApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 val RuntimeMetadata.xykOrNull: XYKSwapApi?
     get() = xykOrNull()?.let(::XYKSwapApi)
 
-context(StorageQueryContext)
 val RuntimeMetadata.xyk: XYKSwapApi
     get() = XYKSwapApi(xyk())
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val XYKSwapApi.poolAssets: QueryableStorageEntry1<AccountId, XYKPoolInfo>
     get() = storage1("PoolAssets")

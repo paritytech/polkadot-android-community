@@ -14,7 +14,7 @@ How we name things, comment, structure files, and keep noise out.
 8. **`major`** — `Duration` / `Instant` over raw `Long` for time (PR #530). See `code/project-types-and-units.md`.
 9. **`major`** — Imports always; never write fully-qualified types inline (PR #484, #544).
 10. **`major`** — JSON encoding / decoding goes through kotlinx-serialization (`@Serializable` + `Json.encodeToString` / `Json.decodeFromString`). No hand-rolled `buildJsonObject { … }` walks, no Gson, no manual `JSONObject` (PR #593). Custom wire shapes use a `KSerializer`. Same family as rule "Manual binary encoder where `BinaryScale` covers it" in `code/database-and-scale.md § Rules at a glance`.
-11. **`minor`** — Comments only when "why" is non-obvious. No redundant comments.
+11. **`major`** — Minimal comments — mandatory. Default to none; write one ONLY where the code is genuinely specific and a competent reader could misread the logic without it (non-obvious invariant, workaround, platform quirk). Never restate what the code does.
 12. **`minor`** — KDoc only on public `api/` interfaces and their non-trivial methods; not on `impl/` classes.
 13. **`minor`** — Method/class name must reflect what it does now; rename when behavior changes (PR #499).
 14. **`minor`** — Trailing positional `Boolean` parameter — use named-call site or split into two methods (PR #480).
@@ -30,7 +30,7 @@ How we name things, comment, structure files, and keep noise out.
 
 ## Comments — only "why", never "what"
 
-Default to **no comments**. The code should explain itself through naming. A comment is justified only when:
+Minimal comments are **mandatory**, not a preference. Default to **no comments** — the code must explain itself through naming. Write a comment ONLY where the code is genuinely specific and a competent reader could misread the logic without it. A comment is justified only when:
 
 1. **A non-obvious invariant or workaround** — "this must run before X because the runtime expects the call wrapped" / "ignoring this branch because the backend always returns it but we don't need it".
 2. **A subtle algorithm** — geometric drawing math, custom encoding, multi-step state machine (PR #429/#494: "this contains intense drawing code: it needs a comment that explains the general idea").

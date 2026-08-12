@@ -14,32 +14,32 @@ import io.paritytech.polkadotapp.feature_cross_chain_transfers_api.domain.model.
 import kotlin.time.Duration
 
 interface CrossChainTransferService {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun availableDirectionIds(): List<CrossChainTransferDirectionId>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getTransferFeatures(directionId: CrossChainTransferDirectionId): CrossChainTransferFeatures
 
     suspend fun getDirectionById(directionId: CrossChainTransferDirectionId): CrossChainTransferDirection
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun requiredRemainingAmountAfterTransfer(directionId: CrossChainTransferDirectionId): Balance
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun estimateMaximumExecutionTime(directionId: CrossChainTransferDirectionId): Duration
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun estimateFee(
         transfer: CrossChainTransfer,
     ): Result<CrossChainTransferFee>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun performAndTrackTransfer(
         transfer: CrossChainTransfer,
         sender: MetaAccount
     ): Result<CrossChainTransferSuccess>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun dryRunTransfer(
         transfer: CrossChainTransfer,
         dryRunOrigin: CrossChainTransferDryRunOrigin,

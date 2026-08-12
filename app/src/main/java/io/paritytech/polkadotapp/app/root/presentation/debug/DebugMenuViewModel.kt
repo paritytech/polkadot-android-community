@@ -11,7 +11,9 @@ import io.paritytech.polkadotapp.common.presentation.clipboard.ClipboardService
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.Urls
 import io.paritytech.polkadotapp.common.utils.launchUnit
+import io.paritytech.polkadotapp.feature_coinage_api.domain.debug.CoinageDebugSettings
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
+import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import io.paritytech.polkadotapp.feature_videogame_impl.data.gameResults.GameResultsWebViewPreloader
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.gameResults.GameResultsMock
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.gameResults.GameResultsPayload
@@ -32,11 +34,13 @@ class DebugMenuViewModel @Inject constructor(
     private val dotNsResolver: DotNsResolver,
     private val jwtTokenStore: JWTTokenStore,
     private val gameResultsPreloader: GameResultsWebViewPreloader,
+    private val coinageDebugSettings: CoinageDebugSettings,
 ) : BaseViewModel(), DebugMenuContract {
     override val state = MutableStateFlow(DebugMenuState())
 
     init {
         refreshJWTTokenState()
+        refreshCoinageDebugWidgetsState()
 
         // No game state drives this screen, so the game-state initializer
         // never preloads the results WebView. Warm it directly so the
@@ -96,7 +100,7 @@ class DebugMenuViewModel @Inject constructor(
 
     override fun onSpaBrowserUrlEntered(url: String) {
         state.update { it.copy(showSpaBrowserDialog = false) }
-        router.openSpaBrowser(Urls.ensureHttpsProtocol(url))
+        router.openSpaBrowser(SpaBrowserPayload.ByUrl(Urls.ensureHttpsProtocol(url)))
     }
 
     override fun onSpaBrowserDialogDismissed() {
@@ -118,7 +122,17 @@ class DebugMenuViewModel @Inject constructor(
         router.openSimulatedGameResults(payload)
     }
 
+    override fun onCoinageDebugWidgetsToggled(enabled: Boolean) = launchUnit {
+        coinageDebugSettings.setWidgetsEnabled(enabled)
+        state.update { it.copy(coinageDebugWidgetsEnabled = enabled) }
+    }
+
     private fun refreshJWTTokenState() {
         state.update { it.copy(hasJWTToken = jwtTokenStore.fetchToken() != null) }
+    }
+
+    private fun refreshCoinageDebugWidgetsState() = launchUnit {
+        val enabled = coinageDebugSettings.areWidgetsEnabled()
+        state.update { it.copy(coinageDebugWidgetsEnabled = enabled) }
     }
 }

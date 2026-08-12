@@ -63,7 +63,7 @@ class RealClaimVoucherUseCase(
                                     message = claimer.value,
                                     context = claimerContext.value,
                                     domainSize = BandersnatchDomainSize.Domain11
-                                )
+                                ).proof
 
                                 privacyVoucher.claimVoucherIntoDestination(
                                     proof = proof.value,

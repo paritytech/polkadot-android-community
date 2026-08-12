@@ -40,12 +40,12 @@ fun TransactionOutcomeScreenInternal(
     config: TransactionOutcomeUiConfig,
     onButtonClick: () -> Unit,
 ) {
-    PolkadotSurface(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-    ) {
-        Box {
+    PolkadotSurface {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

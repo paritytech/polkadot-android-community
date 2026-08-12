@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
-import io.paritytech.polkadotapp.app.root.navigation.AddFragmentNavigator
+import androidx.navigation.fragment.FragmentNavigator
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatOverlay
 import kotlinx.coroutines.flow.Flow
@@ -81,4 +81,4 @@ fun ChatExtensionOverlayHost(
 }
 
 private fun NavDestination?.fragmentClassName(): String? =
-    (this as? AddFragmentNavigator.Destination)?.className
+    (this as? FragmentNavigator.Destination)?.className

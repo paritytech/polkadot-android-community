@@ -13,11 +13,11 @@ import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.VoucherAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.breakdownRoundDown
-import io.paritytech.polkadotapp.feature_coinage_api.domain.common.withTransactionalAllocation
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.OnboardingUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
+import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
@@ -28,6 +28,7 @@ import javax.inject.Inject
 
 class RealOnboardingUseCase @Inject constructor(
     private val voucherAllocator: VoucherAllocator,
+    private val voucherRepository: VoucherRepository,
     private val chainRegistry: ChainRegistry,
     private val extrinsicService: ExtrinsicService,
     private val voucherRingDerivation: VoucherRingDerivation,
@@ -43,12 +44,19 @@ class RealOnboardingUseCase @Inject constructor(
 
         return coinAmountBreakdownUseCase.createCoinAmountBreakdown()
             .map { it.breakdownRoundDown(amount) }
-            .flatMap { denominations ->
-                voucherAllocator.withTransactionalAllocation(denominations) { vouchers ->
-                    registerVouchers(vouchers, signerSource, accountId, chain)
-                }
+            .flatMap { denominations -> voucherAllocator.allocateAll(denominations) }
+            .flatMap { vouchers ->
+                registerVouchers(vouchers, signerSource, accountId, chain)
+                    .onFailure { retireVouchers(vouchers.map { it.ringVrfKeyIndex }) }
             }
             .coerceToUnit()
+    }
+
+    // Retire rather than delete: keeping the row preserves ring-vrf-key-index monotonicity so a freed index
+    // is never reused (which would let a stale proof/memo reference the wrong ring key).
+    private suspend fun retireVouchers(indices: List<Int>) {
+        if (indices.isEmpty()) return
+        voucherRepository.setUsageStateByRingVrfKeyIndices(indices, RecyclerVoucher.UsageState.USED_LOCALLY)
     }
 
     private suspend fun registerVouchers(
@@ -70,9 +78,7 @@ class RealOnboardingUseCase @Inject constructor(
                 .zip(vouchers)
                 .mapNotNull { (result, voucher) -> voucher.ringVrfKeyIndex.takeIf { result.isFailure } }
 
-            if (failedIndices.isNotEmpty()) {
-                voucherAllocator.deallocate(failedIndices)
-            }
+            retireVouchers(failedIndices)
         }
     }
 

@@ -31,13 +31,13 @@ import timber.log.Timber
 import javax.inject.Inject
 
 interface VideoGameVoteInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getFrameUri(accountId: AccountId): String
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getVotesForCurrentGame(): List<VideoGameVote>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun submitVotes(finalVotes: Map<AccountId, Boolean>): Result<Unit>
 
     suspend fun getBannedAccountIds(): Set<AccountId>
@@ -56,19 +56,19 @@ class RealVideoGameVoteInteractor @Inject constructor(
     private val gameDashboardTelemetry: GameDashboardTelemetryEmitter,
     private val playerKeyResolver: VideoGamePlayerKeyResolver,
 ) : VideoGameVoteInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getFrameUri(accountId: AccountId): String {
         val gameIndex = gameInfoSyncService.getCurrentActiveGameInfo().index
         return frameFilePathCreator.getEncodedUri(gameIndex.value, accountId)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getVotesForCurrentGame(): List<VideoGameVote> {
         val gameIndex = gameInfoSyncService.getCurrentActiveGameInfo().index
         return videoGameRepository.getSavedVotesForGame(gameIndex)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun submitVotes(finalVotes: Map<AccountId, Boolean>) = runCatching {
         // Snapshot report-time state the results screen needs but which is gone by then:
         // membership (just-became-member vs existing) and playerCount (only exposed while the
@@ -122,7 +122,7 @@ class RealVideoGameVoteInteractor @Inject constructor(
             }
         }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun captureReportSnapshot() {
         val wasRegistered = runCatching {
             personStatusUseCase.personhoodStatusFlow().first() != PersonhoodStatus.NotPerson
@@ -135,7 +135,7 @@ class RealVideoGameVoteInteractor @Inject constructor(
         reportSnapshot.capture(wasRegistered = wasRegistered, playerCount = playerCount)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun submitReport(
         chain: Chain,
         report: FullVideoGameReport
@@ -155,7 +155,7 @@ class RealVideoGameVoteInteractor @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun getCurrentGameRounds(): List<VideoGameRound> {
         val gameInfo = gameInfoSyncService.getCurrentActiveGameInfo()
 

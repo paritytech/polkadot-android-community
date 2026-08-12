@@ -25,15 +25,15 @@ class ExtendAllocationState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
         // We immediately fail instead of waiting by subscription since approval of initial case to get full allocation is long process
         // So we don't want to consume user resources and our quota - better to schedule retry
-        if (!uploadSession.canIncreaseUploadQuota()) return Result.failure(IllegalStateException("Not yet ready to increase quota"))
+        if (!transition.uploadSession.canIncreaseUploadQuota()) return Result.failure(IllegalStateException("Not yet ready to increase quota"))
 
-        val currentAuthorizedTransactions = uploadSession.requireCurrentStorageAuthorization().extent.transactionsAllowance
+        val currentAuthorizedTransactions = transition.uploadSession.requireCurrentStorageAuthorization().extent.transactionsAllowance
 
-        return uploadSession.increaseUploadQuota().map {
+        return transition.uploadSession.increaseUploadQuota().map {
             val nextParams = Params(currentAuthorizedTransactions)
             stateFactory.awaitExtendAllocationConfirmation(nextParams)
         }
@@ -53,7 +53,7 @@ class AwaitExtendAllocationConfirmationState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
         awaitFullAllocation()
 
@@ -62,9 +62,9 @@ class AwaitExtendAllocationConfirmationState(
         return Result.success(stateFactory.storeFirstVideoChunk())
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     private suspend fun awaitFullAllocation() {
-        val subscriptions = uploadSession.subscriptions.await()
+        val subscriptions = transition.uploadSession.subscriptions.await()
 
         subscriptions.awaitPeopleChainFullAllocation()
         subscriptions.awaitBulletInChainFullAllocation()

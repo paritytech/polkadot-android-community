@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.repository
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.mapList
+import io.paritytech.polkadotapp.database.dao.ChatMessageCompactionDao
 import io.paritytech.polkadotapp.database.dao.ChatMessageDao
 import io.paritytech.polkadotapp.database.dao.ChatMessageDao.MessageContentUpdateLocal
 import io.paritytech.polkadotapp.database.dao.ChatMessageReactionDao
@@ -10,6 +11,7 @@ import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.RoomMetadata
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.*
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatMessageSearchHit
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastMessageSummary
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toDomain
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocal
@@ -119,10 +121,19 @@ interface ChatMessageRepository {
     suspend fun deleteAllChatMessages(chatId: ChatId)
 
     suspend fun getMessageStatuses(messageIds: List<ChatMessageId>): Map<ChatMessageId, ChatMessage.Status>
+
+    suspend fun commitCompaction(commitId: ChatMessageId, originalIds: List<ChatMessageId>)
+
+    suspend fun propagateStatusToCompactedMessages(commitId: ChatMessageId, status: ChatMessage.Status)
+
+    suspend fun unwindUnackedCompactions(chatId: ChatId)
+
+    suspend fun searchMessages(query: String, chatIds: List<ChatId>): Result<List<ChatMessageSearchHit>>
 }
 
 class RealChatMessageRepository @Inject constructor(
     private val chatMessageDao: ChatMessageDao,
+    private val chatMessageCompactionDao: ChatMessageCompactionDao,
     private val chatMessageReactionDao: ChatMessageReactionDao,
     private val chatRoomRepository: ChatRoomRepository,
     private val coroutineDispatchers: CoroutineDispatchers
@@ -136,12 +147,12 @@ class RealChatMessageRepository @Inject constructor(
 
         return when (onConflict) {
             ChatMessageSaveConflictStrategy.REPLACE -> {
-                chatMessageDao.insert(local)
+                chatMessageDao.saveMessage(local)
                 true
             }
 
             ChatMessageSaveConflictStrategy.IGNORE -> {
-                chatMessageDao.insertIfNotExists(local) >= 0
+                chatMessageDao.saveMessageIfNotExists(local) >= 0
             }
         }
     }
@@ -157,12 +168,12 @@ class RealChatMessageRepository @Inject constructor(
 
         return when (onConflict) {
             ChatMessageSaveConflictStrategy.REPLACE -> {
-                chatMessageDao.insert(locals)
+                chatMessageDao.saveMessages(locals)
                 chatMessages
             }
 
             ChatMessageSaveConflictStrategy.IGNORE -> {
-                val rowIds = chatMessageDao.insertIfNotExists(locals)
+                val rowIds = chatMessageDao.saveMessagesIfNotExist(locals)
                 chatMessages.filterIndexed { index, _ -> rowIds[index] >= 0 }
             }
         }
@@ -380,4 +391,52 @@ class RealChatMessageRepository @Inject constructor(
     ): ChatMessage? {
         return chatMessageDao.getMessage(messageId)?.toDomain(customContentDecoder)
     }
+
+    override suspend fun unwindUnackedCompactions(chatId: ChatId) {
+        chatMessageCompactionDao.unwindUnackedCompactions(chatId.toLocal(), updatedAt = System.currentTimeMillis())
+    }
+
+    override suspend fun commitCompaction(commitId: ChatMessageId, originalIds: List<ChatMessageId>) {
+        if (originalIds.isEmpty()) return
+
+        chatMessageCompactionDao.commitCompaction(originalIds, commitId)
+    }
+
+    override suspend fun propagateStatusToCompactedMessages(commitId: ChatMessageId, status: ChatMessage.Status) {
+        if (status != ChatMessage.Status.IS_SENT && status != ChatMessage.Status.IS_READ) return
+
+        val upgradableFrom = ChatMessage.Status.entries.filter { it.deliveryRank < status.deliveryRank }
+
+        chatMessageCompactionDao.propagateStatusToCompactionDescendants(
+            commitId = commitId,
+            fromStatuses = upgradableFrom.map { it.toLocal() },
+            toStatus = status.toLocal(),
+            updatedAt = System.currentTimeMillis()
+        )
+    }
+
+    override suspend fun searchMessages(query: String, chatIds: List<ChatId>): Result<List<ChatMessageSearchHit>> {
+        if (chatIds.isEmpty()) return Result.success(emptyList())
+
+        return runCatching {
+            val rawChatIds = chatIds.map { it.value.value }
+
+            chatMessageDao.searchMessages(query.escapeLikeWildcards(), rawChatIds, MESSAGE_SEARCH_LIMIT).map { local ->
+                ChatMessageSearchHit(
+                    chatId = ChatId.fromRawValue(local.chatId),
+                    messageId = local.id,
+                    snippet = local.searchableContent,
+                    timestamp = local.timestamp
+                )
+            }
+        }
+    }
 }
+
+private fun String.escapeLikeWildcards(): String {
+    return replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+}
+
+private const val MESSAGE_SEARCH_LIMIT = 50

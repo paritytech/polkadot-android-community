@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.design.theme.AppThemeSelector
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.theme.models.ThemeUiState
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -19,6 +20,7 @@ class ThemeViewModel @Inject constructor(
 ) : BaseViewModel() {
     private val availableThemes = PolkadotAppTheme.entries
         .sortedByDescending { it == PolkadotAppTheme.DEFAULT }
+        .toImmutableList()
 
     val state: StateFlow<ThemeUiState> = appThemeSelector.selectedTheme
         .map { selected ->

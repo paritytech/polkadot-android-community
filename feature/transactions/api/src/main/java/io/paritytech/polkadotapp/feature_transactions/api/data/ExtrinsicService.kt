@@ -20,7 +20,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.model.Extrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import kotlinx.coroutines.flow.Flow
 
-typealias FormExtrinsic = suspend context(WithRuntime, ExtrinsicBuilder) () -> Unit
+typealias FormExtrinsic = suspend context(WithRuntime) ExtrinsicBuilder.() -> Unit
 typealias FormMultiExtrinsic = suspend MultiExtrinsicBuilder.() -> Unit
 
 class FormExtrinsicWithOrigin(
@@ -80,7 +80,8 @@ interface ExtrinsicService {
         chain: Chain,
         origin: TransactionOrigin,
         options: SubmissionOptions = SubmissionOptions(),
-        submissionFailureRecovery: ExtrinsicSubmissionFailureRecoveryStrategy = Abort,
+        // null resolves to the default recovery (ResubmitWhenValid on TxInvalidation). Pass Abort to fail fast.
+        submissionFailureRecovery: ExtrinsicSubmissionFailureRecoveryStrategy? = null,
         formExtrinsic: FormExtrinsic,
     ): Result<ExtrinsicExecutionResult>
 

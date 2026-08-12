@@ -136,13 +136,13 @@ class ContainerBridge(
                 val params = gson.fromJson<Any>(paramsElement, entry.paramsType)
                 entry.handler(params)
                     .onSuccess { success -> respondValue(id, gson.toJson(success)) }
-                    .onFailure { respondError(id, "Internal error: ${it.message}") }
+                    .onFailure { respondError(id, it) }
             } catch (e: JsonSyntaxException) {
                 Timber.e(e, "ContainerBridge: failed to parse params for $method")
                 respondError(id, "Invalid params: ${e.message}")
             } catch (e: Exception) {
                 Timber.e(e, "ContainerBridge: handler failed for $method")
-                respondError(id, e.message ?: "Unknown error")
+                respondError(id, e)
             }
         }
     }
@@ -196,9 +196,21 @@ class ContainerBridge(
         callbackToJs(id, """{"value":$resultJson}""")
     }
 
+    private fun respondError(id: String, error: Throwable) {
+        respondError(id, (error as? HostCallException)?.code, error.message ?: "Unknown error")
+    }
+
     private fun respondError(id: String, message: String) {
-        Timber.d("Responding to request $id: Error $message")
-        callbackToJs(id, """{"error":${gson.toJson(message)}}""")
+        respondError(id, code = null, message = message)
+    }
+
+    private fun respondError(id: String, code: String?, message: String) {
+        Timber.d("Responding to request $id: Error [$code] $message")
+        val errorObject = JsonObject().apply {
+            if (code != null) addProperty("code", code)
+            addProperty("message", message)
+        }
+        callbackToJs(id, """{"error":${gson.toJson(errorObject)}}""")
     }
 
     private fun sendUpdate(id: String, updateJson: String) {

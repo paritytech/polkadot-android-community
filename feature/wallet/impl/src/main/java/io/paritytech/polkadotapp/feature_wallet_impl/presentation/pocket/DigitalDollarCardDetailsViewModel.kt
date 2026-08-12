@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDo
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.DigitalDollarCardDetailsUiState
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -49,8 +50,8 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
                     spendableSecuredBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableSecuredBalance)),
                     spendableDegradedBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableDegradedBalance)),
                     pendingBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.pendingBalance)),
-                    coinList = coins,
-                    voucherList = vouchers
+                    coinList = coins.toImmutableList(),
+                    voucherList = vouchers.toImmutableList()
                 ),
                 autoFundAvailable = interactor.autoFundAvailable(),
                 fundInProgress = inProgress,
@@ -114,10 +115,6 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
 
     fun onBackupCloseClick() {
         interactor.markBackupCompleted()
-    }
-
-    fun openScanner() {
-        router.openScan()
     }
 
     private fun BackupProgress.toBalanceRestoreUiState(): BalanceRestoreUiState {

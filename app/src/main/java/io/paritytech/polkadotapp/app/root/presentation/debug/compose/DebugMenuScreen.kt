@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.app.root.presentation.debug.compose
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.app.root.presentation.debug.DebugMenuContract
 import io.paritytech.polkadotapp.app.root.presentation.debug.DebugMenuState
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
+import io.paritytech.polkadotapp.design.components.compound.NovaSwitch
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Close
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
@@ -57,6 +60,7 @@ fun DebugMenuScreen(contract: DebugMenuContract) {
         onClearDotNsCacheClick = contract::onClearDotNsCacheClick,
         onClearJWTTokenClick = contract::onClearJWTTokenClick,
         onSimulateGameResultsClick = contract::onSimulateGameResultsClick,
+        onCoinageDebugWidgetsToggled = contract::onCoinageDebugWidgetsToggled,
     )
 }
 
@@ -79,6 +83,7 @@ private fun DebugMenuScreenInternal(
     onClearDotNsCacheClick: () -> Unit,
     onClearJWTTokenClick: () -> Unit,
     onSimulateGameResultsClick: () -> Unit,
+    onCoinageDebugWidgetsToggled: (Boolean) -> Unit,
 ) {
     PolkadotSurface {
         Column(
@@ -97,6 +102,14 @@ private fun DebugMenuScreenInternal(
             )
 
             VerticalSpacer { large }
+
+            DebugMenuToggleItem(
+                title = stringResource(RCommon.string.debug_menu_coinage_debug_widgets),
+                checked = state.coinageDebugWidgetsEnabled,
+                onCheckedChange = onCoinageDebugWidgetsToggled
+            )
+
+            VerticalSpacer { extraLargeIncreased }
 
             DebugMenuItem(
                 title = stringResource(RCommon.string.debug_menu_clear_backup),
@@ -196,6 +209,8 @@ private fun DebugMenuScreenInternal(
                 enabled = true,
                 onClick = onSimulateGameResultsClick
             )
+
+            VerticalSpacer { extraLargeIncreased }
         }
     }
 
@@ -274,6 +289,33 @@ private fun DebugMenuItem(
     )
 }
 
+@Composable
+private fun DebugMenuToggleItem(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = PolkadotTheme.spacings.large),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NovaText(
+            modifier = Modifier.weight(1f),
+            text = title,
+            style = PolkadotTheme.typography.body.large,
+            color = PolkadotTheme.colors.fg.primary
+        )
+
+        NovaSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
 @Preview
 @Composable
 private fun DebugMenuScreenPreview() {
@@ -295,6 +337,7 @@ private fun DebugMenuScreenPreview() {
             onClearDotNsCacheClick = {},
             onClearJWTTokenClick = {},
             onSimulateGameResultsClick = {},
+            onCoinageDebugWidgetsToggled = {},
         )
     }
 }

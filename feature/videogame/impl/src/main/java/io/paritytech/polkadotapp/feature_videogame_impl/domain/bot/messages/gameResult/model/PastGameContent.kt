@@ -52,6 +52,10 @@ sealed interface SuccessPastGameScoring {
     @Serializable
     @EnumIndex(3)
     data object ExternallyRecognized : SuccessPastGameScoring
+
+    @Serializable
+    @EnumIndex(4)
+    data object AlreadyReachedPersonhood : SuccessPastGameScoring
 }
 
 @Serializable

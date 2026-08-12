@@ -10,7 +10,7 @@ import javax.inject.Singleton
 internal class DeviceSyncInitializer @Inject constructor(
     private val coordinator: DeviceSyncCoordinator,
 ) : AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCatching {
         coordinator.startSubscriptions()
     }

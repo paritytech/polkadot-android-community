@@ -296,7 +296,7 @@ private fun ChatFeedPreview() {
                                     text = "Hello!",
                                     timestamp = 1625247660000,
                                     status = ChatMessageUiModel.Status.SENT,
-                                    reactions = emptyList(),
+                                    reactions = persistentListOf(),
                                     origin = ChatMessageOrigin.User,
                                     replyPreview = null,
                                     isEdited = false
@@ -307,7 +307,7 @@ private fun ChatFeedPreview() {
                                     text = "Hi there!",
                                     timestamp = 1625247600000,
                                     status = ChatMessageUiModel.Status.READ,
-                                    reactions = emptyList(),
+                                    reactions = persistentListOf(),
                                     origin = ChatMessageOrigin.User,
                                     replyPreview = null,
                                     isEdited = false

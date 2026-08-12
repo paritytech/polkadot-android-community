@@ -37,6 +37,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.Cha
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.LocalChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.ChatListLoading
+import kotlinx.collections.immutable.persistentListOf
 import kotlin.random.Random
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -174,7 +175,7 @@ private fun ChatRequestsListScreenLoadedPreview() {
         ChatRequestsListScreenInternal(
             loadingState = LoadingState.Loaded(
                 ChatRequestsListUiState(
-                    requests = listOf(
+                    requests = persistentListOf(
                         ChatRequestsListUiState.ChatRequestItem(
                             accountId = Random.randomBytes(32).intoAccountId(),
                             display = ChatDisplayUiModel(
@@ -207,7 +208,7 @@ private fun ChatRequestsListScreenEmptyPreview() {
     ChatRequestsListScreenPreview {
         ChatRequestsListScreenInternal(
             loadingState = LoadingState.Loaded(
-                ChatRequestsListUiState(requests = emptyList())
+                ChatRequestsListUiState(requests = persistentListOf())
             ),
             onRequestClick = {},
             onDeclineClick = {},

@@ -14,10 +14,10 @@ import javax.inject.Inject
 interface VideoGameChatBotInteractor {
     fun startUpdates(): Flow<*>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun observeGameProgressAndClaimCitizenship()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun observeGameProgressAndStartPersonSetup()
 }
 
@@ -27,7 +27,7 @@ class RealVideoGameChatBotInteractor @Inject constructor(
     private val videoGamesProgressUseCase: VideoGamesProgressUseCase,
     private val claimCitizenshipUseCase: VideoGameClaimCitizenshipUseCase,
 ) : VideoGameChatBotInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun observeGameProgressAndClaimCitizenship() {
         videoGamesProgressUseCase.videoGamesProgressFlow()
             .first { it is VideoGamesProgress.ReadyToReachPersonhood }
@@ -36,7 +36,7 @@ class RealVideoGameChatBotInteractor @Inject constructor(
             .logFailure("Unable to claim citizenship")
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun observeGameProgressAndStartPersonSetup() {
         videoGamesProgressUseCase.videoGamesProgressFlow()
             .first { it is VideoGamesProgress.PersonhoodReached }

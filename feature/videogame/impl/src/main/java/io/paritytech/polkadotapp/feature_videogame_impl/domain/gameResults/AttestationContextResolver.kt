@@ -39,7 +39,7 @@ class AttestationContextResolver @Inject constructor(
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
     private val reportSnapshot: GameReportSnapshot,
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     internal suspend fun resolve(): AttestationContext? {
         val chain = chainRegistry.peopleChain()
         val playingAccount = playingAccountUseCase.getPlayingAccount()

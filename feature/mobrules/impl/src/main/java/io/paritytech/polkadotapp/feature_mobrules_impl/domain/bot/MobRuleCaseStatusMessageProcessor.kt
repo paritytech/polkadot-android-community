@@ -31,32 +31,32 @@ class MobRuleCaseStatusMessageProcessor @Inject constructor(
     private val casesRepository: MobRuleCasesRepository,
     private val chainRegistry: ChainRegistry,
 ) : ChatBotMessageProcessor {
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun launchSendingMessages() {
-        scope.launch {
+        chatBotContext.scope.launch {
             recoverPersistedProcessingCases()
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     internal suspend fun sendInitialStatusAndTrack(caseId: MobRuleCaseId, userVoteType: UserVoteType) {
         val content = MobRuleCaseStatusContent(caseId.toString(), CaseJudgmentStatus.PROCESSING, userVoteType)
-        val message = sendCustomMessage(content, MobRuleCaseStatusMessageRenderer.ID)
-        scope.launch {
+        val message = chatBotContext.sendCustomMessage(content, MobRuleCaseStatusMessageRenderer.ID)
+        chatBotContext.scope.launch {
             val chainId = chainRegistry.knownChains.people
             casesRepository.observeCaseUpdates(chainId, listOf(caseId))
                 .mapNotNull { resolveJudgment(it, userVoteType) }
                 .map { newStatus ->
                     val newContent = MobRuleCaseStatusContent(caseId.toString(), newStatus, userVoteType)
-                    modifyMessage(message.id, ChatMessage.Content.Custom(MobRuleCaseStatusMessageRenderer.ID, Result.success(newContent)))
+                    chatBotContext.modifyMessage(message.id, ChatMessage.Content.Custom(MobRuleCaseStatusMessageRenderer.ID, Result.success(newContent)))
                 }
                 .first()
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun recoverPersistedProcessingCases() {
-        val messages = getPersistedMessages()
+        val messages = chatBotContext.getPersistedMessages()
         val processingCases = messages.mapNotNull { message ->
             val content = message.customContentOrNull<MobRuleCaseStatusContent>() ?: return@mapNotNull null
             if (content.status != CaseJudgmentStatus.PROCESSING) return@mapNotNull null
@@ -76,7 +76,7 @@ class MobRuleCaseStatusMessageProcessor @Inject constructor(
             }
             .collect { (case, judgmentStatus) ->
                 val newContent = MobRuleCaseStatusContent(case.caseId.toString(), judgmentStatus, case.userVoteType)
-                modifyMessage(case.messageId, ChatMessage.Content.Custom(MobRuleCaseStatusMessageRenderer.ID, Result.success(newContent)))
+                chatBotContext.modifyMessage(case.messageId, ChatMessage.Content.Custom(MobRuleCaseStatusMessageRenderer.ID, Result.success(newContent)))
             }
     }
 

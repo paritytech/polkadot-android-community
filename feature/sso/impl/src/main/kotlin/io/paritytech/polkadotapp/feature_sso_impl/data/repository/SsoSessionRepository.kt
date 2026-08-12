@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_sso_impl.data.repository
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.common.utils.mapToUnit
 import io.paritytech.polkadotapp.database.dao.SsoSessionDao
 import io.paritytech.polkadotapp.database.model.SsoSessionLocal
@@ -51,7 +52,7 @@ class SsoSessionRepository @Inject constructor(
 
     private fun SsoSessionWithMetadata.toDomain(): SsoSessionData {
         return SsoSessionData(
-            sharedSecretPublicKey = EncodedPublicKey(session.sharedSecretPublicKey),
+            sharedSecretPublicKey = session.sharedSecretPublicKey.requireX25519PublicKey(),
             statementStorePublicKey = EncodedPublicKey(session.statementStorePublicKey),
             metadata = metadata.toDomain(),
             addedAt = session.addedAt,
@@ -70,7 +71,7 @@ class SsoSessionRepository @Inject constructor(
 
     private fun SsoSessionData.toLocal(): SsoSessionLocal {
         return SsoSessionLocal(
-            sharedSecretPublicKey = sharedSecretPublicKey.value,
+            sharedSecretPublicKey = sharedSecretPublicKey.bytes.value,
             statementStorePublicKey = statementStorePublicKey.value,
             addedAt = addedAt,
             status = status.name,
@@ -83,7 +84,7 @@ class SsoSessionRepository @Inject constructor(
     private fun SsoSessionData.metadataToLocal(): List<SsoSessionMetadataLocal> {
         return metadata.entries.map { (key, value) ->
             SsoSessionMetadataLocal(
-                sessionSharedSecretPublicKey = sharedSecretPublicKey.value,
+                sessionSharedSecretPublicKey = sharedSecretPublicKey.bytes.value,
                 key = key.serialize(),
                 value = value,
             )

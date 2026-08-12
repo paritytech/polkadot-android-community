@@ -4,14 +4,12 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
-import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContextHolder
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.model.CreateProductRoomRequest
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.model.CreateProductRoomResult
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.model.ProductChatIdParameter
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.model.ProductChatRoom
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiInteractor
-import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -21,10 +19,8 @@ import kotlinx.coroutines.flow.emptyFlow
  */
 class ProductsBotApiImpl @AssistedInject constructor(
     hostApiInteractor: HostApiInteractor,
-    signingContextHolder: SigningContextHolder,
-    router: ProductsRouter,
     @Assisted callingProductIdProvider: CallingProductIdProvider
-) : BaseProductsBotApi(hostApiInteractor, signingContextHolder, router, callingProductIdProvider) {
+) : BaseProductsBotApi(hostApiInteractor, callingProductIdProvider) {
     @AssistedFactory
     interface Factory {
         fun create(callingProductIdProvider: CallingProductIdProvider): ProductsBotApiImpl

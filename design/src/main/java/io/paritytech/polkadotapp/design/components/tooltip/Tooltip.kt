@@ -14,7 +14,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 internal val DefaultPopupProperties = PopupProperties(focusable = true)
 
 @Composable
-fun NovaTooltip(
+fun PolkadotTooltip(
     expanded: Boolean,
     onDismiss: () -> Unit,
     backgroundColor: Color = PolkadotTheme.colors.bg.surface.containerInverted,

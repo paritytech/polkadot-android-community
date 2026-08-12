@@ -10,8 +10,10 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
+import io.paritytech.polkadotapp.common.utils.ResettableLazy
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.tools_auth_api.GoogleAuthManager
+import io.paritytech.polkadotapp.tools_backup_api.domain.error.CorruptedBackupException
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.BackupMetadata
 import io.paritytech.polkadotapp.tools_backup_impl.BuildConfig
 import io.paritytech.polkadotapp.tools_backup_impl.data.model.BackupConfig
@@ -34,7 +36,9 @@ class GoogleDriveBackupStorage @Inject constructor(
 ) : EncryptedBackupStore {
     private val config = BackupConfig(FOLDER_NAME, APP_NAME)
 
-    private val drive: Drive by lazy { createGoogleDriveService() }
+    private val driveLazy = ResettableLazy { createGoogleDriveService() }
+
+    private val drive by driveLazy
 
     override suspend fun isAuthorized(): Boolean = googleManager.isAuthorized()
 
@@ -63,20 +67,25 @@ class GoogleDriveBackupStorage @Inject constructor(
 
     override suspend fun resetUserAuthentication() {
         googleManager.signOut()
+        driveLazy.reset()
     }
 
     private fun writeBackupFileToDrive(fileContent: ByteArray, label: String): Result<File> {
         return runCatching {
             val contentStream = ByteArrayContent(BACKUP_MIME_TYPE, fileContent)
 
-            getBackupFileFromCloud()?.apply { drive.files().delete(id).execute() }
+            val existing = getBackupFileFromCloud()
 
-            val fileMetadata = File().apply {
-                parents = listOf(getFolderId())
-                name = getFileName(label)
+            if (existing != null) {
+                drive.files().update(existing.id, File().apply { name = getFileName(label) }, contentStream).execute()
+            } else {
+                val fileMetadata = File().apply {
+                    parents = listOf(getFolderId())
+                    name = getFileName(label)
+                }
+
+                drive.files().create(fileMetadata, contentStream).execute()
             }
-
-            drive.files().create(fileMetadata, contentStream).execute()
         }
     }
 
@@ -91,11 +100,10 @@ class GoogleDriveBackupStorage @Inject constructor(
                     .get(backupFile.id)
                     .executeMediaAndDownloadTo(outputStream)
             } catch (e: HttpResponseException) {
+                // 416 means the stored backup is empty/unreadable — classify as corrupted at the detection site
                 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/416
-                // Not handle 416 error, to handle it as corrupted backup
-                if (e.statusCode != 416) {
-                    throw e
-                }
+                if (e.statusCode == 416) throw CorruptedBackupException(e)
+                throw e
             }
 
             RestoredEncryptedBackup(
@@ -108,7 +116,7 @@ class GoogleDriveBackupStorage @Inject constructor(
     private fun deleteBackupFileFromDrive(): Result<Unit> {
         return runCatching {
             val backupFile = getBackupFileFromCloud() ?: return@runCatching
-            drive.files().delete(backupFile.id).execute()
+            drive.moveToTrash(backupFile.id)
         }.coerceToUnit()
     }
 
@@ -155,3 +163,6 @@ class GoogleDriveBackupStorage @Inject constructor(
 
     private fun getFileName(label: String) = "${getFilePrefix()}-$label-$DO_NOT_DELETE_FILE_POSTFIX"
 }
+
+private fun Drive.moveToTrash(fileId: String) =
+    files().update(fileId, File().apply { trashed = true }).execute()

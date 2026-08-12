@@ -1,10 +1,14 @@
 package io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import io.paritytech.polkadotapp.common.R
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
@@ -18,6 +22,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.asAnyRe
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatMessageUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatPreviewUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.CustomChatPreviewUiModel
+import io.paritytech.polkadotapp.feature_chats_api.presentation.model.DraftPreviewUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.LastMessageUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageAttachmentType
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.util.formatCallDuration
@@ -35,8 +40,27 @@ internal fun ChatPreviewUiModel.toPreviewBody(username: String): ChatPreviewBody
     return when (this) {
         is CustomChatPreviewUiModel<*> -> renderer.formatChatPreview(data).coverUnsupportedMessage().asPlainBody()
 
+        is DraftPreviewUiModel -> draftPreviewBody(text)
+
         is LastMessageUiModel -> toPreviewBody(username)
     }
+}
+
+@Composable
+private fun draftPreviewBody(text: String): ChatPreviewBody {
+    val full = stringResource(R.string.chat_last_message_draft_prefix, text)
+    val body = remember(full, text) {
+        buildAnnotatedString {
+            append(full)
+            val labelEnd = full.indexOf(text).coerceAtLeast(0)
+            addStyle(
+                style = SpanStyle(fontWeight = FontWeight.Bold),
+                start = 0,
+                end = labelEnd,
+            )
+        }
+    }
+    return ChatPreviewBody(text = body)
 }
 
 @Composable
@@ -84,6 +108,8 @@ private fun LastMessageUiModel.toPreviewBody(username: String): ChatPreviewBody 
             ).asPlainBody()
 
         is LastMessageUiModel.Unsupported -> stringResource(R.string.chat_message_unsupported).asPlainBody()
+
+        is LastMessageUiModel.CompactionUnavailable -> stringResource(R.string.chat_message_compaction_unavailable).asPlainBody()
 
         is LastMessageUiModel.LeftChat -> (
             if (isIncoming) stringResource(R.string.chat_last_message_left_chat_incoming, username).withBold(username)

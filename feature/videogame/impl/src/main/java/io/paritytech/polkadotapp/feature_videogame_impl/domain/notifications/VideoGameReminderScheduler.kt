@@ -26,7 +26,6 @@ class RealVideoGameReminderScheduler @Inject constructor(
     private companion object {
         val WAITING_ROOM_SCHEDULE_OFFSET_MILLIS = 5.minutes.inWholeMilliseconds
         val ABOUT_TO_START_SCHEDULE_OFFSET_MILLIS = 1.minutes.inWholeMilliseconds
-        val GAME_START_SCHEDULE_OFFSET_MILLIS = 20.seconds.inWholeMilliseconds
     }
 
     private val alarmManager = contextManager.applicationContext.getSystemService(AlarmManager::class.java)
@@ -50,10 +49,19 @@ class RealVideoGameReminderScheduler @Inject constructor(
     }
 
     override fun scheduleGameStart(gameStartMillis: Timestamp) {
-        scheduleAlarm(
-            VideoGameNotificationType.GameStartsSoon,
-            gameStartMillis - GAME_START_SCHEDULE_OFFSET_MILLIS
-        )
+        val offsetMillis = alarmPreferences.getAlarmOffset().seconds.seconds.inWholeMilliseconds
+        val triggerAtMillis = gameStartMillis - offsetMillis
+
+        if (triggerAtMillis <= System.currentTimeMillis()) {
+            cancelAlarm(VideoGameNotificationType.GameStartsSoon)
+            return
+        }
+
+        scheduleAlarm(VideoGameNotificationType.GameStartsSoon, triggerAtMillis)
+    }
+
+    private fun cancelAlarm(notificationType: VideoGameNotificationType) {
+        alarmManager.cancel(createPendingIntent(notificationType))
     }
 
     @SuppressLint("MissingPermission")

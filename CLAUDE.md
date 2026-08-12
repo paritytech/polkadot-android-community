@@ -32,7 +32,7 @@ These are the cross-cutting rules that apply to **all** code writing, regardless
 12. **Package leaves** are camelCase (`pairRequest`, not `pairrequest`).
 13. **No default values** in data-carrying constructors (requests, payloads, domain models).
 14. **Imports**, never fully-qualified types inline.
-15. **Comments** only when explaining **why** (non-obvious invariants, workarounds). Default to none. KDoc on `api/` public methods only.
+15. **Comments** — minimal is **mandatory**. Default to none. Write one ONLY where the code is genuinely specific and a reader could misread the logic without it (non-obvious **why**: invariant, workaround, platform quirk). Never restate what the code does. KDoc on `api/` public methods only.
 
 When a more specific rule conflicts with one above (rare), the docs win — they have the rationale.
 

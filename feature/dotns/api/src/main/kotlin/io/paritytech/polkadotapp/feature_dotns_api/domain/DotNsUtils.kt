@@ -1,27 +1,26 @@
 package io.paritytech.polkadotapp.feature_dotns_api.domain
 
-import android.R.attr.host
 import android.net.Uri
 import io.paritytech.polkadotapp.common.utils.Urls
+import io.paritytech.polkadotapp.common.utils.isDotWebMirrorHost
+import io.paritytech.polkadotapp.common.utils.toCanonicalDotHost
 
 object DotNsUtils {
-    private val DOT_LI_SUFFIX = Regex("\\.dot\\.li$")
-
     /**
-     * Whether [uri] points to a .dot domain (`.dot` or `.dot.li`).
+     * Whether [uri] points to a .dot domain (`.dot`, or its `.dot.li` / `.paseo.li` web mirrors).
      *
      * Expects a [Uri] with a scheme (e.g. `https://coinflip.dot/path`).
      * Bare hostnames without a scheme will return `false` since [Uri.getHost] returns null for them.
      */
     fun isDotDomain(uri: Uri): Boolean {
         val host = uri.host ?: return false
-        return host.endsWith(".dot") || host.endsWith(".dot.li")
+        return host.endsWith(".dot") || isDotWebMirrorHost(host)
     }
 
     /**
      * Normalize a .dot domain [Uri]:
      * - Ensures `https://` scheme
-     * - Converts `.dot.li` to `.dot`
+     * - Converts the `.dot.li` and `.paseo.li` web mirrors to the canonical `.dot` name
      *
      * Returns `null` if [uri] is not a .dot domain.
      */
@@ -32,7 +31,7 @@ object DotNsUtils {
 
         val host = withScheme.host ?: return null
 
-        val dotDomain = host.replace(DOT_LI_SUFFIX, ".dot")
+        val dotDomain = host.toCanonicalDotHost()
 
         return withScheme.buildUpon()
             .authority(dotDomain)

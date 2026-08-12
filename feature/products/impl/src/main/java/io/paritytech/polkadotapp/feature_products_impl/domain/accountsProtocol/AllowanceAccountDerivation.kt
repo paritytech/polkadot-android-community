@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.accountsProtocol
 
 import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519Keypair
-import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.AccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.SlotAccountKey
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
@@ -19,7 +18,7 @@ class AllowanceAccountDerivation @Inject constructor(
         return accountDerivationUseCase.deriveKeypair(allowancePath(system, productId))
             .mapCatching { keypair ->
                 require(keypair is Sr25519Keypair) { "Allowance accounts must be Sr25519" }
-                SlotAccountKey(DataByteArray(keypair.privateKey + keypair.nonce))
+                SlotAccountKey.fromKeypair(keypair)
             }
     }
 

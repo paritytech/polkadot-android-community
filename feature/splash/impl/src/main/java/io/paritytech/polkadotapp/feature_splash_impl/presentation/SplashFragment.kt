@@ -11,5 +11,7 @@ class SplashFragment : BaseComposeFragment<SplashViewModel>() {
     override val viewModel: SplashViewModel by viewModels()
 
     @Composable
-    override fun Screen() = SplashScreen(viewModel)
+    override fun Screen() {
+        SplashScreen(viewModel)
+    }
 }

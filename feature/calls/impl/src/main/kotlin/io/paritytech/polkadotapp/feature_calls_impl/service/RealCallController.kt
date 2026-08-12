@@ -90,8 +90,8 @@ class RealCallController @Inject constructor(
         context.startService(CallService.setMicrophoneEnabledIntent(context, enabled))
     }
 
-    override fun setSpeakerphoneOn(enabled: Boolean) {
-        context.startService(CallService.setSpeakerphoneOnIntent(context, enabled))
+    override fun selectAudioDevice(deviceId: Int) {
+        context.startService(CallService.selectAudioDeviceIntent(context, deviceId))
     }
 
     private fun hasRecordAudioPermission(): Boolean {

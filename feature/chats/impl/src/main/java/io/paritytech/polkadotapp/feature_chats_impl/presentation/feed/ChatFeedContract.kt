@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.Cha
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatMessagesState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatToolbarAction
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -39,7 +40,7 @@ interface ChatFeedContract {
     val scrollToPosition: SharedFlow<Int>
     val toolbarActions: StateFlow<ImmutableList<ChatToolbarAction>>
 
-    val highlightEvents: SharedFlow<HighlightedMessage>
+    val highlightEvents: Flow<HighlightedMessage>
 
     fun onBackClick()
     fun onMessageChange(message: String)

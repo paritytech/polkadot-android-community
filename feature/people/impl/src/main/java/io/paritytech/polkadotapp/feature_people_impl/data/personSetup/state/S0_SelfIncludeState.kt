@@ -16,14 +16,14 @@ class SelfIncludeState(
 
     override val id = ID
 
-    context(PersonSetupState.Transition)
+    context(transition: PersonSetupState.Transition)
     override suspend fun performTransition(): TransitionResult<PersonSetupState> {
-        val eligibility = runCatching { dataSource.getCurrentEligibility() }
+        val eligibility = runCatching { transition.dataSource.getCurrentEligibility() }
             .getOrElse { return TransitionResult.failure(it) }
 
         return when (eligibility) {
             is SelfIncludeEligibility.Eligible -> {
-                val submission: Result<PersonSetupState> = dataSource.submitSelfInclude(eligibility.callValidAt)
+                val submission: Result<PersonSetupState> = transition.dataSource.submitSelfInclude(eligibility.callValidAt)
                     .flattenExecutionFailure()
                     .logFailure("self_include submission failed")
                     .map { stateFactory.awaitRingInclusion() }

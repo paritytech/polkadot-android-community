@@ -4,6 +4,6 @@ import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import kotlinx.coroutines.flow.Flow
 
 interface GetActiveDimCommitmentState {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     operator fun invoke(currentDim: DimId): Flow<DimState?>
 }

@@ -3,9 +3,10 @@ package io.paritytech.polkadotapp.feature_chats_impl.presentation.chatRequestsLi
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatDisplayUiModel
+import kotlinx.collections.immutable.ImmutableList
 
 data class ChatRequestsListUiState(
-    val requests: List<ChatRequestItem>
+    val requests: ImmutableList<ChatRequestItem>
 ) {
     val isEmpty: Boolean = requests.isEmpty()
 

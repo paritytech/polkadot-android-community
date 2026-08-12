@@ -14,18 +14,17 @@ import io.paritytech.polkadotapp.common.utils.scale.BigEndianU32Scale
 @JvmInline
 value class LtsResourcesApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.ltsResources: LtsResourcesApi
     get() = LtsResourcesApi(resources())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val LtsResourcesApi.longTermStoragePeriodDuration: UInt
     get() = constant("LongTermStoragePeriodDuration")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val LtsResourcesApi.longTermStorageClaimsPerPeriod: UByte
     get() = constant("LongTermStorageClaimsPerPeriod")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val LtsResourcesApi.spentLongTermStorageAliases: QueryableStorageEntry2<BigEndianU32Scale, BandersnatchAlias, Unit>
     get() = storage2("SpentLongTermStorageAliases")

@@ -43,19 +43,18 @@ internal class RealVideoGamesProgressUseCase @Inject constructor(
         const val GAME_PROGRESS_CACHE_KEY = "RealVideoGamesProgressUseCase.GameProgress"
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun videoGamesProgressFlow(): Flow<VideoGamesProgress> {
         return computationalCache.useSharedFlow(GAME_PROGRESS_CACHE_KEY) {
             videoGamesProgressFlowInternal()
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun videoGameProgress(): VideoGamesProgress {
         return videoGamesProgressFlow().first()
     }
 
-    context(ComputationalScope)
     private suspend fun videoGamesProgressFlowInternal(): Flow<VideoGamesProgress> {
         val chain = chainRegistry.peopleChain()
         val candidateAccount = accountRepository.getCandidateAccount()

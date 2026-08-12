@@ -5,5 +5,5 @@ import io.paritytech.polkadotapp.feature_videogame_impl.domain.notifications.Gam
 
 @Immutable
 data class AlertSettingsUiState(
-    val selectedOffset: GameStartAlarmOffset = GameStartAlarmOffset.TEN_SECONDS
+    val selectedOffset: GameStartAlarmOffset
 )

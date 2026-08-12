@@ -37,12 +37,14 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Local
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalKnownTokenFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun FundingOperations(
     modifier: Modifier,
-    operations: List<FundingOperation>,
+    operations: ImmutableList<FundingOperation>,
 ) {
     PolkadotSurface(
         modifier = modifier,
@@ -172,7 +174,7 @@ private fun FundingOperationsPreview() {
         ) {
             FundingOperations(
                 modifier = Modifier.fillMaxWidth(),
-                operations = listOf(
+                operations = persistentListOf(
                     mockOperation(),
                     mockOperation().copy(status = Status.Failure),
                     mockOperation().copy(status = Status.InProgress(5.seconds)),

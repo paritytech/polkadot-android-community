@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 interface VideoGameOffboardingOptionUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribe(): Flow<VideoGameOffboardingOption>
 }
 
@@ -21,7 +21,7 @@ class RealVideoGameOffboardingOptionUseCase @Inject constructor(
     private val gamesProgressUseCase: VideoGamesProgressUseCase,
     private val videoGameInfoSyncService: VideoGameInfoSyncService
 ) : VideoGameOffboardingOptionUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribe(): Flow<VideoGameOffboardingOption> = combine(
         videoGameRegistrationStageUseCase.subscribe(),
         gamesProgressUseCase.videoGamesProgressFlow(),

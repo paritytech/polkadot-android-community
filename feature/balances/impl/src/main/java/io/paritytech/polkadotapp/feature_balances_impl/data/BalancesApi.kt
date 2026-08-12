@@ -13,10 +13,9 @@ import io.paritytech.polkadotapp.feature_balances_impl.data.bindings.bindBalance
 @JvmInline
 value class BalancesApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.balances: BalancesApi
     get() = BalancesApi(balances())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val BalancesApi.holds: QueryableStorageEntry1<ByteArray, List<BalanceHold>>
     get() = storage1("Holds", binding = { dynamic, _ -> bindBalanceHolds(dynamic) })

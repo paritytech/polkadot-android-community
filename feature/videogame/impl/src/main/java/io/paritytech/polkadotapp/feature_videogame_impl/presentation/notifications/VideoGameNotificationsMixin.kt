@@ -21,7 +21,7 @@ class VideoGameNotificationsMixin @Inject constructor(
     private val videoGameReminderScheduler: VideoGameReminderScheduler,
     private val router: VideoGameRouter
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun checkPermissionsAndScheduleGameReminders() {
         if (context.checkIfPermissionsGranted()) {
             scheduleGameReminders()
@@ -30,7 +30,7 @@ class VideoGameNotificationsMixin @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun scheduleGameReminders() {
         val gameInfo = gameInfoSyncService.getCurrentActiveGameInfo()
 

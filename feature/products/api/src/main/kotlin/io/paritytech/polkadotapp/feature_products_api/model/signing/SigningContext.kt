@@ -5,6 +5,9 @@ interface SigningContext {
     val requesterIconUrl: String
     val signingRequestBody: SigningRequestBody
 
+    /** The account this request signs with, resolved before the signing screen is shown. */
+    val signingAccount: SigningAccount
+
     suspend fun deliverSignedResult(signedTransaction: SignedTransaction): Result<Unit>
 
     suspend fun deliverRejection(): Result<Unit>

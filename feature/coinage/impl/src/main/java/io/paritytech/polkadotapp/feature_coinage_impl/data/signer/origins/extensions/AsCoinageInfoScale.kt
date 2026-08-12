@@ -10,6 +10,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.serializers
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchProof
 import io.paritytech.polkadotapp.common.utils.scale.ToDynamicScaleInstance
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
+import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -43,4 +44,5 @@ sealed class AsCoinageInfoScale : ToDynamicScaleInstance {
 class PeopleRingProof(
     val proof: BandersnatchProof,
     val ring: RingIndex,
+    val revision: RingRevision,
 )

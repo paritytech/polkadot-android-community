@@ -13,7 +13,7 @@ import javax.inject.Singleton
 class AppInitializerPipeline @Inject constructor(
     private val initializers: Set<@JvmSuppressWildcards AppInitializer>
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun initialize() {
         initializers.forEach { initializer ->
             initializer.initialize()

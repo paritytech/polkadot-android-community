@@ -127,6 +127,18 @@ sealed class ChatMessageContentLocal {
     ) : ChatMessageContentLocal()
 
     @Serializable
+    @EnumIndex(22)
+    class CompactionCommit(
+        val claimIdentifier: ByteArraySerializable,
+        val claimTicket: ByteArraySerializable,
+        val nodeUrl: String,
+    ) : ChatMessageContentLocal()
+
+    @Serializable
+    @EnumIndex(23)
+    object CompactionUnavailable : ChatMessageContentLocal()
+
+    @Serializable
     @EnumIndex(255)
     class Custom(val rendererId: String, val rawContent: ByteArray?) : ChatMessageContentLocal()
 }

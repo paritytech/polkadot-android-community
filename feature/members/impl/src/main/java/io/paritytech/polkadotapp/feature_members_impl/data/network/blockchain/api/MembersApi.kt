@@ -26,34 +26,32 @@ import io.paritytech.polkadotapp.feature_members_api.data.model.RingStatus
 @JvmInline
 value class MembersApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.members: MembersApi
     get() = MembersApi(module(Modules.MEMBERS))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MembersApi.members: QueryableStorageEntry2<RingCollectionId, BandersnatchPublicKey, RingPosition>
     get() = storage2("Members")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MembersApi.root: QueryableStorageEntry2<RingCollectionId, RingIndex, RingRoot>
     get() = storage2("Root")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MembersApi.ringKeysStatus: QueryableStorageEntry2<RingCollectionId, RingIndex, RingStatus>
     get() = storage2("RingKeysStatus")
 
-context(WithRuntime)
 val MembersApi.ringKeys: QueryableStorageEntry3<RingCollectionId, RingIndex, PageIndex, RingKeys>
     get() = storage3("RingKeys")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MembersApi.collections: QueryableStorageEntry1<RingCollectionId, RingCollection>
     get() = storage1("Collections")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MembersApi.ringsState: QueryableStorageEntry1<RingCollectionId, RingMembersState>
     get() = storage1("RingsState")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MembersApi.onboardingSize: QueryableStorageEntry1<RingCollectionId, Int>
     get() = storage1("OnboardingSize")

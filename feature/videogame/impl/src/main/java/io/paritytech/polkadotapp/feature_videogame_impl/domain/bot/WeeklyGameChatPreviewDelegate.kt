@@ -46,7 +46,7 @@ class WeeklyGameChatPreviewDataProvider @Inject constructor(
         private val TICK_INTERVAL = 1.minutes
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun provide(): Flow<ChatPreview.Custom<WeeklyGameChatPreview>?> {
         // Emit the pinned idle preview immediately so Polkadot Prizes stays on top from the
         // first frame, even before the 5 upstream flows below have all produced their initial

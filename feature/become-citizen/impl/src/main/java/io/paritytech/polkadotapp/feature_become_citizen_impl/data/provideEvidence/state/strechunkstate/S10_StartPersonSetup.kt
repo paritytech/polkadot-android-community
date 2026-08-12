@@ -17,7 +17,7 @@ class StartPersonSetupState(
 
     override val id: String = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
         return runCatching {
             personSetupStarter.startPersonSetup()

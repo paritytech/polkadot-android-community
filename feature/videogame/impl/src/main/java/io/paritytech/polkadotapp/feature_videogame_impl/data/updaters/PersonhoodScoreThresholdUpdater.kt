@@ -14,8 +14,8 @@ class PersonhoodScoreThresholdUpdater @Inject constructor(
     chainRegistry: ChainRegistry,
     storageCache: StorageCache
 ) : SingleStorageKeyUpdater<Unit>(GlobalUpdaterScope, chainRegistry, storageCache) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: Unit, chain: Chain): String {
-        return runtime.metadata.score.personhoodThreshold.storageKey()
+        return withRuntime.runtime.metadata.score.personhoodThreshold.storageKey()
     }
 }

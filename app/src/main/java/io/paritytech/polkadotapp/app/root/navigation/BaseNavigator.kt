@@ -73,10 +73,14 @@ abstract class BaseNavigator(private val navigationHolder: NavigationHolder) : R
         navController?.performNavigation(actionId, args, navOptions)
     }
 
-    protected fun popBackstack(@IdRes destinationId: Int, inclusive: Boolean = false) {
+    /** Returns whether [destinationId] was on the back stack and everything above it got popped. */
+    protected fun popBackstack(@IdRes destinationId: Int, inclusive: Boolean = false): Boolean {
         val navController = navigationHolder.navController
-        navController?.popBackStack(destinationId, inclusive)
+        return navController?.popBackStack(destinationId, inclusive) ?: false
     }
+
+    protected fun isCurrentDestination(@IdRes destinationId: Int): Boolean =
+        navigationHolder.navController?.currentDestination?.id == destinationId
 
     protected fun NavController.performNavigation(
         @IdRes actionId: Int,

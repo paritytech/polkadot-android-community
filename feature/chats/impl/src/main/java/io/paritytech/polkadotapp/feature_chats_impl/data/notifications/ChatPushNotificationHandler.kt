@@ -19,6 +19,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.Incoming
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.IncomingChatPushDecoder.Companion.MESSAGE_KEY
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.IncomingChatPushDecoder.Companion.PUSH_ID_KEY
 import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionStarter
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessageOrUnsupported
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -64,6 +65,7 @@ internal class ChatPushNotificationHandler @Inject constructor(
     private val accountRepository: AccountRepository,
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
+    private val compactionExpansionStarter: CompactionExpansionStarter,
     @param:ApplicationContext private val appContext: Context
 ) : PushNotificationHandler {
     override suspend fun canHandle(data: Map<String, String>): Boolean {
@@ -151,6 +153,10 @@ internal class ChatPushNotificationHandler @Inject constructor(
 
         for (chatMessage in chatMessages) {
             chatEngine.saveMessage(chatMessage, ChatMessageSaveConflictStrategy.IGNORE)
+        }
+
+        if (chatMessages.any { it.content is ChatMessage.Content.CompactionCommit }) {
+            compactionExpansionStarter.startExpansion()
         }
 
         if (previouslyUnseen.isEmpty()) return
@@ -251,7 +257,9 @@ internal class ChatPushNotificationHandler @Inject constructor(
             is ChatMessage.Content.DataChannelIceCandidate,
             is ChatMessage.Content.DataChannelClosed,
             is ChatMessage.Content.DeviceAdded,
-            is ChatMessage.Content.DeviceRemoved -> null
+            is ChatMessage.Content.DeviceRemoved,
+            is ChatMessage.Content.CompactionCommit,
+            is ChatMessage.Content.CompactionUnavailable -> null
 
             is ChatMessage.Content.ChatAccepted,
             is ChatMessage.Content.DeviceChatAccepted -> {
@@ -294,5 +302,7 @@ internal fun ChatMessage.Content.isDisplayableAsPush(): Boolean = when (this) {
     is ChatMessage.Content.DataChannelIceCandidate,
     is ChatMessage.Content.DataChannelClosed,
     is ChatMessage.Content.DeviceAdded,
-    is ChatMessage.Content.DeviceRemoved -> false
+    is ChatMessage.Content.DeviceRemoved,
+    is ChatMessage.Content.CompactionCommit,
+    is ChatMessage.Content.CompactionUnavailable -> false
 }

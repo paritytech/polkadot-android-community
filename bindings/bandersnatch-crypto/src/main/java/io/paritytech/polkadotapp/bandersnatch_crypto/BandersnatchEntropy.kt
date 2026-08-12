@@ -50,12 +50,17 @@ fun BandersnatchEntropy.createProof(
     message: ByteArray,
     context: ByteArray,
     domainSize: BandersnatchDomainSize
-): BandersnatchProof {
+): BandersnatchProofResult {
     require(memberKey() in allMembers) { "Prover member key must be in allMembers" }
 
-    val proof = BandersnatchCrypto.create_proof(value, allMembers.map { it.value }, context, message, domainSize.ordinal)
-    return proof.toDataByteArray()
+    val result = BandersnatchCrypto.create_proof(value, allMembers.map { it.value }, context, message, domainSize.ordinal)
+    return BandersnatchProofResult(
+        proof = result.proof.toDataByteArray(),
+        alias = BandersnatchAlias(result.alias),
+    )
 }
+
+data class BandersnatchProofResult(val proof: BandersnatchProof, val alias: BandersnatchAlias)
 
 fun BandersnatchEntropy.sign(
     message: ByteArray

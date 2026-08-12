@@ -15,6 +15,8 @@ import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.models.EvidenceInstructionItem
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.video.instructions.EvidenceVideoInstructionsContract
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.video.instructions.compose.components.PreconditionsBottomSheetContent
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -44,8 +46,8 @@ fun EvidenceVideoInstructionScreen(contract: EvidenceVideoInstructionsContract) 
 }
 
 @Composable
-private fun rememberEvidenceVideoInstructionItems(): List<EvidenceInstructionItem> = remember {
-    listOf(
+private fun rememberEvidenceVideoInstructionItems(): ImmutableList<EvidenceInstructionItem> = remember {
+    persistentListOf(
         EvidenceInstructionItem(
             titleRes = RCommon.string.evidence_video_instructions_film_during_session_title,
             descriptionRes = RCommon.string.evidence_video_instructions_film_during_session_description

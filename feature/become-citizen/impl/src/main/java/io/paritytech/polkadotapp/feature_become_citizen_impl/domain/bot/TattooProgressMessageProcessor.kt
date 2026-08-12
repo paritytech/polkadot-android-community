@@ -38,27 +38,27 @@ class TattooProgressMessageProcessor @Inject constructor(
     private val instructionsAttachmentUseCase: InstructionsAttachmentUseCase,
     private val evidenceLocalStateStorage: EvidenceLocalStateStorage
 ) : ChatBotMessageProcessor {
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun launchSendingMessages() {
         tattooProgressStateUseCase.tattooProgressStateFlow()
             .mapNotNull { it.getOrNull() }
             .onEach { handleProgress(it) }
-            .launchIn(scope)
+            .launchIn(chatBotContext.scope)
 
         launchEvidenceProvidedMessages()
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private fun launchEvidenceProvidedMessages() {
         subscribeEvidenceStateUpdates(EvidenceType.PHOTO)
 
         subscribeEvidenceStateUpdates(EvidenceType.VIDEO) {
             val message = createTextMessage(RCommon.string.chat_bot_tattoo_after_video_evidence_provided)
-            sendMessage(message)
+            chatBotContext.sendMessage(message)
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun handleProgress(state: TattooProgressState) {
         when (state) {
             is TattooProgressState.Committed -> handleCommitedState(state)
@@ -66,14 +66,14 @@ class TattooProgressMessageProcessor @Inject constructor(
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun handleCommitedState(state: TattooProgressState.Committed) {
         if (messageWasSent<SelectedTattooContent>()) return
 
         sendCommitedMessage(state)
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun sendCommitedMessage(state: TattooProgressState.Committed) {
         val tattooId = state.tattooId
         val familyIndex = tattooId.familyIndex
@@ -91,14 +91,14 @@ class TattooProgressMessageProcessor @Inject constructor(
             tattooFamilyName = metadata.name
         )
 
-        sendCustomMessage(
+        chatBotContext.sendCustomMessage(
             rendererId = SelectedTattooRenderer.ID,
             content = customContent,
         )
 
         buildAfterCommitmentMessages(tattooId, tattooFamilyId, metadata)
             .forEach { message ->
-                sendMessage(message)
+                chatBotContext.sendMessage(message)
             }
     }
 
@@ -136,9 +136,9 @@ class TattooProgressMessageProcessor @Inject constructor(
 
     private fun createTextMessage(textRes: Int) = ChatMessage.Content.Text(context.getString(textRes))
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun sendEvidenceProvidedMessage(evidenceType: EvidenceType): Boolean {
-        val isAlreadySent = getPersistedMessages()
+        val isAlreadySent = chatBotContext.getPersistedMessages()
             .filterCustomContents<EvidenceProvidedContent>()
             .any { it.type == evidenceType }
 
@@ -146,7 +146,7 @@ class TattooProgressMessageProcessor @Inject constructor(
 
         val customContent = EvidenceProvidedContent(evidenceType)
 
-        sendCustomMessage(
+        chatBotContext.sendCustomMessage(
             rendererId = EvidenceProvidedMessageRenderer.ID,
             content = customContent,
         )
@@ -154,7 +154,7 @@ class TattooProgressMessageProcessor @Inject constructor(
         return true
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private fun subscribeEvidenceStateUpdates(
         evidenceType: EvidenceType,
         onMessageSent: (suspend () -> Unit)? = null
@@ -169,6 +169,6 @@ class TattooProgressMessageProcessor @Inject constructor(
                     }
                 }
             }
-            .launchIn(scope)
+            .launchIn(chatBotContext.scope)
     }
 }

@@ -30,14 +30,15 @@ class CoinageTransactionTest {
     private fun newTransaction() = RealCoinageTransaction(coinAllocator, voucherAllocator, coinRepository, voucherRepository)
 
     @Test
-    fun `minted coins are removed on rollback`() = runBlocking {
+    fun `minted coins are retired (spent locally) on rollback, not deleted`() = runBlocking {
         whenever(coinAllocator.allocateAll(any())).thenReturn(Result.success(listOf(coin(1, 2), coin(2, 3))))
 
         val transaction = newTransaction()
         transaction.mintCoins(listOf(ValueExponent(2), ValueExponent(3)))
         transaction.rollback(Stage.MEMO_SHARED, RuntimeException("boom"))
 
-        verify(coinAllocator).deallocate(listOf(1, 2))
+        // Retire, not delete: the row stays so the derivation index is never rewound/reused.
+        verify(coinRepository).setSpentStateByDerivationIndices(listOf(1, 2), Coin.SpentState.SPENT_LOCALLY)
     }
 
     @Test
@@ -48,7 +49,6 @@ class CoinageTransactionTest {
         transaction.mintCoins(listOf(ValueExponent(2)))
         transaction.commit()
 
-        verify(coinAllocator, never()).deallocate(any())
         verify(coinRepository, never()).setSpentStateByDerivationIndices(any(), any())
     }
 
@@ -110,7 +110,7 @@ class CoinageTransactionTest {
     }
 
     @Test
-    fun `minted voucher is deallocated on rollback`() = runBlocking {
+    fun `minted voucher is retired (used locally) on rollback, not deleted`() = runBlocking {
         // ValueExponent is a value class — any() can't match it, so stub the concrete argument.
         whenever(voucherAllocator.allocate(ValueExponent(3))).thenReturn(Result.success(voucher(11)))
 
@@ -118,7 +118,7 @@ class CoinageTransactionTest {
         transaction.mintVoucher(ValueExponent(3))
         transaction.rollback(Stage.MEMO_SHARED, RuntimeException("boom"))
 
-        verify(voucherAllocator).deallocate(listOf(11))
+        verify(voucherRepository).setUsageStateByRingVrfKeyIndices(listOf(11), RecyclerVoucher.UsageState.USED_LOCALLY)
     }
 
     @Test(expected = IllegalStateException::class)

@@ -9,10 +9,10 @@ import io.paritytech.polkadotapp.common.data.storage.preferences.InitialValuePro
 import io.paritytech.polkadotapp.common.data.storage.preferences.Preferences
 import io.paritytech.polkadotapp.database.AppDatabase
 import io.paritytech.polkadotapp.database.AppDatabase.Companion.addAppMigrations
-import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createMigration1to2
-import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createMigration2to3
-import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createMigration3to4
-import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createMigration4to5
+import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createChatMessageMigration1to2
+import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createChatMessageMigration2to3
+import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createChatMessageMigration3to4
+import io.paritytech.polkadotapp.feature_chats_impl.data.migrations.createChatMessageMigration4to5
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Rule
@@ -39,7 +39,7 @@ class MigrationTest {
         )
             .addAppMigrations(
                 NoOpPreferences(),
-                setOf(createMigration1to2(), createMigration2to3(), createMigration3to4(), createMigration4to5())
+                setOf(createChatMessageMigration1to2(), createChatMessageMigration2to3(), createChatMessageMigration3to4(), createChatMessageMigration4to5())
             )
             .build()
             .apply {

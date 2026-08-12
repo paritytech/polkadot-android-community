@@ -141,6 +141,6 @@ class AsCoinageTxExtension(
     }
 
     private fun PeopleMembershipProof.toPeopleRingProof(): PeopleRingProof {
-        return PeopleRingProof(proof, ringIndex)
+        return PeopleRingProof(proof, ringIndex, revision)
     }
 }

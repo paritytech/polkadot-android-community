@@ -1,10 +1,12 @@
 package io.paritytech.polkadotapp.feature_chats_api.presentation.model
 
+import androidx.compose.runtime.Immutable
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatMessageRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatPreviewRenderer
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 
+@Immutable
 sealed interface ChatPreviewUiModel {
     val timestamp: Timestamp
 }
@@ -15,10 +17,16 @@ data class CustomChatPreviewUiModel<T>(
     val renderer: CustomChatPreviewRenderer<T>
 ) : ChatPreviewUiModel
 
+data class DraftPreviewUiModel(
+    override val timestamp: Timestamp,
+    val text: String
+) : ChatPreviewUiModel
+
 enum class MessageAttachmentType {
     IMAGE, VIDEO, FILE
 }
 
+@Immutable
 sealed interface LastMessageUiModel : ChatPreviewUiModel {
     val isIncoming: Boolean
 
@@ -69,6 +77,11 @@ sealed interface LastMessageUiModel : ChatPreviewUiModel {
     ) : LastMessageUiModel
 
     data class Unsupported(
+        override val timestamp: Timestamp,
+        override val isIncoming: Boolean,
+    ) : LastMessageUiModel
+
+    data class CompactionUnavailable(
         override val timestamp: Timestamp,
         override val isIncoming: Boolean,
     ) : LastMessageUiModel

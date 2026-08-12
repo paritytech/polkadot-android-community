@@ -1,8 +1,9 @@
 plugins {
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.dagger.hilt)
 }
 
 android {
@@ -11,9 +12,6 @@ android {
 
 dependencies {
     api(project(":feature:usernames:api"))
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 
     implementation(libs.androidx.fragment.ktx)
 

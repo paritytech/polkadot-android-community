@@ -16,14 +16,11 @@ import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.paritytech.polkadotapp.design.components.badge.IconBadge
-import io.paritytech.polkadotapp.design.components.badge.NumberBadge
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
-import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.HeartSolid
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.ChatListUiState
+import kotlinx.collections.immutable.persistentMapOf
 
 private val PreviewIconSize = 16.dp
 private const val PREVIEW_ICON_ID = "previewIcon"
@@ -54,7 +51,7 @@ internal fun ChatItemBody(
         }
 
         val inlineContent = if (previewIcon != null) {
-            mapOf(
+            persistentMapOf(
                 PREVIEW_ICON_ID to InlineTextContent(
                     Placeholder(
                         width = with(density) { PreviewIconSize.toSp() },
@@ -70,7 +67,7 @@ internal fun ChatItemBody(
                 }
             )
         } else {
-            emptyMap()
+            persistentMapOf()
         }
 
         NovaText(
@@ -83,19 +80,10 @@ internal fun ChatItemBody(
             overflow = TextOverflow.Ellipsis,
         )
 
-        if (hasReaction || badge is ChatListUiState.Badge.Unread) {
-            Row(
-                modifier = Modifier.padding(top = PolkadotTheme.spacings.tiny),
-                horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (hasReaction) IconBadge(icon = NovaIcons.HeartSolid)
-
-                when (badge) {
-                    is ChatListUiState.Badge.Unread -> NumberBadge(number = badge.count)
-                    ChatListUiState.Badge.None -> Unit
-                }
-            }
-        }
+        ChatItemBadges(
+            modifier = Modifier.padding(top = PolkadotTheme.spacings.tiny),
+            badge = badge,
+            hasReaction = hasReaction,
+        )
     }
 }

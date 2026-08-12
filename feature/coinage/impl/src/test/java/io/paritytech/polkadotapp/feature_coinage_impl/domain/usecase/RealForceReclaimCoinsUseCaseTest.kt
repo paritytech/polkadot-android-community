@@ -46,7 +46,7 @@ class RealForceReclaimCoinsUseCaseTest {
 
     @Test
     fun `returns nothing to reclaim and skips submission when no spent-locally coins`() = runBlocking {
-        withSpentLocallyCoins()
+        withReclaimCandidates()
 
         val result = useCase()
 
@@ -57,7 +57,7 @@ class RealForceReclaimCoinsUseCaseTest {
     @Test
     fun `returns nothing to reclaim and skips submission when no coin is present on-chain`() = runBlocking {
         val coin = coin(derivationIndex = 1, exponent = 3)
-        withSpentLocallyCoins(coin)
+        withReclaimCandidates(spentLocally = listOf(coin))
         withOnChainCoins(coin.missingOnChain())
 
         val result = useCase()
@@ -70,8 +70,22 @@ class RealForceReclaimCoinsUseCaseTest {
     fun `reclaims only on-chain present coins and returns their summed balance`() = runBlocking {
         val present = coin(derivationIndex = 1, exponent = 3)
         val absent = coin(derivationIndex = 2, exponent = 5)
-        withSpentLocallyCoins(present, absent)
+        withReclaimCandidates(spentLocally = listOf(present, absent))
         withOnChainCoins(present present onChainInfo(exponent = 3), absent.missingOnChain())
+        withSuccessfulSubmission()
+        withBalanceConversion(exponent = 3, balance = balance(8))
+
+        val result = useCase()
+
+        assertEquals(ReclaimOutcome.Reclaimed(balance(8)), result.getOrNull())
+        verifySubmittedExactlyPresentCoins()
+    }
+
+    @Test
+    fun `reclaims a spent-on-chain coin that reappeared on-chain after a fork`() = runBlocking {
+        val resurrected = coin(derivationIndex = 1, exponent = 3).copy(spentState = Coin.SpentState.SPENT_ON_CHAIN)
+        withReclaimCandidates(spentOnChain = listOf(resurrected))
+        withOnChainCoins(resurrected present onChainInfo(exponent = 3))
         withSuccessfulSubmission()
         withBalanceConversion(exponent = 3, balance = balance(8))
 
@@ -84,7 +98,7 @@ class RealForceReclaimCoinsUseCaseTest {
     @Test
     fun `propagates failure when submission fails`() = runBlocking {
         val coin = coin(derivationIndex = 1, exponent = 3)
-        withSpentLocallyCoins(coin)
+        withReclaimCandidates(spentLocally = listOf(coin))
         withOnChainCoins(coin present onChainInfo(exponent = 3))
         withFailingSubmission()
 
@@ -95,8 +109,12 @@ class RealForceReclaimCoinsUseCaseTest {
 
     // region — arrange helpers
 
-    private suspend fun withSpentLocallyCoins(vararg coins: Coin) {
-        whenever(coinRepository.getCoinsWithSpentState(Coin.SpentState.SPENT_LOCALLY)).thenReturn(coins.toList())
+    private suspend fun withReclaimCandidates(
+        spentLocally: List<Coin> = emptyList(),
+        spentOnChain: List<Coin> = emptyList(),
+    ) {
+        whenever(coinRepository.getCoinsWithSpentState(Coin.SpentState.SPENT_LOCALLY)).thenReturn(spentLocally)
+        whenever(coinRepository.getCoinsWithSpentState(Coin.SpentState.SPENT_ON_CHAIN)).thenReturn(spentOnChain)
         whenever(chainAssetProvider.chainId()).thenReturn(CHAIN_ID)
     }
 

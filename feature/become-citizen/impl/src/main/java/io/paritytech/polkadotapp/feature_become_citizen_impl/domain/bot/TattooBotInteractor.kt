@@ -31,10 +31,10 @@ import javax.inject.Inject
 interface TattooBotInteractor {
     fun startUpdateSystems(): Flow<*>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeToBotState(): Flow<TattooBotState>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun observeBotStepAndStartEvidenceUploader()
 
     fun subscribeReadyToUpgradeUsername(): Flow<UpgradeToFullUsernameState>
@@ -58,7 +58,7 @@ class RealTattooBotInteractor @Inject constructor(
             .logFailure("Unexpected failure when starting tattoo bot update system")
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeToBotState(): Flow<TattooBotState> = getActiveDimCommitmentState(Dim1CommitmentHandler.DIM_ID)
         .transformLatest { dimState ->
             when (dimState) {
@@ -95,7 +95,7 @@ class RealTattooBotInteractor @Inject constructor(
         }
     }.distinctUntilChanged()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun observeBotStepAndStartEvidenceUploader() {
         val step = subscribeToBotState()
             .first { it == TattooBotState.EVIDENCES_CONFIRMED || it == TattooBotState.WAITING_FOR_CONFIRMATION }

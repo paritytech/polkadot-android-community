@@ -33,7 +33,7 @@ class MobRuleBot @Inject constructor(
     private val data = ChatBotData.mobRule()
 
     override val id: ChatExtensionId = data.id
-    override val metadata = ChatBotMetadata(data.name)
+    override val metadata = ChatBotMetadata(data.name, icon = null)
 
     override val customFooterRenderer = MobRuleBotFooterRenderer()
 
@@ -41,12 +41,12 @@ class MobRuleBot @Inject constructor(
         return listOf(votedCaseRenderer, caseStatusRenderer)
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun startBotWork() {
-        scope.launch {
+        chatBotContext.scope.launch {
             botStateController.awaitActive(id)
 
-            setWelcomeMessages { createWelcomeMessages() }
+            chatBotContext.setWelcomeMessages { createWelcomeMessages() }
 
             voteMessageProcessor.launchSendingMessages()
             caseStatusMessageProcessor.launchSendingMessages()

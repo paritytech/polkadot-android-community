@@ -29,7 +29,7 @@ internal class ChatDeepLinkHandler @Inject constructor(
     override fun canHandle(data: Uri) =
         data.scheme == DeepLinkHandler.APP_SCHEME && data.host == CHAT_HOST
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> = withContext(coroutineDispatchers.io) {
         runCancellableCatching {
             accountRepository.awaitAccountsInitialized()

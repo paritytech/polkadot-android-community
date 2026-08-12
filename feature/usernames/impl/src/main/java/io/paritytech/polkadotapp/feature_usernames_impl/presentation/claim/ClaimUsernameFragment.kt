@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeFragment
+import io.paritytech.polkadotapp.common.presentation.tabbar.HideTabBar
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupFoundPayload
 import io.paritytech.polkadotapp.feature_backup_api.presentation.RecoverOptionsPayload
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.compose.PickUsernameScreen
@@ -15,7 +16,10 @@ class ClaimUsernameFragment : BaseComposeFragment<ClaimUsernameViewModel>() {
     override val viewModel: ClaimUsernameViewModel by viewModels()
 
     @Composable
-    override fun Screen() = PickUsernameScreen(viewModel)
+    override fun Screen() {
+        HideTabBar()
+        PickUsernameScreen(viewModel)
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)

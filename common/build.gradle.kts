@@ -1,5 +1,6 @@
 plugins {
-    alias(libs.plugins.kotlin.compose)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -61,11 +62,11 @@ dependencies {
     api(libs.bundles.androidx.lifecycle)
 
     api(libs.bundles.androidx.camera)
-    api(libs.google.play.services.mlkit)
+    compileOnly(libs.google.play.services.mlkit)
 
     api(libs.kotlinx.collections.immutable)
 
-    implementation(libs.bouncycastle.jdk15)
+    implementation(libs.bouncycastle.jdk18)
 
     implementation(libs.bundles.squareup.okhttp3)
     api(libs.squareup.retrofit2.core)

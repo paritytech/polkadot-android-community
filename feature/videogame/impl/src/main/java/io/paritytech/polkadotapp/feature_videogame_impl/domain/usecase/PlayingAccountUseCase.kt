@@ -14,10 +14,10 @@ import timber.log.Timber
 import javax.inject.Inject
 
 interface PlayingAccountUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getOurPlayerAccountId(): AccountId
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getPlayingAccount(): MetaAccount
 }
 
@@ -26,12 +26,12 @@ class RealPlayingAccountUseCase @Inject constructor(
     private val accountRepository: AccountRepository,
     private val chainRegistry: ChainRegistry,
 ) : PlayingAccountUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getOurPlayerAccountId(): AccountId {
         return getPlayingAccount().accountIdIn(chainRegistry.peopleChain())
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getPlayingAccount(): MetaAccount {
         val gameProgress = gamesProgressUseCase.videoGameProgress()
 

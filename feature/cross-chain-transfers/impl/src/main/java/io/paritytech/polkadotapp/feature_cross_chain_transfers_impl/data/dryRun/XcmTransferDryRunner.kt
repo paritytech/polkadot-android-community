@@ -113,7 +113,7 @@ internal class RealXcmTransferDryRunner @Inject constructor(
         }
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private suspend fun constructDryRunCallParams(
         config: CrossChainTransferConfiguration,
         transfer: CrossChainTransfer,
@@ -139,7 +139,7 @@ internal class RealXcmTransferDryRunner @Inject constructor(
         )
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private suspend fun constructDryRunCallFromFakeOrigin(
         transfer: CrossChainTransfer,
         config: CrossChainTransferConfiguration,
@@ -249,11 +249,11 @@ internal class RealXcmTransferDryRunner @Inject constructor(
         return deposits.sumOf { it.amount.value }.intoBalance()
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private fun searchDeliveryFee(
         dryRunEffects: DryRunEffects,
     ): Balance {
-        val xcmPalletName = runtime.metadata.xcmPalletName()
+        val xcmPalletName = withRuntime.runtime.metadata.xcmPalletName()
         val event = dryRunEffects.emittedEvents.findEvent(xcmPalletName, "FeesPaid") ?: return Balance.ZERO
 
         val usedXcmVersion = dryRunEffects.senderXcmVersion()
@@ -264,11 +264,11 @@ internal class RealXcmTransferDryRunner @Inject constructor(
         return multiAssets.extractFirstAmount()
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private fun searchTrappedAssets(
         dryRunEffects: DryRunEffects,
     ): Balance {
-        val xcmPalletName = runtime.metadata.xcmPalletName()
+        val xcmPalletName = withRuntime.runtime.metadata.xcmPalletName()
         val event = dryRunEffects.emittedEvents.findEvent(xcmPalletName, "AssetsTrapped") ?: return Balance.ZERO
 
         val feesDecoded = event.arguments[ASSETS_TRAPPED_ARGUMENT_INDEX]

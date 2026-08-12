@@ -1,6 +1,9 @@
 package io.paritytech.polkadotapp.feature_sso_impl.data.model.scale.session
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.EnumIndex
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
+import io.paritytech.polkadotapp.chains.util.Sr25519SecretKey
+import io.paritytech.polkadotapp.feature_products_api.model.scale.ProductDerivationIndexScale
 import io.paritytech.polkadotapp.feature_products_api.model.scale.ProductIdScale
 import kotlinx.serialization.Serializable
 
@@ -16,7 +19,7 @@ sealed class SsoApAllocatableResourceScale {
 
     @Serializable
     @EnumIndex(2)
-    class SmartContractAllowance(val dest: Int) : SsoApAllocatableResourceScale()
+    class SmartContractAllowance(val dest: ProductDerivationIndexScale) : SsoApAllocatableResourceScale()
 
     @Serializable
     @EnumIndex(3)
@@ -36,6 +39,14 @@ sealed class SsoApAllocatedResourceScale {
     @Serializable
     @EnumIndex(2)
     data object SmartContractAllowance : SsoApAllocatedResourceScale()
+
+    // RFC-0022 secret key of //product//{productId}. Shape only — nothing allocates this yet.
+    @Serializable
+    @EnumIndex(3)
+    class AutoSigning(
+        @FixedLength(Sr25519SecretKey.SIZE_BYTES)
+        val productRootSecretKey: ByteArray,
+    ) : SsoApAllocatedResourceScale()
 }
 
 @Serializable

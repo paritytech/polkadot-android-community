@@ -15,7 +15,6 @@ import io.paritytech.polkadotapp.tools_media_connection_api.domain.signaling.Sig
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 class VideoGamePeerChannelSignaling(
     private val session: CommunicationSession,
@@ -23,7 +22,6 @@ class VideoGamePeerChannelSignaling(
     private val onOfferIdDetermined: suspend (OfferId) -> Unit
 ) : PeerChannelSignaling {
     private val activeOfferFlow = MutableStateFlow<OfferId?>(null)
-    private val respondedRequestIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     override suspend fun sendOffer(sdp: EncodedSdp) {
         Timber.tag("signal_log").d("sendOffer")
@@ -139,9 +137,6 @@ class VideoGamePeerChannelSignaling(
             .filterIsInstance<CommunicationSessionEvent.NewMessagesReceived>()
             .onEach { event ->
                 Timber.tag("signal_log").d("received message event, requestId: ${event.requestId}, messages: ${event.messages.size}")
-                if (respondedRequestIds.add(event.requestId)) {
-                    session.respond(event.requestId, RESPONSE_SUCCESS)
-                }
             }
             .mapNotNull { event ->
                 val envelopes = event.messages.mapNotNull { encodedMessage ->
@@ -161,9 +156,5 @@ class VideoGamePeerChannelSignaling(
     fun getOfferId(): OfferId? {
         Timber.tag("signal_log").d("getOfferId: ${activeOfferFlow.value}")
         return activeOfferFlow.value
-    }
-
-    companion object {
-        private val RESPONSE_SUCCESS = 0.toUByte()
     }
 }

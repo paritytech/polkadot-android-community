@@ -25,10 +25,9 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.VisibilityOffOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.VisibilityOnFilled
-import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
-import io.paritytech.polkadotapp.design.components.tooltip.NovaTooltip
+import io.paritytech.polkadotapp.design.components.tooltip.PolkadotTooltip
 import io.paritytech.polkadotapp.design.components.tooltip.TooltipAlignment
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.webrtc.PlayerConnectionState
@@ -36,7 +35,6 @@ import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.com
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.components.icons.FrontHand
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.components.icons.WavingHand
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.theme.GameColors
-import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.compose.icons.PlayerDisconnectedOutlined
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.compose.icons.SelectionNegative
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.compose.icons.SelectionPositive
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models.PlayerUiModel
@@ -45,7 +43,7 @@ import kotlinx.coroutines.launch
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
-fun PlayerCell(
+internal fun PlayerCell(
     modifier: Modifier,
     state: VideoGameUiState,
     player: PlayerUiModel,
@@ -100,11 +98,7 @@ fun PlayerCell(
 
                     val playerDisconnected = player.connection != PlayerConnectionState.Connected
                     if (player.isCurrentPlayer.not() && playerDisconnected) {
-                        DisconnectedOverlay(
-                            modifier = Modifier.fillMaxSize(),
-                            isHost = player.isHost,
-                            state = state
-                        )
+                        WhiteNoiseIcon(modifier = Modifier.fillMaxSize())
                     }
                 }
             }
@@ -154,39 +148,11 @@ private fun BanToggleButton(
 }
 
 @Composable
-private fun BannedOverlay() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PolkadotTheme.colors.bg.surface.nested),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            NovaIcon(
-                modifier = Modifier.size(32.dp),
-                imageVector = NovaIcons.VisibilityOffOutlined,
-                tint = PolkadotTheme.colors.fg.tertiary
-            )
-
-            VerticalSpacer { small }
-
-            NovaText(
-                text = stringResource(RCommon.string.video_game_play_player_banned),
-                style = PolkadotTheme.typography.title.large,
-                color = PolkadotTheme.colors.fg.tertiary
-            )
-        }
-    }
-}
-
-@Composable
 private fun GestureHintTooltip(
     show: Boolean,
     isCurrentPlayer: Boolean,
 ) {
-    NovaTooltip(
+    PolkadotTooltip(
         expanded = show,
         onDismiss = { },
         shape = CloudTooltipShape,
@@ -281,54 +247,6 @@ private fun SelectionOverlayContent(state: SelectionState) {
                 contentDescription = null
             )
         }
-    }
-}
-
-@Composable
-private fun DisconnectedOverlay(modifier: Modifier, isHost: Boolean, state: VideoGameUiState) {
-    val isLarge = state is VideoGameUiState.HostIntroduction && isHost
-    val transition = updateTransition(targetState = isLarge, label = "LargeDisconnectIcon")
-
-    val iconSize by transition.animateDp(
-        label = "iconSize"
-    ) { isLargeTarget ->
-        if (isLargeTarget) 128.dp else 72.dp
-    }
-
-    val textScale by transition.animateFloat(
-        label = "textScale"
-    ) { isLargeTarget ->
-        if (isLargeTarget) 1f else 72f / 128f
-    }
-
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        NovaIcon(
-            modifier = Modifier.size(iconSize),
-            imageVector = PlayerDisconnectedOutlined,
-            tint = PolkadotTheme.colors.fg.tertiary
-        )
-
-        VerticalSpacer { large }
-
-        NovaText(
-            modifier = Modifier.graphicsLayer {
-                scaleX = textScale
-                scaleY = textScale
-            },
-            text = stringResource(
-                if (isHost) {
-                    RCommon.string.video_game_play_disconnected_host
-                } else {
-                    RCommon.string.video_game_play_disconnected_player
-                }
-            ),
-            style = PolkadotTheme.typography.title.medium,
-            color = PolkadotTheme.colors.fg.tertiary
-        )
     }
 }
 

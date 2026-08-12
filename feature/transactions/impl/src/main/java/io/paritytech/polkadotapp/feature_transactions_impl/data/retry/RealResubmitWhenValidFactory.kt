@@ -19,4 +19,8 @@ class RealResubmitWhenValidFactory @Inject constructor(
             chainStateRepository = chainStateRepository,
         )
     }
+
+    override fun createForTxInvalidation(chainId: ChainId, maxAttempts: Int?): ExtrinsicSubmissionFailureRecoveryStrategy {
+        return CauseBasedRecoveryStrategy(create(chainId, maxAttempts))
+    }
 }

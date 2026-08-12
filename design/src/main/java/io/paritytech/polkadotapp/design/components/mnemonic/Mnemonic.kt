@@ -21,10 +21,12 @@ import io.paritytech.polkadotapp.design.components.mnemonic.model.toWordList
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
 @Composable
 fun ProtectedMnemonic(
-    mnemonic: List<Word>,
+    mnemonic: ImmutableList<Word>,
     onRevealMnemonicAction: () -> Unit,
     isHidden: Boolean,
     coverTitle: String,
@@ -56,7 +58,7 @@ fun ProtectedMnemonic(
 
 @Composable
 fun Mnemonic(
-    mnemonic: List<Word>,
+    mnemonic: ImmutableList<Word>,
     onWordClickAction: ((Word) -> Unit)? = null
 ) {
     Box(
@@ -110,7 +112,7 @@ private fun Cover(
 private val previewMnemonic = listOf(
     "scout", "ribbon", "velvet", "harbor", "puzzle", "anchor",
     "meadow", "signal", "orbit", "cradle", "thunder", "wisdom"
-).toWordList()
+).toWordList().toImmutableList()
 
 @Preview(backgroundColor = 0xFF191919, showBackground = true)
 @Composable

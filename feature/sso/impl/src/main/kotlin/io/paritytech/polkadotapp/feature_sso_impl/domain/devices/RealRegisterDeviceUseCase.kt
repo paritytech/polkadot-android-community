@@ -1,9 +1,9 @@
 package io.paritytech.polkadotapp.feature_sso_impl.domain.devices
 
-import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_chats_api.domain.devices.BroadcastDeviceLifecycleUseCase
 import io.paritytech.polkadotapp.feature_sso_api.domain.HandshakeResponse
 import io.paritytech.polkadotapp.feature_sso_api.domain.SsoHandshakeUseCase
@@ -27,6 +27,7 @@ class RealRegisterDeviceUseCase @Inject constructor(
     private val ssoHandshakeUseCase: SsoHandshakeUseCase,
     private val broadcastDeviceLifecycleUseCase: BroadcastDeviceLifecycleUseCase,
 ) : RegisterDeviceUseCase {
+    context(diagnostics: StalenessReportCollector)
     override fun invoke(offer: HandshakeOffer): Flow<RegisterDeviceProgress> = flow {
         val deviceStatementAccountId = offer.device.statementAccountId
         val deviceEncryptionPublicKey = offer.device.encryptionPublicKey
@@ -34,14 +35,22 @@ class RealRegisterDeviceUseCase @Inject constructor(
 
         emit(RegisterDeviceProgress.Verifying)
 
+        // No region for the Verifying/Registering phases themselves - `ProgressCard` on the pair screen already names
+        // them, so the report only covers the steps that progress model cannot see
         ssoHandshakeUseCase.respondToOffer(offer, HandshakeResponse.AllowanceAllocation)
             .flatMap { slotAllocator.allocate(deviceStatementAccountId, strategy = OnExistingAllocationStrategy.INCREASE, priority = SlotPriority.High) }
             .flatMap { persistDeviceSession(offer) }
             .flatMap {
                 emit(RegisterDeviceProgress.Registering)
+
                 ssoHandshakeUseCase.respondToOffer(offer, HandshakeResponse.Success)
+                    .flatMap {
+                        broadcastDeviceLifecycleUseCase.broadcastDeviceAdded(
+                            statementAccountId = deviceStatementAccountId,
+                            encryptionPublicKey = deviceEncryptionPublicKey,
+                        )
+                    }
             }
-            .flatMap { broadcastDeviceAdded(deviceStatementAccountId, deviceEncryptionPublicKey) }
             .logFailure("device registration failed for device $deviceStatementAccountId")
             .onFailure { throwable ->
                 ssoHandshakeUseCase.respondToOffer(offer, HandshakeResponse.Failure(throwable.toFailureReason()))
@@ -68,16 +77,6 @@ class RealRegisterDeviceUseCase @Inject constructor(
                 outgoingUpdateTime = null,
                 lastSyncOfferId = null,
             )
-        )
-    }
-
-    private suspend fun broadcastDeviceAdded(
-        statementAccountId: AccountId,
-        encryptionPublicKey: EncodedPublicKey,
-    ): Result<Unit> {
-        return broadcastDeviceLifecycleUseCase.broadcastDeviceAdded(
-            statementAccountId = statementAccountId,
-            encryptionPublicKey = encryptionPublicKey,
         )
     }
 

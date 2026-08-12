@@ -9,6 +9,8 @@ import io.paritytech.polkadotapp.common.presentation.notification.success
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.findInCauseChain
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport
+import io.paritytech.polkadotapp.common.utils.progressStallReport.launchWithDiagnostics
 import io.paritytech.polkadotapp.feature_chain_resources_api.domain.slotAllocator.NoFreeStmtStoreSlotsException
 import io.paritytech.polkadotapp.feature_sso_api.domain.model.HandshakeOffer
 import io.paritytech.polkadotapp.feature_sso_impl.SsoRouter
@@ -18,7 +20,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -32,6 +33,8 @@ class PairRequestViewModel @Inject constructor(
 ) : BaseViewModel(), PairRequestContract {
     private val payload: PairRequestPayload = savedStateHandle.getPayload()
     private val offer: HandshakeOffer = payload.toDomain()
+
+    override val stalenessReport = StalenessReport(this)
 
     private val phase = MutableStateFlow<Phase>(Phase.Confirm)
 
@@ -50,7 +53,7 @@ class PairRequestViewModel @Inject constructor(
     override fun onApproveClicked() {
         if (phase.value !is Phase.Confirm) return
 
-        launch {
+        launchWithDiagnostics(stalenessReport) {
             phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
 
             interactor.approveHandshake(offer).collect { progress ->

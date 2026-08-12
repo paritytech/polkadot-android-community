@@ -28,10 +28,11 @@ class BandersnatchCryptoTest {
             entropy(it.toByte()).memberKey()
         } + alice
 
-        val (proof, time) = measureTimedValue {
+        val (result, time) = measureTimedValue {
             aliceEntropy.createProof(allMembers, context, message, BandersnatchDomainSize.Domain11)
         }
-        Log.d("BandersnatchCryptoTest", "Generated proof in ${time}: ${proof.toHexString()}")
+        Log.d("BandersnatchCryptoTest", "Generated proof in $time: ${result.proof.value.toHexString()}")
+        Log.d("BandersnatchCryptoTest", "Proof alias: ${result.alias.value.toHexString()}")
     }
 
     @OptIn(ExperimentalStdlibApi::class)

@@ -3,11 +3,12 @@ package io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.reser
 import androidx.compose.runtime.Immutable
 import io.paritytech.polkadotapp.feature_become_citizen_api.presentation.common.TattooImage
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.models.TattooFamilyUiIdentifier
+import kotlinx.collections.immutable.ImmutableList
 
 @Immutable
 data class TattooFamilyUiModel(
     val identifier: TattooFamilyUiIdentifier,
     val name: String,
     val totalCount: Int,
-    val exampleTattoos: List<TattooImage>
+    val exampleTattoos: ImmutableList<TattooImage>
 )

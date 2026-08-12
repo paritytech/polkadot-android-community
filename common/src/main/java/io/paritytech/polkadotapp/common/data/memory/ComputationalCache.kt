@@ -20,22 +20,22 @@ interface ComputationalCache {
     ): Flow<T>
 }
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 suspend fun <T> ComputationalCache.useCache(
     key: String,
     computation: Computation<T>
-): T = useCache(key, this@ComputationalScope, computation)
+): T = useCache(key, scope, computation)
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun <T> ComputationalCache.useSharedFlow(
     key: String,
     flowLazy: Computation<Flow<T>>
-): Flow<T> = useSharedFlow(key, this@ComputationalScope, flowLazy)
+): Flow<T> = useSharedFlow(key, scope, flowLazy)
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun <T> ComputationalCache.useSharedFlow(
     vararg keyArgs: String,
     flowLazy: Computation<Flow<T>>
-): Flow<T> = useSharedFlow(keyArgs.joinToString(separator = ":"), this@ComputationalScope, flowLazy)
+): Flow<T> = useSharedFlow(keyArgs.joinToString(separator = ":"), scope, flowLazy)
 
 typealias Computation<T> = suspend (cachingScope: ComputationalScope) -> T

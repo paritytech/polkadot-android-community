@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_videogame_impl.domain.interactor
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flowOfAll
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -23,7 +24,7 @@ import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 interface ChatWithPlayersInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeGamePlayers(gameIndex: GameIndex): Flow<List<GamePlayer>>
 
     suspend fun addGameContact(gameIndex: GameIndex, playerAccountId: AccountId): Result<Unit>
@@ -40,7 +41,7 @@ class RealChatWithPlayersInteractor @Inject constructor(
     private val knownChains: KnownChains,
     private val bannedPlayersRepository: BannedPlayersRepository
 ) : ChatWithPlayersInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeGamePlayers(gameIndex: GameIndex): Flow<List<GamePlayer>> = flowOfAll {
         val ourAccountId = playingAccountUseCase.getOurPlayerAccountId()
         val gamePlayersFlow = gamePlayersRepository.subscribeGamePlayers(gameIndex)
@@ -72,7 +73,10 @@ class RealChatWithPlayersInteractor @Inject constructor(
                 addContactUseCase.addContactWithChatRequest(
                     contactAccountId = playerAccountId,
                     username = null,
-                    chatKey = communicationKey.value,
+                    chatKey = (
+                        communicationKey.x25519OrNull()
+                            ?: error("Player uses an unsupported chat encryption key type")
+                        ).bytes.value,
                     sharedSecretDerivationDomain = SharedSecretDerivationDomain.CANDIDATE,
                     ourMetaAccountId = metaAccount.id,
                     avatar = playerFrameFilePathCreator.getEncodedUri(gameIndex.value, playerAccountId),

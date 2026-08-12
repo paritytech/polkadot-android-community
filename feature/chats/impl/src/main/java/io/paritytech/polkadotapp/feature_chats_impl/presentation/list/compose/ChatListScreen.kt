@@ -15,7 +15,11 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.ChatListVi
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.ChatListContent
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.ChatListHeader
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.ChatListLoading
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.IdleSearchEntry
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.SearchRevealContainer
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.rememberSearchRevealState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.ChatListUiState
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun ChatListScreen() {
@@ -26,7 +30,8 @@ fun ChatListScreen() {
         loadingState = state,
         onAddContactClick = viewModel::onAddContactClick,
         onChatClick = viewModel::onChatClick,
-        onNewRequestsClick = viewModel::onNewRequestsClick
+        onNewRequestsClick = viewModel::onNewRequestsClick,
+        onSearchBarClick = viewModel::onSearchBarClick,
     )
 }
 
@@ -35,8 +40,11 @@ private fun ChatListScreenInternal(
     loadingState: LoadingState<ChatListUiState>,
     onAddContactClick: () -> Unit,
     onChatClick: (ChatListUiState.ChatItem) -> Unit,
-    onNewRequestsClick: () -> Unit
+    onNewRequestsClick: () -> Unit,
+    onSearchBarClick: () -> Unit,
 ) {
+    val revealState = rememberSearchRevealState()
+
     PolkadotSurface {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -47,10 +55,16 @@ private fun ChatListScreenInternal(
             )
 
             when (loadingState) {
-                is LoadingState.Loaded -> ChatListContent(
-                    state = loadingState.data,
-                    onChatClick = onChatClick,
-                    onNewRequestsClick = onNewRequestsClick
+                is LoadingState.Loaded -> SearchRevealContainer(
+                    state = revealState,
+                    header = { IdleSearchEntry(onClick = onSearchBarClick) },
+                    content = {
+                        ChatListContent(
+                            state = loadingState.data,
+                            onChatClick = onChatClick,
+                            onNewRequestsClick = onNewRequestsClick
+                        )
+                    },
                 )
 
                 else -> ChatListLoading()
@@ -61,18 +75,19 @@ private fun ChatListScreenInternal(
 
 @Preview(backgroundColor = 0xFF000000, showBackground = true)
 @Composable
-fun ChatListScreenPreview() {
+private fun ChatListScreenPreview() {
     PolkadotTheme {
         ChatListScreenInternal(
             loadingState = LoadingState.Loaded(
                 ChatListUiState(
-                    chats = emptyList(),
+                    chats = persistentListOf(),
                     pendingRequestsCount = 1
                 )
             ),
             onAddContactClick = {},
             onChatClick = {},
-            onNewRequestsClick = {}
+            onNewRequestsClick = {},
+            onSearchBarClick = {},
         )
     }
 }

@@ -1,4 +1,5 @@
 plugins {
+    id("polkadotapp.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -20,6 +21,7 @@ dependencies {
 
     implementation(libs.squareup.okhttp3.core)
     implementation(libs.web3j.abi)
+    implementation(libs.bouncycastle.jdk18)
 
     testImplementation(project(":test-shared"))
 }

@@ -46,7 +46,7 @@ internal class RealBalanceChangeTracker @Inject constructor(
             .flowOn(coroutineDispatchers.io)
     }
 
-    context(CoroutineScope)
+    context(scope: CoroutineScope)
     private suspend fun balancesChangesForChain(
         accountId: AccountId,
         chainId: ChainId,

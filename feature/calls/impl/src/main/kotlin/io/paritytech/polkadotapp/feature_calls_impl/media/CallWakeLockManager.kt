@@ -15,6 +15,7 @@ import javax.inject.Inject
 class CallWakeLockManager @Inject constructor(
     @ApplicationContext context: Context,
     private val callStateHolder: CallStateHolder,
+    private val callAudioRouteController: CallAudioRouteController,
 ) {
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
 
@@ -28,19 +29,20 @@ class CallWakeLockManager @Inject constructor(
             null
         }
 
-    context(CoroutineScope)
+    context(scope: CoroutineScope)
     fun observe() {
         if (wakeLock == null) return
 
         combine(
             callStateHolder.observeActiveCall(),
-            callStateHolder.observeSpeakerOn(),
-        ) { call, speakerOn ->
-            call?.status is CallStatus.Connected && !speakerOn
+            callAudioRouteController.audioDevices,
+        ) { call, audio ->
+            // Proximity screen-off only makes sense when held to the ear (earpiece route).
+            call?.status is CallStatus.Connected && audio.isEarpieceActive
         }
             .distinctUntilChanged()
             .onEach { shouldHold -> if (shouldHold) acquire() else release() }
-            .launchIn(this@CoroutineScope)
+            .launchIn(scope)
     }
 
     fun release() {

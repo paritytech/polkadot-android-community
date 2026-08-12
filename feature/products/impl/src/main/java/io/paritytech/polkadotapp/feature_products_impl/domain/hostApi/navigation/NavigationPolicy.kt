@@ -26,24 +26,52 @@ sealed interface NavigationPolicy {
     }
 
     /**
-     * SPA Browser: same-product navigation loads in the same WebView. Cross-product opens a new SPA session. External is ignored for now.
+     * SPA Browser: load all .dot navigation in the same WebView. External is delegated to upper layer
      */
     class InlineNavigation(
-        private val webViewLoader: (url: String) -> Unit,
-        private val onCrossProductNavigation: (Uri) -> Unit,
+        private val onDeeplinkNavigation: (Uri) -> Unit,
     ) : NavigationPolicy {
         override fun handleNavigation(type: DotNsNavigationType, destination: Uri): NavigationResult {
             return when (type) {
+                // TODO we navigate CROSS_DOTNS_DOMAIN to onExternalNavigation because
+                // we want deeplink handler to open a separate SPA screen for a new product
+                // This is NOT optimal since it creates a stack of WebViews, but provides "expected"
+                // way of back navigation, where previous page stays at the place where user left it
+                // Implementing similar behavior within the same webview is not trivial but should be done later
+                DotNsNavigationType.EXTERNAL,
+                DotNsNavigationType.CROSS_DOTNS_DOMAIN -> {
+                    onDeeplinkNavigation(destination)
+                    NavigationResult.INTERCEPTED_BY_POLICY
+                }
+
+                DotNsNavigationType.SAME_DOTNS_DOMAIN -> NavigationResult.DELEGATE_TO_WEBVIEW
+            }
+        }
+    }
+
+    /**
+     * hostApi.navigateTo: handle loads manually
+     */
+    class HostApiNavigation(
+        private val onDeeplinkNavigation: (Uri) -> Unit,
+        private val webViewLoader: (String) -> Unit
+    ) : NavigationPolicy {
+        override fun handleNavigation(
+            type: DotNsNavigationType,
+            destination: Uri
+        ): NavigationResult {
+            return when (type) {
+                DotNsNavigationType.EXTERNAL,
+                DotNsNavigationType.CROSS_DOTNS_DOMAIN -> {
+                    onDeeplinkNavigation(destination)
+                    NavigationResult.INTERCEPTED_BY_POLICY
+                }
+
                 DotNsNavigationType.SAME_DOTNS_DOMAIN -> {
                     val normalized = DotNsUtils.normalize(destination) ?: destination
                     webViewLoader(normalized.toString())
                     NavigationResult.INTERCEPTED_BY_POLICY
                 }
-                DotNsNavigationType.CROSS_DOTNS_DOMAIN -> {
-                    onCrossProductNavigation(destination)
-                    NavigationResult.INTERCEPTED_BY_POLICY
-                }
-                DotNsNavigationType.EXTERNAL -> NavigationResult.INTERCEPTED_BY_POLICY
             }
         }
     }
@@ -64,6 +92,7 @@ sealed interface NavigationPolicy {
                     onProductSelected(productId)
                     NavigationResult.INTERCEPTED_BY_POLICY
                 }
+
                 DotNsNavigationType.EXTERNAL -> NavigationResult.DELEGATE_TO_WEBVIEW
             }
         }

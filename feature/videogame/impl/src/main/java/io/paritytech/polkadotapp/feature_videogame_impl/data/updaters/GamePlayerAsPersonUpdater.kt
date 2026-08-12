@@ -23,11 +23,11 @@ class GamePlayerAsPersonUpdater @Inject constructor(
     storageCache: StorageCache,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
 ) : SingleStorageKeyUpdater<MetaAccount>(scope, chainRegistry, storageCache) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String {
         val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(scopeValue.id, BandersnatchContext.SCORE)
 
-        return runtime.metadata.videoGame
+        return withRuntime.runtime.metadata.videoGame
             .players
             .storageKey(OnChainAccountOrPerson.Person(scoreAlias))
     }

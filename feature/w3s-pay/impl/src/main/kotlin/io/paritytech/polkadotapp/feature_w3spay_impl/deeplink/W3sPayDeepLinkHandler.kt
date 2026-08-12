@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_w3spay_impl.deeplink
 
 import android.net.Uri
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
 import io.paritytech.polkadotapp.common.presentation.deeplink.getQueryParameterOrThrow
@@ -12,7 +13,6 @@ import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.awaitAccountsInitialized
 import io.paritytech.polkadotapp.feature_w3spay_impl.W3sPayRouter
-import io.paritytech.polkadotapp.feature_w3spay_impl.domain.P256_COMPRESSED_KEY_SIZE
 import io.paritytech.polkadotapp.feature_w3spay_impl.domain.W3S_MAX_DEEPLINK_AMOUNT
 import io.paritytech.polkadotapp.feature_w3spay_impl.domain.W3sPaymentPayloadFactory
 import io.paritytech.polkadotapp.feature_w3spay_impl.domain.parseW3sDecimalAmount
@@ -38,7 +38,7 @@ internal class W3sPayDeepLinkHandler @Inject constructor(
         return data.scheme == DeepLinkHandler.APP_SCHEME && data.host == PAY_HOST && data.path == PAY_PATH
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> = withContext(coroutineDispatchers.io) {
         runCancellableCatching {
             accountRepository.awaitAccountsInitialized()
@@ -51,8 +51,9 @@ internal class W3sPayDeepLinkHandler @Inject constructor(
             }
             require(amount <= W3S_MAX_DEEPLINK_AMOUNT.toBigDecimal()) { "amount must not exceed $W3S_MAX_DEEPLINK_AMOUNT" }
 
-            val merchantKey = data.getQueryParameterOrThrow(PARAM_KEY).decodeFormBase64UrlSafe()
-            require(merchantKey.size == P256_COMPRESSED_KEY_SIZE) { "key must be a compressed P256 public key" }
+            // Same check W3sCoinsSubmitter applies at submit time, so validation cannot drift from
+            // the key type the payload is actually encrypted to.
+            val merchantKey = data.getQueryParameterOrThrow(PARAM_KEY).decodeFormBase64UrlSafe().requireX25519PublicKey()
 
             val topic = (TOPIC_PREFIX + id).toByteArray().blake2b256()
 

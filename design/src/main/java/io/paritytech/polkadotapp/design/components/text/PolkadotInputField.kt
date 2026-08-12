@@ -73,6 +73,7 @@ fun PolkadotInputField(
                 colors = TextFieldDefaults.colors(
                     focusedPlaceholderColor = PolkadotTheme.colors.fg.disabled,
                     unfocusedPlaceholderColor = PolkadotTheme.colors.fg.disabled,
+                    disabledPlaceholderColor = PolkadotTheme.colors.fg.disabled,
                 ),
             )
         },

@@ -4,5 +4,5 @@ import androidx.compose.ui.unit.dp
 
 object CardSizes {
     val HEIGHT = 234.dp
-    val OVERLAP = 178.dp
+    val OVERLAP = 170.dp
 }

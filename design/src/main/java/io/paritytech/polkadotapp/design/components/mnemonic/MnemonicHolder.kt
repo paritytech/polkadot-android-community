@@ -19,13 +19,14 @@ import io.paritytech.polkadotapp.design.components.mnemonic.model.Word
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import kotlinx.collections.immutable.ImmutableList
 
 private const val ColumnsCount = 3
 
 @Composable
 internal fun MnemonicHolder(
     modifier: Modifier = Modifier,
-    mnemonic: List<Word>,
+    mnemonic: ImmutableList<Word>,
     onWordClickAction: ((Word) -> Unit)? = null
 ) {
     PolkadotSurface(

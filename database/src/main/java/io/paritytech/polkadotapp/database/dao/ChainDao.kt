@@ -118,10 +118,11 @@ abstract class ChainDao {
     @Query("SELECT * FROM chain_runtimes")
     abstract suspend fun allRuntimeInfos(): List<ChainRuntimeInfoLocal>
 
-    @Query("UPDATE chain_runtimes SET syncedVersion = :syncedVersion WHERE chainId = :chainId")
+    @Query("UPDATE chain_runtimes SET syncedVersion = :syncedVersion, localMigratorVersion = :localMigratorVersion WHERE chainId = :chainId")
     abstract suspend fun updateSyncedRuntimeVersion(
         chainId: String,
         syncedVersion: Int,
+        localMigratorVersion: Int,
     )
 
     @Query("UPDATE chains SET connectionState = :connectionState WHERE id = :chainId")
@@ -141,7 +142,15 @@ abstract class ChainDao {
         if (isRuntimeInfoExists(chainId)) {
             updateRemoteRuntimeVersionUnsafe(chainId, runtimeVersion, transactionVersion)
         } else {
-            insertRuntimeInfo(ChainRuntimeInfoLocal(chainId, syncedVersion = 0, remoteVersion = runtimeVersion, transactionVersion = transactionVersion))
+            insertRuntimeInfo(
+                ChainRuntimeInfoLocal(
+                    chainId,
+                    syncedVersion = 0,
+                    remoteVersion = runtimeVersion,
+                    transactionVersion = transactionVersion,
+                    localMigratorVersion = 1
+                )
+            )
         }
     }
 

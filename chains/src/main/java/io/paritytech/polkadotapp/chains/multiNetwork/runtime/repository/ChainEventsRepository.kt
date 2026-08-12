@@ -60,7 +60,7 @@ internal class RealChainEventsRepository(
         }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     private fun groupExtrinsicWithEvents(
         eventRecords: List<EventRecord>,
         extrinsics: List<String>
@@ -75,7 +75,7 @@ internal class RealChainEventsRepository(
         )
 
         return extrinsics.mapIndexedNotNull { index, extrinsicScale ->
-            val decodedExtrinsic = Extrinsic.fromHexOrNull(runtime, extrinsicScale)
+            val decodedExtrinsic = Extrinsic.fromHexOrNull(storage.runtime, extrinsicScale)
 
             decodedExtrinsic?.let {
                 val extrinsicEvents = eventsByExtrinsicIndex[index] ?: emptyList()

@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
+import io.paritytech.polkadotapp.common.domain.model.scale.toScale
 import io.paritytech.polkadotapp.common.utils.decodeFromByteArrayCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
@@ -94,12 +95,17 @@ class SyncEntityCollector @Inject constructor(
         ChatMessage.Status.IS_SENT -> OutgoingStatusScale.SENT
 
         ChatMessage.Status.IS_READ -> OutgoingStatusScale.DELIVERED
+
+        // Failed-to-deliver messages were never sent; the wire scale has no failed state, so treat as not-yet-delivered.
+        ChatMessage.Status.DELIVERY_FAILED -> OutgoingStatusScale.NEW
     }
 
     private fun ChatMessage.Status.toIncomingScale(): IncomingStatusScale = when (this) {
         ChatMessage.Status.PROCESSING,
         ChatMessage.Status.NEW,
-        ChatMessage.Status.IS_SENT -> IncomingStatusScale.NEW
+        ChatMessage.Status.IS_SENT,
+        // DELIVERY_FAILED is only ever set on outgoing messages; map defensively for exhaustiveness.
+        ChatMessage.Status.DELIVERY_FAILED -> IncomingStatusScale.NEW
 
         ChatMessage.Status.IS_READ -> IncomingStatusScale.SEEN
     }
@@ -108,7 +114,7 @@ class SyncEntityCollector @Inject constructor(
 private fun ActiveSsoSession.toLocalDeviceScale(): LocalDeviceScale {
     return LocalDeviceScale(
         statementAccountId = statementAccountId.value,
-        encryptionPublicKey = encryptionPublicKey.value,
+        encryptionPublicKey = encryptionPublicKey.toScale(),
         status = DeviceStatusScale.ACTIVE,
         lastUpdate = lastUpdate.toULong(),
     )

@@ -9,7 +9,11 @@ fun VideoGameProcessState.toUi(gameTime: Duration): VideoGameUiState {
     return when (this) {
         is VideoGameProcessState.WaitingRoom -> {
             val timeLeft = (endsAt - gameTime).coerceAtLeast(Duration.ZERO)
-            VideoGameUiState.WaitingRoom(timeLeft)
+            if (preConnection != null) {
+                VideoGameUiState.Connecting(timeLeft)
+            } else {
+                VideoGameUiState.WaitingRoom(timeLeft)
+            }
         }
 
         is VideoGameProcessState.Round -> {

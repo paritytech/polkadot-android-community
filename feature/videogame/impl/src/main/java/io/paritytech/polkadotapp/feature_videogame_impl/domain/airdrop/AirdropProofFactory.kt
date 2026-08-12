@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.domain.airdrop
 
-import io.paritytech.polkadotapp.airdrop_vrf.AirdropVrfSigner
 import io.paritytech.polkadotapp.bandersnatch_crypto.intoBandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
@@ -17,6 +16,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.toRingCollectionId
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.model.GameIndex
 import io.paritytech.polkadotapp.feature_videogame_impl.data.gameResults.AirdropEventId
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnChainAccountOrPerson
+import io.paritytech.polkadotapp.sr25519_vrf.Sr25519VrfSigner
 import javax.inject.Inject
 
 /**
@@ -48,7 +48,11 @@ class AirdropProofFactory @Inject constructor(
         // schnorrkel expects the full 96-byte keypair: secret (privateKey ++ nonce) ++ publicKey.
         val keypairBytes = keypair.privateKey + keypair.nonce + keypair.publicKey
 
-        return AirdropVrfSigner.sign(keypair = keypairBytes, eventId = eventId(gameIndex)).map { signature ->
+        return Sr25519VrfSigner.sign(
+            keypair = keypairBytes,
+            transcriptLabel = AirdropVrfTranscript.LABEL,
+            items = AirdropVrfTranscript.items(eventId(gameIndex), keypair.publicKey),
+        ).map { signature ->
             AirdropProof.Account(preOutput = signature.preOutput, proof = signature.proof)
         }
     }

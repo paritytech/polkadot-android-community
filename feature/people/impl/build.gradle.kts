@@ -1,6 +1,7 @@
 plugins {
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
     alias(libs.plugins.kotlin.parcelize)
-    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -16,6 +17,7 @@ dependencies {
     api(project(":feature:people:api"))
 
     implementation(project(":tools:jwt-auth:api"))
+    implementation(project(":feature:chats:api"))
 
     implementation(libs.hilt.android)
     implementation(libs.hilt.androidx.work)

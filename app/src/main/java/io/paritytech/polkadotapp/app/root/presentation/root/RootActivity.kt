@@ -3,9 +3,7 @@ package io.paritytech.polkadotapp.app.root.presentation.root
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.view.View
 import android.view.ViewGroup
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -15,7 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.Insets
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -24,8 +21,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.app.BuildConfig
 import io.paritytech.polkadotapp.app.R
 import io.paritytech.polkadotapp.app.root.navigation.NavigationHolder
-import io.paritytech.polkadotapp.app.root.navigation.executeBack
 import io.paritytech.polkadotapp.app.root.presentation.root.compose.DevResetOverlay
+import io.paritytech.polkadotapp.app.root.presentation.root.compose.RootNavBarHost
 import io.paritytech.polkadotapp.app.root.presentation.root.compose.chatoverlay.ChatExtensionOverlayHost
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
 import io.paritytech.polkadotapp.common.presentation.formatters.time.LocalTimeFormatter
@@ -36,8 +33,6 @@ import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.BaseScreenDelegate
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ConnectionStatusBanner
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ConnectionStatusBannerModel
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -61,6 +56,14 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         viewModel = ::viewModel
     )
 
+    private val navHostFragment: NavHostFragment by lazy(LazyThreadSafetyMode.NONE) {
+        supportFragmentManager.findFragmentById(R.id.rootNavHost) as NavHostFragment
+    }
+
+    private val navController: NavController by lazy(LazyThreadSafetyMode.NONE) {
+        navHostFragment.navController
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
@@ -72,20 +75,13 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         navigationHolder.attach(navController)
         contextManager.attachActivity(this)
 
-        // overwriting onBackPressedDispatcher as a workaround as otherwise after using default back navigation - navcontroller getting lost and can't navigate again to this screen
-        // This can be reproduced by opening deposit screen from home screen, system back and opening it again
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                navigationHolder.executeBack()
-            }
-        })
-
         intent?.let(::processIntent)
 
         handleDeeplinkOutcome()
         if (BuildConfig.DEBUG) {
             setupDevResetOverlay()
         }
+        setupRootNavBar()
         setupAppNotificationOverlay()
 
         setupChatExtensionOverlay()
@@ -123,13 +119,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         }
     }
 
-    private val navController: NavController by lazy(LazyThreadSafetyMode.NONE) {
-        val navHostFragment =
-            supportFragmentManager.findFragmentById(R.id.rootNavHost) as NavHostFragment
-
-        navHostFragment.navController
-    }
-
     private fun setupDevResetOverlay() {
         val composeView = ComposeView(this).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -157,44 +146,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
-    private fun setupConnectionStatusBanner() {
-        val rootContainer = findViewById<ViewGroup>(R.id.rootContainer)
-        val composeView = findViewById<ComposeView>(R.id.connectionStatusBanner)
-        val navHost = findViewById<View>(R.id.rootNavHost)
-
-        composeView.apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                PolkadotTheme {
-                    val model by viewModel.connectionStatusBanner.collectAsStateWithLifecycle()
-                    val newVisibility = if (model == ConnectionStatusBannerModel.None) View.GONE else View.VISIBLE
-                    if (visibility != newVisibility) {
-                        visibility = newVisibility
-                        ViewCompat.requestApplyInsets(rootContainer)
-                    }
-                    ConnectionStatusBanner(model = model)
-                }
-            }
-        }
-
-        // The banner draws behind the status bar; siblings must not also pad for it.
-        // The default LinearLayout dispatch sends the same insets to every child, so
-        // we intercept here and re-dispatch with the status-bar inset zeroed for the
-        // nav host whenever the banner is visible.
-        ViewCompat.setOnApplyWindowInsetsListener(rootContainer) { _, insets ->
-            ViewCompat.dispatchApplyWindowInsets(composeView, insets)
-
-            val navHostInsets = if (composeView.visibility == View.VISIBLE) {
-                insets.consumeTopInsets()
-            } else {
-                insets
-            }
-            ViewCompat.dispatchApplyWindowInsets(navHost, navHostInsets)
-
-            WindowInsetsCompat.CONSUMED
-        }
-    }
-
     private fun WindowInsetsCompat.consumeTopInsets(): WindowInsetsCompat {
         val systemBars = getInsets(WindowInsetsCompat.Type.systemBars())
         return WindowInsetsCompat.Builder(this)
@@ -207,6 +158,20 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
                 Insets.of(0, 0, 0, 0),
             )
             .build()
+    }
+
+    // The global navigation bar: a bottom overlay shown on every screen. Self-contained — it resolves its
+    // own view-model and holders; the activity only places it.
+    private fun setupRootNavBar() {
+        val composeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                PolkadotTheme {
+                    RootNavBarHost(navController = navController)
+                }
+            }
+        }
+        addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
     private fun setupChatExtensionOverlay() {

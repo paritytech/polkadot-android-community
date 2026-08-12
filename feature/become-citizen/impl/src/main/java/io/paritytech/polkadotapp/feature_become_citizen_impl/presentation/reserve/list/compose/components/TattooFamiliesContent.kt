@@ -38,6 +38,7 @@ import io.paritytech.polkadotapp.feature_become_citizen_api.domain.models.Tattoo
 import io.paritytech.polkadotapp.feature_become_citizen_api.presentation.common.TattooImage
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.models.TattooFamilyUiIdentifier
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.reserve.list.models.TattooFamilyUiModel
+import kotlinx.collections.immutable.toImmutableList
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -139,7 +140,7 @@ private fun TattooFamiliesContentPreview() {
                         identifier = TattooFamilyUiIdentifier.Single(TattooFamilyIndex.ZERO),
                         name = "Tattoo family $it",
                         totalCount = 1234,
-                        exampleTattoos = List(3) { TattooImage.Empty }
+                        exampleTattoos = List(3) { TattooImage.Empty }.toImmutableList()
                     )
                 }
             ),

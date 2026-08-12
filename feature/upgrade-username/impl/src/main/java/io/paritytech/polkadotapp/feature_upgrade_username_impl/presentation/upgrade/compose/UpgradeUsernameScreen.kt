@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -41,7 +42,10 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
+import io.paritytech.polkadotapp.design.theme.ForceDarkBackgroundSystemBarsEffect
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.designsystem.colors.BerlinNightPalette
+import io.paritytech.polkadotapp.designsystem.colors.LocalPolkadotColors
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.presentation.upgrade.UpgradeUsernameContract
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.presentation.upgrade.UpgradeUsernameUiState
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
@@ -79,12 +83,16 @@ private val ErrorPillTextStyle = TextStyle(
 fun UpgradeUsernameScreen(contract: UpgradeUsernameContract) {
     val uiState by contract.uiState.collectAsStateWithLifecycle()
 
-    UpgradeUsernameScreenInternal(
-        state = uiState,
-        onUsernameChanged = contract::onUsernameChanged,
-        onClaimAction = contract::onClaimAction,
-        onBackClick = contract::onBackClick
-    )
+    ForceDarkBackgroundSystemBarsEffect()
+
+    CompositionLocalProvider(LocalPolkadotColors provides remember { BerlinNightPalette() }) {
+        UpgradeUsernameScreenInternal(
+            state = uiState,
+            onUsernameChanged = contract::onUsernameChanged,
+            onClaimAction = contract::onClaimAction,
+            onBackClick = contract::onBackClick
+        )
+    }
 }
 
 @Composable

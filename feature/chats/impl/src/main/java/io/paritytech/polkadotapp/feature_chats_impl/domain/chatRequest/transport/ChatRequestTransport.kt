@@ -4,7 +4,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.decodeFromByteArray
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
@@ -25,6 +25,11 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.StatementSto
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccountParams
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.prepareSignedStatement
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -34,6 +39,11 @@ interface ChatRequestTransport {
         topic: ChatRequestTopic,
         derivationDomain: SharedSecretDerivationDomain,
     ): Result<List<ChatRequestDecrypted>>
+
+    fun subscribeChatRequests(
+        topic: ChatRequestTopic,
+        derivationDomain: SharedSecretDerivationDomain,
+    ): Flow<Result<List<ChatRequestDecrypted>>>
 
     suspend fun submitChatRequest(
         topics: OutgoingChatRequestTopics,
@@ -61,13 +71,29 @@ class RealChatRequestTransport @Inject constructor(
             Timber.d("Fetching chat requests for topic ${statementTopic.toHexString()} ($topic)")
 
             statementStoreService.fetchStatements(TopicFilter.MatchAll(listOf(statementTopic))).map { statements ->
-                statements.mapNotNull { statement ->
-                    decryptAndVerifyStatement(statement, derivationDomain, topic.acceptor)
-                        .logFailure("Failed to decrypt and verify statement: $statement")
-                        .getOrNull()
-                }
+                decryptAndVerifyStatements(statements, derivationDomain, topic.acceptor)
             }
         }
+    }
+
+    override fun subscribeChatRequests(
+        topic: ChatRequestTopic,
+        derivationDomain: SharedSecretDerivationDomain,
+    ): Flow<Result<List<ChatRequestDecrypted>>> {
+        return flow {
+            val statementTopic = topic.toStatementTopic(derivationDomain)
+
+            Timber.d("Subscribing to chat requests for topic ${statementTopic.toHexString()} ($topic)")
+
+            val statements = statementStoreService.subscribeStatements(TopicFilter.MatchAll(listOf(statementTopic)))
+                .map { pageResult ->
+                    pageResult.map { page ->
+                        decryptAndVerifyStatements(page.statements, derivationDomain, topic.acceptor)
+                    }
+                }
+
+            emitAll(statements)
+        }.flowOn(coroutineDispatchers.io)
     }
 
     override suspend fun submitChatRequest(
@@ -124,7 +150,7 @@ class RealChatRequestTransport @Inject constructor(
         val encryption = encryptionFactory.create(derivationDomain, peerPublicKey = topic.peerChatKey)
 
         return ChatRequestTopicDerivation.deriveSessionTopic(
-            sharedSecret = encryption.sharedSecret,
+            sharedSecret = encryption.sharedSecret.bytes.value,
             requester = SessionAccountParams(
                 accountId = topic.requester,
                 pin = topic.pin,
@@ -146,9 +172,21 @@ class RealChatRequestTransport @Inject constructor(
             .flatMap { decrypted -> verifyProof(decrypted, acceptor) }
     }
 
+    private suspend fun decryptAndVerifyStatements(
+        statements: List<Statement>,
+        derivationDomain: SharedSecretDerivationDomain,
+        acceptor: AccountId,
+    ): List<ChatRequestDecrypted> {
+        return statements.mapNotNull { statement ->
+            decryptAndVerifyStatement(statement, derivationDomain, acceptor)
+                .logFailure("Failed to decrypt and verify statement: $statement")
+                .getOrNull()
+        }
+    }
+
     private suspend fun encryptAndEncodeStatementData(
         request: ChatRequestDecrypted,
-        peerPublicKey: EncodedPublicKey,
+        peerPublicKey: X25519PublicKey,
     ): Result<StatementData> {
         return chatRequestCrypto.encrypt(request, peerPublicKey)
             .mapCatching { BinaryScale.encodeToByteArray(it) }

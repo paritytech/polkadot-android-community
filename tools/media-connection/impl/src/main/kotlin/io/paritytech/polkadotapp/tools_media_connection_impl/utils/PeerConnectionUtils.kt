@@ -1,15 +1,49 @@
 package io.paritytech.polkadotapp.tools_media_connection_impl.utils
 
-import android.content.Context
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoDegradationPreference
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoEncodingProfile
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import org.webrtc.*
-import org.webrtc.audio.JavaAudioDeviceModule
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration.Companion.seconds
+
+fun RtpSender.applyEncodingProfile(profile: VideoEncodingProfile) {
+    val currentParameters = parameters
+    if (currentParameters == null || currentParameters.encodings.isEmpty()) return
+
+    currentParameters.encodings.forEach { encoding ->
+        if (profile.maxBitrateBps != VideoEncodingProfile.UNLIMITED_BITRATE_BPS) {
+            encoding.maxBitrateBps = profile.maxBitrateBps
+        }
+    }
+    currentParameters.degradationPreference = profile.degradationPreference.toRtpDegradationPreference()
+
+    parameters = currentParameters
+}
+
+private fun VideoDegradationPreference.toRtpDegradationPreference(): RtpParameters.DegradationPreference = when (this) {
+    VideoDegradationPreference.MAINTAIN_FRAMERATE -> RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE
+    VideoDegradationPreference.MAINTAIN_RESOLUTION -> RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+    VideoDegradationPreference.BALANCED -> RtpParameters.DegradationPreference.BALANCED
+    VideoDegradationPreference.DISABLED -> RtpParameters.DegradationPreference.DISABLED
+}
+
+fun PeerConnection.preferVideoCodec(peerConnectionFactory: PeerConnectionFactory, codecName: String) {
+    val videoTransceiver = transceivers.firstOrNull {
+        it.mediaType == MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO
+    } ?: return
+
+    val capabilities = peerConnectionFactory.getRtpSenderCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)
+    val preferred = capabilities.codecs.filter { it.name.equals(codecName, ignoreCase = true) }
+    if (preferred.isEmpty()) return
+
+    val rest = capabilities.codecs.filterNot { it.name.equals(codecName, ignoreCase = true) }
+    videoTransceiver.setCodecPreferences(preferred + rest)
+}
 
 suspend fun PeerConnection.createOffer() = suspendCancellableCoroutine {
     createOffer(
@@ -88,28 +122,4 @@ private fun onAddCandidateObserver(continuation: Continuation<Unit>) = object : 
     override fun onAddFailure(error: String) {
         continuation.resumeWithException(Exception("Failed to add ICE candidate: $error"))
     }
-}
-
-fun createPeerConnectionFactory(context: Context, eglBase: EglBase): PeerConnectionFactory {
-    val options = PeerConnectionFactory
-        .InitializationOptions
-        .builder(context)
-        .createInitializationOptions()
-
-    PeerConnectionFactory.initialize(options)
-
-    val audioDeviceModule = JavaAudioDeviceModule.builder(context)
-        .setUseHardwareAcousticEchoCanceler(true)
-        .setUseHardwareNoiseSuppressor(true)
-        .setUseLowLatency(true)
-        .createAudioDeviceModule()
-
-    val encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true)
-    val decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
-
-    return PeerConnectionFactory.builder()
-        .setAudioDeviceModule(audioDeviceModule)
-        .setVideoEncoderFactory(encoderFactory)
-        .setVideoDecoderFactory(decoderFactory)
-        .createPeerConnectionFactory()
 }

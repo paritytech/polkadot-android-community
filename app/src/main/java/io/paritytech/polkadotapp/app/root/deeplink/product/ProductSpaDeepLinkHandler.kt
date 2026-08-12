@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.awaitAccountsInitialized
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsUtils
+import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -21,7 +22,7 @@ internal class ProductSpaDeepLinkHandler @Inject constructor(
 ) : DeepLinkHandler {
     override fun canHandle(data: Uri): Boolean = DotNsUtils.isDotDomain(data)
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> =
         withContext(coroutineDispatchers.io) {
             runCancellableCatching {
@@ -32,7 +33,7 @@ internal class ProductSpaDeepLinkHandler @Inject constructor(
                     ?: error("Not a .dot domain: $data")
 
                 DeeplinkProcessingOutcome.Navigate {
-                    rootRouter.openSpaBrowser(normalized.toString())
+                    rootRouter.openSpaBrowser(SpaBrowserPayload.ByUrl(normalized.toString()))
                 }
             }
         }

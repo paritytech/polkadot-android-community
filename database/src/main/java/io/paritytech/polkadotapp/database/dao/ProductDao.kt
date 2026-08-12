@@ -24,6 +24,9 @@ interface ProductDao {
     @Query("UPDATE products SET contentHash = :contentHash WHERE id = :id")
     suspend fun updateContentHash(id: String, contentHash: String)
 
+    @Query("UPDATE products SET iconUrl = :iconUrl WHERE id = :id")
+    suspend fun updateIcon(id: String, iconUrl: String)
+
     @Query("DELETE FROM products WHERE id = :id")
     suspend fun deleteById(id: String)
 }

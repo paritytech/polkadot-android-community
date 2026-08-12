@@ -26,6 +26,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.co
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.rememberRevealedCharCount
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.LocalChatMessageTimeFormatter
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun TextMessage(
@@ -170,7 +171,7 @@ private fun MessagesPreview() {
                         direction = ChatMessageUiModel.Direction.INCOMING,
                         status = ChatMessageUiModel.Status.SENT,
                         timestamp = System.currentTimeMillis(),
-                        reactions = emptyList(),
+                        reactions = persistentListOf(),
                         origin = ChatMessageOrigin.User,
                         isEdited = false,
                         replyPreview = null
@@ -191,7 +192,7 @@ private fun MessagesPreview() {
                         direction = ChatMessageUiModel.Direction.INCOMING,
                         status = ChatMessageUiModel.Status.READ,
                         timestamp = System.currentTimeMillis(),
-                        reactions = listOf(
+                        reactions = persistentListOf(
                             ChatMessageUiModel.Reaction(count = 3, emoji = "👍", reactedByUser = true),
                             ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false)
                         ),
@@ -215,13 +216,13 @@ private fun MessagesPreview() {
                         direction = ChatMessageUiModel.Direction.INCOMING,
                         status = ChatMessageUiModel.Status.SENT,
                         timestamp = System.currentTimeMillis(),
-                        reactions = listOf(
+                        reactions = persistentListOf(
                             ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false)
                         ),
                         replyPreview = ReplyPreview(
                             messageId = "1",
                             title = "avokado.99",
-                            text = "Hello, want to chat?"
+                            content = ReplyPreview.Content.Text("Hello, want to chat?")
                         ),
                         origin = ChatMessageOrigin.User,
                         isEdited = false
@@ -242,13 +243,15 @@ private fun MessagesPreview() {
                         direction = ChatMessageUiModel.Direction.OUTGOING,
                         status = ChatMessageUiModel.Status.SENT,
                         timestamp = System.currentTimeMillis(),
-                        reactions = listOf(
+                        reactions = persistentListOf(
                             ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false)
                         ),
                         replyPreview = ReplyPreview(
                             messageId = "2",
                             title = "pineapple.77",
-                            text = "Hello, want to chat? I have a big question for you... so I need to know if you're available."
+                            content = ReplyPreview.Content.Text(
+                                "Hello, want to chat? I have a big question for you... so I need to know if you're available."
+                            )
                         ),
                         origin = ChatMessageOrigin.User,
                         isEdited = true
@@ -269,13 +272,13 @@ private fun MessagesPreview() {
                         direction = ChatMessageUiModel.Direction.OUTGOING,
                         status = ChatMessageUiModel.Status.SENT,
                         timestamp = System.currentTimeMillis(),
-                        reactions = listOf(
+                        reactions = persistentListOf(
                             ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false)
                         ),
                         replyPreview = ReplyPreview(
                             messageId = "2",
                             title = "mrx.12",
-                            text = "Okay"
+                            content = ReplyPreview.Content.Text("Okay")
                         ),
                         origin = ChatMessageOrigin.User,
                         isEdited = true
@@ -296,13 +299,13 @@ private fun MessagesPreview() {
                         direction = ChatMessageUiModel.Direction.OUTGOING,
                         status = ChatMessageUiModel.Status.SENT,
                         timestamp = System.currentTimeMillis(),
-                        reactions = listOf(
+                        reactions = persistentListOf(
                             ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false)
                         ),
                         replyPreview = ReplyPreview(
                             messageId = "2",
                             title = "mrx.12",
-                            text = "Okay"
+                            content = ReplyPreview.Content.Text("Okay")
                         ),
                         origin = ChatMessageOrigin.User,
                         isEdited = true
@@ -323,7 +326,7 @@ private fun MessagesPreview() {
                         direction = ChatMessageUiModel.Direction.OUTGOING,
                         status = ChatMessageUiModel.Status.SENT,
                         timestamp = System.currentTimeMillis(),
-                        reactions = listOf(
+                        reactions = persistentListOf(
                             ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false),
                             ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false),
                         ),

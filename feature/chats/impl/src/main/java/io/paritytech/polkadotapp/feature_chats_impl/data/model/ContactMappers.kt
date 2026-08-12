@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.model
 
 import io.paritytech.polkadotapp.common.data.os.OperatingSystem
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.database.model.ContactLocal
 import io.paritytech.polkadotapp.database.model.ContactWithChatRequestLocal
@@ -17,7 +18,7 @@ fun ContactLocal.toDomain(): Contact {
     return Contact(
         accountId = accountId.intoAccountId(),
         username = username,
-        chatKey = chatKey.toDataByteArray(),
+        chatKey = chatKey.requireX25519PublicKey(),
         ourMetaAccountId = ourMetaAccountId,
         sharedSecretDerivationDomain = SharedSecretDerivationDomain(sharedSecretDerivationPath),
         pin = pin,
@@ -41,9 +42,9 @@ fun Contact.toLocal(): ContactLocal {
     return ContactLocal(
         accountId = accountId.value,
         username = username,
-        chatKey = chatKey.value,
+        chatKey = chatKey.bytes.value,
         ourMetaAccountId = ourMetaAccountId,
-        sharedSecretDerivationPath = sharedSecretDerivationDomain.derivationPath,
+        sharedSecretDerivationPath = sharedSecretDerivationDomain.domain,
         avatar = avatarUrl,
         pin = pin,
         pushId = pushId?.value,

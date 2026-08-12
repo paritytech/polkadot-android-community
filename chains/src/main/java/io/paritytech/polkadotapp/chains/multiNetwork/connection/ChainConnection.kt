@@ -8,13 +8,19 @@ import io.novasama.substrate_sdk_android.wsrpc.response.RpcResponse
 import io.novasama.substrate_sdk_android.wsrpc.state.SocketStateMachine.State
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.autobalance.NodeAutobalancer
+import io.paritytech.polkadotapp.common.utils.network.NetworkStateService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
@@ -23,23 +29,27 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
+import kotlin.random.Random
 
 @Singleton
 class ChainConnectionFactory @Inject constructor(
     private val refCounter: ChainConnectionRefCounter,
     private val nodeAutobalancer: NodeAutobalancer,
     private val socketServiceProvider: Provider<SocketService>,
+    private val networkStateService: NetworkStateService,
 ) {
     suspend fun create(chain: Chain): ChainConnection {
         val connection = ChainConnection(
             socketService = socketServiceProvider.get(),
             refCounter = refCounter,
             nodeAutobalancer = nodeAutobalancer,
-            chain = chain
+            chain = chain,
+            networkStateService = networkStateService
         )
 
         connection.setup()
@@ -62,11 +72,18 @@ private val RATE_LIMIT_ERROR_CODES =
         BLUST_RATE_LIMIT_ERROR_CODE
     )
 
+private const val NODE_SWITCH_ATTEMPT_THRESHOLD = 3
+
+private const val RECONNECT_JITTER_MAX_MILLIS = 750L
+
+private const val NETWORK_RECONNECT_DEBOUNCE_MILLIS = 1_000L
+
 class ChainConnection internal constructor(
     val socketService: SocketService,
     private val refCounter: ChainConnectionRefCounter,
     nodeAutobalancer: NodeAutobalancer,
     private val chain: Chain,
+    private val networkStateService: NetworkStateService,
 ) : CoroutineScope by CoroutineScope(Dispatchers.Default),
     WebSocketResponseInterceptor {
     val state = socketService.networkStateFlow()
@@ -94,13 +111,29 @@ class ChainConnection internal constructor(
 
         observeCurrentNode()
 
-        refCounter.shouldConnectionBeEnabled(chain.id).onEach {
-            if (it) {
-                socketService.resume()
-            } else {
-                socketService.pause()
-            }
-        }.launchIn(this)
+        launch {
+            refCounter.shouldConnectionBeEnabled(chain.id)
+                .distinctUntilChanged()
+                .collectLatest { shouldBeEnabled ->
+                    if (shouldBeEnabled) {
+                        delay(Random.nextLong(RECONNECT_JITTER_MAX_MILLIS))
+                        socketService.resume()
+                    } else {
+                        socketService.pause()
+                    }
+                }
+        }
+
+        observeNetworkForReconnect()
+    }
+
+    private fun observeNetworkForReconnect() {
+        networkStateService.isNetworkAvailable
+            .debounce(NETWORK_RECONNECT_DEBOUNCE_MILLIS)
+            .drop(1)
+            .filter { isAvailable -> isAvailable }
+            .onEach { (state.value as? State.WaitingForReconnect)?.let { socketService.switchUrl(it.url) } }
+            .launchIn(this)
     }
 
     private suspend fun observeCurrentNode() {
@@ -141,7 +174,17 @@ class ChainConnection internal constructor(
         }
     }
 
-    private fun State.needsAutobalance() = this is State.WaitingForReconnect && attempt > 1
+    /**
+     * Trigger a node switch only after the SDK has retried the current node a few times.
+     *
+     * [SocketService.switchUrl] resets the SDK's reconnect attempt counter to 0, which pins the
+     * SDK's exponential backoff (300ms base, base-2) at its floor: if we rotate nodes on every
+     * reconnect the backoff never escalates and the socket fast-fail-loops. Switching only after
+     * [NODE_SWITCH_ATTEMPT_THRESHOLD] attempts lets the backoff grow a few steps on the same node
+     * before we rotate, so a flaky network produces far fewer reconnect attempts.
+     */
+    private fun State.needsAutobalance() =
+        this is State.WaitingForReconnect && attempt >= NODE_SWITCH_ATTEMPT_THRESHOLD
 
     override fun onRpcResponseReceived(rpcResponse: RpcResponse): ResponseDelivery {
         val error = rpcResponse.error

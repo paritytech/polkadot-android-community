@@ -1,6 +1,9 @@
 package io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models
 
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
+import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ReplyPreview
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatDraft
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatDraftRelation
 
 sealed class ChatInputUiState {
     data class SendMessage(
@@ -47,11 +50,7 @@ fun ChatSendMessageInputState.clearRelation(): ChatSendMessageInputState {
 sealed class InputMessageRelation {
     data object None : InputMessageRelation()
 
-    data class Reply(
-        val messageId: ChatMessageId,
-        val title: String,
-        val text: String?
-    ) : InputMessageRelation()
+    data class Reply(val preview: ReplyPreview) : InputMessageRelation()
 
     data class Edit(
         val messageId: ChatMessageId,
@@ -61,4 +60,13 @@ sealed class InputMessageRelation {
 
 fun InputMessageRelation.isNotNone(): Boolean {
     return this !is InputMessageRelation.None
+}
+
+fun ChatSendMessageInputState.toDomainDraft(): ChatDraft =
+    ChatDraft(text = inputMessage, relation = relation.toDraftRelation())
+
+private fun InputMessageRelation.toDraftRelation(): ChatDraftRelation = when (this) {
+    InputMessageRelation.None -> ChatDraftRelation.None
+    is InputMessageRelation.Reply -> ChatDraftRelation.Reply(preview.messageId)
+    is InputMessageRelation.Edit -> ChatDraftRelation.Edit(messageId, originalText)
 }

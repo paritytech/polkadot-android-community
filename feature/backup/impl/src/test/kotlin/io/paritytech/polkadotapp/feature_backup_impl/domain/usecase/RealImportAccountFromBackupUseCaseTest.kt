@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_backup_api.domain.error.ImportFromBacku
 import io.paritytech.polkadotapp.test_shared.whenever
 import io.paritytech.polkadotapp.tools_backup_api.data.BackupExistsStorage
 import io.paritytech.polkadotapp.tools_backup_api.domain.BackupService
+import io.paritytech.polkadotapp.tools_backup_api.domain.error.CorruptedBackupException
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.Backup
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.RestorableBackup
 import kotlinx.coroutines.runBlocking
@@ -58,6 +59,16 @@ class RealImportAccountFromBackupUseCaseTest {
         val result = useCase()
 
         assertEquals(ImportFromBackupError.NotFound, result.exceptionOrNull())
+    }
+
+    @Test
+    fun `maps CorruptedBackupException thrown during restore to Corrupted error`() = runBlocking {
+        val restorable = givenRestorableBackup(restoreResult = Result.failure(CorruptedBackupException()))
+        givenServiceReturns(Result.success(restorable))
+
+        val result = useCase()
+
+        assertEquals(ImportFromBackupError.Corrupted, result.exceptionOrNull())
     }
 
     @Test

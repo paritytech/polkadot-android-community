@@ -19,28 +19,28 @@ import kotlin.reflect.KType
 typealias QueryableStorageBinder1<K, V> = (dynamicInstance: Any, key: K) -> V
 
 interface QueryableStorageEntry1<I, T> {
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun keys(): List<I>
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun entries(): Map<I, T>
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun entries(keys: Collection<I>): Map<I, T>
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun query(argument: I): T?
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun queryRaw(argument: I): String?
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     fun observe(argument: I): Flow<T?>
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun observe(arguments: List<I>): Flow<Map<I, T?>>
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     fun observeWithRaw(argument: I): Flow<WithRawValue<T?>>
 
     fun storageKey(argument: I): String
@@ -48,13 +48,13 @@ interface QueryableStorageEntry1<I, T> {
     fun decode(scale: String?, argument: I): T?
 }
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 fun <I, T : Any> QueryableStorageEntry1<I, T>.observeNonNull(argument: I): Flow<T> = observe(argument).filterNotNull()
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 suspend fun <I, T : Any> QueryableStorageEntry1<I, T>.queryNonNull(argument: I): T = requireNotNull(query(argument))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun <I, T> QueryableModule.storage1OrNull(
     name: String,
     binding: QueryableStorageBinder1<I, T>,
@@ -63,11 +63,10 @@ fun <I, T> QueryableModule.storage1OrNull(
 ): QueryableStorageEntry1<I, T>? {
     return module.storageOrNull(name)?.let {
         val encoders = Entry1Encoders.Manual(binding, toKeyBinding, fromKeyBinding)
-        RealQueryableStorageEntry1(runtime, it, encoders)
+        RealQueryableStorageEntry1(withRuntime.runtime, it, encoders)
     }
 }
 
-context(WithRuntime)
 fun <I, T : Any> QueryableStorageEntry1<I, T>.decodeNonNull(scale: String?, argument: I): T = requireNotNull(decode(scale, argument))
 
 internal class RealQueryableStorageEntry1<I, T>(
@@ -75,59 +74,75 @@ internal class RealQueryableStorageEntry1<I, T>(
     private val storageEntry: StorageEntry,
     private val encoders: Entry1Encoders<I, T>
 ) : QueryableStorageEntry1<I, T> {
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun query(argument: I): T? {
-        return storageEntry.query(encoders.encodeKey(argument), binding = { decoded -> decoded?.let { encoders.decodeValue(it, argument) } })
+        return with(storage) {
+            storageEntry.query(encoders.encodeKey(argument), binding = { decoded -> decoded?.let { encoders.decodeValue(it, argument) } })
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override fun observe(argument: I): Flow<T?> {
-        return storageEntry.observe(encoders.encodeKey(argument), binding = { decoded -> decoded?.let { encoders.decodeValue(it, argument) } })
+        return with(storage) {
+            storageEntry.observe(encoders.encodeKey(argument), binding = { decoded -> decoded?.let { encoders.decodeValue(it, argument) } })
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun observe(arguments: List<I>): Flow<Map<I, T?>> {
-        return storageEntry.observe(
-            keysArguments = arguments.map { listOf(encoders.encodeKey(it)) },
-            keyExtractor = ::bindKey,
-            binding = { decoded, key -> decoded?.let { encoders.decodeValue(it, key) } as T }
-        )
+        return with(storage) {
+            storageEntry.observe(
+                keysArguments = arguments.map { listOf(encoders.encodeKey(it)) },
+                keyExtractor = ::bindKey,
+                binding = { decoded, key -> decoded?.let { encoders.decodeValue(it, key) } as T }
+            )
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun queryRaw(argument: I): String? {
-        return storageEntry.queryRaw(encoders.encodeKey(argument))
+        return with(storage) {
+            storageEntry.queryRaw(encoders.encodeKey(argument))
+        }
     }
 
     override fun storageKey(argument: I): String {
         return storageEntry.storageKey(runtimeSnapshot, encoders.encodeKey(argument))
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override fun observeWithRaw(argument: I): Flow<WithRawValue<T?>> {
-        return storageEntry.observeWithRaw(encoders.encodeKey(argument), binding = { decoded -> decoded?.let { encoders.decodeValue(it, argument) } })
+        return with(storage) {
+            storageEntry.observeWithRaw(encoders.encodeKey(argument), binding = { decoded -> decoded?.let { encoders.decodeValue(it, argument) } })
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun keys(): List<I> {
-        return storageEntry.keys().map(::bindKey)
+        return with(storage) {
+            storageEntry.keys().map(::bindKey)
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun entries(): Map<I, T> {
-        return storageEntry.entries(
-            keyExtractor = ::bindKey,
-            binding = { decoded, key -> decoded?.let { encoders.decodeValue(it, key) } as T }
-        )
+        return with(storage) {
+            storageEntry.entries(
+                keyExtractor = ::bindKey,
+                binding = { decoded, key -> decoded?.let { encoders.decodeValue(it, key) } as T }
+            )
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun entries(keys: Collection<I>): Map<I, T> {
-        return storageEntry.entries(
-            keysArguments = keys.map { listOf(encoders.encodeKey(it)) },
-            keyExtractor = ::bindKey,
-            binding = { decoded, key -> decoded?.let { encoders.decodeValue(it, key) } as T }
-        )
+        return with(storage) {
+            storageEntry.entries(
+                keysArguments = keys.map { listOf(encoders.encodeKey(it)) },
+                keyExtractor = ::bindKey,
+                binding = { decoded, key -> decoded?.let { encoders.decodeValue(it, key) } as T }
+            )
+        }
     }
 
     override fun decode(scale: String?, argument: I): T? {

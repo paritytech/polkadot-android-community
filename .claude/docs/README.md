@@ -27,6 +27,7 @@ This tree is **lazy-loaded** by the `/architect`, `/implementer`, and `/reviewer
 │   ├── project-types-and-units.md
 │   ├── navigation-and-routers.md
 │   ├── workers-and-background-sync.md
+│   ├── diagnostics-and-stall-reporting.md
 │   ├── testing.md
 │   ├── flow-operators-reference.md      ← reference; load only when needed
 │   └── nova-widget-inventory.md         ← reference; load only when needed
@@ -57,6 +58,7 @@ This tree is **lazy-loaded** by the `/architect`, `/implementer`, and `/reviewer
 | Choosing a type for time / size / binary / identifier | `code/project-types-and-units.md` |
 | Adding a screen / sheet navigation entry; Router/Navigator pair | `code/navigation-and-routers.md` |
 | WorkManager / CoroutineWorker / stateful background jobs | `code/workers-and-background-sync.md` |
+| A one-shot user-initiated operation that can stall (submission, chain read, handshake, cross-chain wait) | `code/diagnostics-and-stall-reporting.md` |
 | Writing a unit test (Mockito + helpers + `with*`/`verify*` style) | `code/testing.md` |
 | Discovering an unusual Flow operator | `code/flow-operators-reference.md` (reference; on demand) |
 | Discovering whether a Nova widget exists for X | `code/nova-widget-inventory.md` (reference; on demand) |

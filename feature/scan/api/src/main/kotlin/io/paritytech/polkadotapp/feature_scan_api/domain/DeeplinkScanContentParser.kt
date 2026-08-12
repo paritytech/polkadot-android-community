@@ -15,7 +15,7 @@ class DeeplinkScanContentParser(
             .getOrDefault(false)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(content: String): Result<PostParseAction> {
         return content.toUriResult()
             .flatMap { deepLinkHandler.handle(it) }

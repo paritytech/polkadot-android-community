@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_backup_api.mnemonic.model.parcel.fromPa
 import io.paritytech.polkadotapp.feature_backup_impl.BackupRouter
 import io.paritytech.polkadotapp.feature_backup_impl.ManualMnemonicInteractor
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm.models.ConfirmationState
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,7 +30,7 @@ class ConfirmMnemonicViewModel @Inject constructor(
 
     override val confirmationState = MutableStateFlow(
         ConfirmationState(
-            allWords = generatedMnemonic.wordList.shuffled().toWordList()
+            allWords = generatedMnemonic.wordList.shuffled().toWordList().toImmutableList()
         )
     )
     override val inProgress = MutableStateFlow(false)
@@ -43,7 +44,7 @@ class ConfirmMnemonicViewModel @Inject constructor(
 
         confirmationState.update { currentState ->
             currentState.copy(
-                addedWords = currentState.addedWords + word
+                addedWords = (currentState.addedWords + word).toImmutableList()
             )
         }
     }
@@ -53,7 +54,7 @@ class ConfirmMnemonicViewModel @Inject constructor(
 
         confirmationState.update { currentState ->
             currentState.copy(
-                addedWords = currentState.addedWords - word
+                addedWords = (currentState.addedWords - word).toImmutableList()
             )
         }
     }

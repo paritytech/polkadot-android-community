@@ -15,7 +15,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnCh
 import javax.inject.Inject
 
 interface CollectiblesInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun loadCollection(): Result<CollectionInput>
 }
 
@@ -27,7 +27,7 @@ class RealCollectiblesInteractor @Inject constructor(
     private val knownChains: KnownChains,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
 ) : CollectiblesInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun loadCollection(): Result<CollectionInput> {
         val displayName = usernameOfAccountUseCase.getUsername().getOrNull()?.username?.getDisplayUsername()
 

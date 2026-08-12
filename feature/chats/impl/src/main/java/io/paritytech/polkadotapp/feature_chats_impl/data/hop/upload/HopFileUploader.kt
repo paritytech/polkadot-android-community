@@ -6,18 +6,17 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
-import io.paritytech.polkadotapp.common.utils.blake2b256
 import io.paritytech.polkadotapp.common.utils.chunked
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Attachment
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
 import io.paritytech.polkadotapp.feature_chats_impl.data.AttachmentMetaBuilder
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.ChatMessageAttachmentUpdater
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopService
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopSigningPayloads
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.auth.HopSigner
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.encryption.HopEncryption
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.encryption.HopTicketKeyDerivation
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.HopMultiSigner
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.HopUploadedFile
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.HopChunkedPayload
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.HopPoolEntryPayload
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.VersionedHopPoolEntry
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferCancelledException
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileUploadRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.storage.AttachmentFileStorage
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
@@ -29,29 +28,28 @@ class HopFileUploader @Inject constructor(
     private val attachmentFileStorage: AttachmentFileStorage,
     private val hopService: HopService,
     private val hopSigner: HopSigner,
-    private val ticketKeyDerivation: HopTicketKeyDerivation,
     private val fileUploadRepository: FileUploadRepository,
     private val messageAttachmentUpdater: ChatMessageAttachmentUpdater,
     private val attachmentMetaBuilder: AttachmentMetaBuilder,
     private val preProcessors: Set<@JvmSuppressWildcards FileUploadPreProcessor>
 ) {
     suspend fun upload(upload: FileUpload) {
+        hopSigner.ensureAllocated()
+
         hopService.withSession(upload.nodeUrl) {
-            val submitterSigner = hopSigner.multiSigner()
-
-            val encryption = HopEncryption(ticketKeyDerivation.deriveEncryptionKey(upload.ticket))
-            val signingKeyPair = ticketKeyDerivation.deriveSigningKeyPair(upload.ticket)
-            val recipient = HopMultiSigner.SR25519(signingKeyPair.publicKey)
-
             val raw = attachmentFileStorage.readFileBytes(upload.meta.uri)
             val fileBytes = preProcessors.fold(raw) { bytes, processor -> processor.preProcess(bytes, upload.meta.mimeType) }
 
             val fileSize = fileBytes.size.toLong().bytes
-            val totalChunks = determineNumberOfChunks(fileSize)
-            fileUploadRepository.updateFileInfo(upload.messageId, fileSize, totalChunks)
 
-            val chunkHashes = uploadChunks(upload, fileBytes, encryption, recipient, submitterSigner)
-            val metadataHash = submitMetadata(fileBytes, chunkHashes, encryption, recipient, submitterSigner)
+            val identifier = if (fileBytes.size <= HopService.INLINE_MAX_BYTES) {
+                fileUploadRepository.updateFileInfo(upload.messageId, fileSize, totalChunks = 1)
+                submitInlineRoot(fileBytes, upload.ticket)
+            } else {
+                fileUploadRepository.updateFileInfo(upload.messageId, fileSize, determineNumberOfChunks(fileSize))
+                val chunkHashes = uploadChunks(upload, fileBytes)
+                submitChunkedRoot(fileBytes.size.toULong(), chunkHashes, upload.ticket)
+            }
 
             val attachmentMeta = attachmentMetaBuilder.build(
                 uri = upload.meta.uri,
@@ -59,24 +57,39 @@ class HopFileUploader @Inject constructor(
                 size = fileSize
             )
 
-            updateMessage(upload, metadataHash, attachmentMeta)
+            updateMessage(upload, identifier, attachmentMeta)
         }
+    }
+
+    private suspend fun HopService.Session.submitInlineRoot(payload: ByteArray, ticket: HopTicket): ByteArray {
+        val envelope: VersionedHopPoolEntry = VersionedHopPoolEntry.V1(HopPoolEntryPayload.Inline(payload))
+        return submitEntry(BinaryScale.encodeToByteArray(envelope), ticket)
+    }
+
+    private suspend fun HopService.Session.submitChunkedRoot(
+        totalSize: ULong,
+        chunkHashes: List<ByteArray>,
+        ticket: HopTicket
+    ): ByteArray {
+        val envelope: VersionedHopPoolEntry = VersionedHopPoolEntry.V1(
+            HopPoolEntryPayload.Chunked(HopChunkedPayload(totalSize = totalSize, chunks = chunkHashes))
+        )
+        return submitEntry(BinaryScale.encodeToByteArray(envelope), ticket)
     }
 
     private suspend fun HopService.Session.uploadChunks(
         upload: FileUpload,
-        fileBytes: ByteArray,
-        encryption: HopEncryption,
-        recipient: HopMultiSigner,
-        submitterSigner: HopMultiSigner
+        fileBytes: ByteArray
     ): List<ByteArray> {
         val previousHashes = upload.progress.uploadedChunkHashes.map { it.fromHex() }
         val allChunkHashes = previousHashes.toMutableList()
 
-        val chunks = fileBytes.chunked(CHUNK_SIZE_BYTES)
+        val chunks = fileBytes.chunked(HopService.CHUNK_SIZE_BYTES)
 
         for (i in upload.progress.uploadedChunks until chunks.size) {
-            val chunkHash = submitChunk(chunks[i], encryption, recipient, submitterSigner)
+            if (!fileUploadRepository.isActive(upload.messageId)) throw TransferCancelledException()
+
+            val chunkHash = submitEntry(chunks[i], upload.ticket)
             allChunkHashes.add(chunkHash)
 
             fileUploadRepository.updateProgress(
@@ -87,53 +100,6 @@ class HopFileUploader @Inject constructor(
         }
 
         return allChunkHashes
-    }
-
-    private suspend fun HopService.Session.submitChunk(
-        chunk: ByteArray,
-        encryption: HopEncryption,
-        recipient: HopMultiSigner,
-        submitterSigner: HopMultiSigner
-    ): ByteArray {
-        val encryptedChunk = encryption.encrypt(chunk)
-        submitToHop(encryptedChunk, recipient, submitterSigner)
-        return encryptedChunk.blake2b256()
-    }
-
-    private suspend fun HopService.Session.submitMetadata(
-        fileBytes: ByteArray,
-        chunkHashes: List<ByteArray>,
-        encryption: HopEncryption,
-        recipient: HopMultiSigner,
-        submitterSigner: HopMultiSigner
-    ): ByteArray {
-        val metadata = HopUploadedFile(
-            totalSize = fileBytes.size.toULong(),
-            chunksHashes = chunkHashes
-        )
-        val encodedMetadata = BinaryScale.encodeToByteArray(metadata)
-        val encryptedMetadata = encryption.encrypt(encodedMetadata)
-
-        submitToHop(encryptedMetadata, recipient, submitterSigner)
-
-        return encryptedMetadata.blake2b256()
-    }
-
-    private suspend fun HopService.Session.submitToHop(
-        encryptedData: ByteArray,
-        recipient: HopMultiSigner,
-        submitterSigner: HopMultiSigner
-    ) {
-        val timestamp = System.currentTimeMillis()
-        val payload = HopSigningPayloads.submit(encryptedData, timestamp)
-        val signature = hopSigner.sign(payload)
-        submit(
-            data = encryptedData,
-            recipients = listOf(recipient),
-            signature = signature,
-            signer = submitterSigner,
-            submitTimestampMs = timestamp
-        )
     }
 
     private suspend fun updateMessage(upload: FileUpload, metadataHash: ByteArray, meta: Attachment.Meta) {
@@ -153,10 +119,8 @@ class HopFileUploader @Inject constructor(
     }
 
     companion object {
-        private const val CHUNK_SIZE_BYTES = 2000000
-
         fun determineNumberOfChunks(fileSize: InformationSize): Int {
-            return ceil(fileSize.inWholeBytes.toDouble() / CHUNK_SIZE_BYTES).toInt()
+            return ceil(fileSize.inWholeBytes.toDouble() / HopService.CHUNK_SIZE_BYTES).toInt()
         }
     }
 }

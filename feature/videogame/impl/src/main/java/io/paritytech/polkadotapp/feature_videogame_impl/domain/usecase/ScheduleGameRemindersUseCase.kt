@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 interface ScheduleGameRemindersUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeReminderUpdates(): Flow<Unit>
 }
 
@@ -22,7 +22,7 @@ class RealScheduleGameRemindersUseCase @Inject constructor(
     private val videoGameRepository: VideoGameRepositoryInternal,
     private val videoGameReminderScheduler: VideoGameReminderScheduler
 ) : ScheduleGameRemindersUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeReminderUpdates(): Flow<Unit> = flowOfAll {
         val chain = chainRegistry.peopleChain()
         val gamePhaseDurations = videoGameRepository.getGamePhaseDurations(chain.id).getOrThrow()

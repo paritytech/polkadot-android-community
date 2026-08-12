@@ -28,7 +28,7 @@ internal class DsFinVkScanContentParser @Inject constructor(
         return DsFinVkReceiptParser.parse(content).isSuccess
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(content: String): Result<PostParseAction> {
         val receipt = DsFinVkReceiptParser.parse(content)
             .getOrElse { cause -> return rejected(W3sScanError.UnreadableReceipt(cause)) }

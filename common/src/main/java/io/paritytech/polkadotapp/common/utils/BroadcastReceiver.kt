@@ -11,9 +11,9 @@ import kotlinx.coroutines.launch
  * (and its process) alive until [block] completes, so the work must finish promptly — the
  * system still imposes a ~10s ceiling.
  */
-context(BroadcastReceiver)
+context(broadcastReceiver: BroadcastReceiver)
 fun launchAsyncJob(block: suspend CoroutineScope.() -> Unit) {
-    val pending = goAsync()
+    val pending = broadcastReceiver.goAsync()
     CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
         try {
             block()

@@ -18,7 +18,7 @@ import io.paritytech.polkadotapp.common.R as RCommon
 class CallNotificationManager(private val context: Context) {
     fun createIncomingCallNotification(callParams: CallParams): Notification {
         val channel = PolkadotNotificationChannel.CALLS
-        ensureNotificationChannel(channel)
+        ensureCallsChannel()
 
         val chatId = ChatId.fromRawValue(callParams.chatId)
         val person = Person.Builder().setName(callParams.callerName).build()
@@ -60,7 +60,7 @@ class CallNotificationManager(private val context: Context) {
 
     fun createOngoingCallNotification(callerName: String): Notification {
         val channel = PolkadotNotificationChannel.CALLS
-        ensureNotificationChannel(channel)
+        ensureCallsChannel()
 
         val person = Person.Builder().setName(callerName).build()
 
@@ -91,13 +91,25 @@ class CallNotificationManager(private val context: Context) {
             .build()
     }
 
+    private fun ensureCallsChannel() {
+        // The original "calls" channel rang via its default sound; the ringtone now lives in
+        // CallAlertManager, so drop the stale channel left behind on upgraded installs.
+        NotificationManagerCompat.from(context).deleteNotificationChannel(LEGACY_CALLS_CHANNEL_ID)
+        ensureNotificationChannel(PolkadotNotificationChannel.CALLS)
+    }
+
     private fun ensureNotificationChannel(channel: PolkadotNotificationChannel) {
         val notificationManager = NotificationManagerCompat.from(context)
         val notificationChannel = NotificationChannelCompat.Builder(channel.id, channel.importance)
             .setName(context.getString(channel.nameRes))
             .setDescription(context.getString(channel.descriptionRes))
+            .apply { if (channel.isSilent) setSound(null, null) }
             .build()
 
         notificationManager.createNotificationChannel(notificationChannel)
+    }
+
+    private companion object {
+        const val LEGACY_CALLS_CHANNEL_ID = "calls"
     }
 }

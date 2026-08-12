@@ -72,7 +72,7 @@ class RealCoinageTransferUseCase @Inject constructor(
         }
     }
 
-    context(FlowCollector<CoinageTransferDetection>)
+    context(flowCollector: FlowCollector<CoinageTransferDetection>)
     private suspend fun startDetecting(keyPairs: List<Keypair>, transferCoins: Boolean) {
         val detectedCoins = awaitCoinsInfo(keyPairs).getOrDefault(mapOf())
         val valueExponents = detectedCoins.map { ValueExponent(it.value.value) }
@@ -82,16 +82,16 @@ class RealCoinageTransferUseCase @Inject constructor(
 
         if (actualDetected.isZero()) {
             coinageLogE("Transfer detection failed: no coins detected")
-            emit(CoinageTransferDetection.Error.Detection)
+            flowCollector.emit(CoinageTransferDetection.Error.Detection)
         } else {
             coinageLogD("Transfer detected: amount=$actualDetected, coins=${detectedCoins.size}")
-            emit(CoinageTransferDetection.Detected(actualDetected))
+            flowCollector.emit(CoinageTransferDetection.Detected(actualDetected))
 
             if (transferCoins) {
                 coinageLogD("Submitting Transfer for ${detectedCoins.size} coins")
                 coinageTransferSubmissionUseCase(keyPairs, detectedCoins)
                     .onFailure {
-                        emit(CoinageTransferDetection.Error.Transfer)
+                        flowCollector.emit(CoinageTransferDetection.Error.Transfer)
                         coinageLogE("Transfer tx submission failed", it)
                     }
             }
@@ -100,17 +100,17 @@ class RealCoinageTransferUseCase @Inject constructor(
         }
     }
 
-    context(FlowCollector<CoinageTransferDetection>)
+    context(flowCollector: FlowCollector<CoinageTransferDetection>)
     private suspend fun proceedDetected(keyPairs: List<Keypair>, transferCoins: Boolean, detected: Balance) {
         coinageLogD("Awaiting coins disappear (transferCoins=$transferCoins)")
         awaitCoinsDisappear(keyPairs, transferCoins)
             .onSuccess {
                 coinageLogD("Coins disappeared - transfer confirmed on chain")
-                emit(CoinageTransferDetection.Transferred(detected))
+                flowCollector.emit(CoinageTransferDetection.Transferred(detected))
             }
             .onFailure {
                 coinageLogE("Transfer on chain failed", it)
-                emit(CoinageTransferDetection.Error.Transfer)
+                flowCollector.emit(CoinageTransferDetection.Error.Transfer)
             }
     }
 

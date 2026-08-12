@@ -20,8 +20,6 @@ class RealValidateTransferPlanUseCase @Inject constructor(
         val coins = coinRepository.getActiveCoins()
         val vouchers = voucherRepository.getActiveVouchers()
 
-        return runCatching {
-            planner.plan(amount, coins, vouchers)
-        }.getOrNull()
+        return planner.plan(amount, coins, vouchers).getOrNull()
     }
 }

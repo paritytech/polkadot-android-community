@@ -4,6 +4,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.Multibinds
 import io.paritytech.polkadotapp.chains.network.updaters.Updater
 import io.paritytech.polkadotapp.feature_account_api.data.CandidateAccount
 import io.paritytech.polkadotapp.feature_account_api.data.WalletAccount
@@ -13,6 +14,10 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.AccountSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.BandersnatchSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.newaccount.NewAccountStorage
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.AccountDerivationProvider
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.RingVrfDerivationProvider
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.RingVrfEntropyDeriver
+import io.paritytech.polkadotapp.feature_account_api.domain.model.AliasAccountDerivationOverride
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.AccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.CreateNewAccountUseCase
@@ -27,6 +32,7 @@ import io.paritytech.polkadotapp.feature_account_impl.data.storage.accountSecret
 import io.paritytech.polkadotapp.feature_account_impl.data.storage.newaccount.RealNewAccountStorage
 import io.paritytech.polkadotapp.feature_account_impl.data.updaters.RealCandidateAccountUpdateScope
 import io.paritytech.polkadotapp.feature_account_impl.data.updaters.RealWalletAccountUpdateScope
+import io.paritytech.polkadotapp.feature_account_impl.domain.derivation.RealRingVrfEntropyDeriver
 import io.paritytech.polkadotapp.feature_account_impl.domain.usecase.RealAccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_account_impl.domain.usecase.RealCreateNewAccountUseCase
 import io.paritytech.polkadotapp.feature_account_impl.domain.usecase.RealSharedSecretDerivationUseCase
@@ -45,6 +51,9 @@ interface AccountFeatureApiModule {
 
     @Binds
     fun bindBandersnatchSecretsStorage(real: RealBandersnatchSecretsStorage): BandersnatchSecretsStorage
+
+    @Binds
+    fun bindRingVrfEntropyDeriver(real: RealRingVrfEntropyDeriver): RingVrfEntropyDeriver
 
     @Binds
     fun bindAccountRepository(real: RealAccountRepository): AccountRepository
@@ -79,4 +88,13 @@ interface AccountFeatureApiModule {
 
     @Binds
     fun bindCreateNewAccountUseCase(impl: RealCreateNewAccountUseCase): CreateNewAccountUseCase
+
+    @Multibinds
+    fun aliasDerivationOverrides(): Set<AliasAccountDerivationOverride>
+
+    @Multibinds
+    fun accountDerivationProviders(): Map<MetaAccount.Purpose, AccountDerivationProvider>
+
+    @Multibinds
+    fun ringVrfDerivationProviders(): Map<MetaAccount.Purpose, RingVrfDerivationProvider>
 }

@@ -32,8 +32,10 @@ import androidx.compose.ui.util.fastForEachIndexed
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 
 private val PICKER_HEIGHT = 280.dp
@@ -127,7 +129,7 @@ internal fun ExpandedEmojiPicker(
                         contentType = { CONTENT_TYPE_EMOJI_ROW }
                     ) { rowIndex ->
                         EmojiRow(
-                            emojis = rows[rowIndex],
+                            emojis = rows[rowIndex].toImmutableList(),
                             userReactedEmojis = userReactedEmojis,
                             onEmojiClick = onEmojiClick
                         )
@@ -140,7 +142,7 @@ internal fun ExpandedEmojiPicker(
 
 @Composable
 private fun EmojiRow(
-    emojis: List<String>,
+    emojis: ImmutableList<String>,
     userReactedEmojis: ImmutableSet<String>,
     onEmojiClick: (String) -> Unit
 ) {

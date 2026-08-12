@@ -5,8 +5,8 @@ extern crate jni;
 extern crate verifiable;
 
 use jni::JNIEnv;
-use jni::objects::{JClass, JList, JObject};
-use jni::sys::{jbyteArray, jint};
+use jni::objects::{JClass, JList, JObject, JValue};
+use jni::sys::{jbyteArray, jint, jobject};
 use jni::errors::{Result as JniResult};
 use verifiable::GenerateVerifiable;
 use verifiable::ring::bandersnatch::BandersnatchVrfVerifiable;
@@ -85,7 +85,7 @@ fn Java_io_paritytech_polkadotapp_bandersnatch_1crypto_BandersnatchCrypto_create
     context: jbyteArray,
     message: jbyteArray,
     domain_size_ordinal: jint,
-) -> jbyteArray {
+) -> jobject {
     let domain_size = match domain_size_from_ordinal(domain_size_ordinal) {
         Ok(ds) => ds,
         Err(msg) => {
@@ -109,7 +109,7 @@ fn Java_io_paritytech_polkadotapp_bandersnatch_1crypto_BandersnatchCrypto_create
     let members_vec = members_to_vec(&jni_env, members_list);
 
     let commitment = BandersnatchVrfVerifiable::open(capacity, &public, members_vec.into_iter()).unwrap();
-    let (proof, _) = BandersnatchVrfVerifiable::create(
+    let (proof, alias) = BandersnatchVrfVerifiable::create(
         commitment,
         &secret,
         &context_slice,
@@ -117,7 +117,26 @@ fn Java_io_paritytech_polkadotapp_bandersnatch_1crypto_BandersnatchCrypto_create
     )
     .unwrap();
 
-    try_or_throw_null!(jni_env, jni_env.byte_array_from_slice(proof.as_ref()))
+    let proof_bytes = try_or_throw_null!(jni_env, jni_env.byte_array_from_slice(proof.as_ref()));
+    let alias_bytes = try_or_throw_null!(jni_env, jni_env.byte_array_from_slice(alias.as_ref()));
+
+    let result_class = try_or_throw_null!(
+        jni_env,
+        jni_env.find_class("io/paritytech/polkadotapp/bandersnatch_crypto/CreateProofResult")
+    );
+    let result = try_or_throw_null!(
+        jni_env,
+        jni_env.new_object(
+            result_class,
+            "([B[B)V",
+            &[
+                JValue::Object(JObject::from(proof_bytes)),
+                JValue::Object(JObject::from(alias_bytes)),
+            ],
+        )
+    );
+
+    result.into_inner()
 }
 
 

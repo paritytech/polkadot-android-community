@@ -3,12 +3,12 @@ package io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.overla
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.feature_videogame_api.domain.models.UpcomingGameStart
 import io.paritytech.polkadotapp.feature_videogame_api.domain.usecase.UpcomingGameStartUseCase
-import io.paritytech.polkadotapp.feature_videogame_impl.data.VideoGameTimings
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.VideoGameRegistrationStage
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.isWaitingRoomAvailable
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.VideoGameProcessState
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.VideoGameSnapshot
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.VideoGameStages
+import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.isWaitingRoomJoinable
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.timeline.VideoGameTimelineService
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.usecase.VideoGameRegistrationStageUseCase
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.usecase.VideoGameReportSubmittedUseCase
@@ -27,7 +27,7 @@ internal class WeeklyGamePillStateProducer @Inject constructor(
     private val registrationStageUseCase: VideoGameRegistrationStageUseCase,
     private val reportSubmittedUseCase: VideoGameReportSubmittedUseCase,
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun pillState(): Flow<VideoGamePillState> = combine(
         stateReader.gameSnapshot,
         timelineService.subscribeTimeline(),
@@ -50,12 +50,10 @@ internal class WeeklyGamePillStateProducer @Inject constructor(
 
         return when (val processState = snapshot.processState) {
             is VideoGameProcessState.WaitingRoom -> {
-                // Snapshot enters WaitingRoom as soon as the chain knows about the game
-                // (hours before start). Gate on the same 5-minute window the chat-bot uses.
-                if (gameTime == null || gameTime < -VideoGameTimings.WAITING_ROOM_AVAILABLE_BEFORE) {
-                    VideoGamePillState.Hidden
-                } else {
+                if (isWaitingRoomJoinable(registrationStage, processState, gameTime)) {
                     waitingCountdown(processState.endsAt, gameTime)
+                } else {
+                    VideoGamePillState.Hidden
                 }
             }
 

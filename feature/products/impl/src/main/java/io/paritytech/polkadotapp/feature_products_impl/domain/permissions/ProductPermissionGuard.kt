@@ -1,14 +1,12 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.permissions
 
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
-import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.AccountAccessPermissionHandler
-import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.BalanceAccessPermissionHandler
-import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.DeviceCapabilityPermissionHandler
-import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.RemotePermissionHandler
-import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.UserIdentityAccessPermissionHandler
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.ProductPermissionHandler
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.PermissionDecision
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission.RemotePermission
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 interface ProductPermissionGuard {
@@ -46,23 +44,21 @@ interface ProductPermissionGuard {
 }
 
 class RealProductPermissionGuard @Inject constructor(
-    private val remotePermissionHandler: RemotePermissionHandler,
-    private val accountAccessHandler: AccountAccessPermissionHandler,
-    private val balanceAccessHandler: BalanceAccessPermissionHandler,
-    private val deviceCapabilityHandler: DeviceCapabilityPermissionHandler,
-    private val userIdentityAccessHandler: UserIdentityAccessPermissionHandler,
+    private val remotePermissionHandler: ProductPermissionHandler<RemotePermission>,
+    private val accountAccessHandler: ProductPermissionHandler<ProductPermission.AccountAccess>,
+    private val balanceAccessHandler: ProductPermissionHandler<ProductPermission.BalanceAccess>,
+    private val deviceCapabilityHandler: ProductPermissionHandler<ProductPermission.DeviceCapability>,
+    private val userIdentityAccessHandler: ProductPermissionHandler<ProductPermission.UserIdentityAccess>,
     private val repository: ProductPermissionRepository,
     private val requester: ProductPermissionRequester,
 ) : ProductPermissionGuard {
+    private val requestMutex = Mutex()
+
     override suspend fun requestPermission(productId: ProductId, permission: ProductPermission): Boolean {
         if (check(productId, permission)) return true
 
-        return when (permission) {
-            is RemotePermission -> remotePermissionHandler.request(productId, permission)
-            is ProductPermission.AccountAccess -> accountAccessHandler.request(productId, permission)
-            is ProductPermission.BalanceAccess -> balanceAccessHandler.request(productId, permission)
-            is ProductPermission.DeviceCapability -> deviceCapabilityHandler.request(productId, permission)
-            is ProductPermission.UserIdentityAccess -> userIdentityAccessHandler.request(productId, permission)
+        return requestMutex.withLock {
+            requestUnderLock(productId, permission)
         }
     }
 
@@ -75,25 +71,36 @@ class RealProductPermissionGuard @Inject constructor(
         val notYetGranted = permissions.filterNot { check(productId, it) }.distinct()
         if (notYetGranted.isEmpty()) return true
 
-        return when (requester.promptBatched(productId, notYetGranted)) {
-            PermissionDecision.AllowAlways -> {
-                notYetGranted.forEach { repository.grant(productId, it) }
-                true
+        return requestMutex.withLock {
+            // A concurrent request may have granted some of these while we waited for the lock
+            val stillNotGranted = notYetGranted.filterNot { check(productId, it) }
+            if (stillNotGranted.isEmpty()) return@withLock true
+
+            when (requester.promptBatched(productId, stillNotGranted)) {
+                PermissionDecision.AllowAlways -> {
+                    stillNotGranted.forEach { repository.grant(productId, it) }
+                    true
+                }
+                PermissionDecision.AllowOnce -> {
+                    stillNotGranted.forEach { repository.grantOneTime(productId, it) }
+                    true
+                }
+                PermissionDecision.Deny -> false
             }
-            PermissionDecision.AllowOnce -> {
-                notYetGranted.forEach { repository.grantOneTime(productId, it) }
-                true
-            }
-            PermissionDecision.Deny -> false
         }
     }
 
     override suspend fun consumePermission(productId: ProductId, permission: ProductPermission): Boolean {
         if (repository.consumeOneTimeGrant(productId, permission)) return true
 
-        return requestPermission(productId, permission).also {
-            // Consume a one-time permission that requestPermission might have just granted
-            repository.consumeOneTimeGrant(productId, permission)
+        return requestMutex.withLock {
+            // A concurrent request may have issued a one-time grant while we waited for the lock
+            if (repository.consumeOneTimeGrant(productId, permission)) return@withLock true
+
+            requestUnderLock(productId, permission).also {
+                // Consume the one-time grant the request might have just issued
+                repository.consumeOneTimeGrant(productId, permission)
+            }
         }
     }
 
@@ -106,6 +113,23 @@ class RealProductPermissionGuard @Inject constructor(
             is ProductPermission.BalanceAccess -> balanceAccessHandler.isGranted(productId, permission)
             is ProductPermission.DeviceCapability -> deviceCapabilityHandler.isGranted(productId, permission)
             is ProductPermission.UserIdentityAccess -> userIdentityAccessHandler.isGranted(productId, permission)
+        }
+    }
+
+    /**
+     * Performs the actual permission request. Must be called while [requestMutex] is held so that
+     * only one request prompt is in flight at a time. [check] runs lock-free and may be called concurrently.
+     */
+    private suspend fun requestUnderLock(productId: ProductId, permission: ProductPermission): Boolean {
+        // A concurrent request may have granted this while we waited for the lock
+        if (check(productId, permission)) return true
+
+        return when (permission) {
+            is RemotePermission -> remotePermissionHandler.request(productId, permission)
+            is ProductPermission.AccountAccess -> accountAccessHandler.request(productId, permission)
+            is ProductPermission.BalanceAccess -> balanceAccessHandler.request(productId, permission)
+            is ProductPermission.DeviceCapability -> deviceCapabilityHandler.request(productId, permission)
+            is ProductPermission.UserIdentityAccess -> userIdentityAccessHandler.request(productId, permission)
         }
     }
 }

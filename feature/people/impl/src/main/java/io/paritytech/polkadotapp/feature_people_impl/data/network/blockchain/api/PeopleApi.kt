@@ -19,22 +19,21 @@ import io.paritytech.polkadotapp.feature_people_impl.data.model.RevisedContextua
 @JvmInline
 value class PeopleApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.people: PeopleApi
     get() = PeopleApi(module(Modules.PEOPLE))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PeopleApi.keys: QueryableStorageEntry1<PersonPublicKey, PersonId>
     get() = storage1(name = "Keys")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PeopleApi.accountToAlias: QueryableStorageEntry1<AccountId, RevisedContextualAlias>
     get() = storage1("AccountToAlias")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PeopleApi.people: QueryableStorageEntry1<PersonId, PersonRecord>
     get() = storage1("People")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PeopleApi.nextPersonId: QueryableStorageEntry0<PersonId>
     get() = storage0(name = "NextPersonalId")

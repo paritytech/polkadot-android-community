@@ -1,12 +1,18 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.webView
 
+import android.net.Uri
 import android.webkit.ConsoleMessage
 import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import io.paritytech.polkadotapp.common.data.storage.file.FileProvider
+import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
+import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.getProductIdOrNull
@@ -19,6 +25,8 @@ import timber.log.Timber
 
 class ProductWebChromeClient @AssistedInject constructor(
     private val permissionGuard: ProductPermissionGuard,
+    private val contextManager: ContextManager,
+    private val fileProvider: FileProvider,
     @Assisted private val logPrefix: String,
     @Assisted private val callingProductIdProvider: CallingProductIdProvider,
     @Assisted private val scope: CoroutineScope,
@@ -72,6 +80,28 @@ class ProductWebChromeClient @AssistedInject constructor(
                 request.deny()
             }
         }
+    }
+
+    override fun onShowFileChooser(
+        webView: WebView?,
+        filePathCallback: ValueCallback<Array<Uri>>?,
+        fileChooserParams: FileChooserParams?,
+    ): Boolean {
+        // Without this override WebView silently no-ops <input type="file">.
+        if (filePathCallback == null || fileChooserParams == null) return false
+
+        scope.launch {
+            // The callback must be invoked exactly once (even with null) or the <input> stays locked
+            // and never reopens. The user picking a file is the consent, so no permission gate here —
+            // matching the iOS/desktop clients.
+            val uris = runCatching {
+                WebFileChooserExecutor(contextManager.requireActivity(), fileChooserParams, fileProvider).execute()
+            }.flatMap { it }
+                .logFailure("$logPrefix: file chooser failed")
+                .getOrNull()
+            filePathCallback.onReceiveValue(uris)
+        }
+        return true
     }
 
     private suspend fun consumeCapability(productId: ProductId, capability: DeviceCapabilityType): Boolean {

@@ -6,12 +6,18 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchProof
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchSignature
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
+import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.models.PersonId
 
 sealed class AsPersonInfo {
     class AsPersonalAliasWithAccount(val nonce: Nonce) : AsPersonInfo()
 
-    class AsPersonalAliasWithProof(val proof: BandersnatchProof, val context: BandersnatchContext, val ringIndex: RingIndex) : AsPersonInfo()
+    class AsPersonalAliasWithProof(
+        val proof: BandersnatchProof,
+        val context: BandersnatchContext,
+        val ringIndex: RingIndex,
+        val revision: RingRevision
+    ) : AsPersonInfo()
 
     class AsPersonalIdentityWithProof(val signature: BandersnatchSignature, val personId: PersonId) : AsPersonInfo()
 
@@ -27,7 +33,7 @@ fun AsPersonInfo.toEncodableInstance(): DictEnum.Entry<*> {
 
         is AsPersonInfo.AsPersonalAliasWithProof -> DictEnum.Entry(
             name = "AsPersonalAliasWithProof",
-            value = listOf(proof.value, ringIndex.value, context.value)
+            value = listOf(proof.value, ringIndex.value, revision.value.toBigInteger(), context.value)
         )
 
         is AsPersonInfo.AsPersonalIdentityWithProof -> DictEnum.Entry(

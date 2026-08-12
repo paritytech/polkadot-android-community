@@ -378,7 +378,7 @@ class RealStatementStoreSlotRenewerTest {
     )
 
     private fun success(): Result<ExtrinsicStatus.InBlock> =
-        Result.success(mock(ExtrinsicStatus.InBlock::class.java))
+        Result.success(ExtrinsicStatus.InBlock(blockHash = "0x00", extrinsicHash = "0x00"))
 
     private fun failure(throwable: Throwable): Result<ExtrinsicStatus.InBlock> =
         Result.failure(throwable)

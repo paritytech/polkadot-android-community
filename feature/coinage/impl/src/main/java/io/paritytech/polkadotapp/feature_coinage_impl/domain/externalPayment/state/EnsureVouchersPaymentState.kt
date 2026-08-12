@@ -14,7 +14,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.subscribeVouchersAvailableNow
+import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.subscribeReadyToUseVouchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withTimeoutOrNull
@@ -42,7 +42,7 @@ class EnsureVouchersPaymentState @AssistedInject constructor(
         fun create(context: PaymentContext): EnsureVouchersPaymentState
     }
 
-    context(NoContext)
+    context(noContext: NoContext)
     override suspend fun performTransition(): TransitionResult<ExternalPaymentState> = runTransition {
         val converter = coinageBalanceConverterUseCase.create().getOrThrow()
 
@@ -87,16 +87,16 @@ class EnsureVouchersPaymentState @AssistedInject constructor(
         }
     }
 
-    context(CoinageBalanceConversionContext)
+    context(coinageContext: CoinageBalanceConversionContext)
     private suspend fun awaitMaturedVouchersReachedAmountWithTimeout(amount: Balance): List<RecyclerVoucher>? {
         return withTimeoutOrNull(POST_RECYCLING_MATURITY_TIMEOUT) {
             awaitMaturedVouchersReachedAmount(amount)
         }
     }
 
-    context(CoinageBalanceConversionContext)
+    context(coinageContext: CoinageBalanceConversionContext)
     private suspend fun awaitMaturedVouchersReachedAmount(amount: Balance): List<RecyclerVoucher> {
-        return voucherRepository.subscribeVouchersAvailableNow().mapNotNull { matured ->
+        return voucherRepository.subscribeReadyToUseVouchers().mapNotNull { matured ->
             val maturedSum = matured.totalBalance()
             matured.takeIf { maturedSum >= amount }
         }.first()

@@ -21,7 +21,11 @@ object VideoGameTimings {
      */
     val PRE_CONNECTION_TIME = 10.seconds
 
+    val CONNECTION_STAGE_DURATION = 20.seconds
+
     val HOST_FULL_CYCLE = HOST_INTRODUCTION + HOST_ACTIVE_MINIMUM + HOST_ENDING
 
     val WAITING_ROOM_AVAILABLE_BEFORE = 5.minutes
+
+    val NO_HOST_TOOLTIP_DURATION = 4.seconds
 }

@@ -8,7 +8,7 @@ import io.paritytech.polkadotapp.feature_calls_api.domain.OfferId
 import io.paritytech.polkadotapp.feature_calls_api.domain.models.CallDirection
 import io.paritytech.polkadotapp.feature_calls_api.domain.models.CallStatus
 import io.paritytech.polkadotapp.feature_calls_api.domain.models.isTerminal
-import io.paritytech.polkadotapp.feature_calls_impl.media.CallAudioManager
+import io.paritytech.polkadotapp.feature_calls_impl.media.CallAudioRouteController
 import io.paritytech.polkadotapp.feature_calls_impl.signaling.asPeerChannelSignaling
 import io.paritytech.polkadotapp.feature_calls_impl.state.CallStateHolder
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
@@ -17,6 +17,8 @@ import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerChannelFa
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerConnectionLogger
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaConfiguration
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.PeerChannelConnectionState
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoDegradationPreference
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoEncodingProfile
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.isTerminal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -30,7 +32,7 @@ import kotlin.time.Duration.Companion.seconds
 class CallSessionManager @Inject constructor(
     private val externalCallSignaling: ExternalCallSignaling,
     private val callStateHolder: CallStateHolder,
-    private val callAudioManager: CallAudioManager,
+    private val callAudioRouteController: CallAudioRouteController,
     private val peerChannelFactory: PeerChannelFactory,
 ) {
     private val peerChannel = MutableStateFlow<PeerChannel?>(null)
@@ -54,6 +56,12 @@ class CallSessionManager @Inject constructor(
                 mediaConfiguration = MediaConfiguration.AudioVideo(
                     initialCameraEnabled = withVideo,
                     initialMicrophoneEnabled = true,
+                    videoProfile = VideoEncodingProfile(
+                        captureTargetHeight = 720,
+                        captureFps = 30,
+                        maxBitrateBps = 2_000_000,
+                        degradationPreference = VideoDegradationPreference.BALANCED
+                    )
                 ),
                 scope = sessionScope,
                 isInitiator = callDirection == CallDirection.Outgoing,
@@ -66,22 +74,19 @@ class CallSessionManager @Inject constructor(
             observeMediaTracks(sessionScope, channel)
             observeMediaState(sessionScope, channel)
 
-            callAudioManager.enableCallMode()
-            setSpeakerphoneOn(withVideo)
+            callAudioRouteController.start(defaultToSpeaker = withVideo)
 
             peerChannel.value = channel
         }
     }
 
-    fun setSpeakerphoneOn(enabled: Boolean) {
-        callAudioManager.setSpeakerphoneOn(enabled)
-        callStateHolder.updateSpeakerOn(enabled)
+    fun selectAudioDevice(deviceId: Int) {
+        callAudioRouteController.selectDevice(deviceId)
     }
 
     fun endSession() {
         Timber.i("endSession: disposing peer channel, hasChannel=${peerChannel.value != null}")
-        setSpeakerphoneOn(false)
-        callAudioManager.disableCallMode()
+        callAudioRouteController.stop()
         peerChannel.value?.dispose()
         peerChannel.value = null
         Timber.i("endSession: complete")
@@ -101,8 +106,8 @@ class CallSessionManager @Inject constructor(
         externalCallSignaling.sendCloseSignal(offerId, chatId)
     }
 
-    context(CoroutineScope)
-    fun observeIncomingCallCanceled(chatId: ChatId, offerId: OfferId, onCanceled: () -> Unit) = launch {
+    context(scope: CoroutineScope)
+    fun observeIncomingCallCanceled(chatId: ChatId, offerId: OfferId, onCanceled: () -> Unit) = scope.launch {
         Timber.i("observeIncomingCallClose: waiting for close signal, offerId=$offerId")
         externalCallSignaling.subscribeIncomingCloseSignal(offerId, chatId).first()
         Timber.i("observeIncomingCallClose: received close signal")
@@ -181,6 +186,6 @@ class CallSessionManager @Inject constructor(
         // PeerChannel handles authoritative track-level mute + peer signal + state update.
         peerChannel.value?.setLocalMicrophoneEnabled(enabled)
         // OS-level mute additionally keeps system indicators / audio routing in sync.
-        callAudioManager.setMicrophoneMute(!enabled)
+        callAudioRouteController.setMicrophoneMute(!enabled)
     }
 }

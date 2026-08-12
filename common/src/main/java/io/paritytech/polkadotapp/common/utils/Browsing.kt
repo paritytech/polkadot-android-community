@@ -75,6 +75,19 @@ fun Context.openEmail(
     return tryStartActivity(intent)
 }
 
+fun Context.openUri(uri: Uri): Boolean {
+    val intent = Intent(ACTION_VIEW).apply {
+        data = uri
+        // Callers pass non-activity contexts (@ApplicationContext in
+        // SpaBrowserViewModel / RealSpaHost). The safetyStart helpers only
+        // add NEW_TASK on SDK >= R, so on API 29 (minSdk) startActivity
+        // throws AndroidRuntimeException — which is NOT one of the caught
+        // exception types. Set it unconditionally, like openPdf/openImage.
+        addFlags(FLAG_ACTIVITY_NEW_TASK)
+    }
+    return tryStartActivity(intent)
+}
+
 private fun Context.tryStartActivity(intent: Intent) =
     safetyStartNativeActivity(intent) || safetyStartActivity(intent)
         .also { success ->

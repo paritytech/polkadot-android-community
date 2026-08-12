@@ -8,10 +8,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-        "@novasamatech/host-api": "0.8.4",
-    "@novasamatech/host-container": "0.8.4",
-    "@novasamatech/storage-adapter": "0.8.4",
-    "@novasamatech/host-substrate-chain-connection": "0.8.4",
+    "@novasamatech/host-api": "0.9.4",
+    "@novasamatech/host-container": "0.9.4",
+    "@novasamatech/host-substrate-chain-connection": "0.9.4",
+    "@novasamatech/scale": "0.9.4",
+    "@novasamatech/storage-adapter": "0.9.4",
     "@polkadot-api/json-rpc-provider": "^0.2.0"
   },
   "devDependencies": {

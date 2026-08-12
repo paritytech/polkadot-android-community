@@ -14,7 +14,6 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_products_api.model.Product
-import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContextHolder
 import io.paritytech.polkadotapp.feature_products_api.model.toChatExtensionId
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.message.ProductsMessageContent
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.message.ProductsMessageRenderer
@@ -28,7 +27,6 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.FixedProdu
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.scriptExecutor.ProductsScriptExecutor
 import io.paritytech.polkadotapp.feature_products_impl.presentation.bot.menu.ProductChatMenuRenderer
-import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
@@ -50,8 +48,6 @@ class ProductChatExtension(
     private val scriptExecutor: ProductsScriptExecutor,
     private val messageRenderer: ProductsMessageRenderer,
     private val hostApiInteractor: HostApiInteractor,
-    private val signingContextHolder: SigningContextHolder,
-    private val productsRouter: ProductsRouter,
 ) : ExternalExtension() {
     override val id = product.id.toChatExtensionId()
 
@@ -67,19 +63,19 @@ class ProductChatExtension(
 
     override fun customMenuRenderer(chatId: ChatId): CustomChatMenuRenderer = ProductChatMenuRenderer(product, chatId)
 
-    context(ChatExtensionContext)
+    context(chatExtensionContext: ChatExtensionContext)
     override fun startGlobalWork() {
-        botScope = scope.childScope(supervised = true)
+        botScope = chatExtensionContext.scope.childScope(supervised = true)
 
         botScope?.launch {
             Timber.d("Starting a bot ${product.name}...")
 
-            val bridge = DelegatingProductsBotApi(this@ChatExtensionContext)
+            val bridge = DelegatingProductsBotApi(chatExtensionContext)
 
-            subscribeNewMessages(NewMessagesRoomFilter.AnyFromExtension(id))
+            chatExtensionContext.subscribeNewMessages(NewMessagesRoomFilter.AnyFromExtension(id))
                 .filter { it.origin !is ChatMessageOrigin.Extension }
                 .onEach { message -> routeMessage(message) }
-                .launchIn(scope)
+                .launchIn(chatExtensionContext.scope)
 
             scriptExecutor.initializeBot(bridge, botScope!!)
                 .onFailure { error ->
@@ -114,8 +110,6 @@ class ProductChatExtension(
         private val extensionContext: ChatExtensionContext
     ) : BaseProductsBotApi(
         hostApiInteractor = hostApiInteractor,
-        signingContextHolder = signingContextHolder,
-        router = productsRouter,
         callingProductIdProvider = FixedProductId(product.id),
     ) {
         override suspend fun createRoom(request: CreateProductRoomRequest): Result<CreateProductRoomResult> {

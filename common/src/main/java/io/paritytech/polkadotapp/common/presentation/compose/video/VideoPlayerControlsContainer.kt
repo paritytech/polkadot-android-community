@@ -21,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
@@ -92,18 +91,22 @@ fun VideoPlayerControlsContainer(
                 PolkadotSurface(
                     modifier = Modifier.align(Alignment.Center),
                     shape = PolkadotTheme.shapes.full,
-                    color = Color(0x73000000),
+                    color = PolkadotTheme.colors.bg.surface.overlay,
                     onClick = {
                         playPauseButtonState.onClick()
                         controlsVisible = true
                     }
                 ) {
-                    NovaIcon(
-                        modifier = Modifier
-                            .padding(PolkadotTheme.spacings.mediumIncreased)
-                            .size(48.dp),
-                        imageVector = if (playPauseButtonState.showPlay) NovaIcons.VideoPlay else NovaIcons.VideoPause
-                    )
+                    Box(
+                        modifier = Modifier.size(60.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        NovaIcon(
+                            modifier = Modifier.size(30.dp),
+                            imageVector = if (playPauseButtonState.showPlay) NovaIcons.VideoPlay else NovaIcons.VideoPause,
+                            tint = PolkadotTheme.colors.fg.primary
+                        )
+                    }
                 }
 
                 PlayerSeekBar(

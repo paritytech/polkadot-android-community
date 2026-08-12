@@ -21,6 +21,8 @@ import io.paritytech.polkadotapp.design.components.avatar.PolkadotAvatar
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatMessageUiModel
+import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatPreviewUiModel
+import io.paritytech.polkadotapp.feature_chats_api.presentation.model.DraftPreviewUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.LastMessageUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageAttachmentType
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatDisplayUiModel
@@ -204,6 +206,17 @@ private fun PolkadotChatListItemPreview() {
                     onClick = {},
                     currentTimestamp = 0L,
                 )
+                PolkadotChatListItem(
+                    chat = previewChat(
+                        username = "willow.glade",
+                        preview = DraftPreviewUiModel(
+                            timestamp = 0L,
+                            text = "Let's catch up tomorrow",
+                        ),
+                    ),
+                    onClick = {},
+                    currentTimestamp = 0L,
+                )
             }
         }
     }
@@ -211,7 +224,7 @@ private fun PolkadotChatListItemPreview() {
 
 private fun previewChat(
     username: String,
-    preview: LastMessageUiModel,
+    preview: ChatPreviewUiModel,
     isMuted: Boolean = false,
     hasReaction: Boolean = false,
     badge: ChatListUiState.Badge = ChatListUiState.Badge.None,

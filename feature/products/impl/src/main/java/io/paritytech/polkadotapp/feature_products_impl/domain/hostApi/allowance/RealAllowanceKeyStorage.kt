@@ -18,7 +18,7 @@ class RealAllowanceKeyStorage @Inject constructor(
 ) : AllowanceKeyStorage {
     override suspend fun get(productId: ProductId, kind: AllowanceResourceKind): SlotAccountKey? = withContext(dispatchers.io) {
         encryptedPreferences.getDecryptedString(prefsKey(productId, kind))
-            ?.let { hex -> SlotAccountKey(DataByteArray(hex.fromHex())) }
+            ?.let { hex -> SlotAccountKey.fromBytes(DataByteArray(hex.fromHex())).getOrNull() }
     }
 
     override suspend fun put(productId: ProductId, kind: AllowanceResourceKind, key: SlotAccountKey) = withContext(dispatchers.io) {

@@ -40,6 +40,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.balanceDetails.compose.BalanceDetailsBottomSheet
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountContract
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendPlanDebugInfo
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountBalance
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountInput
@@ -154,7 +155,7 @@ private fun SendEnterAmountScreenInternal(
                 input = state.input,
                 symbol = symbol,
                 showError = state.showBalanceError,
-                enabled = !state.isSendInProgress && !state.isAmountLocked,
+                enabled = state.sendProgress is SendProgress.Idle && !state.isAmountLocked,
                 focusRequester = focusRequester,
                 onInputChange = onAmountChange
             )
@@ -162,14 +163,20 @@ private fun SendEnterAmountScreenInternal(
 
         state.debugPlanInfo?.let { DebugPlanInfo(it) }
 
+        val progress = state.sendProgress
         PolkadotTextButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(PolkadotTheme.spacings.large),
-            text = stringResource(RCommon.string.common_send),
+            text = stringResource(
+                when (progress) {
+                    is SendProgress.Idle -> RCommon.string.common_send
+                    is SendProgress.Submitting -> RCommon.string.send_enter_amount_submitting
+                    is SendProgress.Settling -> RCommon.string.send_enter_amount_settling
+                }
+            ),
             onClick = onConfirmClick,
-            enabled = state.isSendEnabled,
-            loading = state.isSendInProgress,
+            enabled = state.isSendEnabled && progress is SendProgress.Idle,
             shape = PolkadotButtonShape.pill
         )
     }
@@ -214,7 +221,7 @@ private fun SendEnterAmountScreenPreview() {
                     recipient = "2o4ytihgkgrjbsk4kjb45lnqlkn35lk3ny73l54jnu45lkjulk5u4lu4lubhv",
                     recipientType = ExtractedAddress.DisplayType.ADDRESS,
                     available = TokenAmountModel.mock,
-                    isSendInProgress = false,
+                    sendProgress = SendProgress.Idle,
                     showBalanceError = true,
                     isSendEnabled = false,
                     isAmountLocked = false,

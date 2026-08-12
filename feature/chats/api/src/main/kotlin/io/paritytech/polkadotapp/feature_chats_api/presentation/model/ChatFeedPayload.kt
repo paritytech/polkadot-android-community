@@ -2,10 +2,11 @@ package io.paritytech.polkadotapp.feature_chats_api.presentation.model
 
 import android.os.Parcelable
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatExtensionId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.OpenChatRequest
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.Username
@@ -14,11 +15,15 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 class ChatFeedPayload private constructor(
     val openChatRequest: OpenChatRequestParcelable,
+    val targetMessageId: ChatMessageId?,
 ) : Parcelable {
     companion object {
-        fun existingChat(chatId: ChatId): ChatFeedPayload {
+        fun existingChat(
+            chatId: ChatId,
+            targetMessageId: ChatMessageId? = null
+        ): ChatFeedPayload {
             val request = OpenChatRequestParcelable.ExistingChat(chatId.toParcelable())
-            return ChatFeedPayload(request)
+            return ChatFeedPayload(request, targetMessageId)
         }
 
         fun existingContactChat(contactAccountId: AccountId): ChatFeedPayload {
@@ -33,7 +38,7 @@ class ChatFeedPayload private constructor(
             contactAccountId: AccountId,
             username: Username?,
             avatar: String?,
-            chatKey: EncodedPublicKey,
+            chatKey: X25519PublicKey,
             sharedSecretDerivationDomain: SharedSecretDerivationDomain,
             ourMetaAccountId: Long,
             origin: ContactOrigin,
@@ -42,12 +47,12 @@ class ChatFeedPayload private constructor(
                 contactAccountId = contactAccountId.value,
                 username = username?.getDisplayUsername(),
                 avatar = avatar,
-                sharedSecretDerivationDomain = sharedSecretDerivationDomain.derivationPath,
-                chatKey = chatKey.value,
+                sharedSecretDerivationDomain = sharedSecretDerivationDomain.domain,
+                chatKey = chatKey.bytes.value,
                 ourMetaAccountId = ourMetaAccountId,
                 origin = origin
             )
-            return ChatFeedPayload(request)
+            return ChatFeedPayload(request, targetMessageId = null)
         }
     }
 }

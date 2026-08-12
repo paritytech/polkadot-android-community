@@ -20,17 +20,18 @@ import javax.inject.Inject
 @HiltViewModel
 class ProductSettingsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val interactor: ProductSettingsInteractor,
+    interactor: ProductSettingsInteractor,
     private val router: ProductsRouter
 ) : BaseViewModel() {
     private val payload: ProductSettingsPayload = savedStateHandle.getPayload()
     private val productId = ProductId.fromStoredValue(payload.productId)
 
-    val state: StateFlow<LoadingState<ProductSettingsUiModel>> = interactor.observeProduct(productId)
+    val state: StateFlow<LoadingState<ProductSettingsUiModel>> = interactor.observeProductSettings(productId)
         .filterNotNull()
-        .map { product ->
+        .map { productSettingsInfo ->
             ProductSettingsUiModel(
-                name = product.name,
+                name = productSettingsInfo.product.name,
+                hasPermissions = productSettingsInfo.hasPermissions,
             )
         }
         .withLoading()

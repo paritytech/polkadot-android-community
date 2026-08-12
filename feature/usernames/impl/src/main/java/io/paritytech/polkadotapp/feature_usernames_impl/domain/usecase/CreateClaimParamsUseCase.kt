@@ -7,9 +7,13 @@ import io.novasama.substrate_sdk_android.scale.toByteArray
 import io.novasama.substrate_sdk_android.scale.uint8
 import io.paritytech.polkadotapp.chains.util.invoke
 import io.paritytech.polkadotapp.chains.util.signing.MessageSigningContext
+import io.paritytech.polkadotapp.common.domain.model.AccountEcdhKey
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
-import io.paritytech.polkadotapp.common.utils.Secp256r1KeyGenerator
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.removeHexPrefix
+import io.paritytech.polkadotapp.common.utils.scale.AccountEcdhKeyScaleSerializer
+import io.paritytech.polkadotapp.common.utils.scale.encodeOnChain
+import io.paritytech.polkadotapp.common.utils.scale.toScale
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.sign.AccountBytesSigner
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.BandersnatchSecretsStorage
@@ -31,7 +35,6 @@ class RealCreateClaimParamsUseCase @Inject constructor(
     private val bytesSigner: AccountBytesSigner,
     private val accountRepository: AccountRepository,
     private val sharedSecretDerivationUseCase: SharedSecretDerivationUseCase,
-    private val keyGenerator: Secp256r1KeyGenerator,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage
 ) : CreateClaimParamsUseCase {
     companion object {
@@ -72,9 +75,11 @@ class RealCreateClaimParamsUseCase @Inject constructor(
             .value
     }
 
+    // RFC-0004: on-chain records keep the 65-byte slot, with a keypair-type marker in its first byte.
     private suspend fun getChatPublicKey(): EncodedPublicKey {
         val keypair = sharedSecretDerivationUseCase.deriveForDomain(SharedSecretDerivationDomain.CHAT)
-        return keyGenerator.encode(keypair.public)
+        val scaleModel = AccountEcdhKey.X25519(keypair.publicKey).toScale()
+        return scaleModel.encodeOnChain().toDataByteArray()
     }
 
     private suspend fun getMembershipSignature(): Result<ByteArray> {
@@ -114,7 +119,7 @@ class RealCreateClaimParamsUseCase @Inject constructor(
 private object ResourcesSignatureSchema : Schema<ResourcesSignatureSchema>() {
     val publicKey by sizedByteArray(32)
     val verifier by sizedByteArray(32)
-    val chatPublicKey by sizedByteArray(65)
+    val chatPublicKey by sizedByteArray(AccountEcdhKeyScaleSerializer.CONTAINER_SIZE_BYTES)
     val username by byteArray()
     val zero by uint8()
 }

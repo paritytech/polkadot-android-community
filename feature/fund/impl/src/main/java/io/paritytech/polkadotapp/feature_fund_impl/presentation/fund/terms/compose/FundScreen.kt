@@ -43,6 +43,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.AssetDisp
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.AssetDisplayId
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenSymbolAppearance
+import kotlinx.collections.immutable.persistentListOf
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
@@ -158,7 +159,7 @@ private fun FundScreenInternalPreview() {
                             override val appearance = TokenSymbolAppearance.Symbol(symbol)
                         }
                     ),
-                    operations = listOf(
+                    operations = persistentListOf(
                         mockOperation(),
                         mockOperation().copy(status = Status.Failure),
                         mockOperation().copy(status = Status.InProgress(5.seconds)),

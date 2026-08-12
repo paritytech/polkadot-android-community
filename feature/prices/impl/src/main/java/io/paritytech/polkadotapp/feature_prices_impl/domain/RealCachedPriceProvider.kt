@@ -13,7 +13,7 @@ internal class RealGetCachedPriceUseCase @Inject constructor(
     private val getPriceUseCase: GetPriceUseCase,
     private val computationalCache: ComputationalCache
 ) : GetCachedPriceUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getPrice(chainAsset: Chain.Asset): Price {
         val key = "PRICE_FOR_ASSET:${chainAsset.id}"
 

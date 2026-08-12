@@ -25,20 +25,20 @@ abstract class ChatBot : ChatExtension {
     // --- ChatExtension implementation (final) ---
 
     final override val defaultRoomMetadata: DefaultRoomMetadata
-        get() = DefaultRoomMetadata(metadata.name, icon = null)
+        get() = DefaultRoomMetadata(metadata.name, icon = metadata.icon?.toString())
 
-    context(ChatExtensionContext)
+    context(chatExtensionContext: ChatExtensionContext)
     final override fun startGlobalWork() {
-        scope.launch { createRoom(CreateRoomRequest(chatId = chatId, name = null, icon = null)) }
+        chatExtensionContext.scope.launch { chatExtensionContext.createRoom(CreateRoomRequest(chatId = chatId, name = null, icon = null)) }
 
-        val botContext = ChatBotContext(this@ChatExtensionContext, chatId)
+        val botContext = ChatBotContext(chatExtensionContext, chatId)
 
-        subscribeNewMessages(NewMessagesRoomFilter.Chat(chatId))
+        chatExtensionContext.subscribeNewMessages(NewMessagesRoomFilter.Chat(chatId))
             .filter { it.origin !is ChatMessageOrigin.Extension }
             .onEach { message ->
                 with(botContext) { routeMessage(message) }
             }
-            .launchIn(scope)
+            .launchIn(chatExtensionContext.scope)
 
         with(botContext) { startBotWork() }
     }
@@ -48,6 +48,7 @@ abstract class ChatBot : ChatExtension {
     final override fun customFooterRenderer(chatId: ChatId): CustomChatFooterRenderer? = customFooterRenderer
     final override fun customMenuRenderer(chatId: ChatId): CustomChatMenuRenderer? = customMenuRenderer
     final override fun customChatAppearance(chatId: ChatId): CustomChatAppearance? = customChatAppearance
+    final override fun customOpenHandler(chatId: ChatId): CustomChatOpenHandler? = customOpenHandler
     final override fun customGlobalOverlayRenderer(): CustomChatOverlayRenderer? = customGlobalOverlayRenderer
     final override fun customChatPreviewDelegate(chatId: ChatId): CustomChatPreviewDelegate<*>? = customChatPreviewDelegate
     final override fun animatesMessageReveal(chatId: ChatId): Boolean = animatesMessageReveal
@@ -56,25 +57,25 @@ abstract class ChatBot : ChatExtension {
 
     // --- Bot-specific API (existing bots override these) ---
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     abstract fun startBotWork()
 
     open val customFooterRenderer: CustomChatFooterRenderer? = null
     open val customMenuRenderer: CustomChatMenuRenderer? = null
     open val customChatAppearance: CustomChatAppearance? = null
+    open val customOpenHandler: CustomChatOpenHandler? = null
     open val customGlobalOverlayRenderer: CustomChatOverlayRenderer? = null
     open val customChatPreviewDelegate: CustomChatPreviewDelegate<*>? = null
     open val animatesMessageReveal: Boolean = false
     open fun observeUserInputAllowed(): Flow<Boolean> = flowOf(true)
     open fun observeChatConfig(): Flow<ChatConfig> = flowOf(ChatConfig.Default)
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     open fun onTextMessage(message: ChatMessage, content: ChatMessage.Content.Text) {}
 
-    context(ChatBotContext)
     open fun onCustomMessage(message: ChatMessage, content: ChatMessage.Content.Custom<*>) {}
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private fun routeMessage(message: ChatMessage) {
         when (val content = message.content) {
             is ChatMessage.Content.Text -> onTextMessage(message, content)

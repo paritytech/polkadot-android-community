@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.chains.storage.source.query.metadata
 import io.paritytech.polkadotapp.chains.storage.source.queryCatching
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.mapNotNull
+import io.paritytech.polkadotapp.common.utils.scale.toDomain
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.consumers
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.reservationDuration
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.resources
@@ -114,7 +115,7 @@ class RealResourcesRepository @Inject constructor(
 
     private fun OnChainConsumerInfo.toDomain(accountId: AccountId) = ConsumerInfo(
         accountId = accountId,
-        identifierKey = identifierKey,
+        identifierKey = identifierKey.toDomain().getOrThrow(),
         liteUsername = liteUsername,
         fullUsername = fullUsername
     )

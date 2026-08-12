@@ -12,8 +12,11 @@ import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaC
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaState
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaTracks
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.PeerChannelConnectionState
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoEncodingProfile
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.videoProfile
 import io.paritytech.polkadotapp.tools_media_connection_impl.RealDataTransport
 import io.paritytech.polkadotapp.tools_media_connection_impl.RealVideoTrack
+import io.paritytech.polkadotapp.tools_media_connection_impl.WebRtcCore
 import io.paritytech.polkadotapp.tools_media_connection_impl.media.MediaTrackProvider
 import io.paritytech.polkadotapp.tools_media_connection_impl.models.ExternalRtcConfig
 import io.paritytech.polkadotapp.tools_media_connection_impl.models.MediaStateSignal
@@ -24,7 +27,9 @@ import io.paritytech.polkadotapp.tools_media_connection_impl.signaling.SdpCoder
 import io.paritytech.polkadotapp.tools_media_connection_impl.utils.CompoundPeerConnectionObserver
 import io.paritytech.polkadotapp.tools_media_connection_impl.utils.SimplePeerConnectionObserver
 import io.paritytech.polkadotapp.tools_media_connection_impl.utils.addCandidate
+import io.paritytech.polkadotapp.tools_media_connection_impl.utils.applyEncodingProfile
 import io.paritytech.polkadotapp.tools_media_connection_impl.utils.awaitRemoteSdpSet
+import io.paritytech.polkadotapp.tools_media_connection_impl.utils.preferVideoCodec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
@@ -36,8 +41,7 @@ internal abstract class PeerChannelConnection(
     protected val signaling: PeerChannelSignaling,
     protected val mediaConfiguration: MediaConfiguration,
     private val mediaTrackProvider: MediaTrackProvider,
-    private val peerConnectionFactory: PeerConnectionFactory,
-    private val eglBase: EglBase,
+    private val webRtcCore: WebRtcCore,
     externalRtcConfig: ExternalRtcConfig,
     scope: CoroutineScope,
     protected val logger: PeerConnectionLogger,
@@ -47,6 +51,8 @@ internal abstract class PeerChannelConnection(
         private const val MEDIA_STATE_USE_CASE_ID = "webrtc_media_state_use_case"
         private const val ICE_CANDIDATE_POOL_SIZE = 8
         private const val MAX_IPV6_NETWORKS = 1
+        private const val PREFERRED_VIDEO_CODEC = "H264"
+        private const val MAX_STARTUP_BITRATE_BPS = 1_000_000
     }
 
     protected val sdpCoder = SdpCoder()
@@ -88,7 +94,7 @@ internal abstract class PeerChannelConnection(
         override fun onAddTrack(receiver: RtpReceiver, mediaStreams: Array<out MediaStream?>) {
             receiver.track()?.let { track ->
                 if (track is VideoTrack) {
-                    mediaTracks.updateRemoteVideoTrack(RealVideoTrack(track, eglBase.eglBaseContext))
+                    mediaTracks.updateRemoteVideoTrack(RealVideoTrack(track, webRtcCore.eglBase.eglBaseContext))
                     logger.log("remote video track added")
                 }
             }
@@ -129,7 +135,7 @@ internal abstract class PeerChannelConnection(
 
     protected val connection: PeerConnection by lazy {
         compoundObserver.addObserver(baseObserver)
-        peerConnectionFactory.createPeerConnection(rtcConfig, compoundObserver)!!
+        webRtcCore.peerConnectionFactory.createPeerConnection(rtcConfig, compoundObserver)!!
     }
 
     init {
@@ -248,12 +254,11 @@ internal abstract class PeerChannelConnection(
         when (mediaConfiguration) {
             MediaConfiguration.None -> return
 
-            MediaConfiguration.VideoOnly -> {
+            is MediaConfiguration.VideoOnly -> {
                 val videoTrack = mediaTrackProvider.getOrCreateVideoTrack()
                 connection.addTrack(videoTrack)
-                mediaTrackProvider.setVideoEnabled(true)
-
-                mediaTracks.updateLocalVideoTrack(RealVideoTrack(videoTrack, eglBase.eglBaseContext))
+                connection.preferVideoCodec(webRtcCore.peerConnectionFactory, PREFERRED_VIDEO_CODEC)
+                mediaTracks.updateLocalVideoTrack(RealVideoTrack(videoTrack, webRtcCore.eglBase.eglBaseContext))
             }
 
             is MediaConfiguration.AudioVideo -> {
@@ -261,12 +266,35 @@ internal abstract class PeerChannelConnection(
                 val videoTrack = mediaTrackProvider.getOrCreateVideoTrack()
                 connection.addTrack(audioTrack)
                 connection.addTrack(videoTrack)
+                connection.preferVideoCodec(webRtcCore.peerConnectionFactory, PREFERRED_VIDEO_CODEC)
 
                 mediaTrackProvider.setAudioEnabled(mediaConfiguration.initialMicrophoneEnabled)
                 mediaTrackProvider.setVideoEnabled(mediaConfiguration.initialCameraEnabled)
 
-                mediaTracks.updateLocalVideoTrack(RealVideoTrack(videoTrack, eglBase.eglBaseContext))
+                mediaTracks.updateLocalVideoTrack(RealVideoTrack(videoTrack, webRtcCore.eglBase.eglBaseContext))
             }
+        }
+    }
+
+    protected fun applyVideoSenderParams() {
+        val profile = mediaConfiguration.videoProfile() ?: return
+
+        runCatching {
+            val videoSender = connection.transceivers.firstOrNull {
+                it.mediaType == MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO
+            }?.sender ?: return@runCatching
+
+            videoSender.applyEncodingProfile(profile)
+
+            val startBitrateBps = if (profile.maxBitrateBps == VideoEncodingProfile.UNLIMITED_BITRATE_BPS) {
+                MAX_STARTUP_BITRATE_BPS
+            } else {
+                minOf(MAX_STARTUP_BITRATE_BPS, profile.maxBitrateBps)
+            }
+            connection.setBitrate(null, startBitrateBps, null)
+            logger.log("Applied video sender params: maxBitrate=${profile.maxBitrateBps}, startBitrate=$startBitrateBps")
+        }.onFailure {
+            logger.log("Failed to apply video sender params", it)
         }
     }
 
@@ -316,6 +344,24 @@ internal abstract class PeerChannelConnection(
 
         sendSignal(signal)
     }
+
+    protected fun logNegotiatedVideoCodec(answer: SessionDescription) {
+        val lines = answer.description.lines()
+
+        val primaryPayloadType = lines
+            .firstOrNull { it.startsWith("m=video") }
+            ?.split(" ")
+            ?.getOrNull(3)
+            ?: return
+
+        val codecName = lines
+            .firstOrNull { it.startsWith("a=rtpmap:$primaryPayloadType ") }
+            ?.substringAfter("a=rtpmap:$primaryPayloadType ")
+            ?.substringBefore("/")
+            ?: return
+
+        logger.log("Negotiated video codec: $codecName")
+    }
 }
 
 private fun initialMediaState(mediaConfiguration: MediaConfiguration): MediaState =
@@ -326,8 +372,13 @@ private fun initialMediaState(mediaConfiguration: MediaConfiguration): MediaStat
             remoteCameraEnabled = mediaConfiguration.initialCameraEnabled,
             remoteMicrophoneEnabled = mediaConfiguration.initialMicrophoneEnabled,
         )
-        MediaConfiguration.None,
-        MediaConfiguration.VideoOnly -> MediaState(
+        is MediaConfiguration.VideoOnly -> MediaState(
+            localCameraEnabled = mediaConfiguration.initialCameraEnabled,
+            localMicrophoneEnabled = false,
+            remoteCameraEnabled = mediaConfiguration.initialCameraEnabled,
+            remoteMicrophoneEnabled = false,
+        )
+        MediaConfiguration.None -> MediaState(
             localCameraEnabled = true,
             localMicrophoneEnabled = false,
             remoteCameraEnabled = true,

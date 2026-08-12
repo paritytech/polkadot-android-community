@@ -1,6 +1,7 @@
 plugins {
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.dagger.hilt)
 }
 
 android {
@@ -12,9 +13,6 @@ dependencies {
 
     implementation(project(":common"))
     implementation(project(":chains"))
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 
     testImplementation(project(":test-shared"))
 }

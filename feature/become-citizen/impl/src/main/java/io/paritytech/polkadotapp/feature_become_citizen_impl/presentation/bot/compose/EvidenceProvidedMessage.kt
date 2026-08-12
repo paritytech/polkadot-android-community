@@ -44,6 +44,7 @@ import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.bot.re
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.bot.renderers.evidence.models.EvidenceProvidingState
 import io.paritytech.polkadotapp.feature_chats_api.presentation.common.getMaxMessageWidth
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
+import kotlinx.collections.immutable.persistentMapOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private const val StateIconInlineId = "34ecd227-cb00-4712-bc9c-191b5e1a94f2"
@@ -244,7 +245,7 @@ private fun FullStateDescription(
     }
 
     val inlineContent = remember(state) {
-        mapOf(
+        persistentMapOf(
             StateIconInlineId to InlineTextContent(
                 placeholder = Placeholder(14.sp, 14.sp, PlaceholderVerticalAlign.TextCenter),
                 children = {

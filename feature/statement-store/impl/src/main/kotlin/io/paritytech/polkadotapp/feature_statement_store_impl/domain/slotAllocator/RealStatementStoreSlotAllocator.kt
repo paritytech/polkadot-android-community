@@ -4,6 +4,7 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAlloca
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
@@ -11,6 +12,8 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.mapErrorNotInstance
 import io.paritytech.polkadotapp.common.utils.mapToSet
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.resourcesCalls
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.setStatementStoreAccount
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
@@ -34,6 +37,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.flattenExecutionF
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.ExperimentalTime
+import io.paritytech.polkadotapp.common.R as RCommon
 
 class RealStatementStoreSlotAllocator @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
@@ -42,18 +46,21 @@ class RealStatementStoreSlotAllocator @Inject constructor(
     private val statementStoreSlotRepository: StatementStoreSlotRepository,
     private val slotLoader: StatementStoreSlotLoader,
     private val contextResolver: AllocateContextResolver,
+    private val knownChains: KnownChains,
     private val allocationRepository: StatementStoreSlotAllocationRepository,
     private val renewer: StatementStoreSlotRenewer,
     private val renewalLock: StatementStoreSlotRenewalLock,
     private val currentTimeContext: CurrentTimeContext,
 ) : StatementStoreSlotAllocator {
+    context(diagnostics: StalenessReportCollector)
     override suspend fun allocate(
         target: AccountId,
         strategy: OnExistingAllocationStrategy,
         priority: SlotPriority,
-    ): Result<Unit> {
+    ): Result<Unit> = diagnostics.markRegion(RCommon.string.statement_store_stall_allocating_voucher) {
         Timber.i("allocate starting; strategy=$strategy, priority=$priority")
-        return contextResolver.resolve()
+
+        resolveAllocateContext()
             .flatMap { context ->
                 Timber.d("Resolved context: period=${context.period}, collections=${context.availableCollections}")
 
@@ -67,6 +74,13 @@ class RealStatementStoreSlotAllocator @Inject constructor(
             .mapErrorNotInstance<_, StatementStoreSlotAllocationError> { StatementStoreSlotAllocationError.Unknown(it) }
     }
 
+    override suspend fun deallocateAllSlots(target: AccountId): Result<Unit> = runCatching {
+        allocationRepository.deleteAllForAccount(knownChains.people, target)
+        Timber.i("deallocateAllSlots: dropped local slot rows for target")
+    }
+        .onFailure { Timber.e(it, "deallocateAllSlots failed") }
+        .mapErrorNotInstance<_, StatementStoreSlotAllocationError> { StatementStoreSlotAllocationError.Unknown(it) }
+
     override suspend fun allocationsFor(target: AccountId): Result<StatementStoreSlots> = contextResolver.resolve()
         .flatMap { slotLoader.loadSlots(it) }
 
@@ -75,6 +89,17 @@ class RealStatementStoreSlotAllocator @Inject constructor(
         Timber.i("scheduled periodic slot renewer")
     }
 
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun resolveAllocateContext(): Result<AllocateContext> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
+        contextResolver.resolve()
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun loadSlots(context: AllocateContext): Result<StatementStoreSlots> = diagnostics.markRegion(RCommon.string.statement_store_stall_reading_slots) {
+        slotLoader.loadSlots(context)
+    }
+
+    context(diagnostics: StalenessReportCollector)
     private suspend fun renewIfStale(context: AllocateContext, target: AccountId): Result<Unit> {
         val hasStale = allocationRepository.hasStaleFor(
             chainId = context.chain.id,
@@ -84,16 +109,19 @@ class RealStatementStoreSlotAllocator @Inject constructor(
         if (!hasStale) return Result.success(Unit)
 
         Timber.i("allocate: target has stale rows; running renewer with priorityAccount=target")
-        return renewer.renew(context, priorityAccount = target)
+        return diagnostics.markRegion(RCommon.string.statement_store_stall_renewing_vouchers) {
+            renewer.renew(context, priorityAccount = target)
+        }
     }
 
+    context(diagnostics: StalenessReportCollector)
     private suspend fun runAllocate(
         context: AllocateContext,
         target: AccountId,
         strategy: OnExistingAllocationStrategy,
         priority: SlotPriority,
     ): Result<Unit> {
-        return slotLoader.loadSlots(context).flatMap { slots ->
+        return loadSlots(context).flatMap { slots ->
             Timber.i("allocate: ${slots.takenCount()}/${slots.totalCount()} seqs already claimed in period ${context.period}")
 
             if (strategy == OnExistingAllocationStrategy.IGNORE && slots.hasSlotFor(target)) {
@@ -107,16 +135,17 @@ class RealStatementStoreSlotAllocator @Inject constructor(
         }
     }
 
+    context(diagnostics: StalenessReportCollector)
     private suspend fun submitAndRecord(
         context: AllocateContext,
         pick: SlotPick,
         target: AccountId,
         priority: SlotPriority,
-    ): Result<Unit> {
+    ): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
         Timber.i("allocate: picked seq=${pick.seq} in ${pick.collection}, evictedAccount=${pick.evictedAccount}; submitting")
         val origin = statementStoreOrigins.asResourcesStatementStoreSlot(context.period, pick.seq, pick.collection)
 
-        return extrinsicService.submitExtrinsicAndAwaitExecution(context.chain, origin) {
+        extrinsicService.submitExtrinsicAndAwaitExecution(context.chain, origin) {
             resourcesCalls.setStatementStoreAccount(context.period, pick.seq, target)
         }
             .flattenExecutionFailure()

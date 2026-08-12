@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 interface VideoGameJourneyUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     operator fun invoke(): Flow<List<VideoGameJourneyItem>>
 }
 
@@ -45,7 +45,7 @@ class RealVideoGameJourneyUseCase @Inject constructor(
         private const val JOURNEY_CACHE_KEY = "VideoGameHomeInteractor.Journey"
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override operator fun invoke(): Flow<List<VideoGameJourneyItem>> {
         return computationalCache.useSharedFlow(JOURNEY_CACHE_KEY) {
             val chain = chainRegistry.peopleChain()
@@ -67,7 +67,7 @@ class RealVideoGameJourneyUseCase @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun subscribePastGames(chainId: ChainId): Flow<Result<GamesHistory>> {
         return videoGameRepository.subscribeGameInfo(chainId).map { activeGameInfo ->
             videoGameHistoryRepository.getHistoricalGameInfos(chainId).map {

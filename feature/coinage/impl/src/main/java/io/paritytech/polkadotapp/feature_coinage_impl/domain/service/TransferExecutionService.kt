@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetPr
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.flattenExecutionFailure
+import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ResubmitWhenValidFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +25,7 @@ class TransferExecutionService @Inject constructor(
     private val extrinsicService: ExtrinsicService,
     private val transferWalRepository: CoinageTransferWalRepository,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
+    private val resubmitWhenValidFactory: ResubmitWhenValidFactory,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -37,13 +39,21 @@ class TransferExecutionService @Inject constructor(
         return chainConnectionRefCounter.withConnectionEnabled(chainAssetProvider.chainId(), "TransferExecutionService") {
             coinageLogD("TransferExecutionService submitting wal=${task.walId}")
 
+            // Submission is fire-and-forget on a background scope, so retry a transiently-invalidated transfer
+            // (e.g. a not-yet-finalized ring proof) for more blocks than the global default before rolling back.
+            val recovery = resubmitWhenValidFactory.createForTxInvalidation(chainAssetProvider.chainId(), COINAGE_RECOVERY_MAX_ATTEMPTS)
+
             extrinsicService
-                .submitExtrinsicAndAwaitExecution(chainAssetProvider.chain(), task.origin, formExtrinsic = task.formExtrinsic)
+                .submitExtrinsicAndAwaitExecution(chainAssetProvider.chain(), task.origin, submissionFailureRecovery = recovery, formExtrinsic = task.formExtrinsic)
                 .flattenExecutionFailure()
                 .onSuccess { task.transaction.commit() }
                 .onFailure { task.transaction.rollback(CoinageTransaction.Stage.MEMO_SHARED, it) }
                 .also { transferWalRepository.delete(task.walId) }
                 .coerceToUnit()
         }
+    }
+
+    private companion object {
+        const val COINAGE_RECOVERY_MAX_ATTEMPTS = 10
     }
 }

@@ -27,44 +27,43 @@ import io.paritytech.polkadotapp.feature_vouchers_api.data.model.PrivacyVoucherD
 @JvmInline
 value class MobRuleApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.mobRule: MobRuleApi
     get() = MobRuleApi(mobRule())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.caseCount: QueryableStorageEntry0<CaseCount>
     get() = storage0("CaseCount")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.openCases: QueryableStorageEntry1<MobRuleCaseId, MobRuleOpenCase>
     get() = storage1("OpenCases")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.doneCases: QueryableStorageEntry1<MobRuleCaseId, MobRuleDoneCase>
     get() = storage1("DoneCases")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.ripeCases: QueryableStorageEntry1<MobRuleCaseId, MobRuleOpenCase>
     get() = storage1("RipeCases")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.votes: QueryableStorageEntry2<MobRuleCaseId, PersonalAlias, MobRuleVote>
     get() = storage2("Votes")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.payoutDistribution: QueryableStorageEntry0<PayoutDistribution>
     get() = storage0("PayoutDistribution")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.votingPoints: QueryableStorageEntry2<PayoutRoundIndex, PersonalAlias, VotingPoints>
     get() = storage2("VotingPoints")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.credits: QueryableStorageEntry1<PersonalAlias, MobCredit>
     get() = storage1("Credits")
 
 // Constants
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MobRuleApi.mobRuleVoucherType: PrivacyVoucherDenominationType
     get() = constant("MobRuleVoucherType")

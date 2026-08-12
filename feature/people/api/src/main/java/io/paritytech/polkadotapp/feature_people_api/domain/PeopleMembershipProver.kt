@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchProof
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.network.binding.BlockHash
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
+import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 
 interface PeopleMembershipProver {
     suspend fun proofPersonMembership(
@@ -19,4 +20,5 @@ interface PeopleMembershipProver {
 class PeopleMembershipProof(
     val proof: BandersnatchProof,
     val ringIndex: RingIndex,
+    val revision: RingRevision,
 )

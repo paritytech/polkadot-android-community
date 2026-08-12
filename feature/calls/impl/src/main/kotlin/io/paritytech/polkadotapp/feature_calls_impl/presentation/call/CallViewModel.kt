@@ -13,12 +13,17 @@ import io.paritytech.polkadotapp.feature_calls_api.domain.models.CallDirection
 import io.paritytech.polkadotapp.feature_calls_api.domain.models.CallStatus
 import io.paritytech.polkadotapp.feature_calls_impl.domain.call.CallInteractor
 import io.paritytech.polkadotapp.feature_calls_impl.domain.call.CallerDisplay
+import io.paritytech.polkadotapp.feature_calls_impl.media.CallAudioDevicesState
+import io.paritytech.polkadotapp.feature_calls_impl.media.CallAudioRouteController
+import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.models.AudioDeviceUiModel
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.models.CallUiState
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.models.CallerDisplayUiModel
 import io.paritytech.polkadotapp.feature_calls_impl.state.CallStateHolder
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactAvatar
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaState
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaTracks
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -28,6 +33,7 @@ import kotlin.time.Duration
 @HiltViewModel
 class CallViewModel @Inject constructor(
     private val callStateHolder: CallStateHolder,
+    private val callAudioRouteController: CallAudioRouteController,
     private val callController: CallController,
     private val callInteractor: CallInteractor,
 ) : BaseViewModel() {
@@ -81,9 +87,8 @@ class CallViewModel @Inject constructor(
         callController.setMicrophoneEnabled(inProgress.micMuted)
     }
 
-    fun toggleSpeaker() {
-        val inProgress = state.value as? CallUiState.InProgress ?: return
-        callController.setSpeakerphoneOn(!inProgress.speakerOn)
+    fun selectAudioDevice(deviceId: Int) {
+        callController.selectAudioDevice(deviceId)
     }
 
     private fun uiStateFor(call: ActiveCallState): Flow<CallUiState> {
@@ -96,8 +101,8 @@ class CallViewModel @Inject constructor(
             status is CallStatus.Connected -> combine(
                 callStateHolder.observeMediaTracks(),
                 callStateHolder.observeMediaState(),
-                callStateHolder.observeSpeakerOn(),
-            ) { tracks, media, speakerOn -> inProgressOf(status.duration, tracks, media, speakerOn) }
+                callAudioRouteController.audioDevices,
+            ) { tracks, media, audio -> inProgressOf(status.duration, tracks, media, audio) }
 
             call.direction == CallDirection.Incoming && status is CallStatus.Ringing ->
                 flowOf(CallUiState.Incoming(initiatedWithVideo = call.initiatedWithVideo))
@@ -118,18 +123,23 @@ class CallViewModel @Inject constructor(
         duration: Duration,
         tracks: MediaTracks,
         media: MediaState,
-        speakerOn: Boolean,
+        audio: CallAudioDevicesState,
     ) = CallUiState.InProgress(
         duration = duration,
         cameraOn = media.localCameraEnabled,
         micMuted = !media.localMicrophoneEnabled,
-        speakerOn = speakerOn,
+        audioDevices = audio.toUi(),
         remoteCameraOn = media.remoteCameraEnabled,
         remoteMicMuted = !media.remoteMicrophoneEnabled,
         localVideoTrack = tracks.localVideoTrack,
         remoteVideoTrack = tracks.remoteVideoTrack,
     )
 }
+
+private fun CallAudioDevicesState.toUi(): ImmutableList<AudioDeviceUiModel> =
+    devices
+        .map { AudioDeviceUiModel(it.id, it.type, it.name, isSelected = it.id == selectedId) }
+        .toImmutableList()
 
 private fun CallerDisplay.toUi() = CallerDisplayUiModel(
     name = name,

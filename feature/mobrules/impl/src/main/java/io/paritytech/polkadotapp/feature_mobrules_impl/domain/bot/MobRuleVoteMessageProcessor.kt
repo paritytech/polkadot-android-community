@@ -33,9 +33,9 @@ class MobRuleVoteMessageProcessor @Inject constructor(
 ) : ChatBotMessageProcessor {
     private val pendingMessages = mutableMapOf<MobRuleCaseId, PendingVoteMessage>()
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun launchSendingMessages() {
-        scope.launch {
+        chatBotContext.scope.launch {
             votingStateNotifier.observeState().collect { event ->
                 when (event) {
                     is VotingStateEvent.ReadyToVote -> Unit
@@ -47,7 +47,7 @@ class MobRuleVoteMessageProcessor @Inject constructor(
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun onVoteStarted(vote: MobRuleVote, caseContext: VoteCaseContext) {
         val caseId = caseContext.caseId
         if (caseId in pendingMessages) return
@@ -61,7 +61,7 @@ class MobRuleVoteMessageProcessor @Inject constructor(
         )
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun onVoteCompleted(vote: MobRuleVote, caseContext: VoteCaseContext) {
         pendingMessages.remove(caseContext.caseId) ?: return
 
@@ -71,11 +71,11 @@ class MobRuleVoteMessageProcessor @Inject constructor(
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun onVoteFailed(caseContext: VoteCaseContext) {
         val ids = pendingMessages.remove(caseContext.caseId) ?: return
-        removeMessage(ids.textMessageId)
-        removeMessage(ids.cardMessageId)
+        chatBotContext.removeMessage(ids.textMessageId)
+        chatBotContext.removeMessage(ids.cardMessageId)
     }
 
     private fun MobRuleVote.toUserVoteType(): UserVoteType? {
@@ -88,13 +88,13 @@ class MobRuleVoteMessageProcessor @Inject constructor(
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun sendPendingVoteTextMessage(vote: MobRuleVote): ChatMessage {
         val voteText = context.getString(vote.toVoteStringRes())
-        return sendMessage(ChatMessage.Content.Text(voteText))
+        return chatBotContext.sendMessage(ChatMessage.Content.Text(voteText))
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun sendVotedCaseCardMessage(caseContext: VoteCaseContext): ChatMessage {
         val content = when (caseContext) {
             is VoteCaseContext.Photo -> MobRuleVotedCaseContent(
@@ -112,7 +112,7 @@ class MobRuleVoteMessageProcessor @Inject constructor(
                 tattooFamilyIdHex = caseContext.tattooFamilyId.value.toHexString(withPrefix = false)
             )
         }
-        return sendCustomMessage(
+        return chatBotContext.sendCustomMessage(
             content = content,
             rendererId = MobRuleVotedCaseMessageRenderer.ID,
         )

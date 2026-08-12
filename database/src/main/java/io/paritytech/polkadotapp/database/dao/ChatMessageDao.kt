@@ -1,25 +1,53 @@
 package io.paritytech.polkadotapp.database.dao
 
 import androidx.room.Dao
-import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
+import io.paritytech.polkadotapp.database.model.ChatMessagePendingExpansionLocal
+import io.paritytech.polkadotapp.database.model.ChatMessageSearchRow
+import io.paritytech.polkadotapp.database.model.TransferRetryStateLocal
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 abstract class ChatMessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    abstract suspend fun insert(local: ChatMessageLocal)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    abstract suspend fun insert(local: List<ChatMessageLocal>)
+    protected abstract suspend fun insert(local: List<ChatMessageLocal>)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    abstract suspend fun insertIfNotExists(local: List<ChatMessageLocal>): List<Long>
+    protected abstract suspend fun insertIfNotExists(local: List<ChatMessageLocal>): List<Long>
+
+    @Transaction
+    open suspend fun saveMessage(local: ChatMessageLocal) {
+        saveMessages(listOf(local))
+    }
+
+    @Transaction
+    open suspend fun saveMessageIfNotExists(local: ChatMessageLocal): Long {
+        return saveMessagesIfNotExist(listOf(local)).single()
+    }
+
+    @Transaction
+    open suspend fun saveMessages(locals: List<ChatMessageLocal>) {
+        insert(locals)
+        insertPendingExpansions(locals.pendingExpansions())
+    }
+
+    @Transaction
+    open suspend fun saveMessagesIfNotExist(locals: List<ChatMessageLocal>): List<Long> {
+        val rowIds = insertIfNotExists(locals)
+        val inserted = locals.filterIndexed { index, _ -> rowIds[index] >= 0 }
+        insertPendingExpansions(inserted.pendingExpansions())
+        return rowIds
+    }
+
+    private fun List<ChatMessageLocal>.pendingExpansions(): List<ChatMessagePendingExpansionLocal> {
+        return filter { it.type == ChatMessageLocal.Type.COMPACTION_COMMIT && it.origin.type != ChatMessageLocal.OriginType.USER }
+            .map { ChatMessagePendingExpansionLocal(commitId = it.id, retryState = TransferRetryStateLocal.None) }
+    }
 
     @Query("SELECT * FROM chat_messages WHERE chatId = :chatId ORDER BY timestamp DESC")
     abstract fun subscribeMessages(chatId: ByteArray): Flow<List<ChatMessageLocal>>
@@ -53,6 +81,20 @@ abstract class ChatMessageDao {
     @Query("SELECT * FROM chat_messages WHERE type IN (:types)")
     abstract fun subscribeMessagesByTypes(types: List<ChatMessageLocal.Type>): Flow<List<ChatMessageLocal>>
 
+    @Query("""
+        SELECT id, chatId, timestamp, searchableContent FROM chat_messages
+        WHERE isInternal = 0
+            AND chatId IN (:chatIds)
+            AND searchableContent LIKE '%' || :query || '%' ESCAPE '\'
+        ORDER BY timestamp DESC
+        LIMIT :limit
+    """)
+    abstract suspend fun searchMessages(
+        query: String,
+        chatIds: List<ByteArray>,
+        limit: Int
+    ): List<ChatMessageSearchRow>
+
     @Query("UPDATE chat_messages SET status = :newStatus, updatedAt = :updatedAt WHERE id = :messageId")
     abstract suspend fun updateStatus(messageId: String, newStatus: ChatMessageLocal.Status, updatedAt: Long): Int
 
@@ -62,17 +104,51 @@ abstract class ChatMessageDao {
     @Query("UPDATE chat_messages SET status = :newStatus, updatedAt = :updatedAt WHERE id IN (:messageIds)")
     abstract suspend fun updateMessagesStatus(messageIds: List<String>, newStatus: ChatMessageLocal.Status, updatedAt: Long): Int
 
-    @Query("UPDATE chat_messages SET status = :toStatus WHERE chatId = :chatId AND status = :fromStatus AND origintype == 'USER'")
+    @Query(
+        """
+        UPDATE chat_messages SET status = :toStatus
+        WHERE chatId = :chatId AND status = :fromStatus AND origintype == 'USER'
+        AND NOT EXISTS (SELECT 1 FROM chat_message_compaction_links WHERE originalId = chat_messages.id)
+        """
+    )
     abstract suspend fun updateOutgoingMessagesStatusForChat(chatId: ByteArray, fromStatus: ChatMessageLocal.Status, toStatus: ChatMessageLocal.Status)
 
-    @Query("UPDATE chat_messages SET status = :toStatus WHERE chatId = :chatId AND status = :fromStatus AND origintype == 'USER' AND type IN (:types)")
+    @Query(
+        """
+        UPDATE chat_messages SET status = :toStatus
+        WHERE chatId = :chatId AND status = :fromStatus AND origintype == 'USER' AND type IN (:types)
+        AND NOT EXISTS (SELECT 1 FROM chat_message_compaction_links WHERE originalId = chat_messages.id)
+        """
+    )
     abstract suspend fun updateOutgoingMessagesStatusForChatWithTypes(chatId: ByteArray, fromStatus: ChatMessageLocal.Status, toStatus: ChatMessageLocal.Status, types: List<ChatMessageLocal.Type>)
 
-    @Query("UPDATE chat_messages SET status = :toStatus WHERE chatId = :chatId AND status = :fromStatus AND origintype == 'USER' AND type NOT IN (:types)")
+    @Query(
+        """
+        UPDATE chat_messages SET status = :toStatus
+        WHERE chatId = :chatId AND status = :fromStatus AND origintype == 'USER' AND type NOT IN (:types)
+        AND NOT EXISTS (SELECT 1 FROM chat_message_compaction_links WHERE originalId = chat_messages.id)
+        """
+    )
     abstract suspend fun updateOutgoingMessagesStatusForChatExcludingTypes(chatId: ByteArray, fromStatus: ChatMessageLocal.Status, toStatus: ChatMessageLocal.Status, types: List<ChatMessageLocal.Type>)
 
-    @Query("DELETE FROM chat_messages WHERE id = :messageId")
-    abstract suspend fun remove(messageId: String)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    protected abstract suspend fun insertPendingExpansions(pending: List<ChatMessagePendingExpansionLocal>)
+
+    @Query("DELETE FROM chat_messages WHERE id IN (:messageIds)")
+    protected abstract suspend fun removeMessageRows(messageIds: List<String>)
+
+    @Query("DELETE FROM chat_message_compaction_links WHERE originalId IN (:originalIds)")
+    protected abstract suspend fun deleteCompactionLinksOf(originalIds: List<String>)
+
+    @Query("DELETE FROM chat_message_pending_expansions WHERE commitId = :commitId")
+    protected abstract suspend fun clearPendingExpansion(commitId: String)
+
+    @Transaction
+    open suspend fun remove(messageId: String) {
+        removeMessageRows(listOf(messageId))
+        deleteCompactionLinksOf(listOf(messageId))
+        clearPendingExpansion(messageId)
+    }
 
     @Query("UPDATE chat_messages SET status = 'IS_READ' WHERE chatId = :chatId AND timestamp <= :timestamp AND status = 'NEW' AND origintype != 'USER'")
     abstract suspend fun markMessagesAsReadUpToTimestamp(chatId: ByteArray, timestamp: Long)
@@ -83,33 +159,24 @@ abstract class ChatMessageDao {
     @Query("UPDATE chat_messages SET status = 'IS_READ' WHERE id = :messageId")
     abstract suspend fun markMessageAsRead(messageId: String)
 
-    @Query("""
-        WITH per_chat AS (
-          SELECT
-            chatId,
-            COUNT(CASE WHEN status = 'NEW' AND origintype != 'USER' THEN 1 END) AS unseenCount,
-            MAX(timestamp) AS lastTimestamp,
-            id
-          FROM chat_messages
-          WHERE (:includeInternal = 1 OR isInternal = 0)
-          GROUP BY chatId
-        )
-        SELECT
-          pc.chatId as chatId,
-          pc.unseenCount as unseenCount,
-          m.*
-        FROM per_chat pc
-        JOIN chat_messages m ON m.id = pc.id
-        WHERE (:includeInternal = 1 OR m.isInternal = 0)
-        ORDER BY m.timestamp DESC
-    """)
-    abstract fun subscribeChatSummaries(includeInternal: Boolean = false): Flow<List<ChatSummaryLocal>>
-
     @Query("SELECT * FROM chat_messages WHERE chatId = :chatId AND type = 'UNSUPPORTED'")
     abstract suspend fun getUnsupportedMessages(chatId: ByteArray): List<ChatMessageLocal>
 
     @Query("DELETE FROM chat_messages WHERE chatId = :chatId")
-    abstract suspend fun deleteAllMessages(chatId: ByteArray)
+    abstract suspend fun deleteAllMessageRows(chatId: ByteArray)
+
+    @Query("DELETE FROM chat_message_compaction_links WHERE originalId IN (SELECT id FROM chat_messages WHERE chatId = :chatId)")
+    abstract suspend fun deleteCompactionLinksForChat(chatId: ByteArray)
+
+    @Query("DELETE FROM chat_message_pending_expansions WHERE commitId IN (SELECT id FROM chat_messages WHERE chatId = :chatId)")
+    abstract suspend fun deletePendingExpansionsForChat(chatId: ByteArray)
+
+    @Transaction
+    open suspend fun deleteAllMessages(chatId: ByteArray) {
+        deleteCompactionLinksForChat(chatId)
+        deletePendingExpansionsForChat(chatId)
+        deleteAllMessageRows(chatId)
+    }
 
     @Query("SELECT MAX(timestamp) FROM chat_messages WHERE chatId = :chatId")
     abstract suspend fun getLatestTimestamp(chatId: ByteArray): Long?
@@ -129,18 +196,9 @@ abstract class ChatMessageDao {
     @Query("SELECT id, status FROM chat_messages WHERE id IN (:messageIds)")
     abstract suspend fun getMessageStatuses(messageIds: List<String>): List<MessageStatusProjection>
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    abstract suspend fun insertIfNotExists(local: ChatMessageLocal): Long
-
     data class MessageStatusProjection(
         val id: String,
         val status: ChatMessageLocal.Status
-    )
-
-    data class ChatSummaryLocal(
-        @Embedded
-        val lastMessage: ChatMessageLocal,
-        val unseenCount: Int
     )
 
     class MessageContentUpdateLocal(

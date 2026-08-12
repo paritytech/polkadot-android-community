@@ -16,6 +16,7 @@ import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.chains.util.coinage
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import java.math.BigInteger
 
@@ -25,50 +26,44 @@ typealias CounterAlias = DataByteArray
 @JvmInline
 value class CoinageApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.coinage: CoinageApi
     get() = CoinageApi(coinage())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val CoinageApi.minExponent: Int
     get() = constant("MinimumExponent")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val CoinageApi.maxExponent: Int
     get() = constant("MaximumExponent")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val CoinageApi.consumedFreeUnloadTokens: QueryableStorageEntry2<TokenPeriod, CounterAlias, Unit>
     get() = storage2("ConsumedFreeUnloadTokens")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val CoinageApi.coinsByOwner: QueryableStorageEntry1<AccountId, OnChainCoinInfo>
     get() = storage1("CoinsByOwner")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val CoinageApi.underlyingAssetUnit: BigInteger
     get() = constant("UnderlyingAssetUnit")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val CoinageApi.unloadTokenTimePeriodPeopleLitePeople: Long
     get() = constant("UnloadTokenTimePeriodPeopleLitePeople")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
+val CoinageApi.maxFreeUnloadTokensPerTimePeriod: Long
+    get() = constant("MaxFreeUnloadTokensPerTimePeriod")
+
+context(withRuntime: WithRuntime)
 val CoinageApi.recyclersCoinToRecycler: QueryableStorageEntry1<BandersnatchPublicKey, BigInteger>
     get() = storage1("RecyclersCoinToRecycler")
 
-context(WithRuntime)
-val CoinageApi.recyclersUnloaded: QueryableStorageEntry3<BigInteger, BigInteger, ByteArray, Unit>
-    get() = storage3("RecyclersUnloaded")
+val CoinageApi.recyclerAliasStates: QueryableStorageEntry3<BigInteger, BigInteger, ByteArray, OnChainAliasState>
+    get() = storage3("RecyclerAliasStates")
 
-context(WithRuntime)
-val CoinageApi.unloadTokenPerTimePeriodForLitePeople: Long
-    get() = constant("UnloadTokenPerTimePeriodForLitePeople")
-
-context(WithRuntime)
-val CoinageApi.unloadTokenPerTimePeriodForPeople: Long
-    get() = constant("UnloadTokenPerTimePeriodForPeople")
-
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val CoinageApi.maxConsolidation: Int
     get() = constant("MaxConsolidation")

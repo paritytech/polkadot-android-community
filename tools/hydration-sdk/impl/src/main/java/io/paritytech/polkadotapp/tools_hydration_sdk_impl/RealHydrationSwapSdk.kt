@@ -171,15 +171,15 @@ internal class RealHydrationSwapSdk(
         )
     }
 
-    context(WithRuntime, ExtrinsicBuilder)
+    context(withRuntime: WithRuntime, builder: ExtrinsicBuilder)
     private suspend fun executeRouterSwap(
         trade: Path<HydrationSwapEdge>,
         actualSwapLimit: SwapLimit
     ) {
-        call(executeRouterSwapCall(trade, actualSwapLimit))
+        builder.call(executeRouterSwapCall(trade, actualSwapLimit))
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private suspend fun executeRouterSwapCall(
         trade: Path<HydrationSwapEdge>,
         actualSwapLimit: SwapLimit
@@ -191,7 +191,7 @@ internal class RealHydrationSwapSdk(
         }
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private suspend fun executeRouterBuy(
         trade: Path<HydrationSwapEdge>,
         limit: SwapLimit.SpecifiedOut,
@@ -212,7 +212,7 @@ internal class RealHydrationSwapSdk(
         )
     }
 
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     private suspend fun executeRouterSell(
         trade: Path<HydrationSwapEdge>,
         limit: SwapLimit.SpecifiedIn,

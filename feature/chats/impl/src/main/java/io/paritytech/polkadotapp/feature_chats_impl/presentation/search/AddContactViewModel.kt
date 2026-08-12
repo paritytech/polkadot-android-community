@@ -1,8 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_impl.presentation.search
 
-import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.search.SearchState
@@ -27,13 +25,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import io.paritytech.polkadotapp.common.R as RCommon
 
 @HiltViewModel
 internal class AddContactViewModel @Inject constructor(
     private val interactor: AddContactInteractor,
     private val router: ChatsRouter,
-    @ApplicationContext private val context: Context
 ) : BaseViewModel(), AddContactContract {
     private val searchQuery = MutableStateFlow("")
 
@@ -70,13 +66,6 @@ internal class AddContactViewModel @Inject constructor(
         if (loadingContactId.value != null) return
 
         launch {
-            val ownAccountId = interactor.getCurrentAccountId()
-
-            if (result.contactAccountId == ownAccountId) {
-                showMessage(context.getString(RCommon.string.add_contact_add_self_error))
-                return@launch
-            }
-
             loadingContactId.value = result.contactAccountId
 
             interactor.getStartChatData(result.contactAccountId)

@@ -13,7 +13,7 @@ import javax.inject.Inject
 class RealGetActiveDimCommitmentState @Inject constructor(
     private val handlers: Set<@JvmSuppressWildcards DimCommitmentHandler>
 ) : GetActiveDimCommitmentState {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun invoke(currentDim: DimId): Flow<DimState?> {
         val otherHandlers = handlers.filter { it.dimId != currentDim }
 

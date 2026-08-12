@@ -19,11 +19,13 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatMessageUiModel
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.icons.MessageStatusFailed
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.icons.MessageStatusPending
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.icons.MessageStatusRead
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.icons.MessageStatusSent
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.LocalChatMessageTimeFormatter
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun FlatMessageTimestamp(
@@ -91,14 +93,17 @@ private fun MessageTimestampContent(
         )
 
         if (message.direction == ChatMessageUiModel.Direction.OUTGOING) {
+            val isFailed = message.status == ChatMessageUiModel.Status.FAILED
+
             NovaIcon(
                 modifier = Modifier.size(12.dp),
                 imageVector = when (message.status) {
                     ChatMessageUiModel.Status.PENDING -> MessageStatusPending
                     ChatMessageUiModel.Status.SENT -> MessageStatusSent
                     ChatMessageUiModel.Status.READ -> MessageStatusRead
+                    ChatMessageUiModel.Status.FAILED -> MessageStatusFailed
                 },
-                tint = iconColor
+                tint = if (isFailed) PolkadotTheme.colors.fg.error else iconColor
             )
         }
     }
@@ -120,7 +125,7 @@ private fun MessageTimestampPreview() {
                     direction = ChatMessageUiModel.Direction.OUTGOING,
                     status = ChatMessageUiModel.Status.SENT,
                     timestamp = System.currentTimeMillis(),
-                    reactions = emptyList(),
+                    reactions = persistentListOf(),
                     origin = ChatMessageOrigin.User,
                     replyPreview = null,
                     isEdited = false
@@ -140,7 +145,7 @@ private fun MessageTimestampPreview() {
                     direction = ChatMessageUiModel.Direction.OUTGOING,
                     status = ChatMessageUiModel.Status.READ,
                     timestamp = System.currentTimeMillis(),
-                    reactions = emptyList(),
+                    reactions = persistentListOf(),
                     origin = ChatMessageOrigin.User,
                     replyPreview = null,
                     isEdited = false

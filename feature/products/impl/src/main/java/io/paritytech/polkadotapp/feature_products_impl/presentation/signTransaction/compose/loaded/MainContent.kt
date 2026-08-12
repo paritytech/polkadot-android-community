@@ -71,6 +71,7 @@ fun MainContent(
             text = when (state.content) {
                 is SigningContent.Transaction -> state.content.callName
                 is SigningContent.RawMessage -> state.content.hexData
+                is SigningContent.VrfTranscript -> state.content.transcriptLabel
             },
             style = PolkadotTheme.typography.body.large,
             color = PolkadotTheme.colors.fg.tertiary,
@@ -130,11 +131,15 @@ private fun SigningAccountSection(signingAccount: SigningAccountUi) {
         HorizontalSpacer { small }
 
         NovaText(
-            text = stringResource(
-                RCommon.string.sign_transaction_product_account,
-                signingAccount.productId,
-                signingAccount.derivationIndex
-            ),
+            text = when (signingAccount) {
+                is SigningAccountUi.Product -> stringResource(
+                    RCommon.string.sign_transaction_product_account,
+                    signingAccount.productId,
+                    signingAccount.derivationIndex
+                )
+
+                SigningAccountUi.IdentityAccount -> stringResource(RCommon.string.sign_transaction_identity_account)
+            },
             style = PolkadotTheme.typography.body.large,
             color = PolkadotTheme.colors.fg.primary,
         )

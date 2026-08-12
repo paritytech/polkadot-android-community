@@ -1,6 +1,7 @@
 plugins {
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -13,8 +14,6 @@ dependencies {
     api(project(":feature:chats:api"))
     implementation(project(":feature:chats:transport-protocol"))
 
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
     ksp(libs.hilt.androidx.compiler)
 
     implementation(libs.hilt.androidx.work)
@@ -41,6 +40,7 @@ dependencies {
     implementation(project(":feature:scan:api"))
 
     implementation(project(":tools:push-notifications:api"))
+    implementation(project(":tools:ipfs:api"))
 
     testImplementation(project(":test-shared"))
 }

@@ -299,6 +299,22 @@ Don't reach into `Activity` from the VM (PR #460); always go through a channel/f
 
 ---
 
+## Dedup high-frequency flows on the displayed value
+
+A flow that re-emits on a timer or subscription can fire more often than its rendered value changes (the UI formats/rounds to coarser precision). Dedup on what the UI shows, not the raw value:
+
+```kotlin
+val state = sourceFlow
+    .distinctUntilChangedBy { it.displayProjection() }   // what the UI renders, not the raw value
+    .stateIn(...)
+```
+
+- Dedup upstream of every consumer of the flow.
+- The projection covers every rendered field — an omitted field shows stale UI.
+- The projection is dedup-only (never displayed), so resolving it in the VM is fine even when it formats.
+
+---
+
 ## Flow operators — most-used
 
 The project has a rich Flow library in `common/.../utils/Flows.kt`. **The full catalog is in `code/flow-operators-reference.md`** — load it only when you need an unusual operator. The ones you'll reach for daily:

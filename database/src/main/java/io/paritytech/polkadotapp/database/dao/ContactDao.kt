@@ -44,6 +44,9 @@ abstract class ContactDao {
     @Query("UPDATE contacts SET pushId = :newPushId WHERE accountId = :accountId")
     abstract suspend fun updatePushId(accountId: ByteArray, newPushId: ByteArray)
 
+    @Query("UPDATE contacts SET username = :username WHERE accountId = :accountId")
+    abstract suspend fun updateUsername(accountId: ByteArray, username: String?)
+
     @Query(
         """
         UPDATE contacts

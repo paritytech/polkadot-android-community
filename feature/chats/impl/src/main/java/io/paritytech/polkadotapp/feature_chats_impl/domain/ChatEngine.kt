@@ -27,6 +27,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomC
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatHeaderRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatMenuRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatMessageRenderersById
+import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatOpenHandler
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatPreviewDelegatesById
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatPreviewRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomPreviewData
@@ -125,6 +126,23 @@ class ChatEngine @Inject constructor(
         return defaultDisplay.map { chatDisplayGenerator.applyRoomMetadata(roomMetadata, it) }
     }
 
+    fun observeChatDisplay(chatId: ChatId): Flow<Result<ChatDisplay>> {
+        return when (val variant = chatId.chatVariant()) {
+            is ChatVariant.Contact -> contactsRepository.subscribeContact(variant.contactAccountId)
+                .map { contact ->
+                    Result.success(contact)
+                        .requireNotNull { error("Contact with accountId=${variant.contactAccountId} not found") }
+                        .map(::getContactChatDisplay)
+                }
+
+            is ChatVariant.Extension -> flowOf {
+                val roomMetadata = chatRoomRepository.getRoomMetadata(chatId)
+                getDefaultChatExtensionDisplay(chatId)
+                    .map { chatDisplayGenerator.applyRoomMetadata(roomMetadata, it) }
+            }
+        }
+    }
+
     fun getContactChatDisplay(contact: Contact): ChatDisplay {
         return chatDisplayGenerator.generateAccountChatDisplay(
             accountId = contact.accountId,
@@ -191,7 +209,6 @@ class ChatEngine @Inject constructor(
         }.inBackground()
     }
 
-    context(ComputationalScope)
     fun subscribeMessagesFeed(chatId: ChatId): Flow<List<ChatMessage>> {
         return flowOfAll {
             val customContentDecoder = getCustomContentDecoder(chatId)
@@ -227,14 +244,14 @@ class ChatEngine @Inject constructor(
         )
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeCallSignaling(): Flow<List<ChatMessage>> {
         return observeGlobalContentDecoder().flatMapLatest { contentDecoder ->
             chatMessageRepository.subscribeCallSignalingMessages(contentDecoder)
         }.inBackground()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeChatSummaries(): Flow<List<ChatSummary>> {
         return observeGlobalContentDecoder().flatMapLatest { contentDecoder ->
             val allChatSummaries = chatMessageRepository.subscribeLastMessageSummaries(contentDecoder)
@@ -310,7 +327,7 @@ class ChatEngine @Inject constructor(
         ChatSummaryBadge.None
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun customPreviews(roomIds: Set<ChatId>): Flow<Map<ChatId, CustomPreviewWithRenderer?>> {
         return observeAllCustomChatPreviewDelegates(roomIds)
             .flatMapLatest { delegatesMap ->
@@ -350,13 +367,13 @@ class ChatEngine @Inject constructor(
             .first()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun startExtensions() {
-        launch {
+        scope.launch {
             val globalDecoder = getGlobalContentDecoder()
 
             chatExtensionRegistry.getStaticExtensions().forEach { chatExtension ->
-                val context = RealChatExtensionContext(this@ComputationalScope, chatExtension.id, globalDecoder)
+                val context = RealChatExtensionContext(scope, chatExtension.id, globalDecoder)
                 with(context) { chatExtension.startGlobalWork() }
             }
 
@@ -364,7 +381,7 @@ class ChatEngine @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun launchExternalExtensions(
         globalDecoder: CustomContentDecoder,
     ) {
@@ -379,18 +396,18 @@ class ChatEngine @Inject constructor(
 
                 diff.updated.forEach { newExtension ->
                     activeExtensions.remove(newExtension.identifier)?.dispose()
-                    val context = RealChatExtensionContext(this@ComputationalScope, newExtension.id, globalDecoder)
+                    val context = RealChatExtensionContext(scope, newExtension.id, globalDecoder)
                     with(context) { newExtension.startGlobalWork() }
                     activeExtensions[newExtension.identifier] = newExtension
                 }
 
                 diff.added.forEach { extension ->
-                    val context = RealChatExtensionContext(this@ComputationalScope, extension.id, globalDecoder)
+                    val context = RealChatExtensionContext(scope, extension.id, globalDecoder)
                     with(context) { extension.startGlobalWork() }
                     activeExtensions[extension.identifier] = extension
                 }
             }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     suspend fun sendAttachment(
@@ -447,6 +464,10 @@ class ChatEngine @Inject constructor(
 
     suspend fun getMenuRendererForChat(chatId: ChatId): CustomChatMenuRenderer? {
         return chatExtensionRegistry.getExtensionForChat(chatId)?.customMenuRenderer(chatId)
+    }
+
+    suspend fun getOpenHandlerForChat(chatId: ChatId): CustomChatOpenHandler? {
+        return chatExtensionRegistry.getExtensionForChat(chatId)?.customOpenHandler(chatId)
     }
 
     suspend fun getCustomAppearanceForChat(chatId: ChatId): CustomChatAppearance? {
@@ -650,6 +671,10 @@ class ChatEngine @Inject constructor(
             }
 
         return previousRevisions + currentRevision
+    }
+
+    suspend fun getMessageById(chatId: ChatId, messageId: ChatMessageId): ChatMessage? {
+        return chatMessageRepository.getMessageById(chatId, messageId, getCustomContentDecoder(chatId))
     }
 
     private fun ChatMessage.getText() = (content as? ChatMessage.Content.Text)?.text ?: (content as? ChatMessage.Content.RichText)?.text

@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
+import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.menu.ProductChatMenuInteractor
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +19,7 @@ class ProductChatMenuViewModel @Inject constructor(
     override val currentPage = MutableStateFlow(ProductChatMenuPage.MAIN)
 
     override fun onOpenAppClick(productId: ProductId) {
-        router.openSpaBrowser(productId)
+        router.openSpaBrowser(SpaBrowserPayload.ByProductId(productId.value))
     }
 
     override fun onRemoveChatClick() {

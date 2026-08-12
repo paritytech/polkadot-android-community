@@ -24,6 +24,10 @@ class PermissionHostCalls(
                 dtos.map { it.toRequest() },
             )
         }
+
+        bridge.registerHandler<Unit, Boolean>("allowWebRtcAccess") {
+            botApi.allowWebRtcAccess(callingProductIdProvider.getProductId().getOrThrow())
+        }
     }
 }
 
@@ -36,7 +40,7 @@ private data class RemotePermissionDto(
 
 private object RemotePermissionDtoTag {
     const val REMOTE = "Remote"
-    const val WEB_RTC = "WebRTC"
+    const val WEB_RTC = "WebRtc"
     const val CHAIN_SUBMIT = "ChainSubmit"
     const val STATEMENT_SUBMIT = "StatementSubmit"
     const val PREIMAGE_SUBMIT = "PreimageSubmit"

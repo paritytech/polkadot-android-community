@@ -65,16 +65,16 @@ internal class RealAutoConvertDepositService @Inject constructor(
 ) : AutoConvertDepositService {
     override val currentDeposit = MutableStateFlow<AutoConvertDeposit?>(null)
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun startObserveAndConvert() {
         fundsConverter.launchSync()
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
 
         startSwapObserveAndConvert()
     }
 
-    context(ComputationalScope)
-    private fun startSwapObserveAndConvert() = launch {
+    context(scope: ComputationalScope)
+    private fun startSwapObserveAndConvert() = scope.launch {
         // Keep track of failed conversion checks to avoid checking same balance over and over in case
         // the balance has never left origin chain
         val failedBalances = mutableSetOf<String>()
@@ -129,7 +129,7 @@ internal class RealAutoConvertDepositService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initiateDepositTermsWarmUp() {
         fundsConverter.initiateConversionTermsWarmUp()
     }
@@ -142,7 +142,7 @@ internal class RealAutoConvertDepositService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun depositTerms(chainAsset: Chain.Asset): Result<DepositTerms> {
         val destinationAsset = assetProvider.asset()
         val destinationChain = assetProvider.chain()
@@ -177,7 +177,7 @@ internal class RealAutoConvertDepositService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun executeCheckedConversion(checkedConversion: PossibleFundConversion): Result<Unit> {
         val executionEstimate = checkedConversion.quote.executionEstimate
         val initialDepositInstance = checkedConversion.createInitialDeposit(executionEstimate)

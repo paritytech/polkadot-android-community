@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatReque
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatRequestsList.models.ChatRequestDeclineConfirmationState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatRequestsList.models.ChatRequestsListUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.toUi
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
@@ -28,7 +29,7 @@ class ChatRequestsListViewModel @Inject constructor(
     private val chatEngine: ChatEngine
 ) : BaseViewModel(), ChatRequestsListContract {
     override val state = interactor.subscribeChatRequests()
-        .map { contactsWithTimestamp -> contactsWithTimestamp.map { it.toRequestItem() } }
+        .map { contactsWithTimestamp -> contactsWithTimestamp.map { it.toRequestItem() }.toImmutableList() }
         .map { requests -> ChatRequestsListUiState(requests) }
         .withLoading()
         .inBackground()

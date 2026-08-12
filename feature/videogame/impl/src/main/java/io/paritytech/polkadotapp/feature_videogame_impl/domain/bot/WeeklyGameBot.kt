@@ -5,6 +5,7 @@ package io.paritytech.polkadotapp.feature_videogame_impl.domain.bot
 import android.content.Context
 import androidx.compose.material3.ExperimentalMaterial3Api
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.paritytech.polkadotapp.common.utils.getResourceUri
 import io.paritytech.polkadotapp.designsystem.colors.BerlinNightPalette
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBot
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBotContext
@@ -53,12 +54,16 @@ internal class WeeklyGameBot @Inject constructor(
     private val gameStatusMessageProcessor: GameStatusMessageProcessor,
     private val depositMessageProcessor: DepositMessageProcessor,
     override val customChatPreviewDelegate: WeeklyGameChatPreviewDelegate,
+    override val customOpenHandler: WeeklyGameOpenHandler,
     private val usernameUpgradedMessageProcessor: UsernameUpgradedMessageProcessor,
 ) : ChatBot() {
     private val data = ChatBotData.weeklyGame()
 
     override val id: ChatExtensionId = data.id
-    override val metadata = ChatBotMetadata(data.name)
+    override val metadata = ChatBotMetadata(
+        name = data.name,
+        icon = context.getResourceUri(R.drawable.chat_bot_prizes_icon),
+    )
 
     override val customFooterRenderer: CustomChatFooterRenderer = WeeklyGameBotFooterRenderer()
 
@@ -84,12 +89,12 @@ internal class WeeklyGameBot @Inject constructor(
         return listOf(gameResultRenderer, usernameUpgradedRenderer, depositAddedRenderer)
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun startBotWork() {
-        interactor.startUpdates().launchIn(scope)
+        interactor.startUpdates().launchIn(chatBotContext.scope)
 
-        scope.launch {
-            setWelcomeMessages { createWelcomeMessages() }
+        chatBotContext.scope.launch {
+            chatBotContext.setWelcomeMessages { createWelcomeMessages() }
 
             launchGameProgressObserver()
 
@@ -99,10 +104,10 @@ internal class WeeklyGameBot @Inject constructor(
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private fun launchGameProgressObserver() {
-        scope.launch { interactor.observeGameProgressAndClaimCitizenship() }
-        scope.launch { interactor.observeGameProgressAndStartPersonSetup() }
+        chatBotContext.scope.launch { interactor.observeGameProgressAndClaimCitizenship() }
+        chatBotContext.scope.launch { interactor.observeGameProgressAndStartPersonSetup() }
     }
 
     override fun observeUserInputAllowed(): Flow<Boolean> = flowOf(false)

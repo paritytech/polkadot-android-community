@@ -1,5 +1,6 @@
 plugins {
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.hilt")
 }
 
 android {
@@ -10,9 +11,6 @@ dependencies {
     api(project(":tools:remoteconfig:api"))
 
     implementation(project(":tools:common"))
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.remote.config)

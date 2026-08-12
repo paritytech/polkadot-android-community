@@ -1,4 +1,5 @@
 plugins {
+    id("polkadotapp.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -18,7 +19,7 @@ dependencies {
 
     api(libs.google.gson)
 
-    implementation(libs.bouncycastle.jdk15)
+    implementation(libs.bouncycastle.jdk18)
 
     implementation(libs.bundles.squareup.okhttp3)
     api(libs.squareup.retrofit2.core)

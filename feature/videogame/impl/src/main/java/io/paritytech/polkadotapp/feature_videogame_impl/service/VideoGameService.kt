@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -55,6 +56,7 @@ class VideoGameService : Service(), ComputationalScope {
     private var sessionRunning = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Timber.i("[VideoGame] Service onStartCommand action=${intent?.action}")
         when (intent?.action) {
             ACTION_START_GAME -> startGameIfNotRunning()
             ACTION_STOP_GAME -> stopSelf()
@@ -64,8 +66,12 @@ class VideoGameService : Service(), ComputationalScope {
     }
 
     private fun startGameIfNotRunning() {
-        if (sessionRunning) return
+        if (sessionRunning) {
+            Timber.i("[VideoGame] Service start ignored — session already running")
+            return
+        }
         sessionRunning = true
+        Timber.i("[VideoGame] Service starting session (foreground)")
 
         ServiceCompat.startForeground(
             this,
@@ -78,25 +84,30 @@ class VideoGameService : Service(), ComputationalScope {
             try {
                 stateHolder.setSessionManager(sessionManager)
                 sessionManager.startSession()
-                awaitGameSessionFinished()
+                val terminalState = awaitGameSessionFinished()
+                Timber.i("[VideoGame] Session reached terminal state=${terminalState::class.simpleName}")
+            } catch (throwable: Throwable) {
+                Timber.e(throwable, "[VideoGame] Session failed or cancelled")
+                throw throwable
             } finally {
                 sessionManager.endSession()
                 sessionRunning = false
             }
 
             stateHolder.endSession()
+            Timber.i("[VideoGame] Service stopping self after session end")
             stopSelf()
         }
     }
 
-    private suspend fun awaitGameSessionFinished() {
+    private suspend fun awaitGameSessionFinished(): VideoGameProcessState =
         stateHolder.gameSnapshot
             .filterNotNull()
             .map { it.processState }
             .first { it is VideoGameProcessState.Reporting || it is VideoGameProcessState.Finished || it is VideoGameProcessState.Error }
-    }
 
     override fun onDestroy() {
+        Timber.i("[VideoGame] Service onDestroy")
         cancel()
         stateHolder.endSession()
         super.onDestroy()

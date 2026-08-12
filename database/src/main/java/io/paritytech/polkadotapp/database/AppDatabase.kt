@@ -11,14 +11,18 @@ import io.paritytech.polkadotapp.database.converters.ChainConverters
 import io.paritytech.polkadotapp.database.converters.ExternalApiConverters
 import io.paritytech.polkadotapp.database.converters.IntListConverter
 import io.paritytech.polkadotapp.database.converters.LongMathConverters
+import io.paritytech.polkadotapp.database.dao.BrowserTabDao
 import io.paritytech.polkadotapp.database.dao.ChainDao
 import io.paritytech.polkadotapp.database.dao.ChatBotStateDao
+import io.paritytech.polkadotapp.database.dao.ChatDraftDao
+import io.paritytech.polkadotapp.database.dao.ChatMessageCompactionDao
 import io.paritytech.polkadotapp.database.dao.ChatMessageDao
 import io.paritytech.polkadotapp.database.dao.ChatMessageProcessingDao
 import io.paritytech.polkadotapp.database.dao.ChatMessageReactionDao
 import io.paritytech.polkadotapp.database.dao.ChatRequestDao
 import io.paritytech.polkadotapp.database.dao.ChatRequestSyncStateDao
 import io.paritytech.polkadotapp.database.dao.ChatRoomDao
+import io.paritytech.polkadotapp.database.dao.ChatSearchRecentDao
 import io.paritytech.polkadotapp.database.dao.CoinDao
 import io.paritytech.polkadotapp.database.dao.CoinageTransferDetectionDao
 import io.paritytech.polkadotapp.database.dao.CoinageTransferWalDao
@@ -37,6 +41,7 @@ import io.paritytech.polkadotapp.database.dao.ProductIntegrationDao
 import io.paritytech.polkadotapp.database.dao.ProductPermissionGrantDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RemovedChatDao
+import io.paritytech.polkadotapp.database.dao.RingVrfKeyRegistrationDao
 import io.paritytech.polkadotapp.database.dao.ScheduledProductNotificationDao
 import io.paritytech.polkadotapp.database.dao.SendRecipientDao
 import io.paritytech.polkadotapp.database.dao.SsoHandledRequestDao
@@ -75,13 +80,19 @@ import io.paritytech.polkadotapp.database.migrations.Migration35To36
 import io.paritytech.polkadotapp.database.migrations.Migration38To39
 import io.paritytech.polkadotapp.database.migrations.Migration3To4
 import io.paritytech.polkadotapp.database.migrations.Migration42To43Spec
+import io.paritytech.polkadotapp.database.migrations.Migration48To49
+import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
+import io.paritytech.polkadotapp.database.model.ChatDraftLocal
+import io.paritytech.polkadotapp.database.model.ChatMessageCompactionLinkLocal
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
+import io.paritytech.polkadotapp.database.model.ChatMessagePendingExpansionLocal
 import io.paritytech.polkadotapp.database.model.ChatMessageProcessingLocal
 import io.paritytech.polkadotapp.database.model.ChatMessageReactionLocal
 import io.paritytech.polkadotapp.database.model.ChatRequestLocal
 import io.paritytech.polkadotapp.database.model.ChatRequestSyncStateLocal
 import io.paritytech.polkadotapp.database.model.ChatRoomLocal
+import io.paritytech.polkadotapp.database.model.ChatSearchRecentLocal
 import io.paritytech.polkadotapp.database.model.CoinLocal
 import io.paritytech.polkadotapp.database.model.CoinageTransferDetectionLocal
 import io.paritytech.polkadotapp.database.model.CoinageTransferWalLocal
@@ -100,6 +111,7 @@ import io.paritytech.polkadotapp.database.model.ProductLocal
 import io.paritytech.polkadotapp.database.model.ProductPermissionGrantLocal
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
 import io.paritytech.polkadotapp.database.model.RemovedChatLocal
+import io.paritytech.polkadotapp.database.model.RingVrfKeyRegistrationLocal
 import io.paritytech.polkadotapp.database.model.ScheduledProductNotificationLocal
 import io.paritytech.polkadotapp.database.model.SendRecipientLocal
 import io.paritytech.polkadotapp.database.model.SsoHandledRequestLocal
@@ -122,7 +134,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 47,
+    version = 54,
     entities = [
         ChainLocal::class,
         ChainNodeLocal::class,
@@ -138,6 +150,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         TokenPriceLocal::class,
         SendRecipientLocal::class,
         ChatMessageLocal::class,
+        ChatMessageCompactionLinkLocal::class,
+        ChatMessagePendingExpansionLocal::class,
         ChatMessageProcessingLocal::class,
         CoinageTransferDetectionLocal::class,
         CoinageTransferWalLocal::class,
@@ -169,6 +183,10 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         RemovedChatLocal::class,
         SsoHandledRequestLocal::class,
         ProcessedChatMessageLocal::class,
+        ChatDraftLocal::class,
+        BrowserTabLocal::class,
+        ChatSearchRecentLocal::class,
+        RingVrfKeyRegistrationLocal::class,
     ],
     autoMigrations = [
         // Add ChatMessageReactionLocal
@@ -223,6 +241,18 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 45, to = 46),
         // Add offerId column to sso_sessions (device-sync signaling)
         AutoMigration(from = 46, to = 47),
+        // Add ChatDraftLocal table
+        AutoMigration(from = 47, to = 48),
+        // Add localMigratorVersion column to chain_runtimes (forces the metadata v16 re-fetch)
+        AutoMigration(from = 49, to = 50),
+        // Add ChatSearchRecentLocal table
+        AutoMigration(from = 50, to = 51),
+        // Add compaction links + pending expansion tables (message compaction)
+        AutoMigration(from = 51, to = 52),
+        // Add BrowserTabLocal table + ProductLocal.iconUrl column
+        AutoMigration(from = 52, to = 53),
+        // Add RingVrfKeyRegistrationLocal table (RFC-0024 ring VRF key registry)
+        AutoMigration(from = 53, to = 54),
     ]
 )
 @TypeConverters(
@@ -269,6 +299,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration29To30(),
                 Migration35To36(),
                 Migration38To39(),
+                Migration48To49(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }
@@ -283,6 +314,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tokenBalanceDao(): TokenBalanceDao
 
     abstract fun chatMessageDao(): ChatMessageDao
+
+    abstract fun chatMessageCompactionDao(): ChatMessageCompactionDao
 
     abstract fun contactDao(): ContactDao
 
@@ -318,6 +351,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     abstract fun productDao(): ProductDao
 
+    abstract fun browserTabDao(): BrowserTabDao
+
     abstract fun chatRequestDao(): ChatRequestDao
 
     abstract fun chatRequestSyncStateDao(): ChatRequestSyncStateDao
@@ -351,4 +386,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun removedChatDao(): RemovedChatDao
 
     abstract fun ssoHandledRequestDao(): SsoHandledRequestDao
+
+    abstract fun chatDraftDao(): ChatDraftDao
+
+    abstract fun chatSearchRecentDao(): ChatSearchRecentDao
+
+    abstract fun ringVrfKeyRegistrationDao(): RingVrfKeyRegistrationDao
 }

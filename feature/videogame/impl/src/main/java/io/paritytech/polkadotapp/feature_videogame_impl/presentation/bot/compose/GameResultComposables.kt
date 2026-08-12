@@ -49,6 +49,8 @@ import io.paritytech.polkadotapp.feature_videogame_impl.domain.bot.messages.game
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.bot.messages.gameResult.model.PastGameOutcome
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.bot.messages.gameResult.model.SuccessPastGameScoring
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.theme.NovaPrizesColors
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 private val CARD_RADIUS = 16.dp
 private val CARD_PADDING = 24.dp
@@ -161,7 +163,7 @@ private const val AVATAR_OVERLAP = 8
 
 @Composable
 fun ChatWithPlayers(
-    playerAvatarPaths: List<String>,
+    playerAvatarPaths: ImmutableList<String>,
     onClick: () -> Unit,
 ) {
     if (playerAvatarPaths.isNotEmpty()) {
@@ -192,7 +194,7 @@ fun ChatWithPlayers(
 }
 
 @Composable
-private fun OverlappingAvatars(avatarPaths: List<String>) {
+private fun OverlappingAvatars(avatarPaths: ImmutableList<String>) {
     val totalWidth = (avatarPaths.size * AVATAR_SIZE) - ((avatarPaths.size - 1) * AVATAR_OVERLAP)
 
     Box(modifier = Modifier.size(width = totalWidth.dp, height = AVATAR_SIZE.dp)) {
@@ -229,7 +231,7 @@ private fun PastGameCardPreview() {
                     timestamp = System.currentTimeMillis(),
                 )
                 ChatWithPlayers(
-                    playerAvatarPaths = listOf("a", "b", "c"),
+                    playerAvatarPaths = persistentListOf("a", "b", "c"),
                     onClick = {},
                 )
                 PastGameCard(

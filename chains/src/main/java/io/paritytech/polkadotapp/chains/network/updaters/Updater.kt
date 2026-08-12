@@ -34,5 +34,4 @@ interface Updater<S> {
     }
 }
 
-context(Updater<*>)
 fun <T> Flow<T>.noSideAffects(): Flow<Updater.SideEffect> = transform { }

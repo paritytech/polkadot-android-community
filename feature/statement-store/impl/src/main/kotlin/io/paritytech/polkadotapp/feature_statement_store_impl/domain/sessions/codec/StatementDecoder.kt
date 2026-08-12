@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.codec
 
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
 import io.paritytech.polkadotapp.feature_statement_store_api.data.encryption.CommunicationEncryption
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.decryptAndDecodeEvent
@@ -22,7 +22,7 @@ class StatementDecoder(
     /** Decodes a statement received from a peer using the per-peer-device receive encryption. */
     suspend fun decode(
         statement: Statement,
-        senderEncryptionPublicKey: EncodedPublicKey,
+        senderEncryptionPublicKey: X25519PublicKey,
         receiveEncryption: CommunicationEncryption,
     ): StatementTransportEvent? = runCatching {
         with(receiveEncryption) {

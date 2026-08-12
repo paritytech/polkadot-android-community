@@ -9,8 +9,7 @@ import io.paritytech.polkadotapp.chains.util.signing.MessageSigningContext
 import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.data.network.TestnetEnvironment
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
-import io.paritytech.polkadotapp.common.utils.Secp256r1KeyGenerator
+import io.paritytech.polkadotapp.common.domain.model.AccountEcdhKey
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -65,25 +64,25 @@ import timber.log.Timber
 import javax.inject.Inject
 
 internal interface VideoGameChatBotFooterInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun register(): Result<RegisterOutcome>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeUpcomingGame(): Flow<UpcomingGameStart?>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeIsMember(): Flow<Boolean>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeRegistrationStage(): Flow<VideoGameRegistrationStage>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeAirdropRegistrationReady(): Flow<Boolean>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeFooterState(): Flow<WeeklyGameFooterState>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun deposit(): Result<Unit>
 
     fun subscribeReadyToUpgradeUsername(): Flow<UpgradeToFullUsernameState>
@@ -92,7 +91,7 @@ internal interface VideoGameChatBotFooterInteractor {
 
     fun setAlarmOffset(offset: GameStartAlarmOffset)
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun rescheduleGameStartAlarm()
 }
 
@@ -109,7 +108,6 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
     private val candidateBytesSigner: AccountBytesSigner,
     private val chainRegistry: ChainRegistry,
     private val sharedSecretDerivationUseCase: SharedSecretDerivationUseCase,
-    private val keyGenerator: Secp256r1KeyGenerator,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
     private val getActiveDimCommitmentState: GetActiveDimCommitmentState,
     private val alarmPreferences: VideoGameSettingsPreferences,
@@ -124,11 +122,11 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
     private val scoreRepository: ScoreRepository,
 ) : VideoGameChatBotFooterInteractor {
     companion object {
-        private val TESTNET_TOP_UP_AMOUNT = 100.toBigDecimal()
+        private val TESTNET_TOP_UP_AMOUNT = 10.toBigDecimal()
         private val NIGHTLY_TOP_UP_AMOUNT = 10.toBigDecimal()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun register(): Result<RegisterOutcome> = runCancellableCatching {
         videoGameRepository.clearVotes()
 
@@ -151,13 +149,13 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         }
 
         if (outcome is RegisterOutcome.Submitted) {
-            this@ComputationalScope.launch { emitRegistrationTelemetry() }
+            scope.launch { emitRegistrationTelemetry() }
         }
 
         outcome
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun registerSubmission(externallyRecognized: Boolean): VideoGameTrackedSubmission {
         val gameIndex = gameInfoSyncService.getCurrentActiveGameInfo().index
         return VideoGameTrackedSubmission(
@@ -185,7 +183,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         )
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun registerNoCredibilityProof(externallyRecognized: Boolean): Result<Unit> {
         val chain = chainRegistry.peopleChain()
         return if (externallyRecognized) {
@@ -195,7 +193,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun registerWithCachedInvite(
         cachedInvite: IssuedInvitation,
         requiredDeposit: ChainAssetWithAmount,
@@ -216,7 +214,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         return registerIssuingNewInvite(requiredDeposit)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun registerIssuingNewInvite(
         requiredDeposit: ChainAssetWithAmount,
     ): RegisterOutcome {
@@ -253,10 +251,10 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun registerWithAccount(chain: Chain, needsCredibilityProof: Boolean): Result<Unit> {
         val keypair = sharedSecretDerivationUseCase.deriveForDomain(SharedSecretDerivationDomain.CANDIDATE)
-        val publicKey = keyGenerator.encode(keypair.public)
+        val publicKey = AccountEcdhKey.X25519(keypair.publicKey)
 
         return resolveAirdropProof(externallyRecognized = false).flatMap { airdrop ->
             videoGameRepository.registerWithAccount(
@@ -269,12 +267,12 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         }
     }
 
-    private suspend fun deriveCandidatePublicKey(): EncodedPublicKey {
+    private suspend fun deriveCandidatePublicKey(): AccountEcdhKey {
         val keypair = sharedSecretDerivationUseCase.deriveForDomain(SharedSecretDerivationDomain.CANDIDATE)
-        return keyGenerator.encode(keypair.public)
+        return AccountEcdhKey.X25519(keypair.publicKey)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun registerWithAlias(chain: Chain): Result<Unit> {
         val candidateAccount = accountRepository.getCandidateAccount()
         val alias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, BandersnatchContext.SCORE)
@@ -298,7 +296,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
 
     // Resolves the airdrop lottery proof for an airdrop-scheduled game. A build failure is fatal to
     // registration (propagated, not swallowed): registering without it would forfeit the ticket.
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun resolveAirdropProof(externallyRecognized: Boolean): Result<AirdropProof?> {
         val gameInfo = gameInfoSyncService.getCurrentActiveGameInfo()
         if (!gameInfo.airdropScheduled) {
@@ -324,11 +322,11 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeUpcomingGame(): Flow<UpcomingGameStart?> =
         upcomingGameStartUseCase.subscribe()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeIsMember(): Flow<Boolean> =
         gamesProgressUseCase.videoGamesProgressFlow().map { it.isMember() }
 
@@ -341,15 +339,15 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         is VideoGamesProgress.PlayingGames -> false
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeRegistrationStage(): Flow<VideoGameRegistrationStage> =
         videoGameRegistrationStageUseCase.subscribe()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeAirdropRegistrationReady(): Flow<Boolean> =
         airdropRegistrationGate.subscribe()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeFooterState(): Flow<WeeklyGameFooterState> =
         getActiveDimCommitmentState(Dim2CommitmentHandler.DIM_ID)
             .map { state ->
@@ -362,7 +360,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
                 }
             }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun deposit(): Result<Unit> {
         val chainAsset = chainAssetProvider()
         val amount = when (environment) {
@@ -386,7 +384,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         alarmPreferences.setAlarmOffset(offset)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun rescheduleGameStartAlarm() {
         val gameInfo = gameInfoSyncService.getCurrentActiveGameInfo()
         videoGameReminderScheduler.scheduleGameStart(gameInfo.gameStartMillis)

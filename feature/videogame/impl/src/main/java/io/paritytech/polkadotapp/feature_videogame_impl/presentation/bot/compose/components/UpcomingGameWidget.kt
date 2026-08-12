@@ -54,7 +54,6 @@ fun UpcomingGameWidget(
                 VerticalSpacer { extraSmall }
 
                 ActionArea(
-                    state = state,
                     action = action,
                     onRegister = onRegister,
                     onStartPlaying = onStartPlaying,

@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.feature_chats_api.presentation.model
 
+import android.content.ContentResolver
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
@@ -11,9 +13,9 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigi
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
-import javax.annotation.concurrent.Immutable
 import kotlin.time.Duration
 
+@Immutable
 sealed interface ChatMessageUiModel {
     val id: ChatMessageId
     val timestamp: Timestamp
@@ -29,7 +31,7 @@ sealed interface ChatMessageUiModel {
         override val origin: ChatMessageOrigin,
         val text: String,
         val replyPreview: ReplyPreview?,
-        val reactions: List<Reaction>,
+        val reactions: ImmutableList<Reaction>,
         val isEdited: Boolean
     ) : ChatMessageUiModel
 
@@ -49,11 +51,12 @@ sealed interface ChatMessageUiModel {
         override val origin: ChatMessageOrigin,
         val paymentStatus: Status,
         val amount: TokenAmountModel,
-        val reactions: List<Reaction>
+        val reactions: ImmutableList<Reaction>
     ) : ChatMessageUiModel {
         val differingAmount: TokenAmountModel?
             get() = paymentStatus.settledAmountOrNull()?.takeIf { it.amount.compareTo(amount.amount) != 0 }
 
+        @Immutable
         sealed interface Status {
             data object Detecting : Status
             data class Detected(val detected: TokenAmountModel) : Status
@@ -71,21 +74,19 @@ sealed interface ChatMessageUiModel {
         override val origin: ChatMessageOrigin,
         val uri: Uri?,
         val text: String?,
+        val replyPreview: ReplyPreview?,
         val type: MultimediaType,
         val blurHash: String?,
-        val uploadState: UploadState?,
-        val reactions: List<Reaction>,
+        val reactions: ImmutableList<Reaction>,
         val isEdited: Boolean
     ) : ChatMessageUiModel {
-        sealed interface UploadState {
-            data class Uploading(val progressPercent: Int) : UploadState
-            data class Failed(val errorMessage: String) : UploadState
-        }
-
+        @Immutable
         sealed interface MultimediaType {
             data class Image(val height: Int, val width: Int) : MultimediaType
             data class Video(val duration: Duration) : MultimediaType
         }
+
+        fun isOpenable(): Boolean = uri != null && uri.scheme != ContentResolver.SCHEME_ANDROID_RESOURCE
     }
 
     data class File(
@@ -109,6 +110,14 @@ sealed interface ChatMessageUiModel {
         override val origin: ChatMessageOrigin,
     ) : ChatMessageUiModel
 
+    data class CompactionUnavailable(
+        override val id: ChatMessageId,
+        override val timestamp: Timestamp,
+        override val direction: Direction,
+        override val status: Status,
+        override val origin: ChatMessageOrigin,
+    ) : ChatMessageUiModel
+
     data class ChatRequest(
         override val id: ChatMessageId,
         override val timestamp: Timestamp,
@@ -116,7 +125,7 @@ sealed interface ChatMessageUiModel {
         override val status: Status,
         override val origin: ChatMessageOrigin,
         val welcomeText: String?,
-        val reactions: List<Reaction>,
+        val reactions: ImmutableList<Reaction>,
     ) : ChatMessageUiModel
 
     data class ChatAccepted(
@@ -161,7 +170,7 @@ sealed interface ChatMessageUiModel {
         val content: Result<T>
     ) : ChatMessageUiModel
 
-    enum class Status { PENDING, SENT, READ }
+    enum class Status { PENDING, SENT, READ, FAILED }
     enum class Direction { INCOMING, OUTGOING }
 
     data class Reaction(val count: Int, val emoji: String, val reactedByUser: Boolean)
@@ -171,8 +180,16 @@ sealed interface ChatMessageUiModel {
 data class ReplyPreview(
     val messageId: ChatMessageId,
     val title: String,
-    val text: String?
-)
+    val content: Content
+) {
+    sealed interface Content {
+        data class Text(val text: String) : Content
+        data class Image(val thumbnailUri: Uri?, val caption: String?) : Content
+        data class Video(val thumbnailUri: Uri?, val caption: String?) : Content
+        data class File(val fileName: String, val caption: String?) : Content
+        data class Payment(val amount: TokenAmountModel, val direction: ChatMessageUiModel.Direction) : Content
+    }
+}
 
 @Immutable
 data class HighlightedMessage(
@@ -203,7 +220,7 @@ sealed class MessagePopUpUiState {
         val message: ChatMessageUiModel,
         val userReactedEmojis: ImmutableSet<String>,
         val canLeaveReactions: Boolean,
-        val allowedMenuActions: List<AllowedMessageMenuAction>
+        val allowedMenuActions: ImmutableList<AllowedMessageMenuAction>
     ) : MessagePopUpUiState()
 }
 

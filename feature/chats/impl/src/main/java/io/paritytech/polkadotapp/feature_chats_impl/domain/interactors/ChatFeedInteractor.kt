@@ -1,14 +1,16 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.interactors
 
 import android.net.Uri
-import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.megabytes
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flowOf
+import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.getAccountByIdOrThrow
@@ -42,6 +44,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.AttachmentMetaBuilder
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopNodeUrlProvider
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadStarter
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotificationPublisher
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileUploadRepository
@@ -60,15 +63,19 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.models.MessageEditHis
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.DmChatMessageOriginDisplayResolver
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.MessageOriginDisplayResolver
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.flow.flowOf as flowOfValue
 
 private val MAX_ATTACHMENT_SIZE = 128.megabytes
 
 class ChatFeedInteractor @Inject internal constructor(
     private val chatMessageRepository: ChatMessageRepository,
+    private val chatDraftRepository: ChatDraftRepository,
     private val chatSessionManager: ContactChatSessionManager,
     private val chatNotificationPublisher: ChatNotificationPublisher,
     private val chatActiveTracker: ChatActiveTrackerInternal,
@@ -115,13 +122,11 @@ class ChatFeedInteractor @Inject internal constructor(
         }
     }
 
-    suspend fun getChatDisplay(request: OpenChatRequest): Result<ChatDisplay> {
-        return withContext(coroutineDispatchers.io) {
-            when (request) {
-                is OpenChatRequest.ExistingChat -> chatEngine.getChatDisplay(request.chatId)
-                is OpenChatRequest.StartChatWithContact -> Result.success(getChatDisplay(request))
-            }
-        }
+    fun observeChatDisplay(request: OpenChatRequest): Flow<Result<ChatDisplay>> {
+        return when (request) {
+            is OpenChatRequest.ExistingChat -> chatEngine.observeChatDisplay(request.chatId)
+            is OpenChatRequest.StartChatWithContact -> flowOf { Result.success(getChatDisplay(request)) }
+        }.inBackground()
     }
 
     suspend fun getHeaderRendererForChat(chatId: ChatId): CustomChatHeaderRenderer? =
@@ -166,7 +171,6 @@ class ChatFeedInteractor @Inject internal constructor(
         )
     }
 
-    context(ComputationalScope)
     fun subscribeMessages(chatId: ChatId) = chatEngine.subscribeMessagesFeed(chatId)
 
     suspend fun sendTextMessage(
@@ -272,7 +276,7 @@ class ChatFeedInteractor @Inject internal constructor(
     fun getChatConfig(chatRequest: OpenChatRequest): Flow<ChatConfig> {
         return when (chatRequest) {
             is OpenChatRequest.ExistingChat -> chatEngine.getChatConfig(chatRequest.chatId)
-            is OpenChatRequest.StartChatWithContact -> flowOf(ChatConfig.Default)
+            is OpenChatRequest.StartChatWithContact -> flowOfValue(ChatConfig.Default)
         }
     }
 
@@ -311,7 +315,6 @@ class ChatFeedInteractor @Inject internal constructor(
 
     suspend fun leaveChat(chatId: ChatId): Result<Unit> {
         tryNotifyPeerLeftChat(chatId)
-            .logFailure("Failed to notify peer about leaving chat")
 
         return deleteContactChatLocalData(chatId)
     }
@@ -342,13 +345,22 @@ class ChatFeedInteractor @Inject internal constructor(
         }
     }
 
-    private suspend fun tryNotifyPeerLeftChat(chatId: ChatId): Result<Unit> {
-        val contactId = chatId.contactOrNull()?.contactAccountId ?: return Result.success(Unit)
+    private suspend fun tryNotifyPeerLeftChat(chatId: ChatId) {
+        val contactId = chatId.contactOrNull()?.contactAccountId ?: return
 
-        val session = chatSessionManager.getSession(contactId)
-            ?: return Result.success(Unit)
+        chatSessionManager.getSession(contactId) ?: return
 
-        return session.sendLeftChatMessageAndAwait()
+        runCancellableCatching {
+            val message = chatEngine.sendUserMessage(
+                chatId = chatId,
+                content = ChatMessage.Content.LeftChat
+            )
+
+            withTimeout(LEFT_CHAT_SENT_TIMEOUT) {
+                chatMessageRepository.subscribeMessageStatus(message.id)
+                    .first { it == ChatMessage.Status.IS_SENT || it == ChatMessage.Status.IS_READ }
+            }
+        }.logFailure("Failed to notify peer about leaving chat")
     }
 
     private fun getChatDisplay(startNewContact: OpenChatRequest.StartChatWithContact): ChatDisplay {
@@ -401,6 +413,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private suspend fun deleteContactChatLocalData(chatId: ChatId): Result<Unit> = runCatching {
         deleteLocalMessages(chatId)
         deleteLocalContact(chatId)
+        chatDraftRepository.deleteDraft(chatId)
     }
 
     private suspend fun deleteLocalMessages(chatId: ChatId) {
@@ -411,5 +424,9 @@ class ChatFeedInteractor @Inject internal constructor(
         chatId.onContact { contactChat ->
             removeContactUseCase.removeContact(contactChat.contactAccountId)
         }
+    }
+
+    companion object {
+        private val LEFT_CHAT_SENT_TIMEOUT = 15.seconds
     }
 }

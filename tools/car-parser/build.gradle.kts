@@ -1,6 +1,7 @@
 import com.google.protobuf.gradle.id
 
 plugins {
+    id("polkadotapp.android.library")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.protobuf)
 }

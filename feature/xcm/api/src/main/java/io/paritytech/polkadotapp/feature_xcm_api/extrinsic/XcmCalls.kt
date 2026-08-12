@@ -8,13 +8,13 @@ import io.paritytech.polkadotapp.chains.util.xcmPalletName
 import io.paritytech.polkadotapp.feature_xcm_api.message.VersionedXcmMessage
 import io.paritytech.polkadotapp.feature_xcm_api.versions.toEncodableInstance
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun composeXcmExecute(
     message: VersionedXcmMessage,
     maxWeight: WeightV2,
 ): GenericCall.Instance {
     return composeCall(
-        moduleName = runtime.metadata.xcmPalletName(),
+        moduleName = withRuntime.runtime.metadata.xcmPalletName(),
         callName = "execute",
         arguments = mapOf(
             "message" to message.toEncodableInstance(),

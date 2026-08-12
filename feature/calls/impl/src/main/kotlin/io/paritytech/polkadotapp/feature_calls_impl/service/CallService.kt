@@ -10,7 +10,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.utils.childScope
 import io.paritytech.polkadotapp.feature_calls_api.domain.models.CallDirection
 import io.paritytech.polkadotapp.feature_calls_api.domain.models.CallStatus
+import io.paritytech.polkadotapp.feature_calls_impl.media.CallAlertManager
 import io.paritytech.polkadotapp.feature_calls_impl.media.CallWakeLockManager
+import io.paritytech.polkadotapp.feature_calls_impl.media.toCallAlert
 import io.paritytech.polkadotapp.feature_calls_impl.models.CallParams
 import io.paritytech.polkadotapp.feature_calls_impl.notification.CallNotificationManager
 import io.paritytech.polkadotapp.feature_calls_impl.state.CallStateHolder
@@ -25,6 +27,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -42,7 +49,8 @@ class CallService : Service(), CoroutineScope {
         private const val ACTION_END_CALL = "io.paritytech.polkadotapp.action.END_CALL"
         private const val ACTION_SET_CAMERA_ENABLED = "io.paritytech.polkadotapp.action.SET_CAMERA_ENABLED"
         private const val ACTION_SET_MICROPHONE_ENABLED = "io.paritytech.polkadotapp.action.SET_MICROPHONE_ENABLED"
-        private const val ACTION_SET_SPEAKERPHONE_ON = "io.paritytech.polkadotapp.action.SET_SPEAKERPHONE_ON"
+        private const val ACTION_SELECT_AUDIO_DEVICE = "io.paritytech.polkadotapp.action.SELECT_AUDIO_DEVICE"
+        private const val KEY_DEVICE_ID = "io.paritytech.polkadotapp.extra.DEVICE_ID"
 
         private const val CALL_NOTIFICATION_ID = 999
 
@@ -86,10 +94,10 @@ class CallService : Service(), CoroutineScope {
                 .putExtra(KEY_ENABLED, enabled)
         }
 
-        fun setSpeakerphoneOnIntent(context: Context, enabled: Boolean): Intent {
+        fun selectAudioDeviceIntent(context: Context, deviceId: Int): Intent {
             return Intent(context, CallService::class.java)
-                .setAction(ACTION_SET_SPEAKERPHONE_ON)
-                .putExtra(KEY_ENABLED, enabled)
+                .setAction(ACTION_SELECT_AUDIO_DEVICE)
+                .putExtra(KEY_DEVICE_ID, deviceId)
         }
     }
 
@@ -107,6 +115,9 @@ class CallService : Service(), CoroutineScope {
     @Inject
     lateinit var callWakeLockManager: CallWakeLockManager
 
+    @Inject
+    lateinit var callAlertManager: CallAlertManager
+
     private var sessionRef: ContactChatSessionReference? = null
     private var acquireSessionRefJob: Job? = null
 
@@ -118,6 +129,16 @@ class CallService : Service(), CoroutineScope {
         super.onCreate()
 
         callWakeLockManager.observe()
+        observeCallSounds()
+    }
+
+    private fun observeCallSounds() {
+        callStateHolder.observeActiveCall()
+            .map { it.toCallAlert() }
+            .distinctUntilChanged()
+            .onEach(callAlertManager::setActiveAlert)
+            .onCompletion { callAlertManager.release() }
+            .launchIn(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -144,8 +165,6 @@ class CallService : Service(), CoroutineScope {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
                 )
                 Timber.i("INIT_INCOMING_CALL: foreground started with PHONE_CALL")
-
-                // TODO: vibrate and play ringtone
 
                 callStateHolder.initCall(
                     chatId = callParams.computeChatId(),
@@ -194,7 +213,7 @@ class CallService : Service(), CoroutineScope {
             ACTION_END_CALL -> endCall()
             ACTION_SET_CAMERA_ENABLED -> setCameraEnabled(intent.getBooleanExtra(KEY_ENABLED, true))
             ACTION_SET_MICROPHONE_ENABLED -> setMicrophoneEnabled(intent.getBooleanExtra(KEY_ENABLED, true))
-            ACTION_SET_SPEAKERPHONE_ON -> setSpeakerphoneOn(intent.getBooleanExtra(KEY_ENABLED, true))
+            ACTION_SELECT_AUDIO_DEVICE -> selectAudioDevice(intent.getIntExtra(KEY_DEVICE_ID, 0))
         }
 
         return START_NOT_STICKY
@@ -325,9 +344,9 @@ class CallService : Service(), CoroutineScope {
         callSessionManager.setLocalMicrophoneEnabled(enabled)
     }
 
-    private fun setSpeakerphoneOn(enabled: Boolean) {
-        Timber.i("setSpeakerphoneOn: enabled=$enabled")
-        callSessionManager.setSpeakerphoneOn(enabled)
+    private fun selectAudioDevice(deviceId: Int) {
+        Timber.i("selectAudioDevice: deviceId=$deviceId")
+        callSessionManager.selectAudioDevice(deviceId)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

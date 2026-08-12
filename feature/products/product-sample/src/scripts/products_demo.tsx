@@ -9,8 +9,9 @@ import { useState, useEffect } from 'react';
 import { Column, Row, Spacer, Text, Button, TextField, registerChatMessageRenderer } from '@novasamatech/product-react-renderer';
 import { createClient, type PolkadotSigner, type TxEvent } from 'polkadot-api';
 import { pop, assetHub, MultiAddress, XcmV5Junctions, XcmV5Junction } from '@polkadot-api/descriptors';
-import { createAccountsProvider, createPapiProvider, createProductChatManager, createStatementStore, deriveEntropy, hostApi, notificationManager, paymentManager, preimageManager, requestDevicePermission, type SignedStatement, type TopUpSource } from '@novasamatech/host-api-wrapper';
-import { enumValue } from '@novasamatech/host-api';
+import { createAccountsProvider, createPapiProvider, createProductChatManager, createStatementStore, deriveEntropy, hostApi, notificationManager, paymentManager, preimageManager, requestDevicePermission, ringVrfKeyHandle, type ProofContext, type RegisteredRingVrfKey, type RingVrfKeyDisclosure, type RingVrfKeyHandle, type SignedStatement, type TopUpSource } from '@novasamatech/host-api-wrapper';
+import { enumValue, RingLocation } from '@novasamatech/host-api';
+import type { CodecType } from 'scale-ts';
 import { fromBufferToBase58 } from '@polkadot-api/substrate-bindings';
 import { Keyring } from '@polkadot/keyring';
 import { randomAsU8a } from '@polkadot/util-crypto';
@@ -36,8 +37,8 @@ interface SignRawData {
     type: 'signRaw';
 }
 
-interface AliasData {
-    type: 'alias';
+interface RingVrfData {
+    type: 'ringVrf';
 }
 
 interface CreateRoomFormData {
@@ -97,14 +98,18 @@ interface UserIdentityData {
     type: 'userIdentity';
 }
 
-type MessageData = CounterData | BalanceData | TransferData | SignRawData | AliasData | CreateRoomFormData | NotificationTestData | NetworkPermissionTestData | DeriveEntropyData | BatchedPermissionTestData | WildcardPermissionTestData | ChainSubmitPermissionTestData | PaymentBalanceData | PaymentRequestData | PaymentTrackingData | PaymentTopUpData | RfcAllowanceData | StatementSubscribeData | UserIdentityData;
+interface SignVrfData {
+    type: 'signVrf';
+}
+
+type MessageData = CounterData | BalanceData | TransferData | SignRawData | RingVrfData | CreateRoomFormData | NotificationTestData | NetworkPermissionTestData | DeriveEntropyData | BatchedPermissionTestData | WildcardPermissionTestData | ChainSubmitPermissionTestData | PaymentBalanceData | PaymentRequestData | PaymentTrackingData | PaymentTopUpData | RfcAllowanceData | StatementSubscribeData | UserIdentityData | SignVrfData;
 
 // ============================================================================
 // Host API & Chain Client
 // ============================================================================
 
-const POP_GENESIS_HASH = '0x3389bc9179d3be32568c67278bd080d05631ac71982d28a3fe545421147b311e';
-const ASSET_HUB_GENESIS_HASH = '0x29f7b15e6227f86b90bf5199b5c872c28649a30e5f15fae6dd8fa9d5d48d6fbb';
+const POP_GENESIS_HASH = '0xc5af1826b31493f08b7e2a823842f98575b806a784126f28da9608c68665afa5';
+const ASSET_HUB_GENESIS_HASH = '0xbf0488dbe9daa1de1c08c5f743e26fdc2a4ecd74cf87dd1b4b1eeb99ae4ef19f';
 const ROOM_ID = 'default';
 
 // Shared 32-byte topic so the statement subscription only matches statements this demo submits.
@@ -154,7 +159,7 @@ loadChainProperties().catch(e => console.log(`Products Demo: Failed to load chai
 chat.registerRoom({ roomId: ROOM_ID, name: 'Products Demo', icon: null }).then(status => {
     console.log(`Products Demo: Room registration status: ${status}`);
     if (status === 'New') {
-        sendTextMessageViaChat("Hello! Send me a number to start a counter, or use /balance, /address, /transfer, /signraw, /alias, /rooms, /notify, /network, /entropy, /batched, /wildcard, /chain, /paybalance, /payrequest, /paytopup, /rfc10, or /userid");
+        sendTextMessageViaChat("Hello! Send me a number to start a counter, or use /balance, /address, /transfer, /signraw, /ringvrf, /rooms, /notify, /network, /entropy, /batched, /wildcard, /chain, /paybalance, /payrequest, /paytopup, /rfc10, /userid, or /signvrf");
     }
 }).catch(e => console.log(`Products Demo: Failed to register room: ${e}`));
 
@@ -222,8 +227,8 @@ function onUserMessage(text: string): void {
         return;
     }
 
-    if (text.trim() === '/alias') {
-        sendCustomMessage<AliasData>({ type: 'alias' });
+    if (text.trim() === '/ringvrf' || text.trim() === '/alias') {
+        sendCustomMessage<RingVrfData>({ type: 'ringVrf' });
         return;
     }
 
@@ -292,6 +297,11 @@ function onUserMessage(text: string): void {
         return;
     }
 
+    if (text.trim() === '/signvrf') {
+        sendCustomMessage<SignVrfData>({ type: 'signVrf' });
+        return;
+    }
+
     // Parse number from text or default to 0
     const num = parseInt(text, 10) || 0;
 
@@ -333,8 +343,8 @@ chat.onCustomMessageRenderingRequest(
                     return <TransferCard />;
                 case 'signRaw':
                     return <SignRawCard />;
-                case 'alias':
-                    return <AliasCard />;
+                case 'ringVrf':
+                    return <RingVrfCard />;
                 case 'createRoomForm':
                     return <CreateRoomFormCard />;
                 case 'notificationTest':
@@ -363,6 +373,8 @@ chat.onCustomMessageRenderingRequest(
                     return <StatementSubscribeCard />;
                 case 'userIdentity':
                     return <UserIdentityCard />;
+                case 'signVrf':
+                    return <SignVrfCard />;
                 case 'counter':
                 default:
                     const initialCount = data.initialCount ?? 0;
@@ -383,8 +395,9 @@ function CounterCard({ initialCount }: { initialCount: number }) {
     useEffect(() => {
         Promise.resolve(accountsProvider.getProductAccount('product-sample.dot', 0)).then(result => {
             if (result.isOk()) {
-                setAccountName(result.value.name);
-                console.log(`accountGet success - name: ${result.value.name}`);
+                const publicKey = toHex(result.value.publicKey);
+                setAccountName(publicKey);
+                console.log(`accountGet success - publicKey: ${publicKey}`);
             } else {
                 setAccountName(`Error: ${JSON.stringify(result.error)}`);
                 console.log(`accountGet error: ${JSON.stringify(result.error)}`);
@@ -610,35 +623,305 @@ function SignRawCard() {
     );
 }
 
-function toHex(bytes: Uint8Array): string {
-    return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+function toHex(bytes: Uint8Array): `0x${string}` {
+    return `0x${Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-function AliasCard() {
-    const [context, setContext] = useState<string | null>(null);
-    const [alias, setAlias] = useState<string | null>(null);
+// RFC-0004 amended by RFC-0022: context = (productId, suffix), where the suffix is the same
+// selector an account carries — a plain index here. The ring addresses a Members-pallet ring on the PoP chain.
+const PROOF_CONTEXT: ProofContext = ['product-sample.dot', 0];
+const MEMBERS_PALLET_INDEX = 67;
+
+// RingCollectionId is a 32-byte, space-padded identifier (matches RingCollectionId.Companion.PEOPLE / PEOPLE_LITE).
+function ringCollectionId(name: string): Uint8Array {
+    const bytes = new Uint8Array(32).fill(0x20);
+    bytes.set(new TextEncoder().encode(name).slice(0, 32));
+    return bytes;
+}
+
+function peopleRing(collectionId: Uint8Array): CodecType<typeof RingLocation> {
+    return {
+        chainId: POP_GENESIS_HASH,
+        junctions: [
+            { tag: 'PalletInstance', value: MEMBERS_PALLET_INDEX },
+            { tag: 'CollectionId', value: collectionId },
+        ],
+    };
+}
+
+const FULL_PEOPLE_RING = peopleRing(ringCollectionId('pop:polkadot.network/people'));
+const LITE_PEOPLE_RING = peopleRing(ringCollectionId('pop:polkadot.network/people-lite'));
+
+type RingKind = 'full' | 'lite';
+
+const OWN_PRODUCT_ID = 'product-sample.dot';
+const PERSONHOOD_PRODUCT_ID = 'peopl.dot';
+
+function ringOf(kind: RingKind): CodecType<typeof RingLocation> {
+    return kind === 'full' ? FULL_PEOPLE_RING : LITE_PEOPLE_RING;
+}
+
+function sameRing(a: CodecType<typeof RingLocation>, b: CodecType<typeof RingLocation>): boolean {
+    return a.chainId === b.chainId &&
+        a.junctions.length === b.junctions.length &&
+        a.junctions.every((junction, i) => {
+            const other = b.junctions[i];
+            if (junction.tag !== other.tag) return false;
+            return junction.tag === 'CollectionId'
+                ? toHex(junction.value as Uint8Array) === toHex(other.value as Uint8Array)
+                : junction.value === other.value;
+        });
+}
+
+/** Renders a ring as chain + pallet + collection, so a near-miss is visible rather than just "no match". */
+function describeRing(ring: CodecType<typeof RingLocation>): string {
+    const pallet = ring.junctions.find(j => j.tag === 'PalletInstance');
+    const collection = ring.junctions.find(j => j.tag === 'CollectionId');
+    const collectionText = collection != null
+        ? new TextDecoder().decode(collection.value as Uint8Array).trim()
+        : '?';
+    const chain = ring.chainId;
+    return `${chain.slice(0, 10)}..${chain.slice(-4)} pallet ${pallet != null ? pallet.value : '?'} "${collectionText}"`;
+}
+
+function describeHandle(handle: RingVrfKeyHandle): string {
+    const [owner, index] = handle;
+    const rendered = typeof index === 'object' && 'value' in index ? String(index.value) : String(index);
+    return `${owner} / ${rendered}`;
+}
+
+function short(bytes: Uint8Array): string {
+    const hex = toHex(bytes);
+    return `${hex.slice(0, 12)}...${hex.slice(-6)}`;
+}
+
+/**
+ * RFC-0024: every ring VRF host call in one place. The key is named by an explicit handle - the host
+ * no longer infers one from the ring - so the handle in use is what every call below depends on.
+ */
+function RingVrfCard() {
+    const [index, setIndex] = useState('0');
+    const [message, setMessage] = useState('product-sample-ring-vrf');
+    const [ring, setRing] = useState<RingKind>('full');
+    const [disclosure, setDisclosure] = useState<RingVrfKeyDisclosure>('Anonymized');
+    const [foreignHandle, setForeignHandle] = useState<RingVrfKeyHandle | null>(null);
+    const [status, setStatus] = useState('Press a button to call the host');
+    const [busy, setBusy] = useState<string | null>(null);
+
+    // Own keys are named directly; a foreign key is only ever the handle its owner listed, never a
+    // handle we built - the index is the owner's implementation detail (RFC-0024).
+    const activeHandle = foreignHandle ?? ringVrfKeyHandle(OWN_PRODUCT_ID, parseInt(index, 10) || 0);
+
+    const run = (
+        label: string,
+        call: () => Promise<any>,
+        describe: (value: any) => string,
+    ) => {
+        if (busy != null) return;
+
+        setBusy(label);
+        setStatus(`${label}...`);
+
+        Promise.resolve(call()).then(result => {
+            if (result.isOk()) {
+                setStatus(`${label}: ${describe(result.value)}`);
+                console.log(`Products Demo: ${label} success`);
+            } else {
+                setStatus(`${label} failed: ${JSON.stringify(result.error)}`);
+                console.log(`Products Demo: ${label} error: ${JSON.stringify(result.error)}`);
+            }
+        }).catch((e: unknown) => {
+            setStatus(`${label} threw: ${e}`);
+            console.log(`Products Demo: ${label} exception: ${e}`);
+        }).finally(() => {
+            setBusy(null);
+        });
+    };
+
+    const handleRegister = () => run(
+        'registerRingVrfKey',
+        () => Promise.resolve(accountsProvider.registerRingVrfKey(parseInt(index, 10) || 0, ringOf(ring))),
+        publicKey => `member key ${short(publicKey)} for the ${ring} people ring`,
+    );
+
+    const handleListOwn = () => run(
+        'listRingVrfKeys (own)',
+        () => Promise.resolve(accountsProvider.listRingVrfKeys(OWN_PRODUCT_ID, disclosure)),
+        (entries: RegisteredRingVrfKey[]) => entries.length === 0
+            ? 'no keys registered yet'
+            : entries.map(entry =>
+                `${describeHandle(entry.handle)} [${entry.rings.length} ring(s)]${entry.publicKey != null ? ` key ${short(entry.publicKey)}` : ''}`
+            ).join(' | '),
+    );
+
+    // Selecting by declared ring is the one rule a consuming product has to remember: hardcoding
+    // ['peopl.dot', 0] breaks the moment the owner rotates or adds a key.
+    const handleListPersonhood = () => run(
+        'listRingVrfKeys (peopl.dot)',
+        () => Promise.resolve(accountsProvider.listRingVrfKeys(PERSONHOOD_PRODUCT_ID, disclosure)),
+        (entries: RegisteredRingVrfKey[]) => {
+            const match = entries.find(entry => entry.rings.some((declared: CodecType<typeof RingLocation>) => sameRing(declared, ringOf(ring))));
+            if (match == null) {
+                setForeignHandle(null);
+                const declared = entries.flatMap(entry => entry.rings).map(describeRing).join(' ; ');
+                return `${entries.length} entr(ies), none matching. want [${describeRing(ringOf(ring))}] got [${declared}]`;
+            }
+            setForeignHandle(match.handle);
+            return `using ${describeHandle(match.handle)} - selected by declared ring, not by index`;
+        },
+    );
+
+    const handleUseOwnKey = () => {
+        setForeignHandle(null);
+        setStatus(`Active handle: ${describeHandle(ringVrfKeyHandle(OWN_PRODUCT_ID, parseInt(index, 10) || 0))}`);
+    };
+
+    const handleGetAlias = () => run(
+        'getContextualAlias',
+        () => Promise.resolve(accountsProvider.getContextualAlias(activeHandle, PROOF_CONTEXT, ringOf(ring))),
+        value => `alias ${short(value.alias)} in context ${short(value.context)}`,
+    );
+
+    const handleCreateProof = () => run(
+        'createRingVRFProof',
+        () => Promise.resolve(accountsProvider.createRingVRFProof(
+            activeHandle,
+            PROOF_CONTEXT,
+            ringOf(ring),
+            new TextEncoder().encode(message),
+        )),
+        value => `proof ${short(value.proof)} · alias ${short(value.contextualAlias.alias)} · ring ${value.ringIndex} rev ${value.ringRevision}`,
+    );
+
+    const handleRingVrfSign = () => run(
+        'ringVrfSign',
+        () => Promise.resolve(accountsProvider.ringVrfSign(activeHandle, new TextEncoder().encode(message))),
+        signature => `signature ${short(signature)} - linkable, verified against the member public key`,
+    );
+
+    return (
+        <Column
+            padding={20}
+            background={{ color: 'bg.surface.nested', shape: { tag: 'Rounded', value: 16 } }}
+            horizontalAlignment="center"
+        >
+            <Text style="body.small.regular" color="fg.secondary">Ring VRF via Host API (RFC-0024)</Text>
+            <Spacer height={4} />
+            <Text style="body.small.regular" color="fg.secondary">{`Handle: ${describeHandle(activeHandle)} (${foreignHandle != null ? 'foreign' : 'own'})`}</Text>
+
+            <Spacer height={12} />
+
+            <Row>
+                <Button text="Full People" variant={ring === 'full' ? 'primary' : 'secondary'} onClick={() => setRing('full')} />
+                <Spacer width={8} />
+                <Button text="Lite People" variant={ring === 'lite' ? 'primary' : 'secondary'} onClick={() => setRing('lite')} />
+            </Row>
+
+            <Spacer height={8} />
+
+            <Row>
+                <Button text="Anonymized" variant={disclosure === 'Anonymized' ? 'primary' : 'secondary'} onClick={() => setDisclosure('Anonymized')} />
+                <Spacer width={8} />
+                <Button text="PublicKey" variant={disclosure === 'PublicKey' ? 'primary' : 'secondary'} onClick={() => setDisclosure('PublicKey')} />
+            </Row>
+
+            <Spacer height={12} />
+
+            <TextField value={index} placeholder="Own key index" onValueChange={setIndex} />
+            <Spacer height={8} />
+            <TextField value={message} placeholder="Message to prove / sign" onValueChange={setMessage} />
+
+            <Spacer height={16} />
+
+            <Button text={`Register key for ${ring === 'full' ? 'Full' : 'Lite'} People`} variant="primary" loading={busy === 'registerRingVrfKey'} onClick={handleRegister} />
+            <Spacer height={8} />
+            <Button text="List own keys" variant="primary" loading={busy === 'listRingVrfKeys (own)'} onClick={handleListOwn} />
+            <Spacer height={8} />
+            <Button text="List peopl.dot keys" variant="primary" loading={busy === 'listRingVrfKeys (peopl.dot)'} onClick={handleListPersonhood} />
+            <Spacer height={8} />
+            <Button text="Use own key" variant="secondary" enabled={foreignHandle != null} onClick={handleUseOwnKey} />
+            <Spacer height={8} />
+            <Button text="Get alias" variant="primary" loading={busy === 'getContextualAlias'} onClick={handleGetAlias} />
+            <Spacer height={8} />
+            <Button text="Create proof" variant="primary" loading={busy === 'createRingVRFProof'} onClick={handleCreateProof} />
+            <Spacer height={8} />
+            <Button text="Ring VRF sign" variant="primary" loading={busy === 'ringVrfSign'} onClick={handleRingVrfSign} />
+
+            <Spacer height={16} />
+
+            <Text style="body.large.regular" color="fg.primary">{status}</Text>
+        </Column>
+    );
+}
+
+// RFC-0023 sr25519 VRF. Reproduces the People Chain airdrop transcript so the demo exercises the
+// exact shape the runtime verifies: root label "pop:airdrop", then `domain` and `signer` appends.
+const AIRDROP_TRANSCRIPT_LABEL = new TextEncoder().encode('pop:airdrop');
+
+// "pop:game:airdrop:" right-padded with spaces to 28 bytes ++ big-endian u32 game index = 32 bytes.
+function airdropEventId(gameIndex: number): Uint8Array {
+    const eventId = new Uint8Array(32);
+    eventId.set(new TextEncoder().encode('pop:game:airdrop:           '));
+    new DataView(eventId.buffer).setUint32(28, gameIndex, false);
+    return eventId;
+}
+
+function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
+    const out = new Uint8Array(a.length + b.length);
+    out.set(a);
+    out.set(b, a.length);
+    return out;
+}
+
+function SignVrfCard() {
+    const [gameIndex, setGameIndex] = useState('7');
+    const [preOutput, setPreOutput] = useState<string | null>(null);
+    const [proof, setProof] = useState<string | null>(null);
+    const [signer, setSigner] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    const handleGetAlias = () => {
+    const handleSignVrf = () => {
         if (loading) return;
 
         setLoading(true);
         setError(null);
+        setPreOutput(null);
+        setProof(null);
 
-        Promise.resolve(accountsProvider.getProductAccountAlias('product-sample.dot', 0)).then(result => {
-            if (result.isOk()) {
-                setContext(toHex(result.value.context));
-                setAlias(toHex(result.value.alias));
-                console.log(`Products Demo: getAlias success`);
-            } else {
-                setError(`Error: ${JSON.stringify(result.error)}`);
-                console.log(`Products Demo: getAlias error: ${JSON.stringify(result.error)}`);
+        const index = parseInt(gameIndex, 10) || 0;
+
+        // RFC-0023: the host never injects `signer` — the product fetches its own public key and
+        // puts it into the transcript itself.
+        Promise.resolve(accountsProvider.getProductAccount('product-sample.dot', 0)).then(accountResult => {
+            if (!accountResult.isOk()) {
+                setError(`accountGet error: ${JSON.stringify(accountResult.error)}`);
+                setLoading(false);
+                return;
             }
-            setLoading(false);
+
+            const publicKey = accountResult.value.publicKey;
+            setSigner(toHex(publicKey));
+
+            const items = [
+                { label: new TextEncoder().encode('domain'), value: concatBytes(AIRDROP_TRANSCRIPT_LABEL, airdropEventId(index)) },
+                { label: new TextEncoder().encode('signer'), value: publicKey },
+            ];
+
+            return Promise.resolve(accountsProvider.signVrf('product-sample.dot', 0, AIRDROP_TRANSCRIPT_LABEL, items)).then(result => {
+                if (result.isOk()) {
+                    setPreOutput(toHex(result.value.preOutput));
+                    setProof(toHex(result.value.proof));
+                    console.log('Products Demo: signVrf success');
+                } else {
+                    setError(`signVrf error: ${JSON.stringify(result.error)}`);
+                    console.log(`Products Demo: signVrf error: ${JSON.stringify(result.error)}`);
+                }
+            });
         }).catch((e: unknown) => {
-            console.log(`Products Demo: getAlias exception: ${e}`);
-            setError(`Error: ${e}`);
+            console.log(`Products Demo: signVrf exception: ${e}`);
+            setError(`signVrf error: ${e}`);
+        }).finally(() => {
             setLoading(false);
         });
     };
@@ -649,34 +932,61 @@ function AliasCard() {
             background={{ color: 'bg.surface.nested', shape: { tag: 'Rounded', value: 16 } }}
             horizontalAlignment="center"
         >
-            <Text style="body.small.regular" color="fg.secondary">Get Alias via Host API</Text>
+            <Text style="body.small.regular" color="fg.secondary">sr25519 VRF via Host API (RFC-0023)</Text>
             <Spacer height={8} />
-            {error != null
-                ? <Text style="body.large.regular" color="fg.primary">{error}</Text>
-                : alias != null && context != null
-                    ? (
-                        <>
-                            <Text style="body.small.regular" color="fg.secondary">Context</Text>
-                            <Spacer height={4} />
-                            <Text style="body.large.regular" color="fg.primary">
-                                {`${context.slice(0, 24)}...${context.slice(-8)}`}
-                            </Text>
-                            <Spacer height={8} />
-                            <Text style="body.small.regular" color="fg.secondary">Alias</Text>
-                            <Spacer height={4} />
-                            <Text style="body.large.regular" color="fg.primary">
-                                {`${alias.slice(0, 24)}...${alias.slice(-8)}`}
-                            </Text>
-                        </>
-                    )
-                    : <Text style="body.large.regular" color="fg.secondary">Press button to fetch alias</Text>
-            }
+            <Text style="body.small.regular" color="fg.secondary">Transcript: pop:airdrop · domain + signer</Text>
+
+            <Spacer height={12} />
+
+            <TextField
+                value={gameIndex}
+                placeholder="Game index"
+                onValueChange={setGameIndex}
+            />
+
+            <Spacer height={12} />
+
+            {error != null && <Text style="body.large.regular" color="fg.primary">{error}</Text>}
+            {signer != null && (
+                <>
+                    <Text style="body.small.regular" color="fg.secondary">Signer</Text>
+                    <Spacer height={4} />
+                    <Text style="body.large.regular" color="fg.primary">
+                        {`${signer.slice(0, 24)}...${signer.slice(-8)}`}
+                    </Text>
+                </>
+            )}
+            {preOutput != null && (
+                <>
+                    <Spacer height={8} />
+                    <Text style="body.small.regular" color="fg.secondary">Pre-output (32 bytes)</Text>
+                    <Spacer height={4} />
+                    <Text style="body.large.regular" color="fg.primary">
+                        {`${preOutput.slice(0, 24)}...${preOutput.slice(-8)}`}
+                    </Text>
+                </>
+            )}
+            {proof != null && (
+                <>
+                    <Spacer height={8} />
+                    <Text style="body.small.regular" color="fg.secondary">Proof (64 bytes)</Text>
+                    <Spacer height={4} />
+                    <Text style="body.large.regular" color="fg.primary">
+                        {`${proof.slice(0, 24)}...${proof.slice(-8)}`}
+                    </Text>
+                </>
+            )}
+            {preOutput == null && error == null && (
+                <Text style="body.large.regular" color="fg.secondary">Press the button to call the host</Text>
+            )}
+
             <Spacer height={16} />
+
             <Button
-                text="Get Alias"
+                text="Sign VRF"
                 variant="primary"
                 loading={loading}
-                onClick={handleGetAlias}
+                onClick={handleSignVrf}
             />
         </Column>
     );

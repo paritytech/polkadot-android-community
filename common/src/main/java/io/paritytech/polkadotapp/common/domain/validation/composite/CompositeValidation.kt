@@ -7,7 +7,7 @@ import io.paritytech.polkadotapp.common.domain.validation.ValidationResult
 class CompositeValidation<P> internal constructor(
     private val delegates: List<Validation<P>>
 ) : Validation<P> {
-    context(ValidationProcess)
+    context(validationProcess: ValidationProcess)
     override suspend fun validate(payload: P): ValidationResult<P> {
         return try {
             val initial: ValidationResult<P> = ValidationResult.Success(payload)
@@ -20,7 +20,7 @@ class CompositeValidation<P> internal constructor(
         }
     }
 
-    context(ValidationProcess)
+    context(validationProcess: ValidationProcess)
     private suspend fun ValidationResult<P>.fold(validation: Validation<P>): ValidationResult<P> {
         return when (this) {
             ValidationResult.Aborted -> this

@@ -21,6 +21,9 @@ import io.paritytech.polkadotapp.feature_identity_api.domain.models.IdentityCred
 import io.paritytech.polkadotapp.feature_identity_impl.presentation.credentials.list.CredentialsListContract
 import io.paritytech.polkadotapp.feature_identity_impl.presentation.credentials.list.compose.components.CredentialItem
 import io.paritytech.polkadotapp.feature_identity_impl.presentation.credentials.list.models.CredentialUiModel
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -30,7 +33,7 @@ fun CredentialsListScreen(contract: CredentialsListContract) {
     CredentialsListScreenInternal(
         onBackAction = contract::backClicked,
         onSelectItemAction = contract::selectItem,
-        credentials = credentials
+        credentials = credentials.toImmutableList()
     )
 }
 
@@ -38,7 +41,7 @@ fun CredentialsListScreen(contract: CredentialsListContract) {
 private fun CredentialsListScreenInternal(
     onBackAction: () -> Unit,
     onSelectItemAction: (CredentialUiModel) -> Unit,
-    credentials: List<CredentialUiModel>
+    credentials: ImmutableList<CredentialUiModel>
 ) {
     PolkadotSurface {
         Column(
@@ -107,7 +110,7 @@ private fun CredentialsListScreenPreview() {
         CredentialsListScreenInternal(
             onBackAction = {},
             onSelectItemAction = {},
-            credentials = listOf(
+            credentials = persistentListOf(
                 CredentialUiModel(
                     IdentityCredentialPlatform.Github(""),
                     IdentityCredentialState.NotAdded

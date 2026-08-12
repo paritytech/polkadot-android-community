@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_transaction_storage_impl.data.signer.o
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
-import io.paritytech.polkadotapp.feature_members_api.data.repository.MembersRepository
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.extension.ClaimLongTermStorage
@@ -14,7 +13,6 @@ import javax.inject.Inject
 
 class RealTransactionStorageOrigins @Inject constructor(
     private val peopleMembershipProver: PeopleMembershipProver,
-    private val membersRepository: MembersRepository,
     private val chainRegistry: ChainRegistry,
 ) : TransactionStorageOrigins {
     override suspend fun asResourcesLongTermStorage(
@@ -27,7 +25,6 @@ class RealTransactionStorageOrigins @Inject constructor(
             context = context,
             collection = collection,
             peopleMembershipProver = peopleMembershipProver,
-            membersRepository = membersRepository,
             chainRegistry = chainRegistry,
         )
         return SetTransactionExtensionOrigin(TransactionSignerSource.None, extension)

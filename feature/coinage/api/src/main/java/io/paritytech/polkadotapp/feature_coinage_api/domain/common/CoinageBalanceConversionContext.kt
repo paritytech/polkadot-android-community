@@ -21,29 +21,29 @@ fun CoinageBalanceConversionContext.formatExponentsToBalance(exponents: List<Val
         .sumByBalance { it }
 }
 
-context(CoinageBalanceConversionContext)
+context(coinageContext: CoinageBalanceConversionContext)
 fun RecyclerVoucher.balance(): Balance {
-    return formatExponentToBalance(recyclerValue)
+    return coinageContext.formatExponentToBalance(recyclerValue)
 }
 
 @JvmName("totalVoucherBalance")
-context(CoinageBalanceConversionContext)
+context(coinageContext: CoinageBalanceConversionContext)
 fun List<RecyclerVoucher>.totalBalance(): Balance {
     return sumByBalance { it.balance() }
 }
 
 @JvmName("totalCoinBalance")
-context(CoinageBalanceConversionContext)
+context(coinageContext: CoinageBalanceConversionContext)
 fun Coin.balance(): Balance {
-    return formatExponentToBalance(valueExponent)
+    return coinageContext.formatExponentToBalance(valueExponent)
 }
 
-context(CoinageBalanceConversionContext)
+context(coinageContext: CoinageBalanceConversionContext)
 fun List<Coin>.totalBalance(): Balance {
     return sumByBalance { it.balance() }
 }
 
-context(CoinageBalanceConversionContext)
+context(coinageContext: CoinageBalanceConversionContext)
 fun ValueExponent.balance(): Balance {
-    return formatExponentToBalance(this)
+    return coinageContext.formatExponentToBalance(this)
 }

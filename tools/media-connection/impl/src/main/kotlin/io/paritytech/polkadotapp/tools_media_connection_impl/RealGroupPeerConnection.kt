@@ -7,20 +7,18 @@ import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerChannelSi
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerConnectionLogger
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaConfiguration
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoTrack
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.cameraInitiallyEnabled
 import io.paritytech.polkadotapp.tools_media_connection_impl.connection.AcceptorConnection
 import io.paritytech.polkadotapp.tools_media_connection_impl.connection.InitiatorConnection
 import io.paritytech.polkadotapp.tools_media_connection_impl.media.MediaTrackProvider
 import io.paritytech.polkadotapp.tools_media_connection_impl.models.ExternalRtcConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.webrtc.EglBase
-import org.webrtc.PeerConnectionFactory
 
 internal class RealGroupPeerConnection(
     private val mediaConfiguration: MediaConfiguration,
     private val scope: CoroutineScope,
-    private val eglBase: EglBase,
-    private val peerConnectionFactory: PeerConnectionFactory,
+    private val webRtcCore: WebRtcCore,
     private val mediaTrackProvider: MediaTrackProvider,
     private val externalRtcConfig: ExternalRtcConfig,
 ) : GroupPeerConnection {
@@ -42,8 +40,7 @@ internal class RealGroupPeerConnection(
                 signaling = signaling,
                 mediaConfiguration = mediaConfiguration,
                 mediaTrackProvider = mediaTrackProvider,
-                peerConnectionFactory = peerConnectionFactory,
-                eglBase = eglBase,
+                webRtcCore = webRtcCore,
                 externalRtcConfig = externalRtcConfig,
                 scope = peerScope,
                 logger = logger
@@ -53,8 +50,7 @@ internal class RealGroupPeerConnection(
                 signaling = signaling,
                 mediaConfiguration = mediaConfiguration,
                 mediaTrackProvider = mediaTrackProvider,
-                peerConnectionFactory = peerConnectionFactory,
-                eglBase = eglBase,
+                webRtcCore = webRtcCore,
                 externalRtcConfig = externalRtcConfig,
                 scope = peerScope,
                 logger = logger
@@ -74,12 +70,12 @@ internal class RealGroupPeerConnection(
         when (mediaConfiguration) {
             MediaConfiguration.None -> return
             is MediaConfiguration.AudioVideo,
-            MediaConfiguration.VideoOnly -> {
+            is MediaConfiguration.VideoOnly -> {
                 if (localVideoTrack.value != null) return
 
                 val rawTrack = mediaTrackProvider.getOrCreateVideoTrack()
-                mediaTrackProvider.setVideoEnabled(true)
-                localVideoTrack.value = RealVideoTrack(rawTrack, eglBase.eglBaseContext)
+                mediaTrackProvider.setVideoEnabled(mediaConfiguration.cameraInitiallyEnabled())
+                localVideoTrack.value = RealVideoTrack(rawTrack, webRtcCore.eglBase.eglBaseContext)
                 // no need to set up audio track here, we don't need to expose it anywhere now
             }
         }

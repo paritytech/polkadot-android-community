@@ -11,13 +11,18 @@ class RootDeeplinkHandler @Inject constructor(
     private val handlers: Set<@JvmSuppressWildcards DeepLinkHandler>,
 ) : DeepLinkHandler {
     override fun canHandle(data: Uri): Boolean {
-        return handlers.any { it.canHandle(data) }
+        return data.candidates().any { uri -> handlers.any { it.canHandle(uri) } }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> = withContext(coroutineDispatchers.computation) {
-        handlers.find { it.tryCanHandle(data) }
-            ?.handle(data)
+        data.candidates()
+            .firstNotNullOfOrNull { uri ->
+                handlers.find { it.tryCanHandle(uri) }
+                    ?.handle(uri)
+            }
             ?: Result.failure(IllegalArgumentException("No matching handlers found to handle deeplink: $data"))
     }
+
+    private fun Uri.candidates(): List<Uri> = listOfNotNull(toAppSchemeDeeplinkOrNull(), this)
 }

@@ -30,7 +30,7 @@ class GameResultsLiveUpdater @Inject constructor(
     private val scoreRepository: ScoreRepository,
     private val reportSnapshot: GameReportSnapshot,
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun liveResults(initialInput: GameResultsInput): Flow<GameResultsLiveEvent> = flow {
         val context = runCatching { attestationContextResolver.resolve() }
             .onFailure { Timber.w(it, "[GameResults] live-results subscription setup failed") }

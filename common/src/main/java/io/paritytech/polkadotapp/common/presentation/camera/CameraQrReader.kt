@@ -27,7 +27,7 @@ class RealCameraQrReader @Inject constructor(
         val resolutionSelector = ResolutionSelector.Builder()
             .setResolutionStrategy(
                 ResolutionStrategy(
-                    Size(1280, 720),
+                    Size(1920, 1080),
                     ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
                 )
             )
@@ -43,14 +43,17 @@ class RealCameraQrReader @Inject constructor(
                     qrCodeAnalyzer
                 )
             }
-        processCameraProvider.bindToLifecycle(
+        val camera = processCameraProvider.bindToLifecycle(
             lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, imageAnalysis, preview
         )
+        qrCodeAnalyzer.attachCamera(camera)
 
         try {
             awaitCancellation()
         } finally {
+            imageAnalysis.clearAnalyzer()
             processCameraProvider.unbindAll()
+            qrCodeAnalyzer.close()
         }
     }
 }

@@ -4,18 +4,23 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.utils.combineToPair
 import io.paritytech.polkadotapp.common.utils.inBackground
+import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.withLoading
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatPreview
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatMessageRenderersById
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatPreviewRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomPreviewData
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.asAnyRenderer
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.isIncoming
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatFeedPayload
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatPreviewUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.CustomChatPreviewUiModel
+import io.paritytech.polkadotapp.feature_chats_api.presentation.model.DraftPreviewUiModel
+import io.paritytech.polkadotapp.feature_chats_api.presentation.model.LastMessageUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.LastMessageUiModel.Attachments
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.LastMessageUiModel.Call
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.LastMessageUiModel.ChatAccepted
@@ -31,6 +36,7 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.model.LastMessag
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatListInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.Chat
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatDraft
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatSummaryBadge
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.toUi
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.ChatListUiState
@@ -40,6 +46,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.util.resolveCal
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.util.toCallPurposeUi
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatMessageMappingHelper
 import io.paritytech.polkadotapp.feature_chats_impl.utils.toAttachmentType
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -48,22 +55,25 @@ import javax.inject.Inject
 @Suppress("USELESS_CAST")
 @HiltViewModel
 class ChatListViewModel @Inject constructor(
-    interactor: ChatListInteractor,
+    private val interactor: ChatListInteractor,
     private val router: ChatsRouter,
     private val messageMappingHelper: ChatMessageMappingHelper,
 ) : BaseViewModel() {
     val state = combine(
-        interactor.subscribeChats(),
+        combineToPair(
+            interactor.subscribeChats(),
+            interactor.subscribeDrafts()
+        ),
         interactor.subscribeAllCustomMessageRenderers(),
         interactor.subscribePendingIncomingRequestsCount(),
         interactor.subscribeCallSignaling(),
         interactor.subscribeActiveCall()
-    ) { chatList, customMessageRenderers, pendingRequestsCount, callSignaling, activeCall ->
+    ) { (chatList, drafts), customMessageRenderers, pendingRequestsCount, callSignaling, activeCall ->
         val callContext = buildCallResolutionContext(callSignaling, activeCall)
-        val chats = chatList.map { it.toUi(customMessageRenderers, callContext) }
+        val chats = chatList.map { it.toUi(drafts, customMessageRenderers, callContext) }
 
         ChatListUiState(
-            chats = chats,
+            chats = chats.toImmutableList(),
             pendingRequestsCount = pendingRequestsCount
         )
     }
@@ -75,8 +85,14 @@ class ChatListViewModel @Inject constructor(
             initialValue = LoadingState.Loading
         )
 
-    fun onChatClick(chat: ChatListUiState.ChatItem) {
-        router.openChatFeed(ChatFeedPayload.existingChat(chat.chatId))
+    fun onSearchBarClick() {
+        router.openChatSearch()
+    }
+
+    fun onChatClick(chat: ChatListUiState.ChatItem) = launchUnit {
+        if (!interactor.handleChatOpen(chat.chatId)) {
+            router.openChatFeed(ChatFeedPayload.existingChat(chat.chatId))
+        }
     }
 
     fun onAddContactClick() {
@@ -88,19 +104,27 @@ class ChatListViewModel @Inject constructor(
     }
 
     private suspend fun Chat.toUi(
+        drafts: Map<ChatId, ChatDraft>,
         customMessageRenderers: CustomChatMessageRenderersById,
         callContext: CallResolutionContext,
     ): ChatListUiState.ChatItem {
-        return ChatListUiState.ChatItem(
-            chatId = id,
-            display = display.toUi(),
-            badge = unreadBadge.toUi(),
-            preview = preview.toUi(
+        val draftText = drafts[id]?.text?.takeIf { it.isNotBlank() }
+        val previewModel = if (draftText != null) {
+            DraftPreviewUiModel(timestamp = timestamp, text = draftText)
+        } else {
+            preview.toUi(
                 timestamp = timestamp,
                 customMessageRenderers = customMessageRenderers,
                 customPreviewDelegate = customPreviewRenderer,
                 callContext = callContext,
-            ),
+            )
+        }
+
+        return ChatListUiState.ChatItem(
+            chatId = id,
+            display = display.toUi(),
+            badge = unreadBadge.toUi(),
+            preview = previewModel,
             // TODO: wire mute state from domain Chat once the field exists.
             isMuted = false,
             hasReaction = hasUnseenReaction,
@@ -269,11 +293,19 @@ class ChatListViewModel @Inject constructor(
                 state = resolveCallState(offer = this, callContext = callContext),
             )
 
+            is ChatMessage.Content.CompactionUnavailable -> {
+                LastMessageUiModel.CompactionUnavailable(
+                    timestamp = timestamp,
+                    isIncoming = isIncoming
+                )
+            }
+
             is ChatMessage.Content.DataChannelAnswer,
             is ChatMessage.Content.DataChannelIceCandidate,
             is ChatMessage.Content.DataChannelClosed,
             is ChatMessage.Content.DeviceAdded,
-            is ChatMessage.Content.DeviceRemoved -> {
+            is ChatMessage.Content.DeviceRemoved,
+            is ChatMessage.Content.CompactionCommit -> {
                 Unsupported(
                     timestamp = timestamp,
                     isIncoming = isIncoming

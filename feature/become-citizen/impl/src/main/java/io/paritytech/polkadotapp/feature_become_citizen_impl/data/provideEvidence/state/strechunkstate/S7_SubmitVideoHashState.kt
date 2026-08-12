@@ -18,7 +18,7 @@ class SubmitVideoHashState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(): UploadEvidenceState {
         return stateFactory.awaitProvenCandidacy()
     }

@@ -191,10 +191,10 @@ private fun getArrowSize(alignment: TooltipAlignment): DpSize =
     when (alignment) {
         TooltipAlignment.Top,
         TooltipAlignment.Bottom -> {
-            DpSize(16.dp, 8.dp)
+            DpSize(28.dp, 22.dp)
         }
         TooltipAlignment.Start,
         TooltipAlignment.End -> {
-            DpSize(8.dp, 16.dp)
+            DpSize(22.dp, 28.dp)
         }
     }

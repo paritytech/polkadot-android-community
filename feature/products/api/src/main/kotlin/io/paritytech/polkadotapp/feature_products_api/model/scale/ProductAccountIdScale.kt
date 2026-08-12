@@ -8,16 +8,16 @@ import kotlinx.serialization.Serializable
 @AsTuple
 data class ProductAccountIdScale(
     val dotNsIdentifier: ProductIdScale,
-    val derivationIndex: Int,
+    val derivationIndex: ProductDerivationIndexScale,
 )
 
 typealias DotNsIdentifierScale = String
 typealias ProductIdScale = DotNsIdentifierScale
 
 fun ProductAccountId.toScale(): ProductAccountIdScale {
-    return ProductAccountIdScale(productId, derivationIndex)
+    return ProductAccountIdScale(productId, index.toScale())
 }
 
-fun ProductAccountIdScale.toDomain(): ProductAccountId {
-    return ProductAccountId(dotNsIdentifier, derivationIndex)
+fun ProductAccountIdScale.toDomain(): Result<ProductAccountId> {
+    return derivationIndex.toDomain().map { ProductAccountId(dotNsIdentifier, it) }
 }

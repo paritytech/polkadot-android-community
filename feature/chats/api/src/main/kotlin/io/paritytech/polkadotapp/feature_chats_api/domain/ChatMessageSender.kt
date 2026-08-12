@@ -14,6 +14,6 @@ interface ChatMessageSender {
         replyToMessageId: String? = null,
     ): ChatMessage
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun startExtensions()
 }

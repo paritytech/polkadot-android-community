@@ -35,12 +35,12 @@ class RegisterPersonKeyState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
-        val candidateAccount = uploadSession.candidateAccount
-        val memberKey = bandersnatchSecretsStorage.getMemberKey(uploadSession.candidateAccount.id)
+        val candidateAccount = transition.uploadSession.candidateAccount
+        val memberKey = bandersnatchSecretsStorage.getMemberKey(transition.uploadSession.candidateAccount.id)
 
-        val provenCandidate = when (val candidate = uploadSession.getCurrentCandidate()) {
+        val provenCandidate = when (val candidate = transition.uploadSession.getCurrentCandidate()) {
             is ProofOfInkCandidate.Proven -> candidate
             // Null state means that we could not track registration tx in the previous run but we have actually registered
             null -> {
@@ -60,13 +60,13 @@ class RegisterPersonKeyState(
         val rewardDestination = candidateAccount.defaultAccountId()
 
         return if (provenCandidate.wasReferred) {
-            uploadSession.registerPersonReferred(
+            transition.uploadSession.registerPersonReferred(
                 key = memberKey,
                 rewardDestination = rewardDestination,
                 proofOfOwnership = ownershipProof
             )
         } else {
-            uploadSession.registerPersonNonReferred(
+            transition.uploadSession.registerPersonNonReferred(
                 key = memberKey,
                 rewardDestination = rewardDestination,
                 proofOfOwnership = ownershipProof
@@ -80,12 +80,12 @@ class RegisterPersonKeyState(
         }
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     private suspend fun generateProofOfOwnership(): BandersnatchSignature {
-        val account = uploadSession.candidateAccount
-        val accountId = account.accountIdIn(uploadSession.peopleChain)
+        val account = transition.uploadSession.candidateAccount
+        val accountId = account.accountIdIn(transition.uploadSession.peopleChain)
 
-        val message = uploadSession.generateProofOfOwnershipMessage(accountId)
+        val message = transition.uploadSession.generateProofOfOwnershipMessage(accountId)
         return bandersnatchSecretsStorage.sign(account.id, message).toDataByteArray()
     }
 

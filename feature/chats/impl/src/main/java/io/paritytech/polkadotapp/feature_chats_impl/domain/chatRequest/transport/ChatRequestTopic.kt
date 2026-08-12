@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 
 sealed class ChatRequestTopic {
     abstract val acceptor: AccountId
@@ -12,7 +12,7 @@ sealed class ChatRequestTopic {
 
     data class Session(
         val peerAccountId: AccountId,
-        val peerChatKey: EncodedPublicKey,
+        val peerChatKey: X25519PublicKey,
         val pin: String?,
         val ourAccountId: AccountId,
         val direction: Direction

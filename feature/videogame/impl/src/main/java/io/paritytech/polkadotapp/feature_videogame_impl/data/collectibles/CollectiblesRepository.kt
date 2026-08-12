@@ -16,7 +16,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.domain.collectibles.Owne
 import javax.inject.Inject
 
 interface CollectiblesRepository {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getOwnedNfts(
         chainId: ChainId,
         owners: List<OnChainAccountOrPerson>
@@ -26,7 +26,7 @@ interface CollectiblesRepository {
 class RealCollectiblesRepository @Inject constructor(
     @RemoteSourceQualifier private val remoteStorageSource: StorageDataSource,
 ) : CollectiblesRepository {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getOwnedNfts(
         chainId: ChainId,
         owners: List<OnChainAccountOrPerson>

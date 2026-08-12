@@ -183,7 +183,8 @@ class TransferRecoveryService @Inject constructor(
 
             is ResolveAction.RevertInputs -> runCatching {
                 if (entry.expectedOutputCoinIndices.isNotEmpty()) {
-                    coinRepository.removeCoins(entry.expectedOutputCoinIndices)
+                    // Retire (not delete) so derivation indices stay monotonic and are never reused.
+                    coinRepository.setSpentStateByDerivationIndices(entry.expectedOutputCoinIndices, Coin.SpentState.SPENT_LOCALLY)
                 }
                 if (entry.inputCoinIndices.isNotEmpty()) {
                     coinRepository.setSpentStateByDerivationIndices(entry.inputCoinIndices, Coin.SpentState.NOT_SPENT)

@@ -31,7 +31,7 @@ abstract class SingleStorageKeyUpdater<S>(
     /**
      * @return a storage key to update. null in case updater does not want to update anything
      */
-    context (WithRuntime)
+    context (withRuntime: WithRuntime)
     abstract suspend fun storageKey(scopeValue: S, chain: Chain): String?
 
     override suspend fun listenForUpdates(

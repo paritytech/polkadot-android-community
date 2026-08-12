@@ -8,4 +8,5 @@ data class DebugMenuState(
     val isSharingLogs: Boolean = false,
     val showSpaBrowserDialog: Boolean = false,
     val hasJWTToken: Boolean = false,
+    val coinageDebugWidgetsEnabled: Boolean = true,
 )

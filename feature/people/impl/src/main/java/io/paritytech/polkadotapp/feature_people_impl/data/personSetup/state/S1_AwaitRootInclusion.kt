@@ -15,21 +15,21 @@ class AwaitRingInclusionState(
 
     override val id = ID
 
-    context(PersonSetupState.Transition)
+    context(transition: PersonSetupState.Transition)
     override suspend fun performNonTerminalTransition(): Result<PersonSetupState> = runCatching {
         val personId = awaitAssignedPersonId()
         // This is needed because PersonIdUpdater cannot sync personId while the app is in background
         personIdStorage.savePersonId(personId)
 
-        if (dataSource.hasIncludedIntoRing()) {
+        if (transition.dataSource.hasIncludedIntoRing()) {
             stateFactory.setAliasState(SetAliasState.Params.initial())
         } else {
             throw TransitionDidNotSucceedException("Not yet included into ring")
         }
     }
 
-    context(PersonSetupState.Transition)
+    context(transition: PersonSetupState.Transition)
     private suspend fun awaitAssignedPersonId(): PersonId {
-        return dataSource.subscriptions.await().people.awaitPersonId()
+        return transition.dataSource.subscriptions.await().people.awaitPersonId()
     }
 }
