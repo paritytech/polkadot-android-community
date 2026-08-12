@@ -24,6 +24,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.co
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.ChatMessageSurface
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.MessageReactions
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.SwipeToReplyContainer
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun ChatMessageContainer(
@@ -34,7 +36,7 @@ fun ChatMessageContainer(
     canBeReplied: Boolean,
     onMessageAction: (MessageAction) -> Unit,
     onLongPress: ((MessageLayoutInfo) -> Unit)? = null,
-    reactions: List<ChatMessageUiModel.Reaction> = emptyList(),
+    reactions: ImmutableList<ChatMessageUiModel.Reaction> = persistentListOf(),
     replyPreview: ReplyPreview? = null,
     surfaceStyle: ChatMessageSurfaceStyle = ChatMessageSurfaceStyle.default(message.direction),
     body: @Composable ColumnScope.() -> Unit

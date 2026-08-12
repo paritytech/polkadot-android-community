@@ -9,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.onLoaded
@@ -16,10 +18,12 @@ import io.paritytech.polkadotapp.design.components.bottomsheet.NovaBottomSheetSu
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
+import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.feature_products_impl.presentation.topUpRequest.TopUpRequestContract
+import io.paritytech.polkadotapp.design.utils.withBold
 import io.paritytech.polkadotapp.feature_products_impl.presentation.topUpRequest.TopUpRequestUiState
+import io.paritytech.polkadotapp.feature_products_impl.presentation.topUpRequest.TopUpRequestViewModel
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
@@ -27,13 +31,13 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
-fun TopUpRequestScreen(contract: TopUpRequestContract) {
-    val state by contract.state.collectAsStateWithLifecycle()
+fun TopUpRequestScreen(viewModel: TopUpRequestViewModel) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     state.onLoaded { data ->
         TopUpRequestScreenInternal(
             state = data,
-            onClaim = contract::onClaimClicked,
+            onDismiss = viewModel::onDismissClicked,
         )
     }
 }
@@ -41,7 +45,7 @@ fun TopUpRequestScreen(contract: TopUpRequestContract) {
 @Composable
 private fun TopUpRequestScreenInternal(
     state: TopUpRequestUiState,
-    onClaim: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     NovaBottomSheetSurface {
         Column(
@@ -53,56 +57,125 @@ private fun TopUpRequestScreenInternal(
             ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val formatter = LocalTokenAmountFormatter.current
-            NovaText(
-                text = stringResource(
-                    RCommon.string.product_top_up_title,
-                    state.productId,
-                    formatter.formatTokenAmount(state.amount, precision = RoundPrecision.DEFAULT),
-                ),
-                style = PolkadotTheme.typography.title.large,
-                color = PolkadotTheme.colors.fg.primary,
-            )
-
-            if (state.amountMismatch) {
-                VerticalSpacer { mediumIncreased }
-
-                NovaText(
-                    text = stringResource(RCommon.string.product_top_up_amount_mismatch_warning),
-                    style = PolkadotTheme.typography.body.medium,
-                    color = PolkadotTheme.colors.fg.warning,
-                )
+            when (state) {
+                is TopUpRequestUiState.Failure -> FailureContent(state)
+                is TopUpRequestUiState.PartialPayment -> PartialPaymentContent(state)
             }
 
             VerticalSpacer { extraLarge }
 
             PolkadotTextButton(
                 modifier = Modifier.fillMaxWidth(),
-                text = stringResource(RCommon.string.product_top_up_claim),
+                text = stringResource(RCommon.string.common_close),
                 style = PolkadotButtonStyle.secondary(),
-                loading = state.claiming,
-                enabled = !state.claiming,
-                onClick = onClaim,
+                onClick = onDismiss,
             )
         }
     }
 }
 
+@Composable
+private fun FailureContent(state: TopUpRequestUiState.Failure) {
+    NovaText(
+        text = stringResource(RCommon.string.product_top_up_failed_title, state.productId).withBold(state.productId),
+        style = PolkadotTheme.typography.title.large,
+        color = PolkadotTheme.colors.fg.primary,
+        textAlign = TextAlign.Center,
+    )
+
+    VerticalSpacer { mediumIncreased }
+
+    NovaText(
+        text = state.errorMessage,
+        style = PolkadotTheme.typography.body.medium,
+        color = PolkadotTheme.colors.fg.error,
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
+private fun PartialPaymentContent(state: TopUpRequestUiState.PartialPayment) {
+    val formatter = LocalTokenAmountFormatter.current
+
+    NovaText(
+        text = stringResource(RCommon.string.product_top_up_accepted_title, state.productId).withBold(state.productId),
+        style = PolkadotTheme.typography.title.large,
+        color = PolkadotTheme.colors.fg.primary,
+        textAlign = TextAlign.Center,
+    )
+
+    VerticalSpacer { mediumIncreased }
+
+    PolkadotSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = PolkadotTheme.shapes.medium,
+        color = PolkadotTheme.colors.bg.surface.nested,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(PolkadotTheme.spacings.mediumIncreased),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            NovaText(
+                text = formatter.formatTokenAmount(state.requestedAmount, RoundPrecision.DEFAULT, withSymbol = false),
+                style = PolkadotTheme.typography.body.medium.copy(textDecoration = TextDecoration.LineThrough),
+                color = PolkadotTheme.colors.fg.secondary,
+                textAlign = TextAlign.Center,
+            )
+            NovaText(
+                text = formatter.formatTokenAmount(state.creditedAmount, RoundPrecision.DEFAULT, withSymbol = false),
+                style = PolkadotTheme.typography.headline.large,
+                color = PolkadotTheme.colors.fg.primary,
+                textAlign = TextAlign.Center,
+            )
+            NovaText(
+                text = formatter.formatToSymbol(state.creditedAmount),
+                style = PolkadotTheme.typography.body.medium,
+                color = PolkadotTheme.colors.fg.secondary,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+
+    VerticalSpacer { mediumIncreased }
+
+    NovaText(
+        text = stringResource(RCommon.string.product_top_up_amount_mismatch_warning),
+        style = PolkadotTheme.typography.body.medium,
+        color = PolkadotTheme.colors.fg.warning,
+        textAlign = TextAlign.Center,
+    )
+}
+
 @Preview
 @Composable
-private fun TopUpRequestScreenPreview() {
+private fun TopUpRequestFailurePreview() {
+    PolkadotTheme {
+        TopUpRequestScreenInternal(
+            state = TopUpRequestUiState.Failure(
+                productId = "alice.dot",
+                errorMessage = "Failed to move coins into the user's coin set",
+            ),
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun TopUpRequestPartialPaymentPreview() {
     CompositionLocalProvider(
         LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
     ) {
         PolkadotTheme {
             TopUpRequestScreenInternal(
-                state = TopUpRequestUiState(
+                state = TopUpRequestUiState.PartialPayment(
                     productId = "alice.dot",
-                    amount = TokenAmountModel.mock,
-                    claiming = false,
-                    amountMismatch = false,
+                    requestedAmount = TokenAmountModel.mock,
+                    creditedAmount = TokenAmountModel.mock,
                 ),
-                onClaim = {},
+                onDismiss = {},
             )
         }
     }

@@ -35,6 +35,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.com
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.theme.GameColors
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.VideoGamePlayContract
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.compose.components.*
+import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.compose.components.waitingRoom.WaitingRoomBackground
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.compose.components.waitingRoom.WaitingRoomScreen
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.compose.constraints.*
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models.PlayerUiModel
@@ -46,6 +47,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun VideoGamePlayScreen(contract: VideoGamePlayContract) {
@@ -54,6 +56,7 @@ fun VideoGamePlayScreen(contract: VideoGamePlayContract) {
     val selections by contract.selections.collectAsStateWithLifecycle()
     val sugarLevel by contract.sugarLevel.collectAsStateWithLifecycle()
     val votingTooltipVisible by contract.votingTooltipVisible.collectAsStateWithLifecycle()
+    val noHostTooltipVisible by contract.noHostTooltipVisible.collectAsStateWithLifecycle()
     val tutorialState by contract.tutorialState.collectAsStateWithLifecycle()
     KeepScreenOn()
     LockScreenOrientation()
@@ -73,6 +76,7 @@ fun VideoGamePlayScreen(contract: VideoGamePlayContract) {
         selections = selections,
         sugarLevel = sugarLevel,
         votingTooltipVisible = votingTooltipVisible,
+        noHostTooltipVisible = noHostTooltipVisible,
         onPlayerSelected = contract::selectPlayer,
         onBanPlayer = contract::banPlayer,
         onUnbanPlayer = contract::unbanPlayer
@@ -92,6 +96,7 @@ private fun VideoGamePlayScreenInternal(
     sugarLevel: Float,
     onPlayerSelected: (PlayerUiModel) -> Unit,
     votingTooltipVisible: Boolean,
+    noHostTooltipVisible: Boolean,
     onBanPlayer: (AccountId) -> Unit,
     onUnbanPlayer: (AccountId) -> Unit
 ) {
@@ -112,6 +117,7 @@ private fun VideoGamePlayScreenInternal(
                     )
                 }
 
+                is VideoGameUiState.Connecting,
                 is VideoGameUiState.HostIntroduction,
                 is VideoGameUiState.Hosting,
                 is VideoGameUiState.HostReset -> {
@@ -128,9 +134,16 @@ private fun VideoGamePlayScreenInternal(
                         )
                     }
 
+                    WaitingRoomBackground(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(GameColors.backgroundPrimary),
+                        isVisible = state is VideoGameUiState.Connecting,
+                    )
+
                     DiagonalStripeBackground(
                         modifier = Modifier.fillMaxSize(),
-                        isVisible = state !is VideoGameUiState.WaitingRoom,
+                        isVisible = state !is VideoGameUiState.Connecting,
                         isIntroAnimating = state is VideoGameUiState.HostIntroduction
                     )
 
@@ -144,23 +157,33 @@ private fun VideoGamePlayScreenInternal(
 
                         players.forEach { player ->
                             key(player.accountId) {
-                                PlayerCell(
-                                    modifier = Modifier
-                                        .zIndex(player.zIndex)
-                                        .layoutId(player.referenceId),
-                                    state = state,
-                                    player = player,
-                                    onClick = { onPlayerSelected(player) },
-                                    isSelected = player.accountId in selections,
-                                    onBanToggle = {
-                                        if (player.isBanned) {
-                                            onUnbanPlayer(player.accountId)
-                                        } else {
-                                            onBanPlayer(player.accountId)
-                                        }
-                                    },
-                                    sugarLevel = if (player.isCurrentPlayer) sugarLevel else 0f
-                                )
+                                val cellModifier = Modifier
+                                    .zIndex(player.zIndex)
+                                    .layoutId(player.referenceId)
+
+                                if (state is VideoGameUiState.Connecting) {
+                                    ConnectionPlayerCell(
+                                        modifier = cellModifier,
+                                        player = player,
+                                        revealCamera = state.camerasRevealed,
+                                    )
+                                } else {
+                                    PlayerCell(
+                                        modifier = cellModifier,
+                                        state = state,
+                                        player = player,
+                                        onClick = { onPlayerSelected(player) },
+                                        isSelected = player.accountId in selections,
+                                        onBanToggle = {
+                                            if (player.isBanned) {
+                                                onUnbanPlayer(player.accountId)
+                                            } else {
+                                                onBanPlayer(player.accountId)
+                                            }
+                                        },
+                                        sugarLevel = if (player.isCurrentPlayer) sugarLevel else 0f
+                                    )
+                                }
                             }
                         }
 
@@ -187,6 +210,14 @@ private fun VideoGamePlayScreenInternal(
                             onClick = onOpenTutorialClicked
                         )
 
+                        ConnectingCountdown(
+                            modifier = Modifier
+                                .navigationBarsPadding()
+                                .padding(bottom = PolkadotTheme.spacings.large)
+                                .layoutId(ConnectingCountdownLayoutId),
+                            state = state
+                        )
+
                         SubroundProgressBar(
                             modifier = Modifier
                                 .navigationBarsPadding()
@@ -204,13 +235,6 @@ private fun VideoGamePlayScreenInternal(
                                 else -> 0f
                             }
                         )
-
-                        GameTopBar(
-                            modifier = Modifier
-                                .statusBarsPadding()
-                                .layoutId(GameTopBarLayoutId),
-                            onAction = onCollapse
-                        )
                     }
 
                     VideoGameVotingTooltip(
@@ -220,10 +244,16 @@ private fun VideoGamePlayScreenInternal(
                             .statusBarsPadding(),
                         visible = votingTooltipVisible
                     )
+
+                    HostUnavailableTooltip(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = PolkadotTheme.spacings.small)
+                            .statusBarsPadding(),
+                        visible = noHostTooltipVisible
+                    )
                 }
             }
-
-            HostUnavailableOverlay(state, players)
 
             VideoGameTutorialOverlay(tutorialState, onCloseTutorialClicked)
         }
@@ -234,11 +264,13 @@ private fun createConstraintSet(
     state: VideoGameUiState,
     players: ImmutableList<PlayerUiModel>,
 ) = ConstraintSet {
-    createCommonVideoGameConstraints()
-
     val (anchorLeft, anchorRight) = setupGridAnchors()
 
     when (state) {
+        is VideoGameUiState.Connecting -> {
+            createConnectingConstraints(players, anchorLeft, anchorRight, state.camerasRevealed)
+        }
+
         is VideoGameUiState.HostIntroduction -> {
             createHostIntroductionConstraints(players)
         }
@@ -258,6 +290,55 @@ private fun createConstraintSet(
         VideoGameUiState.Error -> Unit // TODO: should not happen, but if it does, we need to create new layout
     }
 }
+
+@Preview
+@Composable
+private fun ConnectingPreview() {
+    PolkadotTheme {
+        CompositionLocalProvider(
+            LocalTimeFormatter provides TimeFormatter.mocked(LocalContext.current)
+        ) {
+            VideoGamePlayScreenInternal(
+                state = VideoGameUiState.Connecting(timeLeft = 5.seconds),
+                tutorialState = VideoGameTutorialState.Hidden,
+                players = persistentListOf(
+                    previewConnectingPlayer(0, PlayerConnectionState.Connected, isCurrentPlayer = true),
+                    previewConnectingPlayer(1, PlayerConnectionState.Connecting),
+                    previewConnectingPlayer(2, PlayerConnectionState.Connected),
+                    previewConnectingPlayer(3, PlayerConnectionState.Disconnected),
+                    previewConnectingPlayer(4, PlayerConnectionState.Connecting),
+                    previewConnectingPlayer(5, PlayerConnectionState.Disconnected)
+                ),
+                stages = VideoGameStages.Empty,
+                onCollapse = { },
+                onOpenTutorialClicked = { },
+                onCloseTutorialClicked = { },
+                selections = persistentSetOf(),
+                sugarLevel = 0f,
+                onPlayerSelected = { },
+                votingTooltipVisible = false,
+                noHostTooltipVisible = false,
+                onBanPlayer = {},
+                onUnbanPlayer = {}
+            )
+        }
+    }
+}
+
+private fun previewConnectingPlayer(
+    seed: Byte,
+    connection: PlayerConnectionState,
+    isCurrentPlayer: Boolean = false,
+) = PlayerUiModel(
+    accountId = byteArrayOf(seed).toDataByteArray(),
+    videoTrack = null,
+    connection = connection,
+    isHost = false,
+    isCurrentPlayer = isCurrentPlayer,
+    showGestureHintTooltip = false,
+    isBanned = false,
+    isSelectable = false,
+)
 
 @Preview
 @Composable
@@ -289,6 +370,7 @@ private fun TooltipsPreview() {
                     sugarLevel = 0f,
                     onPlayerSelected = { },
                     votingTooltipVisible = false,
+                    noHostTooltipVisible = true,
                     onBanPlayer = {},
                     onUnbanPlayer = {}
                 )

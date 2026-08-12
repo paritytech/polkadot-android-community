@@ -1,10 +1,11 @@
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 
 plugins {
-    alias(libs.plugins.kotlin.compose)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
-    alias(libs.plugins.dagger.hilt)
 }
 
 android {
@@ -23,15 +24,12 @@ android {
 dependencies {
     api(project(":feature:videogame:api"))
 
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
-
     implementation(libs.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.fragment.ktx)
 
     implementation(project(":design"))
     implementation(project(":database"))
-    implementation(project(":bindings:airdrop-vrf"))
+    implementation(project(":bindings:sr25519-vrf"))
     implementation(project(":feature:members:api"))
     implementation(project(":feature:people:api"))
     implementation(project(":feature:tokens:api"))
@@ -47,6 +45,7 @@ dependencies {
     implementation(project(":feature:upgrade-username:api"))
     implementation(project(":feature:chain-resources:api"))
     implementation(project(":feature:dotns:api"))
+    implementation(project(":feature:products:api"))
     implementation(project(":tools:remoteconfig:api"))
     implementation(project(":feature:usernames:api"))
 

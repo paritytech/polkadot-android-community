@@ -20,9 +20,9 @@ class IdentityRegistrationUpdater @Inject constructor(
     storageCache: StorageCache,
     private val accountRepository: AccountRepository
 ) : SingleStorageKeyUpdater<MetaAccount>(scope, chainRegistry, storageCache) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String {
         val identityAccount = accountRepository.getAliasAccount(BandersnatchContext.IDENTITY)
-        return runtime.metadata.identity.identityOf.storageKey(identityAccount.accountIdIn(chain))
+        return withRuntime.runtime.metadata.identity.identityOf.storageKey(identityAccount.accountIdIn(chain))
     }
 }

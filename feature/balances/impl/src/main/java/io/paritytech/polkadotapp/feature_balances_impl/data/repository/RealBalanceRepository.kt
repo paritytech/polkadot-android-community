@@ -49,7 +49,7 @@ internal class RealBalanceRepository @Inject constructor(
             .first()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun observeBalanceHolds(chainId: ChainId, accountId: AccountId): Flow<List<BalanceHold>> {
         return computationalCache.useSharedFlow("BalanceHolds", chainId, accountId.value.toHexString()) {
             remoteStorageDataSource.subscribe(chainId) {

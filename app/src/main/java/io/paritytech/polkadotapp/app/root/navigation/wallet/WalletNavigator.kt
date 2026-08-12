@@ -33,9 +33,6 @@ class PocketNavigator @Inject constructor(
     override fun openScanAddressQr() =
         performNavigation(R.id.action_sendPaymentFragment_to_scanAddressQrFragment)
 
-    override fun openScan() =
-        performNavigation(R.id.action_global_to_scan_graph)
-
     override fun openSelectFundAsset() =
         performNavigation(R.id.action_global_to_fund_graph)
 

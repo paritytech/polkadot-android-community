@@ -12,7 +12,7 @@ class VideoGameSettingsPreferences @Inject constructor(
     private val preferences: Preferences
 ) {
     fun getAlarmOffset(): GameStartAlarmOffset {
-        val seconds = preferences.getInt(KEY_ALARM_OFFSET_SECONDS, GameStartAlarmOffset.TEN_SECONDS.seconds)
+        val seconds = preferences.getInt(KEY_ALARM_OFFSET_SECONDS, GameStartAlarmOffset.DEFAULT.seconds)
         return GameStartAlarmOffset.fromSeconds(seconds)
     }
 

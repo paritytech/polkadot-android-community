@@ -1,18 +1,9 @@
-build:
-  maxIssues: 0
-  excludeCorrectable: false
-  weights:
-    # complexity: 2
-    # LongParameterList: 1
-    # style: 1
-    # comments: 1
-
 config:
   validation: true
   warningsAsErrors: false
   checkExhaustiveness: false
   # when writing own rules with new properties, exclude the property path e.g.: 'my_rule_set,.*>.*>[my_property]'
-  excludes: ''
+  excludes: []
 
 processors:
   active: true
@@ -41,24 +32,15 @@ console-reports:
      - 'FileBasedFindingsReport'
   #  - 'LiteFindingsReport'
 
-output-reports:
-  active: true
-  exclude:
-  # - 'TxtOutputReport'
-  # - 'XmlOutputReport'
-  # - 'HtmlOutputReport'
-  # - 'MdOutputReport'
-  # - 'SarifOutputReport'
-
 comments:
   active: true
   AbsentOrWrongFileLicense:
     active: false
-    licenseTemplateFile: 'license.template'
+    licenseTemplate: 'license.template'
     licenseTemplateIsRegex: false
-  CommentOverPrivateFunction:
+  DocumentationOverPrivateFunction:
     active: false
-  CommentOverPrivateProperty:
+  DocumentationOverPrivateProperty:
     active: false
   DeprecatedBlockTag:
     active: false
@@ -95,21 +77,21 @@ complexity:
   active: true
   CognitiveComplexMethod:
     active: false
-    threshold: 15
+    allowedComplexity: 15
   ComplexCondition:
     # TODO: Enable after addressing complexity issues
     active: false
-    threshold: 4
+    allowedConditions: 4
   ComplexInterface:
     active: false
-    threshold: 10
+    allowedDefinitions: 10
     includeStaticDeclarations: false
     includePrivateDeclarations: false
     ignoreOverloaded: false
   CyclomaticComplexMethod:
     # TODO: Enable after refactoring complex methods
     active: false
-    threshold: 15
+    allowedComplexity: 15
     ignoreSingleWhenExpression: false
     ignoreSimpleWhenEntries: false
     ignoreNestingFunctions: false
@@ -128,32 +110,32 @@ complexity:
     ignoredLabels: []
   LargeClass:
     active: true
-    threshold: 600
+    allowedLines: 600
   LongMethod:
     # TODO: Enable after refactoring long methods
     active: false
-    threshold: 60
+    allowedLines: 60
   LongParameterList:
     active: false
-    functionThreshold: 6
-    constructorThreshold: 7
+    allowedFunctionParameters: 6
+    allowedConstructorParameters: 7
     ignoreDefaultParameters: false
     ignoreDataClasses: true
     ignoreAnnotatedParameter: []
   MethodOverloading:
     active: false
-    threshold: 6
+    allowedOverloads: 6
   NamedArguments:
     active: false
-    threshold: 3
+    allowedArguments: 3
     ignoreArgumentsMatchingNames: false
   NestedBlockDepth:
     # TODO: Enable after reducing block nesting depth
     active: false
-    threshold: 4
+    allowedDepth: 4
   NestedScopeFunctions:
     active: false
-    threshold: 1
+    allowedDepth: 1
     functions:
       - 'kotlin.apply'
       - 'kotlin.run'
@@ -165,19 +147,19 @@ complexity:
   StringLiteralDuplication:
     active: false
     excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**']
-    threshold: 3
+    allowedDuplications: 3
     ignoreAnnotation: true
-    excludeStringsWithLessThan5Characters: true
+    allowedWithLengthLessThan: true
     ignoreStringsRegex: '$^'
   TooManyFunctions:
     # TODO: Enable after breaking down classes with too many functions
     active: false
     excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**']
-    thresholdInFiles: 11
-    thresholdInClasses: 11
-    thresholdInInterfaces: 11
-    thresholdInObjects: 11
-    thresholdInEnums: 11
+    allowedFunctionsPerFile: 11
+    allowedFunctionsPerClass: 11
+    allowedFunctionsPerInterface: 11
+    allowedFunctionsPerObject: 11
+    allowedFunctionsPerEnum: 11
     ignoreDeprecated: false
     ignorePrivate: false
     ignoreOverridden: false
@@ -231,7 +213,7 @@ empty-blocks:
     active: true
   EmptyInitBlock:
     active: true
-  EmptyKtFile:
+  EmptyKotlinFile:
     active: true
   EmptySecondaryConstructor:
     active: true
@@ -241,6 +223,88 @@ empty-blocks:
     active: true
   EmptyWhileBlock:
     active: true
+
+Compose:
+  ComposableAnnotationNaming:
+    active: false
+  ComposableNaming:
+    active: false
+  ComposableNestingDepth:
+    active: false
+  ComposableParamOrder:
+    active: false
+  CompositionLocalAllowlist:
+    active: false
+  CompositionLocalNaming:
+    active: true
+  ConditionHoist:
+    active: false
+  ContentEmitterReturningValues:
+    active: true
+  ContentSlotReused:
+    active: false
+  ContentTrailingLambda:
+    active: false
+  DefaultsVisibility:
+    active: false
+  InvalidReadOnlyComposable:
+    active: false
+  LambdaParameterEventTrailing:
+    active: false
+  LambdaParameterInRestartableEffect:
+    active: false
+  Material2:
+    active: true
+  MissingReadOnlyComposable:
+    active: false
+  ModifierClickableOrder:
+    active: false
+  ModifierComposed:
+    active: true
+  ModifierMissing:
+    active: false
+  ModifierNaming:
+    active: true
+  ModifierNotUsedAtRoot:
+    active: false
+  ModifierReused:
+    active: true
+  ModifierWithoutDefault:
+    active: false
+  MultipleEmitters:
+    active: false
+  MutableParams:
+    active: true
+  MutableStateAutoboxing:
+    active: false
+  MutableStateParam:
+    active: true
+  ParameterNaming:
+    active: false
+  PreviewAnnotationNaming:
+    active: false
+  PreviewNaming:
+    active: false
+  PreviewPublic:
+    active: false
+  RememberContentMissing:
+    active: false
+  RememberMissing:
+    active: true
+  StaleRememberUpdatedStateInRemember:
+    active: false
+  StateParam:
+    active: false
+  UnnecessaryComposable:
+    active: true
+  UnstableCollections:
+    active: true
+  VarsWithoutStateBacking:
+    active: true
+  ViewModelForwarding:
+    active: true
+  ViewModelInjection:
+    active: false
 
 exceptions:
   active: true
@@ -335,10 +399,10 @@ naming:
   ForbiddenClassName:
     active: false
     forbiddenName: []
-  FunctionMaxLength:
+  FunctionNameMaxLength:
     active: false
     maximumFunctionNameLength: 30
-  FunctionMinLength:
+  FunctionNameMinLength:
     active: false
     minimumFunctionNameLength: 3
   FunctionNaming:
@@ -416,7 +480,7 @@ performance:
     active: true
   CouldBeSequence:
     active: false
-    threshold: 3
+    allowedOperations: 3
   ForEachOnRange:
     active: true
     excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**']
@@ -617,8 +681,7 @@ style:
     allowedPatterns: ''
   ForbiddenImport:
     active: false
-    imports: []
-    forbiddenPatterns: ''
+    forbiddenImports: []
   ForbiddenMethodCall:
     active: false
     methods:
@@ -674,7 +737,7 @@ style:
     excludeImportStatements: true
     excludeCommentStatements: false
     excludeRawStrings: true
-  MayBeConst:
+  MayBeConstant:
     # TODO: Enable after marking appropriate properties as const
     active: false
   ModifierOrder:
@@ -701,15 +764,13 @@ style:
     active: true
   OptionalUnit:
     active: false
-  PreferToOverPairSyntax:
-    active: false
   ProtectedMemberInFinalClass:
     active: true
   RedundantExplicitType:
     active: false
   RedundantHigherOrderMapUsage:
     active: true
-  RedundantVisibilityModifierRule:
+  RedundantVisibilityModifier:
     active: false
   ReturnCount:
     # TODO: Enable after reducing return statements
@@ -724,7 +785,7 @@ style:
     active: true
   SerialVersionUIDInSerializableClass:
     active: true
-  SpacingBetweenPackageAndImports:
+  SpacingAfterPackageAndImports:
     active: false
   StringShouldBeRawString:
     active: false
@@ -745,10 +806,6 @@ style:
     active: false
     acceptableLength: 4
     allowNonStandardGrouping: false
-  UnnecessaryAbstractClass:
-    active: true
-  UnnecessaryAnnotationUseSiteTarget:
-    active: false
   UnnecessaryApply:
     active: true
   UnnecessaryBackticks:
@@ -766,7 +823,7 @@ style:
   UnnecessaryParentheses:
     active: false
     allowForUnclearPrecedence: false
-  UntilInsteadOfRangeTo:
+  RangeUntilInsteadOfRangeTo:
     active: false
   UnusedParameter:
     # TODO: Enable after removing unused parameters or naming them properly
@@ -774,10 +831,6 @@ style:
     allowedNames: 'ignored|expected'
   UnusedPrivateClass:
     active: true
-  UnusedPrivateMember:
-    # TODO: Enable after removing unused private members
-    active: false
-    allowedNames: ''
   UnusedPrivateProperty:
     # TODO: Enable after removing unused private properties
     active: false
@@ -825,7 +878,7 @@ style:
     excludeImports:
       - 'java.util.*'
 
-formatting:
+ktlint:
   active: true
   autoCorrect: true
   AnnotationOnSeparateLine:

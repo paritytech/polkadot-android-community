@@ -20,10 +20,10 @@ internal class TransactionStorageAuthorizationUpdater(
     chainRegistry = chainRegistry,
     storageCache = storageCache,
 ) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String {
         val accountId = scopeValue.accountIdIn(chain)
         val authScope = TransactionStorageAuthorizationScope.Account(accountId)
-        return runtime.metadata.transactionStorage.authorizations.storageKey(authScope)
+        return withRuntime.runtime.metadata.transactionStorage.authorizations.storageKey(authScope)
     }
 }

@@ -3,9 +3,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.sessions
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.data.memory.MapCache
-import io.paritytech.polkadotapp.common.data.os.OperatingSystem
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.CollectionDiffer
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.Identifiable
@@ -16,32 +14,24 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
-import io.paritytech.polkadotapp.feature_calls_api.domain.CallController
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
-import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushToken
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSession
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSessionManager
 import io.paritytech.polkadotapp.feature_chats_api.domain.isMultiDeviceChatSupported
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageReaction
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactAccountId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactDevice
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
 import io.paritytech.polkadotapp.feature_chats_api.domain.sessions.ContactChatSessionRefCounter
 import io.paritytech.polkadotapp.feature_chats_api.domain.sessions.withSessionsEnabled
-import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.download.FileDownloadStarter
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
-import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileDownloadRepository
-import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ProcessedChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
-import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileDownload
+import io.paritytech.polkadotapp.feature_chats_impl.domain.compaction.ChatMessageCompactor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.PushSubscriptionSynchronizer
+import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
 import io.paritytech.polkadotapp.feature_statement_store_api.data.encryption.CommunicationEncryption
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSessionCreator
@@ -81,7 +71,6 @@ private data class ContactWithSessionType(
 internal class RealContactChatSessionManager @Inject constructor(
     private val sessionCreatorFactory: CommunicationSessionCreator.Factory,
     private val chatMessageRepository: ChatMessageRepository,
-    private val processedChatMessageRepository: ProcessedChatMessageRepository,
     private val contactsRepository: ContactsRepository,
     private val accountRepository: AccountRepository,
     private val knownChains: KnownChains,
@@ -90,17 +79,16 @@ internal class RealContactChatSessionManager @Inject constructor(
     private val chatPushNotificationsSender: ChatPushNotificationsSender,
     private val encryptionFactory: CommunicationEncryption.Factory,
     private val chatEngine: ChatEngine,
-    private val callController: CallController,
-    private val fallbackUsernameGenerator: FallbackUsernameGenerator,
-    private val fileDownloadRepository: FileDownloadRepository,
-    private val fileDownloadStarter: FileDownloadStarter,
     private val contactDevicesRepository: ContactDevicesRepository,
     private val refCounter: ContactChatSessionRefCounter,
     private val pushSubscriptionSynchronizer: PushSubscriptionSynchronizer,
+    private val syncContactUsernameUseCase: SyncContactUsernameUseCase,
+    private val chatMessageCompactor: ChatMessageCompactor,
+    private val incomingChatMessageProcessor: IncomingChatMessageProcessor,
     dispatchers: CoroutineDispatchers
 ) : ContactChatSessionManager, CoroutineScope, ChatSessionCallbacks {
     companion object {
-        private val MAX_STATEMENT_SIZE = 2.kilobytes
+        private val MAX_STATEMENT_SIZE = 100.kilobytes
     }
 
     override val coroutineContext = dispatchers.io + SupervisorJob()
@@ -139,30 +127,6 @@ internal class RealContactChatSessionManager @Inject constructor(
         subscribeToTokenUpdates()
     }
 
-    override suspend fun onChatTokenReceived(
-        accountId: AccountId,
-        token: ChatPushToken,
-        operatingSystem: OperatingSystem,
-        isVoIP: Boolean
-    ) {
-        val contact = contactsRepository.getContact(accountId)
-        Timber.d("onChatTokenReceived: contact=${contact?.username}, isVoIP=$isVoIP, hadToken=${contact?.pushToken != null}, tokenChanged=${contact?.pushToken != token}")
-
-        if (isVoIP) {
-            contactsRepository.updateContactVoipPushToken(accountId, token)
-        } else {
-            contactsRepository.updateContactPushToken(accountId, token, operatingSystem)
-        }
-    }
-
-    override suspend fun onMessageReaction(reaction: ChatMessageReaction, chatId: ChatId) {
-        chatMessageRepository.addReaction(reaction, chatId)
-    }
-
-    override suspend fun onMessageReactionRemoved(reaction: ChatMessageReaction, chatId: ChatId) {
-        chatMessageRepository.removeMessageReaction(reaction, chatId)
-    }
-
     override suspend fun onShouldNotifyNewMessageSent(
         messageId: ChatMessageId,
         accountId: AccountId,
@@ -187,42 +151,6 @@ internal class RealContactChatSessionManager @Inject constructor(
                 Timber.i("Contact ${contact.username} has no pushToken, cannot send notification")
             }
         }
-    }
-
-    override suspend fun onPeerLeftChatReceived(accountId: AccountId) {
-        contactsRepository.setPeerLeft(accountId, true)
-    }
-
-    override suspend fun onPeerAddedChatReceived(accountId: AccountId) {
-        contactsRepository.setPeerLeft(accountId, false)
-    }
-
-    override suspend fun onIncomingCallReceived(
-        chatId: ChatId,
-        messageId: ChatMessageId,
-        callerName: String,
-        withVideo: Boolean,
-    ) {
-        callController.initiateIncomingCall(
-            chatId = chatId,
-            offerId = messageId,
-            callerName = callerName,
-            withVideo = withVideo,
-        )
-    }
-
-    override suspend fun onAttachmentReceived(
-        chatId: ChatId,
-        messageId: ChatMessageId,
-        identifier: DataByteArray,
-        ticket: HopTicket,
-        nodeUrl: String,
-        mimeType: String
-    ) {
-        fileDownloadRepository.addDownloadToQueue(
-            FileDownload.new(messageId, chatId, identifier, ticket, nodeUrl, mimeType)
-        )
-        fileDownloadStarter.startDownloading()
     }
 
     // TODO: should be removed when fully migrated to push-notifications v2
@@ -321,10 +249,10 @@ internal class RealContactChatSessionManager @Inject constructor(
             contact = contact,
             communicationSessions = communicationSessions,
             chatMessageRepository = chatMessageRepository,
-            processedChatMessageRepository = processedChatMessageRepository,
             callbacks = this,
             chatEngine = chatEngine,
-            fallbackUsernameGenerator = fallbackUsernameGenerator
+            syncContactUsernameUseCase = syncContactUsernameUseCase,
+            incomingChatMessageProcessor = incomingChatMessageProcessor
         )
 
         invalidateContact(chatSession, contact)
@@ -412,6 +340,7 @@ internal class RealContactChatSessionManager @Inject constructor(
                     perDeviceEncryption = perDeviceEncryption,
                     identityChatDomain = contact.sharedSecretDerivationDomain,
                     maxStatementSize = MAX_STATEMENT_SIZE,
+                    compactor = chatMessageCompactor,
                 )
 
                 val identitySession = sessionCreatorWithAccount.creator.createSession(
@@ -420,6 +349,7 @@ internal class RealContactChatSessionManager @Inject constructor(
                     remoteAccount = remoteAccount,
                     encryption = identityEncryption,
                     maxStatementSize = MAX_STATEMENT_SIZE,
+                    compactor = chatMessageCompactor,
                 )
 
                 CommunicationSessions.MultiDevice(main = mainSession, identity = identitySession)
@@ -432,6 +362,7 @@ internal class RealContactChatSessionManager @Inject constructor(
                     remoteAccount = remoteAccount,
                     encryption = identityEncryption,
                     maxStatementSize = MAX_STATEMENT_SIZE,
+                    compactor = chatMessageCompactor,
                 )
                 CommunicationSessions.Pairwise(session)
             }

@@ -17,19 +17,18 @@ import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnCh
 @JvmInline
 value class AirdropApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.airdrop: AirdropApi
     get() = AirdropApi(moduleOrNull(AIRDROP_MODULE) ?: module(NEW_AIRDROP_MODULE))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val AirdropApi.events: QueryableStorageEntry1<AirdropEventKey, OnChainActiveEvent>
     get() = storage1("Events")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val AirdropApi.registrations: QueryableStorageEntry2<AirdropEventKey, TicketSlot, OnChainAirdropRegistrationEntry>
     get() = storage2("Registrations")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val AirdropApi.winners: QueryableStorageEntry2<AirdropEventKey, OnChainAirdropRegistrationEntry, TicketSlot>
     get() = storage2("Winners")
 

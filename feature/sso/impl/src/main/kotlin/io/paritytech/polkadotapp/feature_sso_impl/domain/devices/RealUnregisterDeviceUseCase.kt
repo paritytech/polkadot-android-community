@@ -2,15 +2,15 @@ package io.paritytech.polkadotapp.feature_sso_impl.domain.devices
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.feature_chain_resources_api.domain.slotAllocator.SlotAllocator
 import io.paritytech.polkadotapp.feature_chats_api.domain.devices.BroadcastDeviceLifecycleUseCase
 import io.paritytech.polkadotapp.feature_sso_api.domain.devices.UnregisterDeviceUseCase
 import io.paritytech.polkadotapp.feature_sso_impl.data.repository.SsoSessionRepository
 import io.paritytech.polkadotapp.feature_sso_impl.domain.SsoService
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementStoreSlotAllocator
 import javax.inject.Inject
 
 class RealUnregisterDeviceUseCase @Inject constructor(
-    private val slotAllocator: SlotAllocator,
+    private val slotAllocator: StatementStoreSlotAllocator,
     private val ssoService: SsoService,
     private val ssoSessionRepository: SsoSessionRepository,
     private val broadcastDeviceLifecycleUseCase: BroadcastDeviceLifecycleUseCase,

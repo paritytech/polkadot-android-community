@@ -35,25 +35,32 @@ abstract class ChatRoomDao {
     @Query(
         """
         SELECT r.id AS chatId, r.createdAt, r.name AS roomName, r.icon AS roomIcon,
-               COALESCE(summary.unseenCount, 0) AS unseenCount,
-               COALESCE(summary.hasUnseenReaction, 0) AS hasUnseenReaction,
+               COALESCE(counts.unseenCount, 0) AS unseenCount,
+               COALESCE(counts.hasUnseenReaction, 0) AS hasUnseenReaction,
                m.id AS msg_id, m.chatId AS msg_chatId, m.timestamp AS msg_timestamp,
                m.updatedAt AS msg_updatedAt,
                m.origintype AS msg_origintype, m.originkey AS msg_originkey,
-               m.status AS msg_status, m.type AS msg_type,
-               m.searchableContent AS msg_searchableContent, m.content AS msg_content,
+               m.status AS msg_status, COALESCE(rev.type, m.type) AS msg_type,
+               m.searchableContent AS msg_searchableContent,
+               COALESCE(rev.content, m.content) AS msg_content,
                m.replyToMessageId AS msg_replyToMessageId, m.isInternal AS msg_isInternal
         FROM chat_rooms r
         LEFT JOIN (
             SELECT chatId,
                    COUNT(CASE WHEN status = 'NEW' AND origintype != 'USER' THEN 1 END) AS unseenCount,
-                   MAX(CASE WHEN type IN ('REACTED', 'REACTION_REMOVED') AND status = 'NEW' AND origintype != 'USER' THEN 1 ELSE 0 END) AS hasUnseenReaction,
-                   MAX(timestamp) AS lastTimestamp,
-                   id AS lastMessageId
+                   MAX(CASE WHEN type IN ('REACTED', 'REACTION_REMOVED') AND status = 'NEW' AND origintype != 'USER' THEN 1 ELSE 0 END) AS hasUnseenReaction
             FROM chat_messages WHERE isInternal = 0
             GROUP BY chatId
-        ) summary ON summary.chatId = r.id
-        LEFT JOIN chat_messages m ON m.id = summary.lastMessageId
+        ) counts ON counts.chatId = r.id
+        LEFT JOIN chat_messages m ON m.id = (
+            SELECT lm.id FROM chat_messages lm
+            WHERE lm.chatId = r.id AND lm.isInternal = 0 AND lm.type != 'EDITED'
+            ORDER BY lm.timestamp DESC
+            LIMIT 1
+        )
+        LEFT JOIN message_revisions rev ON rev.messageId = m.id AND rev.timestamp = (
+            SELECT MAX(r2.timestamp) FROM message_revisions r2 WHERE r2.messageId = m.id
+        )
         ORDER BY COALESCE(m.timestamp, r.createdAt) DESC
         """
     )

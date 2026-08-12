@@ -34,6 +34,7 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatMessag
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.defaultTextColor
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.LocalChatMessageTimeFormatter
+import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -345,7 +346,7 @@ private fun previewTextMessage(
         origin = ChatMessageOrigin.User,
         text = "",
         replyPreview = null,
-        reactions = emptyList(),
+        reactions = persistentListOf(),
         isEdited = false
     )
 }

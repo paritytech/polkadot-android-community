@@ -20,10 +20,10 @@ import javax.inject.Inject
 import kotlin.time.Duration
 
 interface VideoGamePlayInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeGameTimeline(): Flow<Duration>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun trySaveVotes(
         round: VideoGameProcessState.Round,
         connectedPlayers: Set<AccountId>,
@@ -59,12 +59,12 @@ class RealVideoGamePlayInteractor @Inject constructor(
     private val bannedPlayersRepository: BannedPlayersRepository,
     private val gestureAcceptanceChannel: GestureAcceptanceChannel
 ) : VideoGamePlayInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeGameTimeline(): Flow<Duration> {
         return timelineService.currentActiveGameTimeline()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun trySaveVotes(
         round: VideoGameProcessState.Round,
         connectedPlayers: Set<AccountId>,

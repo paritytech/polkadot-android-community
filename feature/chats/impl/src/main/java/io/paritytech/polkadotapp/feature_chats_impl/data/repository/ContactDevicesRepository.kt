@@ -2,7 +2,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.repository
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
-import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.database.dao.ContactDeviceDao
 import io.paritytech.polkadotapp.database.model.ContactDeviceLocal
@@ -64,7 +64,7 @@ private fun ContactDeviceLocal.toDomain(): ContactDevice {
     return ContactDevice(
         contactAccountId = contactAccountId.intoAccountId(),
         statementAccountId = statementAccountId.intoAccountId(),
-        encryptionPublicKey = encryptionPublicKey.toDataByteArray(),
+        encryptionPublicKey = encryptionPublicKey.requireX25519PublicKey(),
     )
 }
 
@@ -72,6 +72,6 @@ private fun ContactDevice.toLocal(): ContactDeviceLocal {
     return ContactDeviceLocal(
         contactAccountId = contactAccountId.value,
         statementAccountId = statementAccountId.value,
-        encryptionPublicKey = encryptionPublicKey.value,
+        encryptionPublicKey = encryptionPublicKey.bytes.value,
     )
 }

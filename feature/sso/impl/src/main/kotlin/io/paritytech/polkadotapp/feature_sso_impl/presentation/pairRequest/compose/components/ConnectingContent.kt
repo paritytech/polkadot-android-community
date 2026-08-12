@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_sso_impl.presentation.pairRequest.compose.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import io.paritytech.polkadotapp.common.R as RCommon
 internal fun ConnectingContent(
     device: PairRequestDeviceUiModel,
     step: ConnectingStep,
+    stallReport: @Composable () -> Unit,
     onCancelClicked: () -> Unit,
 ) {
     PairRequestDialogColumn(verticalArrangement = Arrangement.spacedBy(48.dp)) {
@@ -29,7 +31,11 @@ internal fun ConnectingContent(
 
         PairRequestDeviceHeader(device = device)
 
-        ProgressCard(currentStep = step)
+        Column(verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.mediumIncreased)) {
+            ProgressCard(currentStep = step)
+
+            stallReport()
+        }
 
         PairRequestTwoActionRow(
             cancelEnabled = false,

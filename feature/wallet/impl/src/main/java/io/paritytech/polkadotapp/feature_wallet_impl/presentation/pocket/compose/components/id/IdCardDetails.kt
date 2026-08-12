@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.id
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,12 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.Scanner
 import io.paritytech.polkadotapp.design.components.icon.vectors.Share
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
@@ -27,7 +23,6 @@ import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.PocketRank
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.IdCardDetailsViewModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.IdShareQrCard
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketCardSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketContentSlide
@@ -39,27 +34,16 @@ import io.paritytech.polkadotapp.common.R as RCommon
 fun IdCardDetails(
     card: PocketCardUiModel.IdCard,
     onBack: () -> Unit,
+    onShareClick: () -> Unit,
     cardIndex: Int,
 ) {
-    val context = LocalContext.current
-    val viewModel = hiltViewModel<IdCardDetailsViewModel>()
-
-    val onShareClick: () -> Unit = {
-        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "${card.username}\n${card.address}")
-        }
-        runCatching { context.startActivity(Intent.createChooser(sendIntent, null)) }
-    }
-
     BackHandler { onBack() }
 
     IdCardDetailsContent(
         card = card,
         onBack = onBack,
-        cardIndex = cardIndex,
         onShareClick = onShareClick,
-        onOpenScanner = viewModel::openScanner
+        cardIndex = cardIndex
     )
 }
 
@@ -67,9 +51,8 @@ fun IdCardDetails(
 private fun IdCardDetailsContent(
     card: PocketCardUiModel.IdCard,
     onBack: () -> Unit,
-    cardIndex: Int,
     onShareClick: () -> Unit,
-    onOpenScanner: () -> Unit
+    cardIndex: Int
 ) {
     Column(
         modifier = Modifier.fillMaxSize()
@@ -82,10 +65,6 @@ private fun IdCardDetailsContent(
                 rememberTopBarAction(
                     action = onShareClick,
                     icon = NovaIcons.Share
-                ),
-                rememberTopBarAction(
-                    action = onOpenScanner,
-                    icon = NovaIcons.Scanner
                 )
             )
         )
@@ -129,9 +108,9 @@ private fun IdCardDetailsContent(
                     )
 
                     IdShareQrCard(
+                        modifier = Modifier.padding(horizontal = PolkadotTheme.spacings.mediumIncreased),
                         username = card.username,
-                        address = card.address,
-                        modifier = Modifier.padding(horizontal = PolkadotTheme.spacings.mediumIncreased)
+                        address = card.address
                     )
 
                     VerticalSpacer { mediumIncreased }
@@ -141,16 +120,15 @@ private fun IdCardDetailsContent(
     }
 }
 
-@Preview
+@Preview(apiLevel = 31)
 @Composable
 private fun IdCardDetailsPreview() {
     PolkadotTheme {
         IdCardDetailsContent(
-            card = PocketCardUiModel.IdCard("username.99", "pizza", PocketRank.Basic),
+            card = PocketCardUiModel.IdCard("username.99", "pizza", PocketRank.Member),
             onBack = {},
-            cardIndex = 0,
             onShareClick = {},
-            onOpenScanner = {}
+            cardIndex = 0
         )
     }
 }

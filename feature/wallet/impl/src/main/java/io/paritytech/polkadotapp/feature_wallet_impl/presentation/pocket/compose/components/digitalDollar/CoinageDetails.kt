@@ -39,6 +39,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUse
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUseSecured
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.tokenAmount
+import kotlinx.collections.immutable.ImmutableList
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,7 +52,7 @@ private enum class VoucherSortMode { INDEX_DESC, INDEX_ASC, VALUE_DESC, VALUE_AS
 
 @Composable
 internal fun CoinsListSheetContent(
-    coins: List<Coin>,
+    coins: ImmutableList<Coin>,
     onForceRecycleClick: (Coin) -> Unit
 ) {
     var sortMode by remember { mutableStateOf(CoinSortMode.INDEX_DESC) }
@@ -167,7 +168,7 @@ internal fun CoinsListSheetContent(
 
 @Composable
 internal fun VouchersListSheetContent(
-    vouchers: List<RecyclerVoucher>
+    vouchers: ImmutableList<RecyclerVoucher>
 ) {
     var sortMode by remember { mutableStateOf(VoucherSortMode.INDEX_DESC) }
 

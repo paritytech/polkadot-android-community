@@ -5,6 +5,6 @@ import io.paritytech.polkadotapp.feature_videogame_api.domain.models.UpcomingGam
 import kotlinx.coroutines.flow.Flow
 
 interface UpcomingGameStartUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribe(): Flow<UpcomingGameStart?>
 }

@@ -1,6 +1,7 @@
 plugins {
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
 }
 
 android {
@@ -9,9 +10,6 @@ android {
 
 dependencies {
     api(project(":feature:upgrade-username:api"))
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 
     implementation(libs.androidx.fragment.ktx)
 

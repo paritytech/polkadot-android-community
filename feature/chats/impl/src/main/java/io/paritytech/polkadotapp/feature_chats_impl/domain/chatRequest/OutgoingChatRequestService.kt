@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.scale.toScale
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.getAccountByIdOrThrow
@@ -125,7 +126,7 @@ class RealOutgoingChatRequestService @Inject constructor(
             )
             VersionedRequestContent.V2.new(
                 identityProof = identityProof.toScale(),
-                deviceEncPubKey = ourDeviceKeypairProvider.publicKey().value,
+                deviceEncPubKey = ourDeviceKeypairProvider.publicKey().toScale(),
                 pushToken = pushToken,
                 welcomeMessage = welcomeMessage?.toRemote()
             )

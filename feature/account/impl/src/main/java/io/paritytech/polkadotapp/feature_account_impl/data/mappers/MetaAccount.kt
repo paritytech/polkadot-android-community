@@ -21,7 +21,7 @@ private fun MetaAccountLocal.SignerTypeLocal.toDomain(): MetaAccount.SignerType 
     }
 }
 
-private fun MetaAccountLocal.PurposeLocal.toDomain(): MetaAccount.Purpose {
+fun MetaAccountLocal.PurposeLocal.toDomain(): MetaAccount.Purpose {
     return when (this) {
         MetaAccountLocal.PurposeLocal.WALLET -> MetaAccount.Purpose.WALLET
         MetaAccountLocal.PurposeLocal.DEPOSIT -> MetaAccount.Purpose.DEPOSIT

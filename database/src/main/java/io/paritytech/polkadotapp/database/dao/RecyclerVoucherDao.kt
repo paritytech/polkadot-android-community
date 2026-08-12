@@ -65,9 +65,6 @@ interface RecyclerVoucherDao {
         }
     }
 
-    @Query("DELETE FROM recycler_vouchers WHERE ringVrfKeyIndex = :ringVrfKeyIndex")
-    suspend fun removeVoucher(ringVrfKeyIndex: Int)
-
     @Query("UPDATE recycler_vouchers SET usageState = :usageState WHERE ringVrfKeyIndex = :ringVrfKeyIndex")
     suspend fun setUsageStateByRingVrfKeyIndex(ringVrfKeyIndex: Int, usageState: RecyclerVoucherLocal.UsageState)
 
@@ -76,11 +73,6 @@ interface RecyclerVoucherDao {
 
     @Query("SELECT * FROM recycler_vouchers WHERE ringVrfKeyIndex IN (:indices)")
     suspend fun getByRingVrfKeyIndices(indices: List<Int>): List<RecyclerVoucherLocal>
-
-    @Transaction
-    suspend fun removeVouchers(ringVrfKeyIndices: List<Int>) {
-        ringVrfKeyIndices.forEach { removeVoucher(it) }
-    }
 
     @Query("SELECT MAX(ringVrfKeyIndex) FROM recycler_vouchers")
     suspend fun getMaxRingVrfKeyIndex(): Int?

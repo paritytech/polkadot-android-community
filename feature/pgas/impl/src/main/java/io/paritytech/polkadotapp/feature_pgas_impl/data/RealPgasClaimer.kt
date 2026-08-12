@@ -12,6 +12,8 @@ import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.mapErrorNotInstance
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_balances_api.data.type.TokenBalanceTypeRegistry
 import io.paritytech.polkadotapp.feature_people_api.domain.BandersnatchKeyResolver
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
@@ -33,6 +35,7 @@ import javax.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.ExperimentalTime
+import io.paritytech.polkadotapp.common.R as RCommon
 
 private val SECONDS_PER_PERIOD: Long = 1.days.inWholeSeconds
 
@@ -47,39 +50,50 @@ class RealPgasClaimer @Inject constructor(
     private val pgasChainAssetProvider: PgasChainAssetProvider,
     private val tokenBalanceTypeRegistry: TokenBalanceTypeRegistry,
 ) : PgasClaimer {
-    override suspend fun claim(destinationAccountId: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit> {
+    context(diagnostics: StalenessReportCollector)
+    override suspend fun claim(destinationAccountId: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit> = diagnostics.markRegion(RCommon.string.pgas_stall_claiming) {
         Timber.i("starting claim for destination=$destinationAccountId, strategy=$strategy")
-        return runCatching {
-            val chain = chainRegistry.assetHub()
-            val collection = activePeopleCollectionUseCase.getActivePeopleCollection()
-            val period = currentPeriod()
-            val previousBalance = currentPgasBalance(destinationAccountId)
-            Timber.i("resolved chain=${chain.id}, collection=$collection, period=$period, pre-tx balance=$previousBalance")
-            ClaimContext(chain, collection, period, previousBalance)
-        }.flatMap { ctx ->
+
+        resolveClaimContext(destinationAccountId).flatMap { ctx ->
             if (strategy == OnExistingAllocationStrategy.IGNORE && ctx.previousBalance.isPositive()) {
                 Timber.i("existing balance=${ctx.previousBalance}; strategy=IGNORE — skipping claim")
                 return@flatMap Result.success(Unit)
             }
             pickFreeSlotIndex(ctx.chain.id, ctx.period, ctx.collection)
                 .mapError { PgasClaimError.NoAllocationAvailable(it) }
-                .flatMap { slotIndex ->
-                    Timber.i("picked free slotIndex=$slotIndex; submitting claim_pgas extrinsic")
-                    val origin = pgasOrigins.asPgasClaim(ctx.period, slotIndex, ctx.collection)
-                    extrinsicService.submitExtrinsicAndAwaitExecution(
-                        chain = ctx.chain,
-                        origin = origin,
-                        submissionFailureRecovery = resubmitWhenValidFactory.create(ctx.chain.id),
-                    ) {
-                        pgas.claimPgas(slotIndex, destinationAccountId)
-                    }
-                        .flattenExecutionFailure()
-                        .coerceToUnit()
-                        .onSuccess { Timber.i("claim_pgas executed for slotIndex=$slotIndex") }
-                }
+                .flatMap { slotIndex -> submitClaim(ctx, slotIndex, destinationAccountId) }
         }
             .onFailure { Timber.e(it, "claim failed") }
             .mapErrorNotInstance<_, PgasClaimError> { PgasClaimError.Unknown(it) }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun resolveClaimContext(destinationAccountId: AccountId): Result<ClaimContext> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
+        runCatching {
+            val chain = chainRegistry.assetHub()
+            val collection = activePeopleCollectionUseCase.getActivePeopleCollection()
+            val period = currentPeriod()
+            val previousBalance = currentPgasBalance(destinationAccountId)
+            Timber.i("resolved chain=${chain.id}, collection=$collection, period=$period, pre-tx balance=$previousBalance")
+            ClaimContext(chain, collection, period, previousBalance)
+        }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun submitClaim(ctx: ClaimContext, slotIndex: UInt, destinationAccountId: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
+        Timber.i("picked free slotIndex=$slotIndex; submitting claim_pgas extrinsic")
+        val origin = pgasOrigins.asPgasClaim(ctx.period, slotIndex, ctx.collection)
+
+        extrinsicService.submitExtrinsicAndAwaitExecution(
+            chain = ctx.chain,
+            origin = origin,
+            submissionFailureRecovery = resubmitWhenValidFactory.create(ctx.chain.id),
+        ) {
+            pgas.claimPgas(slotIndex, destinationAccountId)
+        }
+            .flattenExecutionFailure()
+            .coerceToUnit()
+            .onSuccess { Timber.i("claim_pgas executed for slotIndex=$slotIndex") }
     }
 
     private suspend fun currentPgasBalance(accountId: AccountId): Balance {
@@ -87,20 +101,23 @@ class RealPgasClaimer @Inject constructor(
         return tokenBalanceTypeRegistry.typeFor(asset).getBalance(accountId).total
     }
 
+    context(diagnostics: StalenessReportCollector)
     private suspend fun pickFreeSlotIndex(
         chainId: ChainId,
         period: UInt,
         collection: PeopleCollection,
-    ): Result<UInt> = runCatching {
-        val maxSlots = pgasRepository.maxClaimsPerPeriod(chainId, collection)
-        Timber.i("scanning $maxSlots slots for period=$period")
-        val aliasesByIndex = (0u until maxSlots).associateWith { slot ->
-            val context = BandersnatchContext.pgasClaim(period, slot)
-            bandersnatchKeyResolver.getAliasInContext(collection, context)
+    ): Result<UInt> = diagnostics.markRegion(RCommon.string.pgas_stall_picking_slot) {
+        runCatching {
+            val maxSlots = pgasRepository.maxClaimsPerPeriod(chainId, collection)
+            Timber.i("scanning $maxSlots slots for period=$period")
+            val aliasesByIndex = (0u until maxSlots).associateWith { slot ->
+                val context = BandersnatchContext.pgasClaim(period, slot)
+                bandersnatchKeyResolver.getAliasInContext(collection, context)
+            }
+            val taken = pgasRepository.claimedAliases(chainId, period, aliasesByIndex.values.toList())
+            Timber.i("${taken.size}/$maxSlots slots already claimed")
+            aliasesByIndex.entries.first { (_, alias) -> alias !in taken }.key
         }
-        val taken = pgasRepository.claimedAliases(chainId, period, aliasesByIndex.values.toList())
-        Timber.i("${taken.size}/$maxSlots slots already claimed")
-        aliasesByIndex.entries.first { (_, alias) -> alias !in taken }.key
     }
 
     private fun currentPeriod(): UInt {

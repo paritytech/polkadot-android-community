@@ -18,9 +18,13 @@ interface TransactionSignContract {
 sealed interface SigningContent {
     class Transaction(val callName: String, val detailsJson: String) : SigningContent
     class RawMessage(val hexData: String) : SigningContent
+    class VrfTranscript(val transcriptLabel: String, val itemsText: String) : SigningContent
 }
 
-data class SigningAccountUi(val productId: String, val derivationIndex: Int)
+sealed interface SigningAccountUi {
+    data class Product(val productId: String, val derivationIndex: String) : SigningAccountUi
+    data object IdentityAccount : SigningAccountUi
+}
 
 data class TransactionSignUiState(
     val requesterName: String,

@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl
 
+import android.text.TextUtils.split
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.common.utils.emptySubstrateAccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAmountBreakdown
@@ -36,7 +37,7 @@ class TransferPlannerTest {
     fun `Strategy 1 - ExactMatch - should return exact match when coins sum matches perfectly`() = runBlocking {
         val coins = listOf(createCoin(exponent = 2), createCoin(exponent = 0))
 
-        val plan = planner.plan(5.0.centsToDollar(), coins, emptyList())
+        val plan = planner.plan(5.0.centsToDollar(), coins, emptyList()).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.ExactCoins
         assertCoinExponents(listOf(2, 0), strategy.coins)
@@ -46,7 +47,7 @@ class TransferPlannerTest {
     fun `Strategy 2 - SingleSplit - should split a single larger coin when no partial coverage possible`() = runBlocking {
         val coins = listOf(createCoin(exponent = 3)) // 8 > 5, doesn't fit as coverage → split entirely
 
-        val plan = planner.plan(5.0.centsToDollar(), coins, emptyList())
+        val plan = planner.plan(5.0.centsToDollar(), coins, emptyList()).getOrThrow()
 
         val split = plan.strategyType as StrategyType.Split
         assertEquals(ValueExponent(3), split.splitFrom.valueExponent)
@@ -63,7 +64,7 @@ class TransferPlannerTest {
             createCoin(exponent = 2) // 4 — extra, not used
         )
 
-        val plan = planner.plan(9.0.centsToDollar(), coins, emptyList())
+        val plan = planner.plan(9.0.centsToDollar(), coins, emptyList()).getOrThrow()
 
         val split = plan.strategyType as StrategyType.Split
         assertEquals(ValueExponent(2), split.splitFrom.valueExponent)
@@ -76,7 +77,7 @@ class TransferPlannerTest {
     fun `Strategy 2 - Split - splitFrom value equals sum of recipient and change denominations`() = runBlocking {
         val coins = listOf(createCoin(exponent = 2)) // 4 > 3
 
-        val plan = planner.plan(3.0.centsToDollar(), coins, emptyList())
+        val plan = planner.plan(3.0.centsToDollar(), coins, emptyList()).getOrThrow()
 
         val split = plan.strategyType as StrategyType.Split
         assertEquals(ValueExponent(2), split.splitFrom.valueExponent)
@@ -92,7 +93,7 @@ class TransferPlannerTest {
             createVoucher(exponent = 1, isReady = true, RingIndex(BigInteger.ZERO))
         )
 
-        val plan = planner.plan(5.5.centsToDollar(), coins, vouchers)
+        val plan = planner.plan(5.5.centsToDollar(), coins, vouchers).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
         assertVoucherExponents(listOf(1), strategy.vouchersToUnload)
@@ -108,7 +109,7 @@ class TransferPlannerTest {
             createVoucher(exponent = 1, isReady = true, RingIndex(BigInteger.ZERO))
         )
 
-        val plan = planner.plan(5.5.centsToDollar(), coins, vouchers)
+        val plan = planner.plan(5.5.centsToDollar(), coins, vouchers).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
         // Single voucher (=2) covers the 1.5 remainder; the second voucher in the same ring stays.
@@ -120,7 +121,39 @@ class TransferPlannerTest {
     fun `should throw exception when not enough funds`(): Unit = runBlocking {
         val coins = listOf(createCoin(exponent = 2))
 
-        planner.plan(10.0.centsToDollar(), coins, emptyList())
+        planner.plan(10.0.centsToDollar(), coins, emptyList()).getOrThrow()
+    }
+
+    @Test
+    fun `Non-spendable coin - is ignored consistently so a valid unload plan is produced`() = runBlocking {
+        // Regression: a NOT_SPENT but past-recycling-age coin (age >= 16) is excluded by exact-match
+        // (findSubsetSum filters canBeSpent) but was previously INCLUDED by coverage
+        // (findMaxCoinCoverage did not filter). Coverage then reached the amount exactly
+        // (restAmount == 0) and crashed with IllegalStateException("Not needed to split coins").
+        // The non-spendable coin must be ignored everywhere, leaving a valid unload plan.
+        val nonSpendableCoin = createCoin(exponent = 2, ageKnown = 20) // 4 cents, age >= 16 → not spendable
+        val spendableCoin = createCoin(exponent = 1) // 2 cents, spendable
+        val voucher = createVoucher(exponent = 2, isReady = true) // 4 cents
+
+        val plan = planner.plan(6.0.centsToDollar(), listOf(nonSpendableCoin, spendableCoin), listOf(voucher))
+            .getOrThrow()
+
+        val strategy = plan.strategyType as StrategyType.UnloadAndSplit
+        assertVoucherExponents(listOf(2), strategy.vouchersToUnload)
+        assertAmountEquals(4.0.centsToDollar(), strategy.recipientAmount)
+        // The non-spendable coin must NOT be selected as an exact coin; only the spendable 2-cent coin is.
+        assertCoinExponents(listOf(1), strategy.exactCoins)
+        assertTrue(strategy.exactCoins.none { it === nonSpendableCoin })
+    }
+
+    @Test(expected = InsufficientBalanceException::class)
+    fun `Non-spendable coin - does not mask insufficient balance as illegal state`(): Unit = runBlocking {
+        // Same non-spendable coin, but no other funds to cover the remainder. The planner must
+        // surface InsufficientBalanceException, not IllegalStateException("Not needed to split coins").
+        val nonSpendableCoin = createCoin(exponent = 2, ageKnown = 20) // 4 cents, not spendable
+        val spendableCoin = createCoin(exponent = 1) // 2 cents
+
+        planner.plan(6.0.centsToDollar(), listOf(nonSpendableCoin, spendableCoin), emptyList()).getOrThrow()
     }
 
     @Test
@@ -132,7 +165,7 @@ class TransferPlannerTest {
         val voucher1 = createVoucher(exponent = 1, isReady = true, index = ring)
         val voucher2 = createVoucher(exponent = 1, isReady = true, index = ring)
 
-        val plan = planner.plan(1.5.centsToDollar(), emptyList(), listOf(voucher1, voucher2))
+        val plan = planner.plan(1.5.centsToDollar(), emptyList(), listOf(voucher1, voucher2)).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
         assertVoucherExponents(listOf(1), strategy.vouchersToUnload)
@@ -145,7 +178,7 @@ class TransferPlannerTest {
         val securedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = true)
         val degradedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
 
-        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(securedVoucher, degradedVoucher))
+        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(securedVoucher, degradedVoucher)).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
         assertEquals(listOf(securedVoucher), strategy.vouchersToUnload)
@@ -159,7 +192,7 @@ class TransferPlannerTest {
         val degradedVoucher1 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
         val degradedVoucher2 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.valueOf(2)), enoughMembers = false)
 
-        val plan = planner.plan(7.5.centsToDollar(), coins, listOf(securedVoucher, degradedVoucher1, degradedVoucher2))
+        val plan = planner.plan(7.5.centsToDollar(), coins, listOf(securedVoucher, degradedVoucher1, degradedVoucher2)).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
         // Secured is exhausted first (2), then one degraded group covers the rest (2 → covers remaining 1.5).
@@ -175,7 +208,7 @@ class TransferPlannerTest {
         val degraded1 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
         val degraded2 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = false)
 
-        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(degraded1, degraded2))
+        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(degraded1, degraded2)).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
         assertEquals(1, strategy.vouchersToUnload.size)
@@ -187,7 +220,7 @@ class TransferPlannerTest {
         val securedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = true)
         val degradedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
 
-        planner.plan(100.0.centsToDollar(), emptyList(), listOf(securedVoucher, degradedVoucher))
+        planner.plan(100.0.centsToDollar(), emptyList(), listOf(securedVoucher, degradedVoucher)).getOrThrow()
     }
 
     @Test
@@ -199,7 +232,7 @@ class TransferPlannerTest {
         val medium = createVoucher(exponent = 2, isReady = true, index = RingIndex(BigInteger.valueOf(2)), enoughMembers = true)
         val large = createVoucher(exponent = 3, isReady = true, index = RingIndex(BigInteger.valueOf(3)), enoughMembers = true)
 
-        val plan = planner.plan(9.5.centsToDollar(), emptyList(), listOf(small, medium, large))
+        val plan = planner.plan(9.5.centsToDollar(), emptyList(), listOf(small, medium, large)).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
         assertEquals(setOf(large, medium), strategy.vouchersToUnload.toSet())
@@ -209,7 +242,7 @@ class TransferPlannerTest {
     fun `should throw exception when target amount cannot be exactly represented by min exponent`(): Unit = runBlocking {
         val coins = listOf(createCoin(exponent = 2))
 
-        planner.plan(10.10.centsToDollar(), coins, emptyList())
+        planner.plan(10.10.centsToDollar(), coins, emptyList()).getOrThrow()
     }
 
     private fun assertCoinExponents(expected: List<Int>, coins: List<Coin>) =
@@ -226,11 +259,11 @@ class TransferPlannerTest {
 
     private var coinIndexCounter = 0
 
-    private fun createCoin(exponent: Int, isSpent: Boolean = false): Coin {
+    private fun createCoin(exponent: Int, isSpent: Boolean = false, ageKnown: Int = 0): Coin {
         return Coin(
             derivationIndex = coinIndexCounter++,
             valueExponent = ValueExponent(exponent),
-            age = Coin.Age.Known(0),
+            age = Coin.Age.Known(ageKnown),
             spentState = if (isSpent) Coin.SpentState.SPENT_ON_CHAIN else Coin.SpentState.NOT_SPENT,
             accountId = emptySubstrateAccountId()
         )

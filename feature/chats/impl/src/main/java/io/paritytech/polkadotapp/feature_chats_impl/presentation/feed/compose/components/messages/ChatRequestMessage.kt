@@ -26,6 +26,7 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageAct
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageLayoutInfo
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.LocalChatMessageTimeFormatter
+import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -110,7 +111,7 @@ private fun ChatRequestMessagePreview() {
                     status = ChatMessageUiModel.Status.SENT,
                     origin = ChatMessageOrigin.User,
                     welcomeText = "Hi! Here's the update we discussed. Let me know if you have any questions.",
-                    reactions = emptyList()
+                    reactions = persistentListOf()
                 ),
                 showTimestamp = true,
                 grouping = ChatMessageGrouping.Standalone,
@@ -135,7 +136,7 @@ private fun ChatRequestMessagePreview_NoText() {
                 status = ChatMessageUiModel.Status.SENT,
                 origin = ChatMessageOrigin.User,
                 welcomeText = null,
-                reactions = emptyList()
+                reactions = persistentListOf()
             ),
             showTimestamp = true,
             grouping = ChatMessageGrouping.Standalone,
@@ -162,7 +163,7 @@ private fun ChatRequestMessagePreview_WithReactions() {
                     status = ChatMessageUiModel.Status.SENT,
                     origin = ChatMessageOrigin.User,
                     welcomeText = "Hi! Here's the update we discussed.",
-                    reactions = listOf(
+                    reactions = persistentListOf(
                         ChatMessageUiModel.Reaction(count = 2, emoji = "👍", reactedByUser = true),
                         ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = false)
                     )

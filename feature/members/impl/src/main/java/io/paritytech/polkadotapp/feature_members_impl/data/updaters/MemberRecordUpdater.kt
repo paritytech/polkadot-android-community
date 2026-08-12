@@ -23,12 +23,12 @@ internal class MemberRecordUpdater(
     chainRegistry = chainRegistry,
     storageCache = storageCache
 ) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(
         scopeValue: MetaAccount,
         chain: Chain,
     ): String {
         val personKey = bandersnatchSecretsStorage.getMemberKey(scopeValue.id)
-        return runtime.metadata.members.members.storageKey(collectionId, personKey)
+        return withRuntime.runtime.metadata.members.members.storageKey(collectionId, personKey)
     }
 }

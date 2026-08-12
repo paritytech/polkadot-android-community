@@ -7,7 +7,6 @@ import io.novasama.substrate_sdk_android.runtime.metadata.module.StorageEntry
 import io.novasama.substrate_sdk_android.runtime.metadata.storageKey
 import io.paritytech.polkadotapp.chains.storage.source.query.StorageQueryContext
 import io.paritytech.polkadotapp.chains.storage.source.query.WithRawValue
-import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.chains.util.decode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
@@ -18,16 +17,16 @@ typealias QueryableStorageBinder0<V> = (dynamicInstance: Any) -> V
 interface QueryableStorageEntry0<T : Any> {
     val meta: StorageEntry
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun query(): T?
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     suspend fun queryRaw(): String?
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     fun observe(): Flow<T?>
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     fun observeWithRaw(): Flow<WithRawValue<T?>>
 
     fun storageKey(): String
@@ -35,13 +34,12 @@ interface QueryableStorageEntry0<T : Any> {
     fun decode(scale: String?): T?
 }
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 fun <T : Any> QueryableStorageEntry0<T>.observeNonNull(): Flow<T> = observe().filterNotNull()
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 suspend fun <T : Any> QueryableStorageEntry0<T>.queryNonNull(): T = requireNotNull(query())
 
-context(WithRuntime)
 fun <T : Any> QueryableStorageEntry0<T>.decodeNonNull(scale: String?): T = requireNotNull(decode(scale))
 
 internal class RealQueryableStorageEntry0<T : Any>(
@@ -51,24 +49,32 @@ internal class RealQueryableStorageEntry0<T : Any>(
 ) : QueryableStorageEntry0<T> {
     override val meta: StorageEntry = storageEntry
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun query(): T? {
-        return storageEntry.query(binding = { decoded -> decoded?.let(encoders::decodeValue) })
+        return with(storage) {
+            storageEntry.query(binding = { decoded -> decoded?.let(encoders::decodeValue) })
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override fun observe(): Flow<T?> {
-        return storageEntry.observe(binding = { decoded -> decoded?.let(encoders::decodeValue) })
+        return with(storage) {
+            storageEntry.observe(binding = { decoded -> decoded?.let(encoders::decodeValue) })
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override fun observeWithRaw(): Flow<WithRawValue<T?>> {
-        return storageEntry.observeWithRaw(binding = { decoded -> decoded?.let(encoders::decodeValue) })
+        return with(storage) {
+            storageEntry.observeWithRaw(binding = { decoded -> decoded?.let(encoders::decodeValue) })
+        }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     override suspend fun queryRaw(): String? {
-        return storageEntry.queryRaw()
+        return with(storage) {
+            storageEntry.queryRaw()
+        }
     }
 
     override fun storageKey(): String {

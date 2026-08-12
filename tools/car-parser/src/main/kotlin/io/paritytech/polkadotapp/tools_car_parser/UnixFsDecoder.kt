@@ -3,6 +3,10 @@ package io.paritytech.polkadotapp.tools_car_parser
 import io.paritytech.polkadotapp.common.utils.buildByteArray
 import io.paritytech.polkadotapp.tools_car_parser.proto.UnixFsProto
 import io.paritytech.polkadotapp.tools_ipfs_api.Cid
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.io.SequenceInputStream
+import java.util.Enumeration
 
 typealias FilePath = String
 
@@ -41,6 +45,96 @@ object UnixFsDecoder {
         val result = mutableMapOf<FilePath, FileContent>()
         traverseNode(rootCid, "", blocks, result)
         return result
+    }
+
+    /**
+     * Streaming counterpart of [reconstructFileTree]: performs the same DFS but, instead of
+     * collecting file content into a map, emits each file to [onFile] as an [InputStream] backed
+     * by the on-disk [index]. Memory stays bounded — only small DAG-PB nodes and the chunk-order
+     * list are held; file bytes are pulled from disk lazily as each stream is consumed.
+     */
+    internal fun unpack(
+        rootCid: Cid,
+        index: CarBlockIndex,
+        onFile: (FilePath, content: InputStream) -> Unit
+    ) {
+        traverseNodeStreaming(rootCid, "", index, onFile)
+    }
+
+    private fun traverseNodeStreaming(
+        cid: Cid,
+        currentPath: FilePath,
+        index: CarBlockIndex,
+        onFile: (FilePath, content: InputStream) -> Unit
+    ) {
+        // Raw codec blocks contain file content directly — stream the region straight from disk.
+        if (cid.codec == Cid.Codec.Raw) {
+            onFile(currentPath, index.openRegion(index.blockRef(cid)))
+            return
+        }
+
+        val dagPbNode = DagPbDecoder.decode(index.readBlock(cid))
+
+        require(dagPbNode.data != null || dagPbNode.links.isNotEmpty()) {
+            "Empty DAG-PB node (no data, no links) at path: $currentPath"
+        }
+
+        val unixFs = dagPbNode.data?.let { decodeUnixFs(it) }
+
+        when (unixFs) {
+            is UnixFsData.Directory, null -> {
+                for (link in dagPbNode.links) {
+                    val linkName = requireNotNull(link.name) { "Directory entry is missing a name at path: $currentPath" }
+                    traverseNodeStreaming(link.hash, "$currentPath/$linkName", index, onFile)
+                }
+            }
+            is UnixFsData.Leaf -> {
+                // Inline content lives in the node itself (bounded by one block); wrap as-is.
+                onFile(currentPath, ByteArrayInputStream(unixFs.content))
+            }
+            is UnixFsData.ChunkedFile -> {
+                val segments = mutableListOf<() -> InputStream>()
+                collectChunkSegments(dagPbNode, index, segments)
+                onFile(currentPath, SequenceInputStream(LazyStreamEnumeration(segments)))
+            }
+        }
+    }
+
+    /**
+     * Walks a chunked file's DAG-PB link tree in order, appending a lazy stream producer per leaf
+     * chunk. Raw leaves stream their region from disk; inline (UnixFS leaf) chunks are decoded one
+     * at a time when their producer is invoked, so at most one chunk is in memory at any moment.
+     */
+    private fun collectChunkSegments(
+        dagPbNode: DagPbNode,
+        index: CarBlockIndex,
+        out: MutableList<() -> InputStream>
+    ) {
+        for (link in dagPbNode.links) {
+            if (link.hash.codec == Cid.Codec.Raw) {
+                val ref = index.blockRef(link.hash)
+                out.add { index.openRegion(ref) }
+                continue
+            }
+
+            val childDagPb = DagPbDecoder.decode(index.readBlock(link.hash))
+
+            when {
+                childDagPb.links.isNotEmpty() -> collectChunkSegments(childDagPb, index, out)
+                childDagPb.data?.let { decodeUnixFs(it) } is UnixFsData.Leaf -> {
+                    val chunkCid = link.hash
+                    out.add { ByteArrayInputStream(leafChunkContent(chunkCid, index)) }
+                }
+                else -> error("Unexpected chunk child: expected Leaf or nested chunks at CID ${link.hash}")
+            }
+        }
+    }
+
+    private fun leafChunkContent(cid: Cid, index: CarBlockIndex): FileContent {
+        val dagPb = DagPbDecoder.decode(index.readBlock(cid))
+        val leaf = dagPb.data?.let { decodeUnixFs(it) } as? UnixFsData.Leaf
+            ?: error("Expected UnixFS leaf chunk at CID $cid")
+        return leaf.content
     }
 
     private fun traverseNode(
@@ -144,4 +238,18 @@ private sealed interface UnixFsData {
     data object ChunkedFile : UnixFsData
 
     class Leaf(val content: FileContent) : UnixFsData
+}
+
+/**
+ * An [Enumeration] over stream producers that invokes each producer only when reached, so
+ * [SequenceInputStream] opens (and the producer materializes) one chunk stream at a time.
+ */
+private class LazyStreamEnumeration(
+    private val producers: List<() -> InputStream>
+) : Enumeration<InputStream> {
+    private var index = 0
+
+    override fun hasMoreElements(): Boolean = index < producers.size
+
+    override fun nextElement(): InputStream = producers[index++].invoke()
 }

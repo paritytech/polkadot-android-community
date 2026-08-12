@@ -1,8 +1,9 @@
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 
 plugins {
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.application")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.firebase.crashlytics)
     alias(libs.plugins.google.services)
     alias(libs.plugins.sentry.android.gradle)
@@ -18,6 +19,8 @@ android {
 
         versionCode = computeVersionCode()
         versionName = computeVersionName()
+
+        testInstrumentationRunner = "io.paritytech.polkadotapp.app.HiltTestRunner"
 
         manifestPlaceholders["sentryDsn"] = localProperties.readSecretOrNull("SENTRY_DSN") ?: ""
 
@@ -73,9 +76,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.hilt.android)
     implementation(libs.hilt.androidx.work)
-    ksp(libs.hilt.android.compiler)
     ksp(libs.hilt.androidx.compiler)
 
     implementation(libs.androidx.appcompat)
@@ -157,8 +158,17 @@ dependencies {
     "gpImplementation"(platform(libs.firebase.bom))
     "gpImplementation"(libs.firebase.crashlytics)
     "gpImplementation"(libs.firebase.analytics)
-}
 
+    "gpImplementation"(libs.google.play.services.mlkit)
+    "vanillaImplementation"(libs.google.mlkit.barcode.scanning)
+
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.android.compiler)
+}
 
 sentry {
     org.set(localProperties.readSecretOrNull("SENTRY_ORG") ?: "your-sentry-org")

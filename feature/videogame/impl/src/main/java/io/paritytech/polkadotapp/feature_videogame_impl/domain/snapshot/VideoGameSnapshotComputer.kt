@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +23,7 @@ class VideoGameSnapshotComputer @Inject constructor(
     private val stateCalculator: VideoGameLogicStateCalculator,
     private val snapshotWriter: VideoGameSnapshotWriter,
 ) : AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
         combineToPair(
             gameInfoSyncService.subscribeCurrentActiveGameInfo(),
@@ -33,7 +34,14 @@ class VideoGameSnapshotComputer @Inject constructor(
                 else stateCalculator.calculate(time, info)
             }
             .distinctUntilChanged()
-            .onEach { snapshotWriter.updateGameSnapshot(it) }
-            .launchIn(this@ComputationalScope)
+            .onEach { snapshot ->
+                if (snapshot == null) {
+                    Timber.i("[VideoGame] snapshot cleared — no active game")
+                } else {
+                    Timber.i("[VideoGame] snapshot: game=${snapshot.gameIndex.value} state=${snapshot.processState::class.simpleName}")
+                }
+                snapshotWriter.updateGameSnapshot(snapshot)
+            }
+            .launchIn(scope)
     }
 }

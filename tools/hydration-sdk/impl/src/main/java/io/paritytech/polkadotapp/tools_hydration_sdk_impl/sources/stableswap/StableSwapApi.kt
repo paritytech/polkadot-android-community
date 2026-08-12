@@ -17,22 +17,20 @@ import io.paritytech.polkadotapp.tools_hydration_sdk_impl.sources.stableswap.mod
 @JvmInline
 value class StableSwapApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 val RuntimeMetadata.stableSwapOrNull: StableSwapApi?
     get() = stableSwapOrNull()?.let(::StableSwapApi)
 
-context(StorageQueryContext)
 val RuntimeMetadata.stableSwap: StableSwapApi
     get() = StableSwapApi(stableSwap())
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val StableSwapApi.pools: QueryableStorageEntry1<HydraDxAssetId, StableSwapPoolInfo>
     get() = storage1(
         name = "Pools",
         binding = ::bindStablePoolInfo,
     )
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val StableSwapApi.poolPegs: QueryableStorageEntry1<HydraDxAssetId, StalbeSwapPoolPegInfo>
     get() = storage1(
         name = "PoolPegs",

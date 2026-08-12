@@ -20,26 +20,24 @@ import java.math.BigInteger
 @JvmInline
 value class PrivacyVoucherApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.privacyVoucher: PrivacyVoucherApi
     get() = PrivacyVoucherApi(privacyVoucher())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PrivacyVoucherApi.keys: QueryableStorageEntry2<Balance, BigInteger, List<BandersnatchPublicKey>>
     get() = storage2(name = "Keys")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PrivacyVoucherApi.keysToRing: QueryableStorageEntry1<BandersnatchPublicKey, PrivacyVoucherRingPosition>
     get() = storage1(name = "KeysToRing")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PrivacyVoucherApi.buildingRings: QueryableStorageEntry1<BigInteger, Unit>
     get() = storage1("BuildingRings", binding = { _, _ -> })
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PrivacyVoucherApi.rings: QueryableStorageEntry2<Balance, BigInteger, Unit>
     get() = storage2("Rings")
 
-context(WithRuntime)
 val PrivacyVoucherApi.usedVouchers: QueryableStorageEntry3<Balance, BigInteger, BandersnatchAlias, Unit>
     get() = storage3(name = "UsedTickets")

@@ -18,7 +18,10 @@ class FileUpload(
     val meta: Meta,
     val progress: Progress,
     val createdAt: Timestamp
-) {
+) : WithRetryState {
+    override val retryState: HopTransferRetryState
+        get() = progress.retryState
+
     sealed interface Size {
         data object NotMeasured : Size
         data class Measured(val size: InformationSize) : Size
@@ -34,7 +37,8 @@ class FileUpload(
         val totalChunks: Int,
         val uploadedChunks: Int,
         val uploadedChunkHashes: List<String>,
-        val error: Error?
+        val error: Error?,
+        val retryState: HopTransferRetryState
     )
 
     enum class Status {
@@ -76,7 +80,8 @@ class FileUpload(
                     totalChunks = 0,
                     uploadedChunks = 0,
                     uploadedChunkHashes = emptyList(),
-                    error = null
+                    error = null,
+                    retryState = HopTransferRetryState.None
                 ),
                 createdAt = System.currentTimeMillis()
             )

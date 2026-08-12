@@ -1,26 +1,36 @@
 package io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages
 
+import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.design.components.image.NovaAsyncImage
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatMessageUiModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ReplyPreview
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.paymentSubtitle
 import io.paritytech.polkadotapp.common.R as RCommon
+
+private val ReplyThumbnailSize = 48.dp
 
 @Composable
 fun ReplyPreviewBubble(
@@ -46,40 +56,143 @@ fun ReplyPreviewBubble(
         onClick = onClick
     ) {
         Row(
-            modifier = Modifier.height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.height(IntrinsicSize.Min)
         ) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(
-                        color = PolkadotTheme.colors.stroke.tertiary,
-                    )
-            )
+            ReplyAccentBar()
+
+            when (val content = preview.content) {
+                is ReplyPreview.Content.Image -> ReplyThumbnail(content.thumbnailUri, direction)
+                is ReplyPreview.Content.Video -> ReplyThumbnail(content.thumbnailUri, direction)
+
+                is ReplyPreview.Content.Text,
+                is ReplyPreview.Content.File,
+                is ReplyPreview.Content.Payment -> Unit
+            }
 
             Column(
-                modifier = Modifier.padding(
-                    vertical = PolkadotTheme.spacings.small,
-                    horizontal = PolkadotTheme.spacings.tiny
-                )
+                modifier = Modifier.padding(PolkadotTheme.spacings.small)
             ) {
                 NovaText(
                     text = preview.title,
-                    style = PolkadotTheme.typography.title.tinyEmphasized,
+                    style = PolkadotTheme.typography.title.tiny,
                     color = textColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // A quoted message with no text is treated as a generic attachment label.
-                // Interim: reply previews should later use a sealed type that renders per message kind.
                 NovaText(
-                    text = preview.text ?: stringResource(RCommon.string.chat_reply_attachment),
+                    text = preview.content.subtitle(),
                     style = PolkadotTheme.typography.body.smallEmphasized,
                     color = textColor,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReplyThumbnail(uri: Uri?, direction: ChatMessageUiModel.Direction) {
+    val borderColor = when (direction) {
+        ChatMessageUiModel.Direction.INCOMING -> PolkadotTheme.colors.stroke.secondary
+        ChatMessageUiModel.Direction.OUTGOING -> PolkadotTheme.colors.stroke.primaryInverted
+    }
+
+    PolkadotSurface(
+        modifier = Modifier
+            .padding(
+                start = PolkadotTheme.spacings.small,
+                top = PolkadotTheme.spacings.small,
+                bottom = PolkadotTheme.spacings.small
+            )
+            .size(ReplyThumbnailSize),
+        shape = PolkadotTheme.shapes.small,
+        color = PolkadotTheme.colors.bg.surface.container,
+        border = BorderStroke(PolkadotTheme.borders.default, borderColor)
+    ) {
+        NovaAsyncImage(
+            modifier = Modifier.fillMaxSize(),
+            model = uri,
+            contentScale = ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+private fun ReplyAccentBar() {
+    Box(
+        modifier = Modifier
+            .width(PolkadotTheme.borders.large)
+            .fillMaxHeight()
+            .background(PolkadotTheme.colors.stroke.tertiary)
+    )
+}
+
+@Composable
+private fun ReplyPreview.Content.subtitle(): String {
+    return when (this) {
+        is ReplyPreview.Content.Text -> text
+        is ReplyPreview.Content.Image -> caption ?: stringResource(RCommon.string.chat_attachment_name_image)
+        is ReplyPreview.Content.Video -> caption ?: stringResource(RCommon.string.chat_attachment_name_video)
+        is ReplyPreview.Content.File -> caption ?: fileName
+        is ReplyPreview.Content.Payment -> paymentSubtitle()
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+private fun ReplyPreviewBubblePreview() {
+    PolkadotTheme {
+        Column(
+            modifier = Modifier
+                .width(260.dp)
+                .padding(PolkadotTheme.spacings.medium),
+            verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
+        ) {
+            val variants = listOf(
+                ReplyPreview.Content.Text("short message short message short message short message short"),
+                ReplyPreview.Content.Image(thumbnailUri = null, caption = "short message short message"),
+                ReplyPreview.Content.Image(thumbnailUri = null, caption = null),
+                ReplyPreview.Content.Video(thumbnailUri = null, caption = "check out this clip"),
+                ReplyPreview.Content.Video(thumbnailUri = null, caption = null),
+                ReplyPreview.Content.File(fileName = "report-q3.pdf", caption = null)
+            )
+
+            variants.forEach { content ->
+                ReplyPreviewBubble(
+                    modifier = Modifier,
+                    preview = ReplyPreview(messageId = "1", title = "Jake.23", content = content),
+                    direction = ChatMessageUiModel.Direction.INCOMING,
+                    onClick = {}
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A1A)
+@Composable
+private fun ReplyPreviewBubbleOutgoingPreview() {
+    PolkadotTheme {
+        Column(
+            modifier = Modifier
+                .width(260.dp)
+                .padding(PolkadotTheme.spacings.medium),
+            verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
+        ) {
+            val variants = listOf(
+                ReplyPreview.Content.Text("short message short message short"),
+                ReplyPreview.Content.Image(thumbnailUri = null, caption = null),
+                ReplyPreview.Content.File(fileName = "report-q3.pdf", caption = null)
+            )
+
+            variants.forEach { content ->
+                ReplyPreviewBubble(
+                    modifier = Modifier,
+                    preview = ReplyPreview(messageId = "1", title = "Jake.23", content = content),
+                    direction = ChatMessageUiModel.Direction.OUTGOING,
+                    onClick = {}
                 )
             }
         }

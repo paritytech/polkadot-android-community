@@ -21,7 +21,7 @@ class ContactSessionChainBridge @Inject constructor(
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val knownChains: KnownChains,
 ) : AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCatching {
         var heldRef: EnabledChainConnectionReference? = null
         contactChatSessionRefCounter.enabledIds
@@ -40,6 +40,6 @@ class ContactSessionChainBridge @Inject constructor(
                 heldRef?.release()
                 heldRef = null
             }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 }

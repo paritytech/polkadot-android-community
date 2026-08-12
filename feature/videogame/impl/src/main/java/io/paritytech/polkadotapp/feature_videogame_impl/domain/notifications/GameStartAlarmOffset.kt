@@ -7,8 +7,10 @@ enum class GameStartAlarmOffset(val seconds: Int) {
     TWENTY_SECONDS(20);
 
     companion object {
+        val DEFAULT = TWENTY_SECONDS
+
         fun fromSeconds(seconds: Int): GameStartAlarmOffset {
-            return entries.find { it.seconds == seconds } ?: TEN_SECONDS
+            return entries.find { it.seconds == seconds } ?: DEFAULT
         }
     }
 }

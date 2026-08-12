@@ -93,18 +93,20 @@ class RealCoinageRecyclingUseCase @Inject constructor(
         val rolledBackCoins = coinsWithVouchers.map { it.first }.withSpentState(Coin.SpentState.NOT_SPENT)
         coinRepository.saveAll(rolledBackCoins)
 
+        // Retire the freshly-allocated vouchers (USED_LOCALLY) rather than delete, keeping ring-vrf-key
+        // indices monotonic so a freed index is never reused.
         val rolledBackVouchers = coinsWithVouchers.map { it.second.ringVrfKeyIndex }
-        voucherRepository.removeVouchers(rolledBackVouchers)
+        voucherRepository.setUsageStateByRingVrfKeyIndices(rolledBackVouchers, RecyclerVoucher.UsageState.USED_LOCALLY)
     }
 
     private fun List<Coin>.withSpentState(state: Coin.SpentState) = map { it.copy(spentState = state) }
 
-    context(MultiExtrinsicBuilder)
+    context(builder: MultiExtrinsicBuilder)
     private suspend fun buildLoadRecyclerExtrinsic(coin: Coin, voucher: RecyclerVoucher) {
         val keypair = voucherRingDerivation.deriveBandersnatch(voucher.ringVrfKeyIndex)
         val origin = coinageTransactionOrigins.createAsCoinOrigin(coin)
 
-        extrinsic(origin = origin) {
+        builder.extrinsic(origin = origin) {
             coinage.loadRecyclerWithCoin(
                 memberKey = keypair.memberKey().value,
                 proofOfOwnership = keypair.sign(coin.accountId.value)

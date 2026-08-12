@@ -12,8 +12,11 @@ import java.util.UUID
 // topic size (32 byte) + channel size (32 byte) + expiry (8 byte) + proof (64 byte) + signer (32 byte)
 private val STATEMENT_OVERHEAD = (32 + 32 + 8 + 64 + 32).bytes
 
+internal val PROTOCOL_ACK_CODE: UByte = 0u
+
 sealed class CommunicationState : StateMachine.State<CommunicationState, CommunicationSideEffect, CommunicationStateEvent> {
     abstract val maxStatementSize: InformationSize
+    abstract val canCompact: Boolean
 
     protected val maxRequestSize: InformationSize get() = maxStatementSize - STATEMENT_OVERHEAD
 

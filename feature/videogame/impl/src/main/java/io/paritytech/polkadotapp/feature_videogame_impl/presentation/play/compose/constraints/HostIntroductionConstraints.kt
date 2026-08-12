@@ -40,4 +40,5 @@ fun ConstraintSetScope.createHostIntroductionConstraints(
 
     hideHostingProgressBar()
     hideHowToPlayButton()
+    hideConnectingCountdown()
 }

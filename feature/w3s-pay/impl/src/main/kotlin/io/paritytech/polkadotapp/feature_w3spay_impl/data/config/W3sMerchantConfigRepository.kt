@@ -2,9 +2,10 @@ package io.paritytech.polkadotapp.feature_w3spay_impl.data.config
 
 import androidx.annotation.Keep
 import com.google.gson.Gson
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.common.utils.decodeFormBase64UrlSafe
 import io.paritytech.polkadotapp.common.utils.fromJson
-import io.paritytech.polkadotapp.feature_w3spay_impl.domain.P256_COMPRESSED_KEY_SIZE
 import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
 import javax.inject.Inject
 
@@ -12,12 +13,12 @@ import javax.inject.Inject
  * A merchant ("cash register") registered in the `w3s-merchants` Firebase remote config entry.
  *
  * @param topic the 32-byte statement store topic the merchant listens on
- * @param key the compressed P256 public key the payment payload is encrypted to
+ * @param key the X25519 public key the payment payload is encrypted to
  * @param name optional human-readable merchant name shown to the payer; falls back to the serial
  */
 class W3sMerchant(
     val topic: ByteArray,
-    val key: ByteArray,
+    val key: X25519PublicKey,
     val name: String?,
 )
 
@@ -46,12 +47,11 @@ class RealW3sMerchantConfigRepository @Inject constructor(
         val topicBytes = topic.decodeFormBase64UrlSafe()
         require(topicBytes.size == TOPIC_SIZE) { "W3S merchant topic must be exactly $TOPIC_SIZE bytes" }
 
-        val keyBytes = key.decodeFormBase64UrlSafe()
-        require(keyBytes.size == P256_COMPRESSED_KEY_SIZE) {
-            "W3S merchant key must be a $P256_COMPRESSED_KEY_SIZE-byte compressed P256 key"
-        }
+        // Same check W3sCoinsSubmitter applies at submit time, so validation cannot drift from
+        // the key type the payload is actually encrypted to.
+        val merchantKey = key.decodeFormBase64UrlSafe().requireX25519PublicKey()
 
-        return W3sMerchant(topic = topicBytes, key = keyBytes, name = name)
+        return W3sMerchant(topic = topicBytes, key = merchantKey, name = name)
     }
 
     @Keep

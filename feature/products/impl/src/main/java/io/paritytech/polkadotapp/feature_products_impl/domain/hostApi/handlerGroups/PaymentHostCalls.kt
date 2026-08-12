@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups
 
+import com.google.gson.annotations.JsonAdapter
 import io.novasama.substrate_sdk_android.extensions.fromHex
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
@@ -11,6 +12,9 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.bot.ProductsBotApi
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.InsufficientBalanceException
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.PaymentRejectedException
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.DerivationIndexWire
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.DerivationIndexWireAdapter
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.toDomain
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.ContainerBridge
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpSource
 import kotlinx.coroutines.flow.map
@@ -75,15 +79,16 @@ private data class PaymentTopUpParams(
     val amount: String,
     /** "ProductAccount", "PrivateKey" or "Coins" — discriminator for the flattened source fields below. */
     val sourceTag: String,
-    val sourceDerivationIndex: Int? = null,
+    @JsonAdapter(DerivationIndexWireAdapter::class)
+    val sourceDerivationIndex: DerivationIndexWire? = null,
     val sourceKeyHex: HexString? = null,
     val sourceKeyListHex: List<HexString>? = null,
 ) {
     fun toDomainSource(): PaymentTopUpSource = when (sourceTag) {
         "ProductAccount" -> PaymentTopUpSource.ProductAccount(
-            derivationIndex = requireNotNull(sourceDerivationIndex) {
+            index = requireNotNull(sourceDerivationIndex) {
                 "sourceDerivationIndex missing for ProductAccount source"
-            },
+            }.toDomain().getOrThrow(),
         )
         "PrivateKey" -> PaymentTopUpSource.PrivateKey(
             DataByteArray(requireNotNull(sourceKeyHex) { "sourceKeyHex missing for PrivateKey source" }.fromHex())

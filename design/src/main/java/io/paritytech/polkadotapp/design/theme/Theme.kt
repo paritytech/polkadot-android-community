@@ -12,6 +12,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -50,7 +51,9 @@ fun PolkadotTheme(
 
     val activity = LocalActivity.current
     if (activity != null) {
-        val lightSystemBarIcons = !theme.isDark
+        val systemBarsAppearance = rememberSystemBarsAppearanceStateHolder()
+        val forceDarkBackground by systemBarsAppearance.forceDarkBackground.collectAsStateWithLifecycle()
+        val lightSystemBarIcons = !theme.isDark && !forceDarkBackground
 
         SideEffect {
             val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
@@ -91,6 +94,31 @@ fun PolkadotTheme(
         ) {
             content()
         }
+    }
+}
+
+@Composable
+fun ForceDarkBackgroundSystemBarsEffect() {
+    val systemBarsAppearance = rememberSystemBarsAppearanceStateHolder()
+
+    DisposableEffect(systemBarsAppearance) {
+        systemBarsAppearance.acquireForceDarkBackground()
+
+        onDispose {
+            systemBarsAppearance.releaseForceDarkBackground()
+        }
+    }
+}
+
+@Composable
+private fun rememberSystemBarsAppearanceStateHolder(): SystemBarsAppearanceStateHolder {
+    if (LocalInspectionMode.current) return remember { SystemBarsAppearanceStateHolder() }
+
+    val context = LocalContext.current
+    return remember(context) {
+        EntryPointAccessors
+            .fromApplication(context.applicationContext, AppThemeSelectorEntryPoint::class.java)
+            .systemBarsAppearanceStateHolder()
     }
 }
 

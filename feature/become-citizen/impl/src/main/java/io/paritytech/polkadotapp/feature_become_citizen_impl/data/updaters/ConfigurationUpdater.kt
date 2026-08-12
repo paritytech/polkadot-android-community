@@ -18,8 +18,8 @@ class ConfigurationUpdater @Inject constructor(
     chainRegistry = chainRegistry,
     storageCache = storageCache
 ) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: Unit, chain: Chain): String {
-        return runtime.metadata.proofOfInk.configuration.storageKey()
+        return withRuntime.runtime.metadata.proofOfInk.configuration.storageKey()
     }
 }

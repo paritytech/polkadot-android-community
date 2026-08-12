@@ -1,12 +1,14 @@
 package io.paritytech.polkadotapp.feature_chats_api.domain.devices
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 
 interface BroadcastDeviceLifecycleUseCase {
+    context(diagnostics: StalenessReportCollector)
     suspend fun broadcastDeviceAdded(
         statementAccountId: AccountId,
-        encryptionPublicKey: EncodedPublicKey,
+        encryptionPublicKey: X25519PublicKey,
     ): Result<Unit>
 
     suspend fun broadcastDeviceRemoved(statementAccountId: AccountId): Result<Unit>
@@ -18,6 +20,6 @@ interface BroadcastDeviceLifecycleUseCase {
     suspend fun sendDeviceAddedTo(
         contactAccountId: AccountId,
         statementAccountId: AccountId,
-        encryptionPublicKey: EncodedPublicKey,
+        encryptionPublicKey: X25519PublicKey,
     ): Result<Unit>
 }

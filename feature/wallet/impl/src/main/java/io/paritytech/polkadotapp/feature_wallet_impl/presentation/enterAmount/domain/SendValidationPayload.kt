@@ -5,6 +5,5 @@ import java.math.BigDecimal
 
 data class SendValidationPayload(
     val value: BigDecimal,
-    val trackTransfer: Boolean,
     val transferMethod: TransferMethod,
 )

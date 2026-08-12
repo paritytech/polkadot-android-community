@@ -9,6 +9,7 @@ data class Product(
     @Deprecated("Used only for debug menu. Will be migrated to ProductIntegration metadata.")
     val scriptUrl: String,
     val contentHash: String?,
+    val iconUrl: String?,
 ) : Identifiable {
     override val identifier: String get() = id.value
 }

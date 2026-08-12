@@ -23,6 +23,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.HostingSta
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.VideoGamePlayer
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.VideoGameProcessState
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.VideoGameSnapshot
+import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.requiresLocalCamera
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.telemetry.GameDashboardTelemetryEmitter
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.usecase.PlayingAccountUseCase
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.helpers.PlayerFrameCapturer
@@ -30,6 +31,8 @@ import io.paritytech.polkadotapp.tools_media_connection_api.domain.GroupPeerConn
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerChannelFactory
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaConfiguration
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.PeerChannelConnectionState
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoDegradationPreference
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoEncodingProfile
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoTrack
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -66,22 +69,42 @@ class VideoGameSessionManager @Inject constructor(
 ) {
     private val peerChannels = MutableStateFlow<Map<AccountId, VideoGamePeerChannel>>(emptyMap())
 
-    context(ComputationalScope)
+    private val videoProfile = VideoEncodingProfile(
+        captureTargetHeight = 480,
+        captureFps = 24,
+        maxBitrateBps = 600_000,
+        degradationPreference = VideoDegradationPreference.MAINTAIN_FRAMERATE
+    )
+
+    context(scope: ComputationalScope)
     suspend fun startSession() {
+        Timber.i("[VideoGame] startSession: resolving playing account")
         val playingAccount = playingAccountUseCase.getPlayingAccount()
         val localAccountId = playingAccount.accountIdIn(chainRegistry.peopleChain())
         val communicationSessionCreator = communicationSessionCreatorFactory.create(playingAccount)
 
+        Timber.i("[VideoGame] startSession: creating group peer connection")
         val connection = peerChannelFactory.createGroupConnection(
-            mediaConfiguration = MediaConfiguration.VideoOnly,
-            scope = this@ComputationalScope
+            mediaConfiguration = MediaConfiguration.VideoOnly(
+                initialCameraEnabled = false,
+                videoProfile = videoProfile,
+            ),
+            scope = scope
         )
 
+        Timber.i("[VideoGame] startSession: initializing local media (camera)")
         connection.initLocalMedia()
 
-        appLifecycleObserver.subscribeIsForeground()
-            .onEach { foregrounded -> connection.setLocalVideoEnabled(foregrounded) }
-            .launchIn(this@ComputationalScope)
+        combine(
+            appLifecycleObserver.subscribeIsForeground(),
+            videoGameStateHolder.gameSnapshot
+                .filterNotNull()
+                .map { it.processState.requiresLocalCamera() }
+                .distinctUntilChanged(),
+        ) { foregrounded, cameraNeeded -> foregrounded && cameraNeeded }
+            .distinctUntilChanged()
+            .onEach { connection.setLocalVideoEnabled(it) }
+            .launchIn(scope)
 
         val sessionInfo = SessionInfo(
             groupConnection = connection,
@@ -89,17 +112,19 @@ class VideoGameSessionManager @Inject constructor(
             localAccountId = localAccountId
         )
 
+        Timber.i("[VideoGame] startSession: observing game state for account=$localAccountId")
         videoGameStateHolder.gameSnapshot
             .filterNotNull()
             .distinctUntilChanged()
             .onEach { snapshot -> handleGameStateChange(sessionInfo, snapshot) }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
 
         observePlayers(localAccountId, connection)
         startReportingTelemetry(localAccountId)
     }
 
     fun endSession() {
+        Timber.i("[VideoGame] endSession: disposing ${peerChannels.value.size} peer channel(s)")
         peerChannels.value.forEach { (_, peerChannel) -> peerChannel.dispose() }
         peerChannels.value = emptyMap()
     }
@@ -113,8 +138,9 @@ class VideoGameSessionManager @Inject constructor(
         peerChannels.value[targetAccountId]?.sendAcceptance(message)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun handleGameStateChange(sessionInfo: SessionInfo, snapshot: VideoGameSnapshot) {
+        Timber.i("[VideoGame] game=${snapshot.gameIndex.value} session state=${snapshot.processState::class.simpleName}")
         when (val state = snapshot.processState) {
             is VideoGameProcessState.WaitingRoom -> {
                 val players = state.preConnection?.players.orEmpty()
@@ -122,6 +148,7 @@ class VideoGameSessionManager @Inject constructor(
             }
 
             is VideoGameProcessState.Round -> {
+                Timber.i("[VideoGame] game=${snapshot.gameIndex.value} round=${state.roundIndex} roundPlayers=${state.roundPlayers.size} preConnect=${state.preConnection?.players?.size ?: 0}")
                 val players = state.roundPlayers + state.preConnection?.players.orEmpty()
                 setConnectedPlayers(sessionInfo, snapshot.gameIndex, players)
                 handleFrameCaptureIfNeeded(snapshot, state)
@@ -137,7 +164,7 @@ class VideoGameSessionManager @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun setConnectedPlayers(
         sessionInfo: SessionInfo,
         gameIndex: GameIndex,
@@ -148,6 +175,10 @@ class VideoGameSessionManager @Inject constructor(
         val current = peerChannels.value.keys
         val toAdd = remotePlayers.toSet() - current
         val toRemove = current - remotePlayers.toSet()
+
+        if (toAdd.isNotEmpty() || toRemove.isNotEmpty()) {
+            Timber.i("[VideoGame] game=${gameIndex.value} peers added=${toAdd.size} removed=${toRemove.size} activeRemote=${remotePlayers.size}")
+        }
 
         toRemove.forEach { accountId ->
             peerChannels.value[accountId]?.dispose()
@@ -164,7 +195,7 @@ class VideoGameSessionManager @Inject constructor(
                 localAccountId = sessionInfo.localAccountId,
                 remoteAccountId = accountId,
                 gameIndex = gameIndex,
-                scope = childScope(true)
+                scope = scope.childScope(true)
             ).also { it.start() }
         }
 
@@ -173,11 +204,11 @@ class VideoGameSessionManager @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun handleFrameCaptureIfNeeded(snapshot: VideoGameSnapshot, state: VideoGameProcessState.Round) {
         if (state.hostingState !is HostingState.Hosting) return
 
-        launch {
+        scope.launch {
             delay(PlayerFrameCapturer.CAPTURE_DELAY)
 
             val hostAccountId = state.currentHost
@@ -195,7 +226,7 @@ class VideoGameSessionManager @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun observePlayers(
         currentPlayerAccountId: AccountId,
         groupConnection: GroupPeerConnection
@@ -208,7 +239,7 @@ class VideoGameSessionManager @Inject constructor(
             val currentHost = (snapshot.processState as? VideoGameProcessState.Round)?.currentHost
 
             val playerAccountIds = when (val gameState = snapshot.processState) {
-                is VideoGameProcessState.WaitingRoom -> listOf(currentPlayerAccountId)
+                is VideoGameProcessState.WaitingRoom -> gameState.preConnection?.players ?: listOf(currentPlayerAccountId)
                 is VideoGameProcessState.Round -> gameState.roundPlayers
                 is VideoGameProcessState.Reporting,
                 is VideoGameProcessState.Finished,
@@ -228,11 +259,14 @@ class VideoGameSessionManager @Inject constructor(
                 )
             }
         }
-            .onEach { videoGameStateHolder.updatePlayers(it) }
-            .launchIn(this@ComputationalScope)
+            .onEach { players ->
+                Timber.i("[VideoGame] players rendered=${players.size} connected=${players.count { it.connection == PlayerConnectionState.Connected }} withVideo=${players.count { it.videoTrack != null }}")
+                videoGameStateHolder.updatePlayers(players)
+            }
+            .launchIn(scope)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun startReportingTelemetry(localAccountId: AccountId) {
         combine(
             gameInfoSyncService.subscribeCurrentActiveGameInfo().filterNotNull(),
@@ -250,7 +284,7 @@ class VideoGameSessionManager @Inject constructor(
                 gameDashboardTelemetry.submitReporting(localAccount = localAccountId, rounds = payload)
             }
             .catch { Timber.w(it, "Dashboard reporting flow failed") }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     private fun buildReportingPayload(

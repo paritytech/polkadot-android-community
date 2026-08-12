@@ -35,7 +35,8 @@ fun PocketCollectibles(
                 .fillMaxWidth()
                 .padding(PolkadotTheme.spacings.mediumIncreased)
                 .pocketCollectiblesImageSharedElement(),
-            onViewButtonClick = onViewButtonClick
+            onViewButtonClick = onViewButtonClick,
+            expanded = true
         )
     }
 }

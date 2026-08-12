@@ -31,12 +31,12 @@ interface DimSwitchMixin {
     }
 }
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun DimSwitchMixin.Factory.create(
     currentDimId: DimId,
     onError: (Throwable) -> Unit
 ): DimSwitchMixin = create(
-    computationalScope = this@ComputationalScope,
+    computationalScope = scope,
     currentDimId = currentDimId,
     onError = onError
 )

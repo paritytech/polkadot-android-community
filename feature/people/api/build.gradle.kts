@@ -1,6 +1,7 @@
 plugins {
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -15,4 +16,6 @@ dependencies {
     api(project(":feature:account:api"))
     api(project(":feature:transactions:api"))
     api(project(":feature:members:api"))
+
+    implementation(libs.hilt.android)
 }

@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.common.utils.permissions.PermissionResult
 import io.paritytech.polkadotapp.feature_videogame_impl.VideoGameRouter
 import io.paritytech.polkadotapp.feature_videogame_impl.service.VideoGameServiceController
 import io.paritytech.polkadotapp.feature_videogame_impl.service.VideoGameStateReader
+import timber.log.Timber
 import javax.inject.Inject
 
 class VideoGameLaunchCoordinator @Inject constructor(
@@ -21,12 +22,14 @@ class VideoGameLaunchCoordinator @Inject constructor(
     suspend fun launchGame() {
         when (permissionAsker.askPermission(Manifest.permission.CAMERA)) {
             PermissionResult.GRANTED -> {
+                Timber.i("[VideoGame] Camera permission granted — launching game")
                 serviceController.start()
                 router.openGamePlay()
             }
 
             PermissionResult.DENIED,
             PermissionResult.DENIED_FOREVER -> {
+                Timber.w("[VideoGame] Camera permission denied — game not launched")
                 appContext.openAppSettings()
             }
         }
@@ -38,6 +41,7 @@ class VideoGameLaunchCoordinator @Inject constructor(
      */
     suspend fun openOrLaunchGame() {
         if (stateReader.isSessionRunning) {
+            Timber.i("[VideoGame] Re-entering already running session")
             router.openGamePlay()
         } else {
             launchGame()

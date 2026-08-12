@@ -34,16 +34,16 @@ import java.math.BigDecimal
 import javax.inject.Inject
 
 internal interface FundsConverter {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun launchSync(): Flow<*>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun initiateConversionTermsWarmUp()
 
     /**
      * error: [AutoConversionCheckError]
      */
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun checkConversionPossible(
         tokenBalance: TokenBalance,
         destination: Chain.Asset,
@@ -51,12 +51,12 @@ internal interface FundsConverter {
         recipient: AccountId,
     ): Result<PossibleFundConversion>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun performConversion(
         checked: PossibleFundConversion,
     ): Flow<ConversionProgress>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getConversionTerms(
         depositAsset: Chain.Asset,
         conversionTarget: Chain.Asset,
@@ -76,7 +76,7 @@ internal class RealFundsConverter @Inject constructor(
         private val MID_SIZE_DEPOSIT_IN_USD = 100.toBigDecimal()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun launchSync(): Flow<*> {
         return flow {
             swapService.sync()
@@ -85,12 +85,12 @@ internal class RealFundsConverter @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initiateConversionTermsWarmUp() {
         swapService.initiateWarmUp()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun checkConversionPossible(
         tokenBalance: TokenBalance,
         destination: Chain.Asset,
@@ -109,7 +109,7 @@ internal class RealFundsConverter @Inject constructor(
             }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun performConversion(checked: PossibleFundConversion): Flow<ConversionProgress> {
         swapService.awaitFullyLoadedRouting()
 
@@ -117,7 +117,7 @@ internal class RealFundsConverter @Inject constructor(
             .map { it.toConversionProgress() }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getConversionTerms(
         depositAsset: Chain.Asset,
         conversionTarget: Chain.Asset,
@@ -205,7 +205,7 @@ internal class RealFundsConverter @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun calculateFee(
         quote: SwapQuote,
         sender: MetaAccount,
@@ -222,7 +222,7 @@ internal class RealFundsConverter @Inject constructor(
             .mapError(AutoConversionCheckError::FeeCalculationFailure)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun quoteTransferableConversion(
         tokenBalance: TokenBalance,
         destination: Chain.Asset,
@@ -230,7 +230,7 @@ internal class RealFundsConverter @Inject constructor(
         return quote(tokenBalance.token, destination, tokenBalance.transferable)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun quote(
         from: Chain.Asset,
         to: Chain.Asset,

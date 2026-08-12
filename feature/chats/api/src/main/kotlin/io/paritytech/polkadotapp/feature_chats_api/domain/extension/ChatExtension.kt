@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBot
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatFooterRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatMenuRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatMessageRenderer
+import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatOpenHandler
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatOverlayRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatPreviewDelegate
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatConfig
@@ -24,12 +25,18 @@ interface ChatExtension {
      */
     val activationStateExternallyControlled: Boolean
 
-    context(ChatExtensionContext)
+    context(chatExtensionContext: ChatExtensionContext)
     fun startGlobalWork()
 
     fun customFooterRenderer(chatId: ChatId): CustomChatFooterRenderer? = null
     fun customMenuRenderer(chatId: ChatId): CustomChatMenuRenderer? = null
     fun customChatAppearance(chatId: ChatId): CustomChatAppearance? = null
+
+    /**
+     * Optional takeover of opening this chat from the chat list. When this returns a handler and
+     * [CustomChatOpenHandler.handleOpen] returns true, the host skips opening the default chat feed.
+     */
+    fun customOpenHandler(chatId: ChatId): CustomChatOpenHandler? = null
 
     /** Optional global overlay rendered above the app shell whenever this extension is active. */
     fun customGlobalOverlayRenderer(): CustomChatOverlayRenderer? = null

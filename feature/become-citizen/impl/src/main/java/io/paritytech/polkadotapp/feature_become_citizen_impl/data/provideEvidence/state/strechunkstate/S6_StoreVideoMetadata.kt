@@ -24,7 +24,7 @@ class StoreVideoMetadataState(
 
     override val evidenceType: EvidenceType = EvidenceType.VIDEO
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(
         authorizedTransactionsBeforeSubmission: BigInteger,
         evidenceHash: String
@@ -47,7 +47,7 @@ class AwaitVideoMetadataConfirmationState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(): UploadEvidenceState {
         val newParams = SubmitVideoHashState.Params(params.evidenceHash)
         return stateFactory.submitVideoHash(newParams)

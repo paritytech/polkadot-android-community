@@ -9,4 +9,5 @@ class ProductLocal(
     val name: String,
     val scriptUrl: String,
     val contentHash: String?,
+    val iconUrl: String?,
 )

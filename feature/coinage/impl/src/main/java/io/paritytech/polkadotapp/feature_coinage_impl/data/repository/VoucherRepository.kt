@@ -16,10 +16,11 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationInde
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.filterReadyNowSecured
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.filterIsReadyToUse
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinage
+import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclerAliasStates
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclersCoinToRecycler
-import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclersUnloaded
+import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.getNextIndex
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -49,24 +50,20 @@ interface VoucherRepository {
 
     suspend fun fetchValuesForKeys(chainId: ChainId, voucherKeys: List<BandersnatchPublicKey>): Result<Map<BandersnatchPublicKey, ValueExponent>>
 
-    suspend fun removeVoucher(index: DerivationIndex)
-
-    suspend fun removeVouchers(indexes: List<DerivationIndex>)
-
     suspend fun getByRingVrfKeyIndices(indices: List<DerivationIndex>): List<RecyclerVoucher>
 
     suspend fun setUsageStateByRingVrfKeyIndices(indices: List<DerivationIndex>, state: RecyclerVoucher.UsageState)
 
     fun subscribeActiveVouchers(): Flow<List<RecyclerVoucher>>
 
-    suspend fun detektNotUnloadedVouchers(
+    suspend fun fetchRecyclerAliasStates(
         chainId: ChainId,
         keys: List<Triple<BigInteger, BigInteger, ByteArray>>
-    ): Result<Map<String, Unit?>>
+    ): Result<Map<String, OnChainAliasState?>>
 }
 
-fun VoucherRepository.subscribeVouchersAvailableNow(): Flow<List<RecyclerVoucher>> {
-    return subscribeActiveVouchers().map { vouchers -> vouchers.filterReadyNowSecured() }
+fun VoucherRepository.subscribeReadyToUseVouchers(): Flow<List<RecyclerVoucher>> {
+    return subscribeActiveVouchers().map { vouchers -> vouchers.filterIsReadyToUse() }
 }
 
 class RealVoucherRepository @Inject constructor(
@@ -99,14 +96,6 @@ class RealVoucherRepository @Inject constructor(
         recyclerVoucherDao.updateLocations(updates)
     }
 
-    override suspend fun removeVoucher(index: DerivationIndex) {
-        recyclerVoucherDao.removeVoucher(index)
-    }
-
-    override suspend fun removeVouchers(indexes: List<DerivationIndex>) {
-        recyclerVoucherDao.removeVouchers(indexes)
-    }
-
     override suspend fun getByRingVrfKeyIndices(indices: List<DerivationIndex>): List<RecyclerVoucher> {
         return recyclerVoucherDao.getByRingVrfKeyIndices(indices).map { it.toDomain() }
     }
@@ -122,12 +111,12 @@ class RealVoucherRepository @Inject constructor(
         return recyclerVoucherDao.getMaxRingVrfKeyIndex().getNextIndex()
     }
 
-    override suspend fun detektNotUnloadedVouchers(
+    override suspend fun fetchRecyclerAliasStates(
         chainId: ChainId,
         keys: List<Triple<BigInteger, BigInteger, ByteArray>>
-    ): Result<Map<String, Unit?>> {
+    ): Result<Map<String, OnChainAliasState?>> {
         return remoteStorageSource.queryCatching(chainId) {
-            metadata.coinage.recyclersUnloaded.entries(keys)
+            metadata.coinage.recyclerAliasStates.entries(keys)
         }
             .map {
                 it.mapKeys { (key, _) -> key.third.toDataByteArray().toString() }

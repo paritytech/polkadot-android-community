@@ -3,6 +3,10 @@ package io.paritytech.polkadotapp.tools_car_parser
 import com.google.protobuf.CodedInputStream
 import io.paritytech.polkadotapp.tools_ipfs_api.Cid
 import java.io.ByteArrayInputStream
+import java.io.EOFException
+import java.io.File
+import java.io.InputStream
+import java.io.RandomAccessFile
 
 /**
  * Parses CARv1 (Content Addressable aRchive) files from IPFS.
@@ -45,6 +49,27 @@ object CarParser {
 
         val files = UnixFsDecoder.reconstructFileTree(rootCid, carFile.blocks)
         UnpackedCarArchive(files)
+    }
+
+    /**
+     * Streams a CARv1 archive from disk and reconstructs the file tree, emitting each file to
+     * [onFile] as it is reassembled rather than materializing the whole archive in memory.
+     *
+     * Unlike [parse], this never holds the archive (or any whole file) in memory: a single
+     * sequential scan builds a `CID -> offset` index ([CarBlockIndex]), then a DFS traversal
+     * streams each file's content straight from disk. Use this for large archives that would
+     * OOM the buffered path.
+     *
+     * The [content] stream passed to [onFile] is backed by the open archive file and must be
+     * fully consumed before [onFile] returns. Throws on malformed input (the caller is expected
+     * to wrap this in `runCatching` / `mapCatching`); a thrown exception lets the caller clean up
+     * any partially-written output.
+     */
+    fun unpack(carFile: File, onFile: (FilePath, content: InputStream) -> Unit) {
+        buildIndex(carFile).use { index ->
+            require(index.roots.isNotEmpty()) { "CAR archive has no root CIDs" }
+            UnixFsDecoder.unpack(index.roots.first(), index, onFile)
+        }
     }
 
     /**
@@ -93,8 +118,67 @@ object CarParser {
         return CarFile(roots = header.roots, blocks = blocks)
     }
 
+    /**
+     * Scans a CAR file sequentially, recording each block's data offset and length into a
+     * [CarBlockIndex] without copying block bytes. The returned index owns the open file handle.
+     */
+    private fun buildIndex(carFile: File): CarBlockIndex {
+        val file = RandomAccessFile(carFile, "r")
+
+        try {
+            val headerLength = readRawVarint(file)
+            val headerBytes = ByteArray(headerLength)
+            file.readFully(headerBytes)
+            val header = CborHeaderDecoder.decode(headerBytes)
+
+            val blocks = HashMap<Cid, BlockRef>()
+            val fileLength = file.length()
+
+            while (file.filePointer < fileLength) {
+                val blockLength = readRawVarint(file)
+                val blockStart = file.filePointer
+
+                // Read a bounded prefix to parse the CID, whose byte length is not known up front.
+                val prefixLength = minOf(blockLength, MAX_CID_PREFIX_BYTES)
+                val prefix = ByteArray(prefixLength)
+                file.readFully(prefix)
+
+                val prefixStream = ByteArrayInputStream(prefix)
+                val cid = Cid.cast(prefixStream as InputStream)
+                val cidLength = prefixLength - prefixStream.available()
+
+                blocks[cid] = BlockRef(offset = blockStart + cidLength, length = blockLength - cidLength)
+                file.seek(blockStart + blockLength)
+            }
+
+            return CarBlockIndex(file, header.roots, blocks)
+        } catch (e: Throwable) {
+            file.close()
+            throw e
+        }
+    }
+
+    private fun readRawVarint(file: RandomAccessFile): Int {
+        var result = 0
+        var shift = 0
+
+        while (true) {
+            val byte = file.read()
+            if (byte < 0) throw EOFException("Unexpected end of CAR file while reading varint")
+
+            result = result or ((byte and 0x7F) shl shift)
+            if (byte and 0x80 == 0) return result
+
+            shift += 7
+            require(shift <= 35) { "Varint is too long" }
+        }
+    }
+
     private class CarFile(
         val roots: List<Cid>,
         val blocks: Map<Cid, BlockData>
     )
+
+    // Comfortably larger than any IPFS CIDv1 (sha2-256 dag-pb/raw CIDs are ~36 bytes).
+    private const val MAX_CID_PREFIX_BYTES = 256
 }

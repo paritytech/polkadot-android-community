@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest
 
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
+import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.ResourcesRepository
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.requireConsumerInfo
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
@@ -31,6 +32,7 @@ class RealIncomingChatRequestVerifier @Inject constructor(
             .requireConsumerInfo(chainRegistry.getChain(knownChains.people), proof.identityAccountId)
             .getOrThrow()
             .identifierKey
+            .let { it.x25519OrNull() ?: error("Peer account uses an unsupported chat encryption key type") }
 
         val ok = identityProofCodec.verify(
             proof = proof,

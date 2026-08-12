@@ -12,36 +12,36 @@ import io.paritytech.polkadotapp.feature_swap_api.domain.model.SwapQuoteArgs
 import kotlinx.coroutines.flow.Flow
 
 interface SwapService {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun initiateWarmUp()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun sync()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun assetsAvailableForSwap(): Flow<Set<FullChainAssetId>>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun awaitFullyLoadedRouting()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun availableSwapDirectionsFor(asset: Chain.Asset): Flow<Set<FullChainAssetId>>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun hasAvailableSwapDirections(asset: Chain.Asset): Flow<Boolean>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun quote(
         args: SwapQuoteArgs,
     ): Result<SwapQuote>
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun estimateFee(feeArgs: SwapFeeArgs): Result<SwapFee>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun swap(
         calculatedFee: SwapFee
     ): Flow<SwapProgress>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun runSubscriptions(): Flow<ReQuoteTrigger>
 }

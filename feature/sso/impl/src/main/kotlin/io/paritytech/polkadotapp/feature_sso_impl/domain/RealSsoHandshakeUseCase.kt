@@ -2,8 +2,9 @@ package io.paritytech.polkadotapp.feature_sso_impl.domain
 
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
-import io.paritytech.polkadotapp.common.utils.Secp256r1KeyGenerator
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.AccountDerivationUseCase
@@ -24,6 +25,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.data.encryption.Com
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 class RealSsoHandshakeUseCase @Inject constructor(
     private val communicationEncryption: CommunicationEncryption.Factory,
@@ -34,14 +36,14 @@ class RealSsoHandshakeUseCase @Inject constructor(
     private val sharedSecretDerivationUseCase: SharedSecretDerivationUseCase,
     private val deriveEntropyUseCase: DeriveEntropyUseCase,
     private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
-    private val keyGenerator: Secp256r1KeyGenerator,
     private val coroutineDispatchers: CoroutineDispatchers,
 ) : SsoHandshakeUseCase {
+    context(diagnostics: StalenessReportCollector)
     override suspend fun respondToOffer(
         offer: HandshakeOffer,
         response: HandshakeResponse,
-    ): Result<Unit> {
-        return withContext(coroutineDispatchers.io) {
+    ): Result<Unit> = diagnostics.markRegion(RCommon.string.sso_stall_responding_to_device) {
+        withContext(coroutineDispatchers.io) {
             val rootAccount = accountDerivationUseCase.deriveRootAccount()
             val walletAccount = accountRepository.getWalletAccount()
 
@@ -63,10 +65,10 @@ class RealSsoHandshakeUseCase @Inject constructor(
         val walletAccount = accountRepository.getWalletAccount()
 
         val identityChatKeypair = sharedSecretDerivationUseCase.deriveForDomain(SharedSecretDerivationDomain.CHAT)
-        val identityChatPrivateKey = keyGenerator.encodePrivate(identityChatKeypair.private)
+        val identityChatPrivateKey = identityChatKeypair.privateKey.bytes
 
         val ssoSessionKeypair = sharedSecretDerivationUseCase.deriveForDomain(SsoDerivationDomains.SSO_DERIVATION_DOMAIN)
-        val ssoEncrPubKey = keyGenerator.encode(ssoSessionKeypair.public)
+        val ssoEncrPubKey = ssoSessionKeypair.publicKey
 
         val rootEntropySource = deriveEntropyUseCase.deriveRootEntropySource().getOrThrow()
 

@@ -27,6 +27,7 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.faq.ChatFaqContr
 import io.paritytech.polkadotapp.feature_chats_api.presentation.faq.ChatFaqViewModel
 import io.paritytech.polkadotapp.feature_chats_api.presentation.faq.model.FaqQuestion
 import io.paritytech.polkadotapp.feature_chats_api.presentation.faq.model.FaqUiState
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -34,7 +35,7 @@ import io.paritytech.polkadotapp.common.R as RCommon
 fun FaqQuestions(
     modifier: Modifier = Modifier,
     botId: ChatExtensionId,
-    allQuestions: List<FaqQuestion>
+    allQuestions: ImmutableList<FaqQuestion>
 ) {
     val contract = hiltViewModel<ChatFaqViewModel, ChatFaqViewModel.Factory>(
         creationCallback = { it.create(botId, allQuestions) }

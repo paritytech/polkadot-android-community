@@ -1,3 +1,7 @@
+plugins {
+    id("polkadotapp.android.library")
+}
+
 android {
     namespace = "io.paritytech.polkadotapp.feature_chain_resources_impl"
 }

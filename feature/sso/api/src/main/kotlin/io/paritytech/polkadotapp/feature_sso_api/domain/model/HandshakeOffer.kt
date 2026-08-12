@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_sso_api.domain.model
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 
 class HandshakeOffer(
     val device: HandshakeDevice,
@@ -10,7 +10,7 @@ class HandshakeOffer(
 
 class HandshakeDevice(
     val statementAccountId: AccountId,
-    val encryptionPublicKey: EncodedPublicKey,
+    val encryptionPublicKey: X25519PublicKey,
 )
 
 class HandshakeMetadata(val entries: Map<Key, String>) {

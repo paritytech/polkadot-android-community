@@ -1,4 +1,5 @@
 plugins {
+    id("polkadotapp.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -11,5 +12,5 @@ dependencies {
     api(project(":feature:account:api"))
     api(project(":feature:people:api"))
 
-    api(libs.bouncycastle.jdk15)
+    api(libs.bouncycastle.jdk18)
 }

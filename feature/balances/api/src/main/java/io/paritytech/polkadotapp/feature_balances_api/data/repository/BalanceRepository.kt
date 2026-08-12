@@ -21,11 +21,11 @@ interface BalanceRepository {
         chainAsset: Chain.Asset
     ): TokenBalance
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun observeBalanceHolds(chainId: ChainId, accountId: AccountId): Flow<List<BalanceHold>>
 }
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun BalanceRepository.observeBalanceHoldById(
     chainId: ChainId,
     accountId: AccountId,

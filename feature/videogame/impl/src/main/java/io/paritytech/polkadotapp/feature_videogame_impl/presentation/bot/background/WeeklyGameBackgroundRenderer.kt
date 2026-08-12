@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
+import io.paritytech.polkadotapp.design.theme.ForceDarkBackgroundSystemBarsEffect
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatBackgroundRenderer
 import io.paritytech.polkadotapp.feature_videogame_impl.R
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.theme.NovaPrizesColors
@@ -17,6 +18,8 @@ private const val PATTERN_ALPHA = 0.10f
 internal class WeeklyGameBackgroundRenderer : CustomChatBackgroundRenderer {
     @Composable
     override fun DrawBackground() {
+        ForceDarkBackgroundSystemBarsEffect()
+
         PolkadotSurface(
             modifier = Modifier.fillMaxSize(),
             brush = BASE_GRADIENT,

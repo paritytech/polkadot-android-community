@@ -44,6 +44,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Local
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
+import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -53,6 +54,7 @@ fun PaymentMessage(
     grouping: ChatMessageGrouping,
     isHighlighted: Boolean,
     username: String,
+    canBeReplied: Boolean,
     onMessageAction: (MessageAction) -> Unit,
     onLongPress: (MessageLayoutInfo) -> Unit,
     customBubbleStyle: ChatMessageSurfaceStyle? = null,
@@ -62,7 +64,7 @@ fun PaymentMessage(
         message = message,
         grouping = grouping,
         isHighlighted = isHighlighted,
-        canBeReplied = false,
+        canBeReplied = canBeReplied,
         onMessageAction = onMessageAction,
         onLongPress = onLongPress,
         reactions = message.reactions,
@@ -329,6 +331,11 @@ private fun MessagesPreview(direction: ChatMessageUiModel.Direction) {
                     direction = direction,
                     paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Transferred(TokenAmountModel.mock(value = 500)),
                 )
+                PaymentMessagePreview(
+                    direction = direction,
+                    paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Detected(TokenAmountModel.mock),
+                    deliveryStatus = ChatMessageUiModel.Status.FAILED,
+                )
             }
         }
     }
@@ -337,23 +344,25 @@ private fun MessagesPreview(direction: ChatMessageUiModel.Direction) {
 @Composable
 private fun PaymentMessagePreview(
     direction: ChatMessageUiModel.Direction,
-    paymentStatus: ChatMessageUiModel.CoinagePayment.Status
+    paymentStatus: ChatMessageUiModel.CoinagePayment.Status,
+    deliveryStatus: ChatMessageUiModel.Status = ChatMessageUiModel.Status.SENT
 ) {
     PaymentMessage(
         modifier = Modifier.fillMaxWidth(),
         message = ChatMessageUiModel.CoinagePayment(
             id = "1",
             direction = direction,
-            status = ChatMessageUiModel.Status.SENT,
+            status = deliveryStatus,
             timestamp = System.currentTimeMillis(),
             amount = TokenAmountModel.mock,
             paymentStatus = paymentStatus,
             origin = ChatMessageOrigin.User,
-            reactions = emptyList()
+            reactions = persistentListOf()
         ),
         grouping = ChatMessageGrouping.Standalone,
         isHighlighted = false,
         username = "Glak",
+        canBeReplied = true,
         onMessageAction = {},
         onLongPress = {}
     )

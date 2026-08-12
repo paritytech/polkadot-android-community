@@ -64,11 +64,13 @@ private fun AllowanceResourceKind.toApResource(): ApAllocatableResource = when (
 private fun ApAllocatedResource.slotKey(): SlotAccountKey? = when (this) {
     is ApAllocatedResource.BulletInAllowance -> slotAccountKey
     is ApAllocatedResource.StatementStoreAllowance -> slotAccountKey
-    ApAllocatedResource.SmartContractAllowance -> null
+    ApAllocatedResource.SmartContractAllowance,
+    is ApAllocatedResource.AutoSigning -> null
 }
 
 private fun ApAllocatedResource.toAllowanceResourceKind(): AllowanceResourceKind? = when (this) {
     is ApAllocatedResource.BulletInAllowance -> AllowanceResourceKind.BULLETIN
     is ApAllocatedResource.StatementStoreAllowance -> AllowanceResourceKind.STATEMENT_STORE
-    ApAllocatedResource.SmartContractAllowance -> null
+    ApAllocatedResource.SmartContractAllowance,
+    is ApAllocatedResource.AutoSigning -> null
 }

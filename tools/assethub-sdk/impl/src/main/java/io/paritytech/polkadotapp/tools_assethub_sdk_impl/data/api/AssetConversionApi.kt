@@ -17,11 +17,10 @@ import io.paritytech.polkadotapp.feature_xcm_api.multiLocation.RelativeMultiLoca
 @JvmInline
 internal value class AssetConversionApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 internal val RuntimeMetadata.assetConversionOrNull: AssetConversionApi?
     get() = assetConversionOrNull()?.let(::AssetConversionApi)
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 internal val AssetConversionApi.pools: QueryableStorageEntry1<Tuple2<RelativeMultiLocation, RelativeMultiLocation>, Unit>
     get() = storage1(name = "Pools")
 

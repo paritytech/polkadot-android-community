@@ -8,19 +8,13 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.getChainIdByGenesisHashOrThrow
 import io.paritytech.polkadotapp.chains.util.findGenesisHashOrThrow
-import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
-import io.paritytech.polkadotapp.common.utils.requireNotNull
-import io.paritytech.polkadotapp.feature_members_api.data.repository.MembersRepository
-import io.paritytech.polkadotapp.feature_members_api.data.repository.getRingRoot
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
-import io.paritytech.polkadotapp.feature_people_api.domain.toRingCollectionId
 
 class ClaimLongTermStorage(
     private val context: BandersnatchContext,
     private val collection: PeopleCollection,
     private val peopleMembershipProver: PeopleMembershipProver,
-    private val membersRepository: MembersRepository,
     private val chainRegistry: ChainRegistry,
 ) : TransactionExtension {
     override val name: String = "AsResources"
@@ -41,17 +35,10 @@ class ClaimLongTermStorage(
             peopleCollection = collection,
         ).getOrThrow()
 
-        val revision = membersRepository.getRingRoot(
-            chainId = chainId,
-            collectionId = collection.toRingCollectionId(),
-            ringIndex = proofResult.ringIndex,
-            consistency = CacheableDataConsistency.CONSISTENT_WITH_REMOTE,
-        ).requireNotNull().getOrThrow().revision
-
         return AsResourcesInfoScale.ClaimLongTermStorage(
             proof = proofResult.proof,
             ringIndex = proofResult.ringIndex,
-            revision = revision,
+            revision = proofResult.revision,
             collection = collection.toScale(),
         ).toEncodableInstance()
     }

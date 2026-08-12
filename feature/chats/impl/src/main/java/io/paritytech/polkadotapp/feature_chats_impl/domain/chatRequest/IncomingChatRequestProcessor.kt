@@ -4,8 +4,10 @@ import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.data.os.OperatingSystem
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
+import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.common.utils.CurrentTimeContext
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -119,6 +121,10 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
 ) : IncomingChatRequestProcessor {
+    private companion object {
+        const val ACCEPTED_MESSAGE_ID_PREFIX = "req-accepted:"
+    }
+
     override suspend fun processIncomingRequest(
         data: IncomingChatRequestData
     ): Result<IncomingRequestProcessingResult> = runCatching {
@@ -303,13 +309,13 @@ class RealIncomingChatRequestProcessor @Inject constructor(
             .requireConsumerInfo(chainRegistry.getChain(knownChains.people), peerAccountId)
             .getOrThrow()
 
-        return createNewIncomingRequestChat(data, consumerInfo.username, consumerInfo.identifierKey)
+        return createNewIncomingRequestChat(data, consumerInfo.username, (consumerInfo.identifierKey.x25519OrNull() ?: error("Peer account uses an unsupported chat encryption key type")))
     }
 
     private suspend fun createNewIncomingRequestChat(
         data: IncomingChatRequestData,
         peerUsername: String?,
-        peerChatKey: EncodedPublicKey,
+        peerChatKey: X25519PublicKey,
     ): IncomingRequestProcessingResult {
         val peerAccountId = data.request.peerIdentityAccountId()
 
@@ -395,6 +401,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         val ourPAppDevice = buildPAppDevice()
 
         val chatMessage = ChatMessage.new(
+            messageId = "$ACCEPTED_MESSAGE_ID_PREFIX$requestId",
             chatId = ChatId.fromContact(peerAccountId),
             content = ChatMessage.Content.DeviceChatAccepted(requestId, ourPAppDevice),
             origin = ChatMessageOrigin.User,
@@ -422,7 +429,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
             is VersionedRequestContent.V2 -> NormalizedRequestContent(
                 pushToken = content.content.pushToken,
                 welcomeMessage = content.content.welcomeMessage,
-                peerDeviceEncPubKey = EncodedPublicKey(content.content.deviceEncPubKey),
+                peerDeviceEncPubKey = content.content.deviceEncPubKey.toDomain().getOrThrow(),
             )
         }
     }
@@ -433,7 +440,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private suspend fun savePeerDevice(
         contactAccountId: AccountId,
         peerStatementAccountId: AccountId,
-        peerDeviceEncPubKey: EncodedPublicKey?,
+        peerDeviceEncPubKey: X25519PublicKey?,
     ) {
         if (peerDeviceEncPubKey == null) return
 
@@ -452,7 +459,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private data class NormalizedRequestContent(
         val pushToken: TokenContent?,
         val welcomeMessage: RichTextContent?,
-        val peerDeviceEncPubKey: EncodedPublicKey?,
+        val peerDeviceEncPubKey: X25519PublicKey?,
     )
 
     private fun RichTextContent.toWelcomeContent(): ChatMessage.Content.RichText {

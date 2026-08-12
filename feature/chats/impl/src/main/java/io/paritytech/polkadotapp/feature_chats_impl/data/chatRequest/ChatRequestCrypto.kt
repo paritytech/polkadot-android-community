@@ -3,8 +3,8 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.decodeFromByteArray
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
-import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestEncryptedRemote
@@ -25,7 +25,7 @@ interface ChatRequestCrypto {
      */
     suspend fun encrypt(
         decrypted: ChatRequestDecrypted,
-        peerPublicKey: EncodedPublicKey
+        peerPublicKey: X25519PublicKey
     ): Result<ChatRequestEncryptedRemote>
 
     /**
@@ -47,7 +47,7 @@ class RealChatRequestCrypto @Inject constructor(
 ) : ChatRequestCrypto {
     override suspend fun encrypt(
         decrypted: ChatRequestDecrypted,
-        peerPublicKey: EncodedPublicKey
+        peerPublicKey: X25519PublicKey
     ): Result<ChatRequestEncryptedRemote> = runCatching {
         val decryptedBytes = BinaryScale.encodeToByteArray(decrypted)
 
@@ -55,7 +55,7 @@ class RealChatRequestCrypto @Inject constructor(
         val encryptedBytes = encryption.encrypt(decryptedBytes)
 
         ChatRequestEncryptedRemote(
-            encryptionPubKey = encryption.localPublicKey.value,
+            encryptionPubKey = encryption.localPublicKey.bytes.value,
             encryptedRequest = encryptedBytes
         )
     }
@@ -64,7 +64,7 @@ class RealChatRequestCrypto @Inject constructor(
         encrypted: ChatRequestEncryptedRemote,
         domain: SharedSecretDerivationDomain
     ): Result<ChatRequestDecrypted> = runCatching {
-        val oneTimePeerKey = encrypted.encryptionPubKey.toDataByteArray()
+        val oneTimePeerKey = encrypted.encryptionPubKey.requireX25519PublicKey()
         val encryption = encryptionFactory.create(domain, oneTimePeerKey)
         val decryptedBytes = encryption.decrypt(encrypted.encryptedRequest)
 

@@ -87,6 +87,7 @@ class ChatMenuActionsProvider @Inject constructor() {
             is ChatMessageUiModel.Custom<*>,
             is ChatMessageUiModel.CoinagePayment,
             is ChatMessageUiModel.Unsupported,
+            is ChatMessageUiModel.CompactionUnavailable,
             is ChatMessageUiModel.Call -> null
         }
     }
@@ -105,6 +106,7 @@ class ChatMenuActionsProvider @Inject constructor() {
             is ChatMessageUiModel.Custom<*>,
             is ChatMessageUiModel.CoinagePayment,
             is ChatMessageUiModel.Unsupported,
+            is ChatMessageUiModel.CompactionUnavailable,
             is ChatMessageUiModel.Call -> null
         }
     }

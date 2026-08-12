@@ -30,14 +30,14 @@ class DepositMessageProcessor @Inject constructor(
         val DEPOSIT_HOLD_ID = BalanceHoldId("Game", "PlayGame")
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun launchSendingMessages() {
-        scope.launch {
+        chatBotContext.scope.launch {
             handleDepositHoldMessage()
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun handleDepositHoldMessage() {
         val chain = depositAssetProvider.chain()
         val candidateAccount = accountRepository.getCandidateAccount()
@@ -48,7 +48,7 @@ class DepositMessageProcessor @Inject constructor(
         observeGameDepositHold(chain, depositAssetProvider.asset(), candidateAccountId)
             .collect { currentHold ->
                 if (hadNoHoldPreviously && currentHold != null) {
-                    sendCustomMessage(
+                    chatBotContext.sendCustomMessage(
                         content = DepositContent(
                             asset = DepositContent.Asset(chain.id, currentHold.chainAsset.id),
                             amount = currentHold.amount
@@ -61,7 +61,7 @@ class DepositMessageProcessor @Inject constructor(
             }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun observeGameDepositHold(chain: Chain, asset: Chain.Asset, candidateAccountId: AccountId): Flow<ChainAssetWithAmount?> {
         return balanceRepository.observeBalanceHoldById(chain.id, candidateAccountId, DEPOSIT_HOLD_ID)
             .map { gameDepositHold ->

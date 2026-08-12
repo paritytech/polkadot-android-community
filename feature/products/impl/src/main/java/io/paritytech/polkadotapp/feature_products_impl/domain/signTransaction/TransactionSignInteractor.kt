@@ -1,10 +1,10 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction
 
-import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SignedTransaction
+import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningAccount
 
 interface TransactionSignInteractor {
-    val account: ProductAccountId
+    val account: SigningAccount
 
     suspend fun parseSigningContent(): Result<ParsedSigningContent>
 

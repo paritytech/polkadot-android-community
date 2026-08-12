@@ -28,7 +28,7 @@ class RealTokenAmountMapper @Inject constructor() : TokenAmountMapper {
         )
     }
 
-    private class RealTokenAmountModel(
+    private data class RealTokenAmountModel(
         override val amount: BigDecimal,
         override val appearance: TokenSymbolAppearance,
     ) : TokenAmountModel

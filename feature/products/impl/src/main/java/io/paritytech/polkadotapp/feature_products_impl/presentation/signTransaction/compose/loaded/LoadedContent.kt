@@ -25,6 +25,7 @@ fun LoadedContent(
             val (detailsText, detailsTitle) = when (val content = state.content) {
                 is SigningContent.Transaction -> content.detailsJson to stringResource(RCommon.string.sign_transaction_details_title)
                 is SigningContent.RawMessage -> content.hexData to stringResource(RCommon.string.sign_raw_message_details_title)
+                is SigningContent.VrfTranscript -> content.itemsText to stringResource(RCommon.string.sign_vrf_transcript_details_title)
             }
 
             DetailsContent(

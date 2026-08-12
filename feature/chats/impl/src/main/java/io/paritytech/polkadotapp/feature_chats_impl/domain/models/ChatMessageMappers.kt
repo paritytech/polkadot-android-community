@@ -127,6 +127,8 @@ internal fun ChatMessage.Content.toLocalType(): ChatMessageLocal.Type {
         is ChatMessage.Content.DataChannelClosed -> ChatMessageLocal.Type.DATA_CHANNEL_CLOSED
         is ChatMessage.Content.DeviceAdded -> ChatMessageLocal.Type.DEVICE_ADDED
         is ChatMessage.Content.DeviceRemoved -> ChatMessageLocal.Type.DEVICE_REMOVED
+        is ChatMessage.Content.CompactionCommit -> ChatMessageLocal.Type.COMPACTION_COMMIT
+        is ChatMessage.Content.CompactionUnavailable -> ChatMessageLocal.Type.COMPACTION_UNAVAILABLE
     }
 }
 
@@ -152,6 +154,8 @@ internal fun KClass<out ChatMessage.Content>.toLocalType(): ChatMessageLocal.Typ
         ChatMessage.Content.DataChannelClosed::class -> ChatMessageLocal.Type.DATA_CHANNEL_CLOSED
         ChatMessage.Content.DeviceAdded::class -> ChatMessageLocal.Type.DEVICE_ADDED
         ChatMessage.Content.DeviceRemoved::class -> ChatMessageLocal.Type.DEVICE_REMOVED
+        ChatMessage.Content.CompactionCommit::class -> ChatMessageLocal.Type.COMPACTION_COMMIT
+        ChatMessage.Content.CompactionUnavailable::class -> ChatMessageLocal.Type.COMPACTION_UNAVAILABLE
         else -> error("Unknown content type: $this")
     }
 }
@@ -178,7 +182,9 @@ private fun ChatMessage.Content.toSearchableContent(): String {
         is ChatMessage.Content.DeviceRemoved,
         is ChatMessage.Content.Custom<*>,
         is ChatMessage.Content.ChatAccepted,
-        is ChatMessage.Content.DeviceChatAccepted -> ""
+        is ChatMessage.Content.DeviceChatAccepted,
+        is ChatMessage.Content.CompactionCommit,
+        is ChatMessage.Content.CompactionUnavailable -> ""
     }
 }
 
@@ -188,6 +194,7 @@ fun ChatMessage.Status.toLocal(): ChatMessageLocal.Status {
         ChatMessage.Status.NEW -> ChatMessageLocal.Status.NEW
         ChatMessage.Status.IS_SENT -> ChatMessageLocal.Status.IS_SENT
         ChatMessage.Status.IS_READ -> ChatMessageLocal.Status.IS_READ
+        ChatMessage.Status.DELIVERY_FAILED -> ChatMessageLocal.Status.DELIVERY_FAILED
     }
 }
 
@@ -197,5 +204,6 @@ internal fun ChatMessageLocal.Status.toDomain(): ChatMessage.Status {
         ChatMessageLocal.Status.NEW -> ChatMessage.Status.NEW
         ChatMessageLocal.Status.IS_SENT -> ChatMessage.Status.IS_SENT
         ChatMessageLocal.Status.IS_READ -> ChatMessage.Status.IS_READ
+        ChatMessageLocal.Status.DELIVERY_FAILED -> ChatMessage.Status.DELIVERY_FAILED
     }
 }

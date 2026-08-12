@@ -25,13 +25,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.Scanner
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleSize
-import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
@@ -47,6 +44,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.id.IdCardDetails
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketScreenState
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -59,39 +57,39 @@ fun PocketScreen() {
     val screenState by viewModel.state.collectAsStateWithLifecycle()
     val cards by viewModel.cards.collectAsStateWithLifecycle()
 
-    val cardTilt = rememberCardTilt()
-
-    CompositionLocalProvider(LocalCardTilt provides cardTilt) {
-        PocketScreenInternal(
-            screenState = screenState,
-            cards = cards,
-            onCardSelected = viewModel::selectCard,
-            onCardDismissed = viewModel::dismissCard,
-            onSketchbookSelected = viewModel::showCollectiblesSketchbook,
-            onSketchbookDismissed = viewModel::hideCollectiblesSketchbook,
-            onOpenCollectibles = viewModel::openCollectibles,
-            onOpenScanner = viewModel::openScanner
-        )
-    }
+    PocketScreenInternal(
+        screenState = screenState,
+        cards = cards,
+        onCardSelected = viewModel::selectCard,
+        onCardDismissed = viewModel::dismissCard,
+        onShareId = viewModel::onShareId,
+        onSketchbookSelected = viewModel::showCollectiblesSketchbook,
+        onSketchbookDismissed = viewModel::hideCollectiblesSketchbook,
+        onOpenCollectibles = viewModel::openCollectibles
+    )
 }
 
 @Composable
 private fun PocketScreenInternal(
     screenState: PocketScreenState,
-    cards: List<PocketCardUiModel>,
+    cards: ImmutableList<PocketCardUiModel>,
     onCardSelected: (PocketCardUiModel) -> Unit,
     onCardDismissed: () -> Unit,
+    onShareId: () -> Unit,
     onSketchbookSelected: () -> Unit,
     onSketchbookDismissed: () -> Unit,
-    onOpenCollectibles: () -> Unit,
-    onOpenScanner: () -> Unit
+    onOpenCollectibles: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val transition = updateTransition(screenState, label = "pocket_card_selection")
+    val cardTilt = rememberCardTilt()
 
     PolkadotSurface {
         SharedTransitionLayout {
-            CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            CompositionLocalProvider(
+                LocalSharedTransitionScope provides this,
+                LocalCardTilt provides cardTilt
+            ) {
                 transition.AnimatedContent(
                     transitionSpec = { pocketFadeIn() togetherWith pocketFadeOut() },
                     contentKey = { it.contentKey }
@@ -105,8 +103,7 @@ private fun PocketScreenInternal(
                                     listState = listState,
                                     collectiblesAvailable = current.collectiblesAvailable,
                                     onCardSelected = onCardSelected,
-                                    onCollectiblesSelected = onSketchbookSelected,
-                                    onOpenScanner = onOpenScanner
+                                    onCollectiblesSelected = onSketchbookSelected
                                 )
                             }
 
@@ -115,6 +112,7 @@ private fun PocketScreenInternal(
                                     selectedCard = current.selectedCard,
                                     allCards = cards,
                                     onBack = onCardDismissed,
+                                    onShareId = onShareId,
                                 )
                             }
 
@@ -135,8 +133,9 @@ private fun PocketScreenInternal(
 @Composable
 private fun SelectedCardDetails(
     selectedCard: PocketCardUiModel,
-    allCards: List<PocketCardUiModel>,
+    allCards: ImmutableList<PocketCardUiModel>,
     onBack: () -> Unit,
+    onShareId: () -> Unit,
 ) {
     val cardIndex = allCards.indexOfFirst { it.id == selectedCard.id }
     when (selectedCard) {
@@ -149,6 +148,7 @@ private fun SelectedCardDetails(
         is PocketCardUiModel.IdCard -> IdCardDetails(
             card = selectedCard,
             onBack = onBack,
+            onShareClick = onShareId,
             cardIndex = cardIndex,
         )
     }
@@ -156,13 +156,12 @@ private fun SelectedCardDetails(
 
 @Composable
 private fun PocketList(
-    cards: List<PocketCardUiModel>,
+    cards: ImmutableList<PocketCardUiModel>,
     anchorCard: PocketCardUiModel?,
     listState: LazyListState,
     collectiblesAvailable: Boolean,
     onCardSelected: (PocketCardUiModel) -> Unit,
-    onCollectiblesSelected: () -> Unit,
-    onOpenScanner: () -> Unit
+    onCollectiblesSelected: () -> Unit
 ) {
     val anchorIndex = cards.indexOfFirst { it.id == anchorCard?.id }
 
@@ -176,13 +175,7 @@ private fun PocketList(
         ) {
             PolkadotTopBar(
                 title = stringResource(RCommon.string.pocket_toolbar_title),
-                titleSize = TopBarTitleSize.Large,
-                actions = persistentListOf(
-                    rememberTopBarAction(
-                        action = onOpenScanner,
-                        icon = NovaIcons.Scanner
-                    )
-                )
+                titleSize = TopBarTitleSize.Large
             )
 
             LazyColumn(
@@ -208,7 +201,8 @@ private fun PocketList(
                             DigitalDollarCard(
                                 modifier = cardModifier,
                                 card = card,
-                                onSelected = onCardSelected
+                                onSelected = onCardSelected,
+                                isExpanded = false
                             )
                         }
 
@@ -264,16 +258,16 @@ private fun PocketScreenPreview() {
         ) {
             PocketScreenInternal(
                 screenState = PocketScreenState.List(collectiblesAvailable = true),
-                cards = listOf(
+                cards = persistentListOf(
                     PocketCardUiModel.DigitalDollar(TokenAmountModel.mock, TokenAmountModel.mock, false),
                     PocketCardUiModel.IdCard("username.99", "15oF4u...zaC1Ap", PocketRank.Basic)
                 ),
                 onCardSelected = {},
                 onCardDismissed = {},
+                onShareId = {},
                 onSketchbookSelected = {},
                 onSketchbookDismissed = {},
-                onOpenCollectibles = {},
-                onOpenScanner = {}
+                onOpenCollectibles = {}
             )
         }
     }

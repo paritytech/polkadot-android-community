@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.interceptor
 
 import io.paritytech.polkadotapp.tools_jwt_auth_api.CallWithBearerToken
+import io.paritytech.polkadotapp.tools_jwt_auth_impl.BuildConfig
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.manager.JWTTokenProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -19,6 +20,8 @@ internal class BearerTokenInterceptor(
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
+        if (BuildConfig.DISABLE_AUTH) return chain.proceed(request)
+
         val needsBearer = request.tag(Invocation::class.java)
             ?.method()?.annotations?.any { it is CallWithBearerToken } == true
 
@@ -32,6 +35,7 @@ internal class BearerTokenInterceptor(
                 else -> throw IOException("JWT acquisition failed", e)
             }
         }
+
         val authedRequest = request.newBuilder()
             .header(HEADER_AUTHORIZATION, "$BEARER_PREFIX$token")
             .build()

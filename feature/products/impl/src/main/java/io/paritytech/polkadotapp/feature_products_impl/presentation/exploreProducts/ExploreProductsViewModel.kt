@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
+import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.ProductsBotApiImpl
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiEnvironment
@@ -58,7 +59,7 @@ class ExploreProductsViewModel @Inject constructor(
     }
 
     fun onProductSelected(productId: ProductId) {
-        launch { router.openSpaBrowser(productId) }
+        launch { router.openSpaBrowser(SpaBrowserPayload.ByProductId(productId.value)) }
     }
 
     fun pauseConnections() {
@@ -85,7 +86,6 @@ class ExploreProductsViewModel @Inject constructor(
         val handlerGroups = hostCallGroupFactory.createShared(botApi, productIdProvider, navigationPolicy)
 
         val environment = HostApiEnvironment(
-            navigationPolicy = navigationPolicy,
             injectionStrategy = PageLoadInjection(
                 pageLifecycleSource = webViewProvider,
                 coroutineScope = this,

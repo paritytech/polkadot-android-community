@@ -20,7 +20,7 @@ internal class PairDeepLinkHandler @Inject constructor(
         return ssoHandshakeProtocol.isPairingDeeplink(data)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> {
         accountRepository.awaitAccountsInitialized()
 

@@ -16,7 +16,17 @@ import androidx.compose.ui.graphics.Path
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.compose.theme.GameColors
 
 @Composable
-fun WaitingRoomBackground(modifier: Modifier = Modifier) {
+fun WaitingRoomBackground(
+    modifier: Modifier = Modifier,
+    isVisible: Boolean = true,
+) {
+    if (isVisible) {
+        ShimmeringBand(modifier)
+    }
+}
+
+@Composable
+private fun ShimmeringBand(modifier: Modifier) {
     val transition = rememberInfiniteTransition(label = "waitingRoomShimmer")
     val shimmerProgress by transition.animateFloat(
         initialValue = 0f,

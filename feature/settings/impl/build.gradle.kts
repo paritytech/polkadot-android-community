@@ -1,8 +1,9 @@
 plugins {
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.dagger.hilt)
 }
 
 android {
@@ -28,9 +29,8 @@ dependencies {
     implementation(project(":tools:backup:api"))
     implementation(project(":tools:biometrics:api"))
 
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
-
     implementation(libs.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.fragment.ktx)
+
+    testImplementation(project(":test-shared"))
 }

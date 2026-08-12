@@ -9,6 +9,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.encode
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchProof
 import io.paritytech.polkadotapp.common.utils.scale.ToDynamicScaleInstance
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
+import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -20,6 +21,7 @@ sealed class AsResourcesInfoScale : ToDynamicScaleInstance {
     class RegisterStatementStoreAllowance(
         val proof: BandersnatchProof,
         val ringIndex: RingIndex,
+        val revision: RingRevision,
         val collection: MembershipCollectionScale,
     ) : AsResourcesInfoScale()
 }

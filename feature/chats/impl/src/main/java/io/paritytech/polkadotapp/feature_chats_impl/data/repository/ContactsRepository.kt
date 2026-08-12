@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.database.dao.ContactDao
 import io.paritytech.polkadotapp.feature_chats_api.domain.BlockedContactsRepository
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushToken
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactWithChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactWithRequestTimestamp
@@ -33,6 +34,7 @@ interface ContactsRepository {
     fun observeContactsChanged(): Flow<Unit>
 
     suspend fun saveContact(contact: Contact)
+    suspend fun updateContactUsername(accountId: AccountId, username: String?)
     suspend fun updateContactPushToken(accountId: AccountId, token: ChatPushToken, operatingSystem: OperatingSystem)
     suspend fun updateContactVoipPushToken(accountId: AccountId, token: ChatPushToken)
     suspend fun updateLastSharedPushTokenFor(accounts: List<AccountId>, newPushToken: String)
@@ -77,6 +79,7 @@ fun ContactsRepository.subscribeContactsWithChatRequestsByContactId(): Flow<Map<
 
 class RealContactsRepository @Inject constructor(
     private val dao: ContactDao,
+    private val chatSearchRecentsRepository: ChatSearchRecentsRepository,
 ) : ContactsRepository, BlockedContactsRepository {
     override suspend fun getContacts(): List<Contact> {
         return dao.getAll().map { it.toDomain() }
@@ -107,6 +110,10 @@ class RealContactsRepository @Inject constructor(
 
     override suspend fun saveContact(contact: Contact) {
         dao.upsert(contact.toLocal())
+    }
+
+    override suspend fun updateContactUsername(accountId: AccountId, username: String?) {
+        dao.updateUsername(accountId.value, username)
     }
 
     override suspend fun updateContactPushToken(
@@ -145,6 +152,7 @@ class RealContactsRepository @Inject constructor(
 
     override suspend fun deleteContact(accountId: AccountId) {
         dao.delete(accountId.value)
+        chatSearchRecentsRepository.removeRecent(ChatId.fromContact(accountId))
     }
 
     override suspend fun setPeerLeft(accountId: AccountId, isLeft: Boolean) {

@@ -27,7 +27,7 @@ class ContactSessionLifecycleBinder @Inject constructor(
 ) : AppInitializer {
     private val heldRefs = mutableMapOf<AccountId, ContactChatSessionReference>()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCatching {
         combine(
             appLifecycleObserver.subscribe(),
@@ -44,7 +44,7 @@ class ContactSessionLifecycleBinder @Inject constructor(
         }
             .onEach { target -> reconcile(target) }
             .onCompletion { releaseAll() }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     private suspend fun reconcile(target: Set<AccountId>) {

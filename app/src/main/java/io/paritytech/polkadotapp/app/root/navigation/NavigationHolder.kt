@@ -3,16 +3,16 @@ package io.paritytech.polkadotapp.app.root.navigation
 import androidx.navigation.NavController
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.tabs.BottomTab
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
 class NavigationHolder @Inject constructor(val contextManager: ContextManager) {
     var navController: NavController? = null
         private set
 
-    val tabRequests: SharedFlow<BottomTab>
-        field = MutableSharedFlow(extraBufferCapacity = 1)
+    val currentTab: StateFlow<BottomTab>
+        field = MutableStateFlow(BottomTab.CHATS)
 
     fun attach(navController: NavController) {
         this.navController = navController
@@ -23,7 +23,7 @@ class NavigationHolder @Inject constructor(val contextManager: ContextManager) {
     }
 
     fun requestTab(tab: BottomTab) {
-        tabRequests.tryEmit(tab)
+        currentTab.value = tab
     }
 
     fun finishApp() {

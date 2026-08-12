@@ -4,15 +4,23 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.ContextualAlias
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.GenesisHash
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentStatus
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocationOutcome
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ProductProofContext
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RegisteredRingVrfKey
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingLocation
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingVrfKeyDisclosure
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingVrfProof
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.VrfSignature
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.VrfTranscriptItem
 import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SignedTransaction
-import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContextHolder
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.GetUserIdResult
@@ -24,9 +32,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.ProductThe
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.NotificationId
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.DeviceCapabilityType
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.RemotePermissionRequest
-import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ProductSigningContext
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpSource
-import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
 import io.paritytech.polkadotapp.feature_statement_store_api.data.StatementsPage
 import io.paritytech.polkadotapp.feature_statement_store_api.data.TopicFilter
@@ -37,16 +43,62 @@ import kotlin.time.Instant
 
 abstract class BaseProductsBotApi(
     private val hostApiInteractor: HostApiInteractor,
-    private val signingContextHolder: SigningContextHolder,
-    private val router: ProductsRouter,
     private val callingProductIdProvider: CallingProductIdProvider
 ) : ProductsBotApi {
     override suspend fun accountGet(callingProductId: ProductId, productAccountId: ProductAccountId): Result<ProductAccountResult> {
         return hostApiInteractor.accountGet(callingProductId, productAccountId)
     }
 
-    override suspend fun accountGetAlias(callingProductId: ProductId, productAccountId: ProductAccountId): Result<ContextualAlias> {
-        return hostApiInteractor.accountGetAlias(callingProductId, productAccountId)
+    override suspend fun registerRingVrfKey(
+        callingProductId: ProductId,
+        index: DerivationIndex32,
+        ring: RingLocation,
+    ): Result<DataByteArray> {
+        return hostApiInteractor.registerRingVrfKey(callingProductId, index, ring)
+    }
+
+    override suspend fun listRingVrfKeys(
+        callingProductId: ProductId,
+        owner: ProductId,
+        disclosure: RingVrfKeyDisclosure,
+    ): Result<List<RegisteredRingVrfKey>> {
+        return hostApiInteractor.listRingVrfKeys(callingProductId, owner, disclosure)
+    }
+
+    override suspend fun ringVrfSign(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        message: ByteArray,
+    ): Result<ByteArray> {
+        return hostApiInteractor.ringVrfSign(callingProductId, keyHandle, message)
+    }
+
+    override suspend fun accountGetAlias(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        context: ProductProofContext,
+        ring: RingLocation,
+    ): Result<ContextualAlias> {
+        return hostApiInteractor.accountGetAlias(callingProductId, keyHandle, context, ring)
+    }
+
+    override suspend fun accountCreateProof(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        context: ProductProofContext,
+        ring: RingLocation,
+        message: ByteArray,
+    ): Result<RingVrfProof> {
+        return hostApiInteractor.accountCreateProof(callingProductId, keyHandle, context, ring, message)
+    }
+
+    override suspend fun accountSignVrf(
+        callingProductId: ProductId,
+        account: ProductAccountId,
+        transcriptLabel: ByteArray,
+        items: List<VrfTranscriptItem>,
+    ): Result<VrfSignature> {
+        return hostApiInteractor.signVrf(callingProductId, account, transcriptLabel, items)
     }
 
     override suspend fun getUserId(callingProductId: ProductId): Result<GetUserIdResult> {
@@ -65,8 +117,12 @@ abstract class BaseProductsBotApi(
         return hostApiInteractor.submitPreimage(callingProductId, data)
     }
 
-    override suspend fun createStatementProof(statementBody: Statement.Body): Result<StatementStoreMessageProof> {
-        return hostApiInteractor.createStatementProof(statementBody)
+    override suspend fun createStatementProof(
+        callingProductId: ProductId,
+        productAccountId: ProductAccountId,
+        statementBody: Statement.Body,
+    ): Result<StatementStoreMessageProof> {
+        return hostApiInteractor.createStatementProof(callingProductId, productAccountId, statementBody)
     }
 
     override suspend fun createStatementProofAuthorized(
@@ -92,6 +148,10 @@ abstract class BaseProductsBotApi(
         requests: List<RemotePermissionRequest>,
     ): Result<Boolean> {
         return hostApiInteractor.requestRemotePermissions(callingProductId, requests)
+    }
+
+    override suspend fun allowWebRtcAccess(callingProductId: ProductId): Result<Boolean> {
+        return hostApiInteractor.allowWebRtcAccess(callingProductId)
     }
 
     @OptIn(ExperimentalTime::class)
@@ -171,17 +231,19 @@ abstract class BaseProductsBotApi(
         return openSigningScreen(signingRequestBody).map { it as SignedTransaction.GeneralTransaction }
     }
 
+    override suspend fun signRawLegacy(signingRequestBody: SigningRequestBody.RawLegacy): Result<SignedTransaction.Raw> {
+        return openSigningScreen(signingRequestBody).map { it as SignedTransaction.Raw }
+    }
+
+    override suspend fun signCreateTransactionLegacy(
+        signingRequestBody: SigningRequestBody.CreateTransactionLegacy,
+    ): Result<SignedTransaction.GeneralTransaction> {
+        return openSigningScreen(signingRequestBody).map { it as SignedTransaction.GeneralTransaction }
+    }
+
     private suspend fun openSigningScreen(signingRequestBody: SigningRequestBody): Result<SignedTransaction> {
         return callingProductIdProvider.getProductId().flatMap { productId ->
-            val context = ProductSigningContext(
-                requesterName = productId.value,
-                requesterIconUrl = "",
-                signingRequestBody = signingRequestBody,
-            )
-            signingContextHolder.set(context)
-            router.openSignTransaction()
-
-            context.awaitResult()
+            hostApiInteractor.openSigningScreen(productId, signingRequestBody)
         }
     }
 }

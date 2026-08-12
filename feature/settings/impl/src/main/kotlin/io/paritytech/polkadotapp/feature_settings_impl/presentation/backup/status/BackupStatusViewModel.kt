@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictPayload
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
+import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.BackupState
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.BackupStatusInteractor
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.status.models.BackupStatusUiState
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
@@ -72,24 +73,14 @@ class BackupStatusViewModel @Inject constructor(
     private fun checkBackupAndInitCurrentState() = launchUnit {
         state.value = BackupStatusUiState.CheckingForBackup
 
-        interactor.getRestorableBackup()
-            .fold(
-                onSuccess = {
-                    if (it == null) {
-                        state.value = BackupStatusUiState.NoBackup
-                        return@fold
-                    }
-
-                    if (interactor.hasBackupConflict()) {
-                        state.value = BackupStatusUiState.BackupConflict(it.createdAt)
-                        router.openBackupConflict(BackupConflictPayload(it.createdAt))
-                    } else {
-                        state.value = BackupStatusUiState.BackupExists
-                    }
-                },
-                onFailure = {
-                    state.value = BackupStatusUiState.NoAccess
-                }
-            )
+        when (val backupState = interactor.resolveBackupState()) {
+            BackupState.None, BackupState.Corrupted -> state.value = BackupStatusUiState.NoBackup
+            is BackupState.Available -> state.value = BackupStatusUiState.BackupExists
+            is BackupState.Conflict -> {
+                state.value = BackupStatusUiState.BackupConflict(backupState.createdAt)
+                router.openBackupConflict(BackupConflictPayload(backupState.createdAt))
+            }
+            BackupState.NoAccess -> state.value = BackupStatusUiState.NoAccess
+        }
     }
 }

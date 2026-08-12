@@ -37,6 +37,7 @@ internal fun ChatMessageStatementContent.logContent(): String = when (this) {
     is ChatMessageStatementContent.DataChannelAnswer -> "DataChannelAnswer(offer=$offerMessageId)"
     is ChatMessageStatementContent.DataChannelIceCandidate -> "DataChannelIceCandidate(offer=$offerMessageId)"
     is ChatMessageStatementContent.DataChannelClosed -> "DataChannelClosed(offer=$offerMessageId)"
+    is ChatMessageStatementContent.CompactionCommit -> "CompactionCommit(${claimIdentifier.shortHex()})"
 }
 
 internal fun LocalStatusScale.logDirection(): String = when (this) {

@@ -27,21 +27,25 @@ class RealForceReclaimCoinsUseCase @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
 ) : ForceReclaimCoinsUseCase {
     override suspend operator fun invoke(): Result<ReclaimOutcome> {
-        val spentLocallyCoins = coinRepository.getCoinsWithSpentState(Coin.SpentState.SPENT_LOCALLY)
-        Timber.d("Force reclaim: ${spentLocallyCoins.size} SPENT_LOCALLY candidates ${spentLocallyCoins.logSummary()}")
+        // Both spent states are candidates: SPENT_LOCALLY (optimistically spent) and SPENT_ON_CHAIN — the latter
+        // because a fork rollback can resurrect a coin that tracking marked spent-on-chain when it disappeared.
+        // The decision is on-chain presence, not the stored state, so a still-absent coin is simply skipped.
+        val reclaimCandidates = coinRepository.getCoinsWithSpentState(Coin.SpentState.SPENT_LOCALLY) +
+            coinRepository.getCoinsWithSpentState(Coin.SpentState.SPENT_ON_CHAIN)
+        Timber.d("Force reclaim: ${reclaimCandidates.size} candidates (SPENT_LOCALLY + SPENT_ON_CHAIN) ${reclaimCandidates.logSummary()}")
 
-        if (spentLocallyCoins.isEmpty()) return Result.success(ReclaimOutcome.NothingToReclaim)
+        if (reclaimCandidates.isEmpty()) return Result.success(ReclaimOutcome.NothingToReclaim)
 
-        return coinRepository.fetchCoinsInfoFor(chainAssetProvider.chainId(), spentLocallyCoins.map { it.accountId })
-            .flatMap { coinsInfo -> reclaim(spentLocallyCoins, coinsInfo.filterNotNull()) }
+        return coinRepository.fetchCoinsInfoFor(chainAssetProvider.chainId(), reclaimCandidates.map { it.accountId })
+            .flatMap { coinsInfo -> reclaim(reclaimCandidates, coinsInfo.filterNotNull()) }
     }
 
     private suspend fun reclaim(
-        spentLocallyCoins: List<Coin>,
+        candidates: List<Coin>,
         presentCoinsInfo: Map<AccountId, OnChainCoinInfo>,
     ): Result<ReclaimOutcome> {
-        val presentCoins = spentLocallyCoins.filter { it.accountId in presentCoinsInfo }
-        Timber.d("Force reclaim: ${presentCoins.size}/${spentLocallyCoins.size} candidates present on-chain ${presentCoins.logSummary()}")
+        val presentCoins = candidates.filter { it.accountId in presentCoinsInfo }
+        Timber.d("Force reclaim: ${presentCoins.size}/${candidates.size} candidates present on-chain ${presentCoins.logSummary()}")
 
         if (presentCoins.isEmpty()) return Result.success(ReclaimOutcome.NothingToReclaim)
 

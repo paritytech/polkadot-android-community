@@ -28,3 +28,10 @@ class HopAckRequest(
     method = "hop_ack",
     params = listOf(hash, signature)
 )
+
+class BitswapGetRequest(
+    cid: String
+) : RuntimeRequest(
+    method = "bitswap_v1_get",
+    params = listOf(cid)
+)

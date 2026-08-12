@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,6 +24,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.compose
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.compose.getTitleRes
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.gameResult.GameResultContract
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.bot.gameResult.GameResultViewModel
+import kotlinx.collections.immutable.toImmutableList
 import javax.inject.Inject
 
 class GameResultRenderer @Inject constructor(
@@ -56,8 +58,12 @@ class GameResultRenderer @Inject constructor(
                     if (content.outcome is PastGameOutcome.Success) {
                         VerticalSpacer { extraSmall }
 
+                        val playerAvatarPaths = remember(content.playerAvatarPaths) {
+                            content.playerAvatarPaths.toImmutableList()
+                        }
+
                         ChatWithPlayers(
-                            playerAvatarPaths = content.playerAvatarPaths,
+                            playerAvatarPaths = playerAvatarPaths,
                             onClick = { contract.onChatWithPlayersClick() }
                         )
                     }

@@ -29,13 +29,13 @@ class AirdropRegistrationGate @Inject constructor(
     private val videoGameRepository: VideoGameRepositoryInternal,
     private val airdropRepository: AirdropRepository,
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribe(): Flow<Boolean> {
         return flow { emit(chainRegistry.peopleChain().id) }
             .flatMapLatest { chainId -> gateForChain(chainId) }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun gateForChain(chainId: ChainId): Flow<Boolean> {
         return videoGameRepository.subscribeGameInfo(chainId).flatMapLatest { game ->
             if (game?.airdropScheduled != true) {

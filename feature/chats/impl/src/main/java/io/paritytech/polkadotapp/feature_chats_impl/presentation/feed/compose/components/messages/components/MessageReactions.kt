@@ -14,12 +14,14 @@ import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatMessageUiModel
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MessageReactions(
     modifier: Modifier = Modifier,
-    reactions: List<ChatMessageUiModel.Reaction>,
+    reactions: ImmutableList<ChatMessageUiModel.Reaction>,
     onReactionClick: (String) -> Unit,
 ) {
     FlowRow(
@@ -80,7 +82,7 @@ private fun ReactionChip(
 private fun MessageReactionsPreview() {
     PolkadotTheme {
         MessageReactions(
-            reactions = listOf(
+            reactions = persistentListOf(
                 ChatMessageUiModel.Reaction(count = 3, emoji = "👍", reactedByUser = true),
                 ChatMessageUiModel.Reaction(count = 1, emoji = "❤️", reactedByUser = true),
                 ChatMessageUiModel.Reaction(count = 2, emoji = "😂", reactedByUser = true)

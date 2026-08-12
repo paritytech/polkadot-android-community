@@ -1,13 +1,18 @@
 package io.paritytech.polkadotapp.common.presentation.deeplink
 
+import android.content.Context
 import android.net.Uri
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.presentation.screens.MessageDisplay
+import io.paritytech.polkadotapp.common.utils.openUri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 interface DeepLinkHandler {
     fun canHandle(data: Uri): Boolean
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome>
 
     companion object {
@@ -39,4 +44,22 @@ suspend fun DeepLinkHandler.tryCanHandle(data: Uri): Boolean {
     return runCatching { canHandle(data) }
         .onFailure { Timber.e("Deeplink canHandle threw an error: $it") }
         .getOrDefault(false)
+}
+
+context(scope: ComputationalScope, messageDisplay: MessageDisplay, context: Context)
+suspend fun DeepLinkHandler.handleAndProcessOutcomeWithSystemFallback(data: Uri) {
+    if (!canHandle(data)) {
+        context.openUri(data)
+        return
+    }
+
+    val outcome = handle(data)
+        .onFailure { Timber.e(it, "Failed to handle navigation deeplink: $data") }
+        .flatten()
+
+    when (outcome) {
+        is DeeplinkProcessingOutcome.Navigate -> withContext(Dispatchers.Main) { outcome.navigate() }
+        DeeplinkProcessingOutcome.NoOp -> Unit
+        is DeeplinkProcessingOutcome.ShowMessage -> messageDisplay.showMessage(outcome.message)
+    }
 }

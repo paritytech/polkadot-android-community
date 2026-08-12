@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.common.utils.requireSuffix
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.model.toUrl
+import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import io.paritytech.polkadotapp.feature_products_impl.domain.productBotManagement.ProductBotManagementInteractor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -47,7 +48,7 @@ class ProductBotManagementViewModel @Inject constructor(
 
     override fun onProductClick(productId: ProductId) {
         launch {
-            router.openSpaBrowser(productId)
+            router.openSpaBrowser(SpaBrowserPayload.ByProductId(productId.value))
         }
     }
 

@@ -18,7 +18,7 @@ class SampleBotChatPreviewDelegate @Inject constructor(
 ) : CustomChatPreviewDelegate<String>
 
 class SampleBotChatPreviewDataProvider @Inject constructor() : CustomChatPreviewDataProvider<String> {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun provide(): Flow<ChatPreview.Custom<String>?> {
         return flowOf {
             ChatPreview.Custom(

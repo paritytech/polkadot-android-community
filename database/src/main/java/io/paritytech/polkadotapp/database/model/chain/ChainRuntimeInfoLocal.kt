@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.database.model.chain
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -24,4 +25,6 @@ class ChainRuntimeInfoLocal(
     val syncedVersion: Int,
     val remoteVersion: Int,
     val transactionVersion: Int?,
+    // Pre-existing rows default to 1 so that RuntimeCacheMigrator forces a single metadata re-fetch on upgrade
+    @ColumnInfo(defaultValue = "1") val localMigratorVersion: Int,
 )

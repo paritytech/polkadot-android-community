@@ -1,7 +1,9 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.devices
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatBroadcastUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatMessageSender
@@ -10,19 +12,21 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.isMultiDeviceChatSuppo
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 class RealBroadcastDeviceLifecycleUseCase @Inject constructor(
     private val chatBroadcastUseCase: ChatBroadcastUseCase,
     private val chatMessageSender: ChatMessageSender,
     private val accountRepository: AccountRepository,
 ) : BroadcastDeviceLifecycleUseCase {
+    context(diagnostics: StalenessReportCollector)
     override suspend fun broadcastDeviceAdded(
         statementAccountId: AccountId,
-        encryptionPublicKey: EncodedPublicKey,
-    ): Result<Unit> {
+        encryptionPublicKey: X25519PublicKey,
+    ): Result<Unit> = diagnostics.markRegion(RCommon.string.chats_stall_broadcasting_device) {
         val walletAccount = accountRepository.getWalletAccount()
 
-        return chatBroadcastUseCase.broadcastToContacts(
+        chatBroadcastUseCase.broadcastToContacts(
             ChatMessage.Content.DeviceAdded(
                 statementAccountId = statementAccountId,
                 encryptionPublicKey = encryptionPublicKey,
@@ -43,7 +47,7 @@ class RealBroadcastDeviceLifecycleUseCase @Inject constructor(
     override suspend fun sendDeviceAddedTo(
         contactAccountId: AccountId,
         statementAccountId: AccountId,
-        encryptionPublicKey: EncodedPublicKey,
+        encryptionPublicKey: X25519PublicKey,
     ): Result<Unit> = runCatching {
         chatMessageSender.sendUserMessage(
             chatId = ChatId.fromContact(contactAccountId),

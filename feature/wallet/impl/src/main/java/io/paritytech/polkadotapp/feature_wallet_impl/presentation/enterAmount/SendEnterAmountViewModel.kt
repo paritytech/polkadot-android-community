@@ -9,8 +9,6 @@ import io.paritytech.polkadotapp.common.domain.validation.onSuccess
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.validation.ValidationMixin
-import io.paritytech.polkadotapp.common.utils.disable
-import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.orZero
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.design.configs.colors.AvatarColorScheme
@@ -18,6 +16,7 @@ import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddressParcel
 import io.paritytech.polkadotapp.feature_balances_api.presentation.provider.BalanceFlowAvailableBalanceProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlan
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferPlan
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.amountinput.AmountInput
@@ -32,12 +31,15 @@ import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.SendPlan
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.TransferMethod
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.spendablePlanks
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendEnterAmountInteractor
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -56,10 +58,12 @@ class SendEnterAmountViewModel @Inject constructor(
     private val walletRouter: PocketRouter,
     private val interactor: SendEnterAmountInteractor,
 ) : BaseViewModel(), SendEnterAmountContract {
-    private val isInProgress = MutableStateFlow(false)
+    private val sendProgress = MutableStateFlow<SendProgress>(SendProgress.Idle)
     private val frozenBalance = MutableStateFlow<BigDecimal?>(null)
 
-    private val balanceFlow: Flow<BigDecimal> = isInProgress
+    private val balanceFlow: Flow<BigDecimal> = sendProgress
+        .map { it !is SendProgress.Idle }
+        .distinctUntilChanged()
         .flatMapLatest { inProgress ->
             if (inProgress) {
                 flowOf(frozenBalance.value.orZero())
@@ -85,9 +89,14 @@ class SendEnterAmountViewModel @Inject constructor(
         payload.amountPreset?.let { applyPreset(it) }
     }
 
-    private val debugPlanFlow: Flow<SendPlanDebugInfo?> = amountInputMixin.value.mapLatest { mixinValue ->
+    private val debugPlanFlow: Flow<SendPlanDebugInfo?> = combine(
+        amountInputMixin.value,
+        interactor.observeDebugWidgetsEnabled()
+    ) { mixinValue, widgetsEnabled ->
+        mixinValue to widgetsEnabled
+    }.mapLatest { (mixinValue, widgetsEnabled) ->
         val amount = mixinValue.input.input.toBigDecimalOrNull()
-        if (amount == null || amount <= BigDecimal.ZERO || !BuildConfig.DEBUG) {
+        if (amount == null || amount <= BigDecimal.ZERO || !BuildConfig.DEBUG || !widgetsEnabled) {
             null
         } else {
             val plan = interactor.plan(amount, transferMethod)
@@ -100,9 +109,9 @@ class SendEnterAmountViewModel @Inject constructor(
     override val state = combine(
         amountInputMixin.value,
         amountInputMixin.availableBalance,
-        isInProgress,
+        sendProgress,
         debugPlanFlow,
-    ) { inputMixinValue, availableBalance, isSendInProgress, debugPlan ->
+    ) { inputMixinValue, availableBalance, progress, debugPlan ->
         val inputNum = inputMixinValue.input.input.toBigDecimalOrNull()
 
         val isPositiveAmount = inputNum?.let { it > BigDecimal.ZERO } ?: false
@@ -112,7 +121,7 @@ class SendEnterAmountViewModel @Inject constructor(
         LoadingState.Loaded(
             SendEnterAmountUiState(
                 input = inputMixinValue.input.input,
-                isSendInProgress = isSendInProgress,
+                sendProgress = progress,
                 available = availableBalance,
                 recipient = recipientInfo.display,
                 recipientType = recipientInfo.type,
@@ -136,27 +145,27 @@ class SendEnterAmountViewModel @Inject constructor(
 
     override fun onConfirmClick() {
         launch {
-            isInProgress.enable()
+            sendProgress.value = SendProgress.Submitting
 
-            val trackTransfer = payload.showTransactionResult
             val amount = amountInputMixin.value.first().amount
 
-            val payload = SendValidationPayload(amount.amount, trackTransfer, transferMethod)
+            val payload = SendValidationPayload(amount.amount, transferMethod)
 
             sendValidationMixin.runValidation(interactor.sendValidation, payload)
                 .onSuccess { sendValidatedTransfer(it) }
 
-            isInProgress.disable()
+            sendProgress.value = SendProgress.Idle
         }
     }
 
     private suspend fun sendValidatedTransfer(payload: SendValidationPayload) {
-        interactor.send(payload.value, payload.trackTransfer, payload.transferMethod)
-            .onSuccess {
-                handleTransactionResult(error = null)
-            }
-            .onFailure {
-                handleTransactionResult(error = it)
+        interactor.send(payload.value, payload.transferMethod)
+            .collect { state ->
+                when (state) {
+                    is SendState.Settling -> sendProgress.value = SendProgress.Settling(state.detection.toStageUi())
+                    is SendState.Complete -> handleTransactionResult(error = null)
+                    is SendState.Failed -> handleTransactionResult(error = state.error)
+                }
             }
     }
 
@@ -205,6 +214,11 @@ private fun TransferMethodPayload.toRecipientInfo(): RecipientInfo = when (this)
 
 private fun ExtractedAddressParcel.toRecipientInfo(): RecipientInfo =
     RecipientInfo(display, type, AvatarColorScheme.from(accountId))
+
+private fun CoinageTransferDetection.toStageUi(): SendProgress.Settling.Stage = when (this) {
+    is CoinageTransferDetection.Detected -> SendProgress.Settling.Stage.DETECTED
+    else -> SendProgress.Settling.Stage.DETECTING
+}
 
 private fun TransferMethodPayload.toDomain(): TransferMethod = when (this) {
     is TransferMethodPayload.CoinsViaChat -> TransferMethod.CoinsViaChat(recipient.accountId.intoAccountId())

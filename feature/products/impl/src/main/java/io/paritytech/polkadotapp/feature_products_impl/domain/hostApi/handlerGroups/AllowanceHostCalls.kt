@@ -1,9 +1,13 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups
 
+import com.google.gson.annotations.JsonAdapter
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocationOutcome
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.ProductsBotApi
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.DerivationIndexWire
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.DerivationIndexWireAdapter
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.toDomain
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.ContainerBridge
 
 class AllowanceHostCalls(
@@ -29,7 +33,8 @@ private data class RequestResourceAllocationResult(val outcomes: List<Allocation
 
 private data class AllocatableResourceDto(
     val kind: String,
-    val dest: Int? = null,
+    @JsonAdapter(DerivationIndexWireAdapter::class)
+    val dest: DerivationIndexWire? = null,
 )
 
 private data class AllocationOutcomeDto(val kind: String)
@@ -38,7 +43,7 @@ private fun AllocatableResourceDto.toDomain(): AllocatableResource = when (kind)
     "BulletinAllowance" -> AllocatableResource.BulletInAllowance
     "StatementStoreAllowance" -> AllocatableResource.StatementStoreAllowance
     "SmartContractAllowance" -> AllocatableResource.SmartContractAllowance(
-        dest = requireNotNull(dest) { "SmartContractAllowance requires `dest`" }
+        dest = requireNotNull(dest) { "SmartContractAllowance requires `dest`" }.toDomain().getOrThrow()
     )
     "AutoSigning" -> AllocatableResource.AutoSigning
     else -> throw IllegalArgumentException("Unknown AllocatableResource kind: $kind")

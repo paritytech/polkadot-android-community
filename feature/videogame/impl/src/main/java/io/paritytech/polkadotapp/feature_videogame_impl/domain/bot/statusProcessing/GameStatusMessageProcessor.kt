@@ -36,20 +36,21 @@ class GameStatusMessageProcessor @Inject constructor(
     private val playerFrameFilePathCreator: PlayerFrameFilePathCreator,
     private val playingAccountUseCase: PlayingAccountUseCase
 ) : ChatBotMessageProcessor {
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun launchSendingMessages() {
-        scope.launch {
+        chatBotContext.scope.launch {
             videoGameJourneyUseCase()
                 .collect { journeyItems -> processJourneyItems(journeyItems) }
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun processJourneyItems(journeyItems: List<VideoGameJourneyItem>) {
-        val allExistingMessages = getPersistedMessages()
+        val allExistingMessages = chatBotContext.getPersistedMessages()
         val fullyCompleted = allExistingMessages.fullyCompletedLookup()
         val messageByIndex = allExistingMessages.messageByIndexMapping()
         val ourPlayerAccountId = playingAccountUseCase.getOurPlayerAccountId()
+        val alreadyAnnouncedPersonhood = allExistingMessages.hasAnnouncedPersonhood()
 
         journeyItems
             .filter { it.gameIndex !in fullyCompleted && it.status != VideoGameJourneyItem.Status.FUTURE }
@@ -63,7 +64,7 @@ class GameStatusMessageProcessor @Inject constructor(
 
                     VideoGameJourneyItem.Status.SUCCESSFUL -> {
                         val canDetectPersonhoodProgress = canDetectPersonhoodProgress(item, journeyItems)
-                        upsertSuccessGameMessage(item, canDetectPersonhoodProgress, existingMessage, ourPlayerAccountId)
+                        upsertSuccessGameMessage(item, canDetectPersonhoodProgress, alreadyAnnouncedPersonhood, existingMessage, ourPlayerAccountId)
                     }
 
                     VideoGameJourneyItem.Status.FAILED -> {
@@ -89,7 +90,16 @@ class GameStatusMessageProcessor @Inject constructor(
         }.toMap()
     }
 
-    context(ChatBotContext)
+    private fun List<ChatMessage>.hasAnnouncedPersonhood(): Boolean {
+        val latestScoring = filterCustomContents<PastGameContent>()
+            .mapNotNull { content -> (content.outcome as? PastGameOutcome.Success)?.scoring?.let { content.gameIndex to it } }
+            .maxByOrNull { (gameIndex, _) -> gameIndex }
+            ?.second
+
+        return latestScoring is SuccessPastGameScoring.ReachedPersonhood || latestScoring is SuccessPastGameScoring.AlreadyReachedPersonhood
+    }
+
+    context(chatBotContext: ChatBotContext)
     private suspend fun sendNewPendingGameMessage(
         item: VideoGameJourneyItem,
         ourPlayerAccountId: AccountId,
@@ -100,24 +110,31 @@ class GameStatusMessageProcessor @Inject constructor(
             ourPlayerAccountId = ourPlayerAccountId
         )
 
-        sendCustomMessage(
+        chatBotContext.sendCustomMessage(
             rendererId = GameResultRenderer.ID,
             content = customContent,
         )
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun upsertSuccessGameMessage(
         item: VideoGameJourneyItem,
         canDetectPersonhoodProgress: Boolean,
+        alreadyAnnouncedPersonhood: Boolean,
         existingMessage: ChatMessage?,
         ourPlayerAccountId: AccountId
     ) {
-        val content = constructSuccessMessageContent(item, canDetectPersonhoodProgress, existingMessage, ourPlayerAccountId)
-        upsertMessage(existingMessage?.id, content)
+        val content = constructSuccessMessageContent(
+            item,
+            canDetectPersonhoodProgress,
+            alreadyAnnouncedPersonhood,
+            existingMessage,
+            ourPlayerAccountId
+        )
+        chatBotContext.upsertMessage(existingMessage?.id, content)
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun upsertFailedGameMessage(
         item: VideoGameJourneyItem,
         canDetectPersonhoodProgress: Boolean,
@@ -125,19 +142,20 @@ class GameStatusMessageProcessor @Inject constructor(
         ourPlayerAccountId: AccountId
     ) {
         val content = constructFailedMessageContent(item, canDetectPersonhoodProgress, existingMessage, ourPlayerAccountId)
-        upsertMessage(existingMessage?.id, content)
+        chatBotContext.upsertMessage(existingMessage?.id, content)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun constructSuccessMessageContent(
         gameJourneyItem: VideoGameJourneyItem,
         canDetectPersonhoodProgress: Boolean,
+        alreadyAnnouncedPersonhood: Boolean,
         existingMessage: ChatMessage?,
         ourPlayerAccountId: AccountId,
     ): ChatMessage.Content {
         val outcome = if (canDetectPersonhoodProgress) {
             val gameProgress = gamesProgressUseCase.awaitStateForSuccessGame()
-            PastGameOutcome.Success(gameProgress.toSuccessPastGameScoringState())
+            PastGameOutcome.Success(gameProgress.toSuccessPastGameScoringState(alreadyAnnouncedPersonhood))
         } else {
             val gameProgress = gamesProgressUseCase.videoGameProgress()
             PastGameOutcome.Success(gameProgress.toSuccessPastGameScoringStateWithoutDetection())
@@ -146,7 +164,7 @@ class GameStatusMessageProcessor @Inject constructor(
         return modifyOrNewPastGameContent(outcome, gameJourneyItem, existingMessage, ourPlayerAccountId)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun constructFailedMessageContent(
         gameJourneyItem: VideoGameJourneyItem,
         canDetectPersonhoodProgress: Boolean,
@@ -164,13 +182,13 @@ class GameStatusMessageProcessor @Inject constructor(
         return modifyOrNewPastGameContent(outcome, gameJourneyItem, existingMessage, ourPlayerAccountId)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun VideoGamesProgressUseCase.awaitStateForSuccessGame(): VideoGamesProgress {
         // Filter out impossible states for success game - if they appear it means cache was not updated yet
         return videoGamesProgressFlow().first { it !is VideoGamesProgress.FinalGameProcessing }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun VideoGamesProgressUseCase.awaitStateForFailedGame(): VideoGamesProgress {
         // Filter out impossible states for failed game - if they appear it means cache was not updated yet
         return videoGamesProgressFlow().first {
@@ -194,19 +212,27 @@ class GameStatusMessageProcessor @Inject constructor(
         }
     }
 
-    private fun VideoGamesProgress.toSuccessPastGameScoringState(): SuccessPastGameScoring {
+    private fun VideoGamesProgress.toSuccessPastGameScoringState(alreadyAnnouncedPersonhood: Boolean): SuccessPastGameScoring {
         return when (this) {
             VideoGamesProgress.ExternallyRecognized -> SuccessPastGameScoring.ExternallyRecognized
 
             is VideoGamesProgress.NotStarted -> SuccessPastGameScoring.Playing(score.gamesLeft, hasSuspendedPersonhood = false)
 
-            is VideoGamesProgress.PersonhoodReached -> SuccessPastGameScoring.ReachedPersonhood
+            is VideoGamesProgress.PersonhoodReached -> reachedPersonhoodScoring(alreadyAnnouncedPersonhood)
 
             is VideoGamesProgress.PlayingGames -> SuccessPastGameScoring.Playing(score.gamesLeft, hasSuspendedPersonhood)
 
-            is VideoGamesProgress.ReadyToReachPersonhood -> SuccessPastGameScoring.ReachedPersonhood
+            is VideoGamesProgress.ReadyToReachPersonhood -> reachedPersonhoodScoring(alreadyAnnouncedPersonhood)
 
             is VideoGamesProgress.FinalGameProcessing -> error("FinalGameProcessing state was filtered out, should not appear here")
+        }
+    }
+
+    private fun reachedPersonhoodScoring(alreadyAnnouncedPersonhood: Boolean): SuccessPastGameScoring {
+        return if (alreadyAnnouncedPersonhood) {
+            SuccessPastGameScoring.AlreadyReachedPersonhood
+        } else {
+            SuccessPastGameScoring.ReachedPersonhood
         }
     }
 

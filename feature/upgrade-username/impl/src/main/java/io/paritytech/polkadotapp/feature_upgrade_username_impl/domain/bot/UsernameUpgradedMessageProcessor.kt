@@ -15,9 +15,9 @@ import javax.inject.Inject
 class RealUsernameUpgradedMessageProcessor @Inject constructor(
     private val readyToUpgradeUsernameUseCase: ReadyToUpgradeUsernameUseCase
 ) : UsernameUpgradedMessageProcessor {
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun launchSendingMessages() {
-        scope.launch {
+        chatBotContext.scope.launch {
             val completedState = awaitUsernameUpgraded()
             if (messageWasSent<UsernameUpgradedContent>()) return@launch
 
@@ -29,14 +29,14 @@ class RealUsernameUpgradedMessageProcessor @Inject constructor(
         .filter { it is UpgradeToFullUsernameState.Completed }
         .first() as UpgradeToFullUsernameState.Completed
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     private suspend fun sendUsernameUpgradedMessage(usernameState: UpgradeToFullUsernameState.Completed) {
         val customContent = UsernameUpgradedContent(
             username = usernameState.liteUsername.getDisplayUsername(),
             usernameWithoutSuffix = usernameState.fullUsername.getDisplayUsername()
         )
 
-        sendCustomMessage(
+        chatBotContext.sendCustomMessage(
             rendererId = UsernameUpgradedRenderer.ID,
             content = customContent,
         )

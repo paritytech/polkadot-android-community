@@ -23,7 +23,7 @@ class VideoGameResultsPreloadInitializer @Inject constructor(
     private val stateReader: VideoGameStateReader,
     private val preloader: GameResultsWebViewPreloader,
 ) : AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
         stateReader.gameSnapshot
             .map { it?.processState.shouldPreload() }
@@ -31,7 +31,7 @@ class VideoGameResultsPreloadInitializer @Inject constructor(
             .onEach { shouldPreload ->
                 if (shouldPreload) preloader.startWithRetry() else preloader.stopRetrying()
             }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     private fun VideoGameProcessState?.shouldPreload(): Boolean = when (this) {

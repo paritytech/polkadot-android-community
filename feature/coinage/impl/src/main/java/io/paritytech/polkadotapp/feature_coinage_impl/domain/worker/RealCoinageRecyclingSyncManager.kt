@@ -11,9 +11,9 @@ class RealCoinageRecyclingSyncManager @Inject constructor(
     private val contextManager: ContextManager,
     private val coinageRecyclingUseCase: CoinageRecyclingUseCase
 ) : CoinageRecyclingSyncManager {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun recycleAndSchedule() {
-        launch { coinageRecyclingUseCase() }
+        scope.launch { coinageRecyclingUseCase() }
         CoinageRecyclingWorker.schedule(contextManager.applicationContext)
     }
 }

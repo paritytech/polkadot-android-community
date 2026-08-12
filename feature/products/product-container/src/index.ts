@@ -1,10 +1,13 @@
 import { createContainer } from '@novasamatech/host-container';
 import type { Provider, Subscription } from '@novasamatech/host-api';
-import { RequestCredentialsErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, toHex, fromHex } from '@novasamatech/host-api';
+import { RequestCredentialsErr, CreateProofErr, GetAliasErr, SignVrfErr, RegisterRingVrfKeyErr, ListRingVrfKeysErr, RingVrfSignErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, toHex, fromHex } from '@novasamatech/host-api';
 import { createWsJsonRpcProvider } from '@novasamatech/host-substrate-chain-connection';
 
 type PausableJsonRpcProvider = ReturnType<typeof createWsJsonRpcProvider>;
 import { createNativeTransport } from './native-transport';
+
+type WireDerivationIndex = { tag: 'Index'; value: number } | { tag: 'Raw'; value: Uint8Array };
+import { WebRtcManager } from './webrtc-manager';
 
 // =============================================================================
 // Isolation: Capture private refs BEFORE locking down globals.
@@ -13,6 +16,9 @@ import { createNativeTransport } from './native-transport';
 
 // Captured before sandbox lockdown freezes window.WebSocket below.
 const CapturedWebSocket = globalThis.WebSocket;
+
+// Captured before the permission-gated replacement is installed below.
+const CapturedRTCPeerConnection = window.RTCPeerConnection;
 
 // =============================================================================
 // Isolation: Lock down globals so product scripts cannot access platform APIs.
@@ -52,7 +58,6 @@ freezeValue(window, 'WebSocket', function WebSocket() {
 });
 
 // --- Network: delete (no future permission path) ---
-freezeAndDelete(window, 'RTCPeerConnection');
 freezeAndDelete(window, 'EventSource');
 
 freezeValue(navigator, 'sendBeacon', () => false);
@@ -99,6 +104,16 @@ const { callNative, subscribeNative } = createNativeTransport((message) => {
   (window as any).Android.call('__container__', json);
 });
 
+if (CapturedRTCPeerConnection) {
+  const webRtcManager = new WebRtcManager(
+    CapturedRTCPeerConnection,
+    () => callNative('allowWebRtcAccess', {}).then((allowed: unknown) => allowed === true),
+  );
+  freezeValue(window, 'RTCPeerConnection', webRtcManager.connectionClass);
+} else {
+  freezeAndDelete(window, 'RTCPeerConnection');
+}
+
 const { port1, port2 } = new MessageChannel();
 
 (window as any).__HOST_API_PORT__ = port1;
@@ -130,9 +145,23 @@ const containerProvider: Provider = {
 
 const container = createContainer(containerProvider);
 
+/**
+ * RFC-0022: native takes the account selector in its tolerant JSON form — a number for a plain
+ * index, a 0x-hex string for a raw 32-byte one. Native re-expands `Left(n)` to `index_bytes(n)`.
+ *
+ * Handler params arrive already decoded into the tagged wire form, so this reads the tag rather
+ * than normalizing again — `derivationIndexOf` runs the other direction, selector to wire.
+ */
+function toNativeDerivationIndex(index: WireDerivationIndex): number | string {
+  return index.tag === 'Index' ? index.value : toHex(index.value);
+}
+
 container.handleAccountGet((params, { ok, err }) => {
   const [productId, derivationIndex] = params;
-  const promise: Promise<any> = callNative('accountGet', { productId, derivationIndex }).then(
+  const promise: Promise<any> = callNative('accountGet', {
+    productId,
+    derivationIndex: toNativeDerivationIndex(derivationIndex),
+  }).then(
     (result) => ok({
       publicKey: fromHex(result.publicKey),
       name: result.name ?? undefined,
@@ -142,14 +171,216 @@ container.handleAccountGet((params, { ok, err }) => {
   return promise;
 });
 
+// RFC-0004 (amended by RFC-0022): context is a [productId, suffix] tuple where the suffix is the
+// same selector an account carries; ring is { chainId, junctions }. Native expects bytes as hex.
+function toNativeContext(context: [string, WireDerivationIndex]) {
+  const [productId, suffix] = context;
+  return { productId, suffix: toNativeDerivationIndex(suffix) };
+}
+
+function toNativeRing(ring: { chainId: string; junctions: Array<{ tag: string; value: any }> }) {
+  return {
+    chainId: ring.chainId,
+    junctions: ring.junctions.map((junction) => ({
+      tag: junction.tag,
+      value: junction.tag === 'CollectionId' ? toHex(junction.value) : junction.value,
+    })),
+  };
+}
+
 container.handleAccountGetAlias((params, { ok, err }) => {
-  const [productId, derivationIndex] = params;
-  return callNative('accountGetAlias', { productId, derivationIndex }).then(
+  const [keyHandle, context, ring] = params;
+  return callNative('accountGetAlias', {
+    keyHandle: toNativeKeyHandle(keyHandle),
+    context: toNativeContext(context),
+    ring: toNativeRing(ring),
+  }).then(
     (result) => ok({
       context: fromHex(result.context),
       alias: fromHex(result.alias),
     }),
-    (e) => err(new RequestCredentialsErr.Unknown({ reason: String(e) })),
+    (e) => {
+      switch (e?.code) {
+        case 'RingNotFound':
+          return err(new GetAliasErr.RingNotFound());
+        case 'NotMember':
+          return err(new GetAliasErr.NotMember());
+        case 'KeyNotRegistered':
+          return err(new GetAliasErr.KeyNotRegistered());
+        case 'KeyNotInRing':
+          return err(new GetAliasErr.KeyNotInRing());
+        case 'Rejected':
+          return err(new GetAliasErr.Rejected());
+        default:
+          return err(new GetAliasErr.Unknown({ reason: String(e?.message ?? e) }));
+      }
+    },
+  );
+});
+
+container.handleAccountCreateProof((params, { ok, err }) => {
+  const [keyHandle, context, ring, message] = params;
+  return callNative('accountCreateProof', {
+    keyHandle: toNativeKeyHandle(keyHandle),
+    context: toNativeContext(context),
+    ring: toNativeRing(ring),
+    message: toHex(message),
+  }).then(
+    (result) => ok({
+      proof: fromHex(result.proof),
+      contextualAlias: {
+        context: fromHex(result.contextualAlias.context),
+        alias: fromHex(result.contextualAlias.alias),
+      },
+      ringIndex: result.ringIndex,
+      ringRevision: result.ringRevision,
+    }),
+    (e) => {
+      switch (e?.code) {
+        case 'RingNotFound':
+          return err(new CreateProofErr.RingNotFound());
+        case 'NotMember':
+          return err(new CreateProofErr.NotMember());
+        case 'KeyNotRegistered':
+          return err(new CreateProofErr.KeyNotRegistered());
+        case 'KeyNotInRing':
+          return err(new CreateProofErr.KeyNotInRing());
+        case 'NotAllowlisted':
+          return err(new CreateProofErr.NotAllowlisted());
+        case 'Rejected':
+          return err(new CreateProofErr.Rejected());
+        default:
+          return err(new CreateProofErr.Unknown({ reason: String(e?.message ?? e) }));
+      }
+    },
+  );
+});
+
+// --- Ring VRF key registry (RFC-0024) ---
+
+// A key handle is structurally a ProductAccountId, but names a slot in the ring VRF tree. It is
+// opaque to consumers: the raw selector round-trips unchanged rather than being re-narrowed.
+function toNativeKeyHandle(handle: [string, WireDerivationIndex]) {
+  const [productId, derivationIndex] = handle;
+  return { productId, derivationIndex: toNativeDerivationIndex(derivationIndex) };
+}
+
+function fromNativeRing(ring: { chainId: string; junctions: Array<{ tag: string; value: string }> }) {
+  return {
+    chainId: ring.chainId,
+    junctions: ring.junctions.map((junction) =>
+      junction.tag === 'CollectionId'
+        ? { tag: 'CollectionId', value: fromHex(junction.value) }
+        : { tag: 'PalletInstance', value: Number(junction.value) },
+    ),
+  };
+}
+
+/** Inverse of {@link toNativeDerivationIndex}: the wire form is a tagged enum, not a bare value. */
+function fromNativeDerivationIndex(index: number | string): WireDerivationIndex {
+  return typeof index === 'number'
+    ? { tag: 'Index', value: index }
+    : { tag: 'Raw', value: fromHex(index) };
+}
+
+function fromNativeRegistryEntry(entry: any) {
+  return {
+    handle: [entry.handle.productId, fromNativeDerivationIndex(entry.handle.derivationIndex)] as const,
+    rings: entry.rings.map(fromNativeRing),
+    publicKey: entry.publicKey ? fromHex(entry.publicKey) : undefined,
+  };
+}
+
+container.handleAccountRegisterRingVrfKey((params, { ok, err }) => {
+  const [index, ring] = params;
+  return callNative('registerRingVrfKey', {
+    index: toNativeDerivationIndex(index),
+    ring: toNativeRing(ring),
+  }).then(
+    (result) => ok(fromHex(result.publicKey)),
+    (e) => {
+      switch (e?.code) {
+        case 'NotConnected':
+          return err(new RegisterRingVrfKeyErr.NotConnected());
+        case 'RingNotFound':
+          return err(new RegisterRingVrfKeyErr.RingNotFound());
+        case 'Rejected':
+          return err(new RegisterRingVrfKeyErr.Rejected());
+        default:
+          return err(new RegisterRingVrfKeyErr.Unknown({ reason: String(e?.message ?? e) }));
+      }
+    },
+  );
+});
+
+container.handleAccountListRingVrfKeys((params, { ok, err }) => {
+  const [owner, disclosure] = params;
+  return callNative('listRingVrfKeys', { owner, disclosure: disclosure ?? 'Anonymized' }).then(
+    (result: any[]) => ok(result.map(fromNativeRegistryEntry)),
+    (e) => {
+      switch (e?.code) {
+        case 'NotConnected':
+          return err(new ListRingVrfKeysErr.NotConnected());
+        case 'Rejected':
+          return err(new ListRingVrfKeysErr.Rejected());
+        default:
+          return err(new ListRingVrfKeysErr.Unknown({ reason: String(e?.message ?? e) }));
+      }
+    },
+  );
+});
+
+container.handleAccountRingVrfSign((params, { ok, err }) => {
+  const [keyHandle, message] = params;
+  return callNative('ringVrfSign', {
+    keyHandle: toNativeKeyHandle(keyHandle),
+    message: toHex(message),
+  }).then(
+    (result) => ok(fromHex(result.signature)),
+    (e) => {
+      switch (e?.code) {
+        case 'NotConnected':
+          return err(new RingVrfSignErr.NotConnected());
+        case 'KeyNotRegistered':
+          return err(new RingVrfSignErr.KeyNotRegistered());
+        case 'NotAllowlisted':
+          return err(new RingVrfSignErr.NotAllowlisted());
+        case 'Rejected':
+          return err(new RingVrfSignErr.Rejected());
+        default:
+          return err(new RingVrfSignErr.Unknown({ reason: String(e?.message ?? e) }));
+      }
+    },
+  );
+});
+
+// --- Sign VRF (RFC-0023) ---
+
+container.handleAccountSignVrf((params, { ok, err }) => {
+  const [dotNsIdentifier, derivationIndex] = params.account;
+  return callNative('accountSignVrf', {
+    productId: dotNsIdentifier,
+    derivationIndex: toNativeDerivationIndex(derivationIndex),
+    label: toHex(params.transcriptLabel),
+    items: params.items.map((item) => ({
+      label: toHex(item.label),
+      value: toHex(item.value),
+    })),
+  }).then(
+    (result) => ok({
+      preOutput: fromHex(result.preOutput),
+      proof: fromHex(result.proof),
+    }),
+    (e) => {
+      switch (e?.code) {
+        case 'NotConnected':
+          return err(new SignVrfErr.NotConnected());
+        case 'Rejected':
+          return err(new SignVrfErr.Rejected());
+        default:
+          return err(new SignVrfErr.Unknown({ reason: String(e?.message ?? e) }));
+      }
+    },
   );
 });
 
@@ -242,6 +473,30 @@ container.handleDeriveEntropy(async (key, { ok, err }) => {
 
 // --- Signing ---
 
+type RawSignPayload = { tag: 'Bytes'; value: Uint8Array } | { tag: 'Payload'; value: string };
+type CreateTxPayload = {
+  genesisHash: Uint8Array;
+  callData: Uint8Array;
+  extensions: { id: string; additionalSigned: Uint8Array; extra: Uint8Array }[];
+  txExtVersion: number;
+};
+
+const rawSignNativeData = (payload: RawSignPayload) =>
+  payload.tag === 'Bytes' ? { data: toHex(payload.value) } : { payload: payload.value };
+
+// `signer` is the product-account tuple for product signing, or a hex account id for legacy signing.
+const createTxNativeParams = (signer: unknown, payload: CreateTxPayload) => ({
+  signer,
+  genesisHash: toHex(payload.genesisHash),
+  callData: toHex(payload.callData),
+  extensions: payload.extensions.map((e) => ({
+    id: e.id,
+    implicit: toHex(e.additionalSigned),
+    explicit: toHex(e.extra),
+  })),
+  txExtVersion: payload.txExtVersion,
+});
+
 container.handleSignPayload(async ({ account, payload }, { ok, err }) => {
   try {
     const result = await callNative('signPayload', { account, ...payload });
@@ -253,11 +508,7 @@ container.handleSignPayload(async ({ account, payload }, { ok, err }) => {
 
 container.handleSignRaw(async ({ account, payload }, { ok, err }) => {
   try {
-    const nativeData = payload.tag === 'Bytes'
-      ? { data: toHex(payload.value) }
-      : { payload: payload.value };
-
-    const result = await callNative('signRaw', { account, ...nativeData });
+    const result = await callNative('signRaw', { account, ...rawSignNativeData(payload) });
     return ok({ signature: result.signature, signedTransaction: result.signedTx ?? undefined });
   } catch (e) {
     return err(new SigningErr.Rejected());
@@ -268,17 +519,29 @@ container.handleSignRaw(async ({ account, payload }, { ok, err }) => {
 
 container.handleCreateTransaction(async (payload, { ok, err }) => {
   try {
-    const result = await callNative('createTransaction', {
-      signer: payload.signer,
-      genesisHash: toHex(payload.genesisHash),
-      callData: toHex(payload.callData),
-      extensions: payload.extensions.map((e) => ({
-        id: e.id,
-        implicit: toHex(e.additionalSigned),
-        explicit: toHex(e.extra),
-      })),
-      txExtVersion: payload.txExtVersion,
-    });
+    const result = await callNative('createTransaction', createTxNativeParams(payload.signer, payload));
+    return ok(fromHex(result.signedTx));
+  } catch (e) {
+    return err(new CreateTransactionErr.Unknown({ reason: String(e) }));
+  }
+});
+
+// --- Legacy account signing ---
+// These sign with a plain account id (e.g. the user's identity account) instead of a product
+// account. The native side reverse-resolves the account before showing the signing screen.
+
+container.handleSignRawWithLegacyAccount(async ({ signer, payload }, { ok, err }) => {
+  try {
+    const result = await callNative('signRawWithLegacyAccount', { account: signer, ...rawSignNativeData(payload) });
+    return ok({ signature: result.signature, signedTransaction: result.signedTx ?? undefined });
+  } catch (e) {
+    return err(new SigningErr.Rejected());
+  }
+});
+
+container.handleCreateTransactionWithLegacyAccount(async (payload, { ok, err }) => {
+  try {
+    const result = await callNative('createTransactionWithLegacyAccount', createTxNativeParams(toHex(payload.signer), payload));
     return ok(fromHex(result.signedTx));
   } catch (e) {
     return err(new CreateTransactionErr.Unknown({ reason: String(e) }));
@@ -404,17 +667,34 @@ container.handlePreimageSubmit(async (data, { ok, err }) => {
   }
 });
 
+// --- Statement Store: shared validation ---
+
+const STATEMENT_TOPIC_BYTES = 32;
+
+// Statement-store topics are fixed-size 32-byte hashes; reject malformed input before it reaches native.
+function validateStatementTopics(topics: Uint8Array[]): string | null {
+  const invalid = topics.find((topic) => topic.length !== STATEMENT_TOPIC_BYTES);
+  if (invalid === undefined) return null;
+
+  const asUtf8 = new TextDecoder().decode(invalid);
+  return `Statement topic must be ${STATEMENT_TOPIC_BYTES} bytes, got ${invalid.length}: ${toHex(invalid)} ("${asUtf8}")`;
+}
+
 // --- Statement Store Create Proof ---
 
-// TODO: Currently signs with wallet account, ignoring requested product account id.
-//  Switch to product-derived account once the chain supports granting allowances (e.g. zk vouchers).
-container.handleStatementStoreCreateProof(async ([_account, statement], { ok, err }) => {
+container.handleStatementStoreCreateProof(async ([account, statement], { ok, err }) => {
+  const topicError = validateStatementTopics(statement.topics);
+  if (topicError) return err(new StatementProofErr.Unknown({ reason: topicError }));
+
   try {
     const result = await callNative('createStatementProof', {
-      channel: statement.channel ? toHex(statement.channel) : undefined,
-      expiry: statement.expiry?.toString() ?? undefined,
-      topics: statement.topics.map((t) => toHex(t)),
-      data: statement.data ? toHex(statement.data) : undefined,
+      account,
+      statement: {
+        channel: statement.channel ? toHex(statement.channel) : undefined,
+        expiry: statement.expiry?.toString() ?? undefined,
+        topics: statement.topics.map((t) => toHex(t)),
+        data: statement.data ? toHex(statement.data) : undefined,
+      },
     });
     return ok({
       tag: result.tag as 'Sr25519',
@@ -428,6 +708,9 @@ container.handleStatementStoreCreateProof(async ([_account, statement], { ok, er
 // --- Statement Store Create Proof Authorized (RFC-0010) ---
 
 container.handleStatementStoreCreateProofAuthorized(async (statement, { ok, err }) => {
+  const topicError = validateStatementTopics(statement.topics);
+  if (topicError) return err(new StatementProofErr.Unknown({ reason: topicError }));
+
   try {
     const result = await callNative('createStatementProofAuthorized', {
       channel: statement.channel ? toHex(statement.channel) : undefined,
@@ -451,7 +734,7 @@ container.handleRequestResourceAllocation(async (resources, { ok, err }) => {
     const dtos = resources.map((r) => {
       switch (r.tag) {
         case 'SmartContractAllowance':
-          return { kind: r.tag, dest: r.value };
+          return { kind: r.tag, dest: toNativeDerivationIndex(r.value) };
         case 'StatementStoreAllowance':
         case 'BulletinAllowance':
         case 'AutoSigning':
@@ -472,6 +755,9 @@ container.handleRequestResourceAllocation(async (resources, { ok, err }) => {
 // --- Statement Store Submit ---
 
 container.handleStatementStoreSubmit(async (statement, { ok, err }) => {
+  const topicError = validateStatementTopics(statement.topics);
+  if (topicError) return err(new GenericError({ reason: topicError }));
+
   try {
     await callNative('statementStoreSubmit', {
       proof: {
@@ -492,7 +778,14 @@ container.handleStatementStoreSubmit(async (statement, { ok, err }) => {
 
 // --- Statement Store Subscribe ---
 
-container.handleStatementStoreSubscribe((filter, send, _interrupt) => {
+container.handleStatementStoreSubscribe((filter, send, interrupt) => {
+  const topicError = validateStatementTopics(filter.value);
+  if (topicError) {
+    console.error(topicError);
+    interrupt();
+    return () => {};
+  }
+
   const hexTopics = filter.value.map((t) => toHex(t));
   const nativeFilter = filter.tag === 'MatchAll' ? { matchAll: hexTopics } : { matchAny: hexTopics };
   const unsub = subscribeNative('statementStoreSubscribe', { filter: nativeFilter }, (page: { statements: { proof: { tag: string; signature: string; signer: string }; channel?: string; expiry: string; topics: string[]; data?: string }[]; isComplete: boolean }) => {
@@ -675,7 +968,7 @@ container.handlePaymentTopUp(async (params, { ok, err }) => {
       sourceTag: params.source.tag,
     };
     if (params.source.tag === 'ProductAccount') {
-      nativeParams.sourceDerivationIndex = params.source.value;
+      nativeParams.sourceDerivationIndex = toNativeDerivationIndex(params.source.value);
     } else if (params.source.tag === 'Coins') {
       nativeParams.sourceKeyListHex = params.source.value.map((key) => toHex(key));
     } else {
@@ -685,6 +978,10 @@ container.handlePaymentTopUp(async (params, { ok, err }) => {
     return ok();
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);
+    const partial = msg.match(/PartialPayment:(\d+)/);
+    if (partial) {
+      return err(new PaymentTopUpErr.PartialPayment({ credited: BigInt(partial[1]) }));
+    }
     return err(new PaymentTopUpErr.Unknown({ reason: msg }));
   }
 });

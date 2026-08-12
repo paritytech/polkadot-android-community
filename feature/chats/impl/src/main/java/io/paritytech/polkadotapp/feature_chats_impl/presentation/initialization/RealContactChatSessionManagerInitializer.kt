@@ -10,7 +10,7 @@ import javax.inject.Singleton
 internal class RealContactChatSessionManagerInitializer @Inject constructor(
     private val manager: RealContactChatSessionManager,
 ) : AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCatching {
         manager.startSubscriptions()
     }

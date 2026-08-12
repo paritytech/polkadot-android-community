@@ -38,6 +38,7 @@ class RegisterStatementStoreAllowance(
         return AsResourcesInfoScale.RegisterStatementStoreAllowance(
             proof = proofResult.proof,
             ringIndex = proofResult.ringIndex,
+            revision = proofResult.revision,
             collection = collection.toScale(),
         ).toEncodableInstance()
     }

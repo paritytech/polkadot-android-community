@@ -1,6 +1,7 @@
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 
 plugins {
+    id("polkadotapp.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 

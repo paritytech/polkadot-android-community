@@ -2,11 +2,10 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
-import io.paritytech.polkadotapp.common.utils.Secp256r1KeyGenerator
 import io.paritytech.polkadotapp.common.utils.blake2b256
-import io.paritytech.polkadotapp.common.utils.ecdhSharedSecret
+import io.paritytech.polkadotapp.common.utils.x25519SharedSecret
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.SharedSecretDerivationUseCase
@@ -18,11 +17,10 @@ import javax.inject.Inject
 class IdentityProofCodec @Inject constructor(
     private val accountRepository: AccountRepository,
     private val sharedSecretDerivationUseCase: SharedSecretDerivationUseCase,
-    private val keyGenerator: Secp256r1KeyGenerator,
 ) {
     suspend fun produce(
         statementAccountId: AccountId,
-        peerIdentityChatPubKey: EncodedPublicKey,
+        peerIdentityChatPubKey: X25519PublicKey,
     ): IdentityProof {
         val identityAccountId = accountRepository.getWalletAccount().defaultAccountId()
         val sharedSecret = deriveSharedSecret(peerIdentityChatPubKey)
@@ -37,7 +35,7 @@ class IdentityProofCodec @Inject constructor(
     suspend fun verify(
         proof: IdentityProof,
         statementAccountId: AccountId,
-        peerIdentityChatPubKey: EncodedPublicKey,
+        peerIdentityChatPubKey: X25519PublicKey,
     ): Boolean {
         val sharedSecret = deriveSharedSecret(peerIdentityChatPubKey)
         val payload = encodePayload(proof.identityAccountId, statementAccountId)
@@ -46,10 +44,10 @@ class IdentityProofCodec @Inject constructor(
         return expected.contentEquals(proof.proof.value)
     }
 
-    private suspend fun deriveSharedSecret(peerChatPubKey: EncodedPublicKey): ByteArray {
+    private suspend fun deriveSharedSecret(peerChatPubKey: X25519PublicKey): ByteArray {
         val ourChatKeypair = sharedSecretDerivationUseCase.deriveForDomain(SharedSecretDerivationDomain.CHAT)
-        val peerPublicKey = keyGenerator.derivePublicKey(peerChatPubKey.value)
-        return ecdhSharedSecret(ourChatKeypair.private, peerPublicKey)
+
+        return x25519SharedSecret(ourChatKeypair.privateKey, peerChatPubKey).getOrThrow().bytes.value
     }
 
     private fun encodePayload(identityAccountId: AccountId, statementAccountId: AccountId): ByteArray {

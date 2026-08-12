@@ -7,17 +7,22 @@ import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.common.presentation.clipboard.ClipboardService
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.loading.awaitLoaded
+import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
 import io.paritytech.polkadotapp.common.presentation.loading.onLoaded
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.OneShotEventChannel
 import io.paritytech.polkadotapp.common.utils.collectionIndexOrNull
 import io.paritytech.polkadotapp.common.utils.combineToPair
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.mapResult
 import io.paritytech.polkadotapp.common.utils.permissions.PermissionAsker
 import io.paritytech.polkadotapp.common.utils.permissions.PermissionResult
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.common.utils.stateInBackground
+import io.paritytech.polkadotapp.common.utils.throttleLatest
 import io.paritytech.polkadotapp.common.utils.withLoading
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddressParcel
@@ -42,6 +47,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatFeedInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatUserInputState
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.InitiateCallResult
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.draft.ChatDraftController
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.mappers.ChatMessageUiMapper
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatInputUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatMenuState
@@ -62,11 +68,10 @@ import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.Sen
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.TransferMethodPayload
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -74,7 +79,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
@@ -97,6 +102,8 @@ class ChatFeedViewModel @Inject constructor(
     private val menuActionsProvider: ChatMenuActionsProvider,
     private val permissionAsker: PermissionAsker,
     private val attachmentExecutor: AttachmentExecutor,
+    private val dispatchers: CoroutineDispatchers,
+    draftControllerFactory: ChatDraftController.Factory,
     callStateTracker: CallStateTracker
 ) : BaseViewModel(), ChatFeedContract {
     private val payload: ChatFeedPayload = savedStateHandle.getPayload()
@@ -105,8 +112,8 @@ class ChatFeedViewModel @Inject constructor(
     private val chatId = openChatRequest.computeChatId()
 
     private val messagePopupSection = MutableStateFlow<MessagePopUpSelection?>(null)
-    private val _highlightEvents = MutableSharedFlow<HighlightedMessage>()
-    override val highlightEvents: SharedFlow<HighlightedMessage> = _highlightEvents.asSharedFlow()
+    private val _highlightEvents = OneShotEventChannel<HighlightedMessage>()
+    override val highlightEvents = _highlightEvents.receiveAsFlow()
     override val scrollToPosition = MutableSharedFlow<Int>()
     private val lastReadMessageTimestamp = MutableStateFlow<Timestamp>(0)
 
@@ -155,9 +162,8 @@ class ChatFeedViewModel @Inject constructor(
         messageUiMapper.map(messages, originDisplayResolver, reactions, revisionsMap, customMessageRenderers, activeCall)
     }.shareInBackground()
 
-    override val chatDisplay = flowOf {
-        interactor.getChatDisplay(openChatRequest).map { it.toUi() }
-    }
+    override val chatDisplay = interactor.observeChatDisplay(openChatRequest)
+        .mapResult { it.toUi() }
         .withLoading()
         .stateInBackground(initialValue = LoadingState.Loading)
 
@@ -199,6 +205,8 @@ class ChatFeedViewModel @Inject constructor(
     private val messageInputState = MutableStateFlow(ChatSendMessageInputState())
     private val chatRequestAnswerProgress = MutableStateFlow(ChatRequestAnswerProgress.None)
 
+    private val draftController = draftControllerFactory.create(this, openChatRequest, messageInputState)
+
     override val chatInputUiState = combine(
         messageInputState,
         chatInputStateType,
@@ -223,7 +231,7 @@ class ChatFeedViewModel @Inject constructor(
 
     private val unreadCounter = combine(
         messages,
-        lastReadMessageTimestamp.sample(50.milliseconds),
+        lastReadMessageTimestamp.throttleLatest(50.milliseconds),
     ) { messagesList, lastReadTimestamp ->
         messagesList.count { it.isUnread() && it.timestamp > lastReadTimestamp }
     }.shareInBackground()
@@ -238,7 +246,9 @@ class ChatFeedViewModel @Inject constructor(
             unreadCounter = unreadCounter,
             firstNewMessageInfo = firstNewMessageInfo
         )
-    }.withLoading().stateIn(this, SharingStarted.Eagerly, LoadingState.Loading)
+    }
+        .withLoading()
+        .stateIn(CoroutineScope(coroutineContext + dispatchers.computation), SharingStarted.Eagerly, LoadingState.Loading)
 
     override val menuState = MutableStateFlow(ChatMenuState())
 
@@ -257,10 +267,13 @@ class ChatFeedViewModel @Inject constructor(
         seedMessageRevealProgress()
         handleMarkMessagesAsReadTrigger()
         markNonDisplayableMessagesAsRead()
+        draftController.start()
+        jumpToTargetMessageIfNeeded()
     }
 
     override fun onCleared() {
         interactor.setChatInactive()
+        draftController.flush()
         super.onCleared()
     }
 
@@ -481,7 +494,7 @@ class ChatFeedViewModel @Inject constructor(
                 messagePopupSection.update { MessagePopUpSelection.reactionDetails(action.message.id) }
             }
 
-            is MessageAction.ReplyPreviewTap -> scrollToReply(action.messageId)
+            is MessageAction.ReplyPreviewTap -> scrollToMessage(action.messageId)
             is MessageAction.ViewEditHistory -> {
                 messagePopupSection.update { null }
                 showMessageHistory(action.message.id)
@@ -528,7 +541,7 @@ class ChatFeedViewModel @Inject constructor(
 
                 val inputState = messageInputState.value
                 val text = inputState.inputMessage.trim().takeIf { it.isNotEmpty() }
-                val replyToMessageId = (inputState.relation as? InputMessageRelation.Reply)?.messageId
+                val replyToMessageId = (inputState.relation as? InputMessageRelation.Reply)?.preview?.messageId
 
                 messageInputState.clear()
 
@@ -584,7 +597,7 @@ class ChatFeedViewModel @Inject constructor(
                 interactor.sendTextMessage(
                     chatId = chatId,
                     text = messageText,
-                    replyToMessageId = relation.messageId
+                    replyToMessageId = relation.preview.messageId
                 )
             }
 
@@ -598,12 +611,21 @@ class ChatFeedViewModel @Inject constructor(
         }
     }
 
-    private fun scrollToReply(messageId: String) {
+    private fun jumpToTargetMessageIfNeeded() {
+        val messageId = payload.targetMessageId ?: return
+
+        launchUnit {
+            chatMessagesState.first { state -> state.dataOrNull?.messages.orEmpty().any { it.id == messageId } }
+            scrollToMessage(messageId)
+        }
+    }
+
+    private fun scrollToMessage(messageId: String) {
         chatMessagesState.value.onLoaded { state ->
             val scrollIndex = state.messages.indexOfFirst { it.id == messageId }.collectionIndexOrNull()
 
-            if (scrollIndex != null) launch {
-                _highlightEvents.emit(
+            if (scrollIndex != null) {
+                _highlightEvents.trySend(
                     HighlightedMessage(
                         messageId = messageId,
                         scrollIndex = scrollIndex

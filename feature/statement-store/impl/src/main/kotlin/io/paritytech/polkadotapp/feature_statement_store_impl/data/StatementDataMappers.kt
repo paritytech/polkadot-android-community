@@ -3,7 +3,7 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.data
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.decodeFromByteArray
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
 import io.paritytech.polkadotapp.feature_statement_store_api.data.StatementData
 import io.paritytech.polkadotapp.feature_statement_store_api.data.encryption.CommunicationEncryption
@@ -11,12 +11,12 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.data.encryption.Mu
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.models.scale.StructuredStatementData
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 
-context(CommunicationEncryption)
+context(communicationEncryption: CommunicationEncryption)
 fun StatementTransportEvent.toEncryptedStatementData(): StatementData {
     val structuredData = toStructuredStatementData()
     val scaleEncodedData = BinaryScale.encodeToByteArray<StructuredStatementData.Single>(structuredData)
 
-    return encrypt(scaleEncodedData)
+    return communicationEncryption.encrypt(scaleEncodedData)
 }
 
 /**
@@ -24,7 +24,7 @@ fun StatementTransportEvent.toEncryptedStatementData(): StatementData {
  * per-device via [envelopeEncryption], then the whole SCALE envelope is encrypted again with
  * the outer pairwise [CommunicationEncryption] — same outer layer as the single-device path.
  */
-context(CommunicationEncryption)
+context(communicationEncryption: CommunicationEncryption)
 suspend fun StatementTransportEvent.toMultiDeviceEncryptedStatementData(
     envelopeEncryption: MultiDeviceEnvelopeEncryption,
     recipients: List<MultiDeviceEnvelopeEncryption.Recipient>,
@@ -52,7 +52,7 @@ suspend fun StatementTransportEvent.toMultiDeviceEncryptedStatementData(
     }
 
     val scaleEncodedData = BinaryScale.encodeToByteArray<StructuredStatementData>(outer)
-    return encrypt(scaleEncodedData)
+    return communicationEncryption.encrypt(scaleEncodedData)
 }
 
 /**
@@ -60,10 +60,10 @@ suspend fun StatementTransportEvent.toMultiDeviceEncryptedStatementData(
  * format is plain (Request/Response) or multi-device envelope. Envelope variants are
  * unwrapped via [envelopeEncryption] using [senderEncryptionPublicKey].
  */
-context(CommunicationEncryption)
+context(communicationEncryption: CommunicationEncryption)
 suspend fun Statement.decryptAndDecodeEvent(
     envelopeEncryption: MultiDeviceEnvelopeEncryption,
-    senderEncryptionPublicKey: EncodedPublicKey,
+    senderEncryptionPublicKey: X25519PublicKey,
 ): StatementTransportEvent {
     val single = body.data.decryptAndDecodeStructuredSingle(envelopeEncryption, senderEncryptionPublicKey)
     return single.toTransportEvent(body.expiry)
@@ -73,12 +73,12 @@ suspend fun Statement.decryptAndDecodeEvent(
  * Decodes one of OUR OWN previously-submitted statements. Multi-device envelopes have no entry
  * for us, so they are unwrapped via a peer device entry ([MultiDeviceEnvelopeEncryption.unwrapOwn]).
  */
-context(CommunicationEncryption)
+context(communicationEncryption: CommunicationEncryption)
 suspend fun Statement.decryptAndDecodeOwnEvent(
     envelopeEncryption: MultiDeviceEnvelopeEncryption,
     peerDevices: List<MultiDeviceEnvelopeEncryption.Recipient>,
 ): StatementTransportEvent {
-    val decryptedData = decrypt(body.data)
+    val decryptedData = communicationEncryption.decrypt(body.data)
     val statementData = BinaryScale.decodeFromByteArray<StructuredStatementData>(decryptedData)
 
     val single = when (statementData) {
@@ -105,12 +105,12 @@ suspend fun Statement.decryptAndDecodeOwnEvent(
  * Request/Response payload is needed and there is no enclosing [Statement] (e.g. wire bytes
  * delivered out-of-band via push notifications).
  */
-context(CommunicationEncryption)
+context(communicationEncryption: CommunicationEncryption)
 suspend fun ByteArray.decryptAndDecodeStructuredSingle(
     envelopeEncryption: MultiDeviceEnvelopeEncryption,
-    senderEncryptionPublicKey: EncodedPublicKey,
+    senderEncryptionPublicKey: X25519PublicKey,
 ): StructuredStatementData.Single {
-    val decryptedData = decrypt(this)
+    val decryptedData = communicationEncryption.decrypt(this)
     val statementData = BinaryScale.decodeFromByteArray<StructuredStatementData>(decryptedData)
 
     return when (statementData) {

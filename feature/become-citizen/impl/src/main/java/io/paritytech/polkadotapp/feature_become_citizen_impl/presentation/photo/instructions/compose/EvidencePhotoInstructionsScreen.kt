@@ -11,6 +11,8 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.Photocam
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.compose.EvidenceInstructionScreen
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.models.EvidenceInstructionItem
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.photo.instructions.EvidencePhotoInstructionsContract
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -26,8 +28,8 @@ fun EvidencePhotoInstructionScreen(contract: EvidencePhotoInstructionsContract) 
 }
 
 @Composable
-private fun rememberEvidencePhotoInstructionItems(): List<EvidenceInstructionItem> = remember {
-    listOf(
+private fun rememberEvidencePhotoInstructionItems(): ImmutableList<EvidenceInstructionItem> = remember {
+    persistentListOf(
         EvidenceInstructionItem(
             titleRes = RCommon.string.evidence_photo_instructions_in_app_camera_title,
             descriptionRes = RCommon.string.evidence_photo_instructions_in_app_camera_description

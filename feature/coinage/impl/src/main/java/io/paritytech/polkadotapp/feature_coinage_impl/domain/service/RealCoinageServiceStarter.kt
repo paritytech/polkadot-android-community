@@ -18,12 +18,12 @@ class RealCoinageServiceStarter @Inject constructor(
     private val coinageRecyclingSyncManager: CoinageRecyclingSyncManager,
     private val observeAccountOnboardingStatusUseCase: ObserveAccountOnboardingStatusUseCase,
 ) : CoinageServiceStarter {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun start() {
-        launch { coinsTrackingService.start() }
-        launch { voucherLocationService.start() }
-        launch { voucherRingMembersService.start() }
-        launch {
+        scope.launch { coinsTrackingService.start() }
+        scope.launch { voucherLocationService.start() }
+        scope.launch { voucherRingMembersService.start() }
+        scope.launch {
             observeAccountOnboardingStatusUseCase().filter { it.isOnboarded }.first()
             coinageBackupService.start()
         }

@@ -1,6 +1,7 @@
 plugins {
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -37,6 +38,8 @@ val buildContainerScript by tasks.registering(Exec::class) {
     runMultiplatformCommand("npm run build")
 
     inputs.dir(containerDir.resolve("src"))
+    // Bundled deps are inlined by esbuild, so a version bump alone must invalidate the output.
+    inputs.file(containerDir.resolve("package-lock.json"))
     outputs.file(containerOutput)
 }
 
@@ -58,16 +61,15 @@ afterEvaluate {
 dependencies {
     api(project(":feature:products:api"))
 
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
-
     implementation(libs.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.fragment.ktx)
+    implementation(libs.androidx.webkit)
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.nova.substrate.serialization)
 
     implementation(project(":common"))
+    implementation(project(":bindings:sr25519-vrf"))
     implementation(project(":tools:ipfs:api"))
     implementation(project(":design"))
     implementation(project(":database"))

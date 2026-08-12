@@ -14,14 +14,4 @@ class SpaBrowserFragment : BaseComposeFragment<SpaBrowserViewModel>() {
     override fun Screen() {
         SpaBrowserScreen(viewModel)
     }
-
-    override fun onPause() {
-        super.onPause()
-        viewModel.pauseConnections()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        viewModel.resumeConnections()
-    }
 }

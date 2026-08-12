@@ -11,10 +11,12 @@ import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
 import java.lang.reflect.Type
 
 class ProductAccountIdTupleAdapter : JsonSerializer<ProductAccountId>, JsonDeserializer<ProductAccountId> {
+    private val indexAdapter = DerivationIndexWireAdapter()
+
     override fun serialize(src: ProductAccountId, typeOfSrc: Type, context: JsonSerializationContext): JsonElement {
         return JsonArray().apply {
             add(JsonPrimitive(src.productId))
-            add(JsonPrimitive(src.derivationIndex))
+            add(indexAdapter.serialize(src.index.toWire(), DerivationIndexWire::class.java, context))
         }
     }
 
@@ -22,9 +24,12 @@ class ProductAccountIdTupleAdapter : JsonSerializer<ProductAccountId>, JsonDeser
         require(json is JsonArray && json.size() == 2) {
             "ProductAccountId wire form must be a 2-element JSON array [productId, derivationIndex]"
         }
+
+        val index = indexAdapter.deserialize(json[1], DerivationIndexWire::class.java, context)
+
         return ProductAccountId(
             productId = json[0].asString,
-            derivationIndex = json[1].asInt,
+            index = index.toDomain().getOrThrow(),
         )
     }
 }

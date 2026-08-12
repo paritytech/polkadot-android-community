@@ -27,6 +27,9 @@ interface StatementStoreSlotAllocationDao {
     )
     suspend fun deleteSlot(chainId: String, collection: String, accountId: ByteArray, seq: Int)
 
+    @Query("DELETE FROM statement_store_slot_allocations WHERE chainId = :chainId AND accountId = :accountId")
+    suspend fun deleteAllForAccount(chainId: String, accountId: ByteArray)
+
     @Query(
         """
         SELECT * FROM statement_store_slot_allocations

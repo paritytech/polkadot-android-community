@@ -30,7 +30,8 @@ internal fun ScaleResult<RawScaleValue, TransactionValidityError>.toTransactionV
     return when (this) {
         is ScaleResult.Ok -> TransactionValidity.Valid
         is ScaleResult.Error -> when (val validityError = error) {
-            is TransactionValidityError.Invalid -> TransactionValidity.Invalid(validityError.reason)
+            is TransactionValidityError.Invalid -> TransactionValidity
+                .Invalid(validityError.reason)
             is TransactionValidityError.Unknown -> TransactionValidity.Unknown(validityError.reason)
         }
     }

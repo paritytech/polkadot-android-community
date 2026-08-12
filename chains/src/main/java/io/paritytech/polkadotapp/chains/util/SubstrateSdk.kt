@@ -96,22 +96,22 @@ inline fun <reified T> T.scaleEncodeBinary(): ByteArray {
     return BinaryScale.encodeToByteArray(this)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
+fun <E> RuntimeType<E, *>.toByteArray(value: E): ByteArray {
+    return toByteArray(withRuntime.runtime, value)
+}
+
+context(runtime: RuntimeSnapshot)
 fun <E> RuntimeType<E, *>.toByteArray(value: E): ByteArray {
     return toByteArray(runtime, value)
 }
 
-context(RuntimeSnapshot)
-fun <E> RuntimeType<E, *>.toByteArray(value: E): ByteArray {
-    return toByteArray(this@RuntimeSnapshot, value)
-}
-
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun GenericCall.Instance.toByteArray(): ByteArray {
     return GenericCall.toByteArray(this)
 }
 
-context(RuntimeSnapshot)
+context(runtime: RuntimeSnapshot)
 fun GenericCall.Instance.toByteArray(): ByteArray {
     return GenericCall.toByteArray(this)
 }
@@ -129,13 +129,13 @@ fun RuntimeSnapshot.composeCall(
     return GenericCall.Instance(module, call, arguments)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun composeCall(
     moduleName: String,
     callName: String,
     arguments: Map<String, Any?>
 ): GenericCall.Instance {
-    return runtime.composeCall(moduleName, callName, arguments)
+    return withRuntime.runtime.composeCall(moduleName, callName, arguments)
 }
 
 fun ExtrinsicBuilder.call(
@@ -172,18 +172,18 @@ operator fun <S : Schema<S>> S.invoke(block: StructBuilderWithContext<S>? = null
     return struct
 }
 
-context (WithRuntime)
+context(withRuntime: WithRuntime)
 fun StorageEntry.storageKeyWith(keyArguments: Array<out Any?>): String {
     return if (keyArguments.isEmpty()) {
         storageKey()
     } else {
-        storageKey(runtime, *keyArguments)
+        storageKey(withRuntime.runtime, *keyArguments)
     }
 }
 
-context (WithRuntime)
+context(withRuntime: WithRuntime)
 fun StorageEntry.decode(scale: String?): Any? {
-    return decode(runtime, scale)
+    return decode(withRuntime.runtime, scale)
 }
 
 fun StorageEntry.decode(runtime: RuntimeSnapshot, scale: String?): Any? {
@@ -214,8 +214,8 @@ fun Module.constantOrNull(name: String) = constants[name]
 
 fun Module.numberConstant(name: String, runtimeSnapshot: RuntimeSnapshot) = bindNumberConstant(constant(name), runtimeSnapshot)
 
-context(WithRuntime)
-fun Module.numberConstant(name: String) = bindNumberConstant(constant(name), runtime)
+context(withRuntime: WithRuntime)
+fun Module.numberConstant(name: String) = bindNumberConstant(constant(name), withRuntime.runtime)
 
 fun Module.numberConstantOrNull(name: String, runtimeSnapshot: RuntimeSnapshot) = constantOrNull(name)?.let {
     bindNumberConstant(it, runtimeSnapshot)
@@ -303,11 +303,16 @@ fun RuntimeMetadata.hasDetectedRuntimeApi(section: String, method: String): Bool
     return runtimeApiOrNull(section)?.methodOrNull(method) != null
 }
 
+// View functions are only present in v16+ metadata; older runtimes expose an empty map rather than null
+fun RuntimeMetadata.hasDetectedViewFunction(pallet: String, name: String): Boolean {
+    return moduleOrNull(pallet)?.viewFunctionOrNull(name) != null
+}
+
 fun Any?.asRawScaleValue(): AsRawScaleValue {
     return AsRawScaleValue(this)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun composeDispatchAs(
     call: GenericCall.Instance,
     origin: OriginCaller
@@ -322,7 +327,7 @@ fun composeDispatchAs(
     )
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun composeBatchAll(
     calls: List<GenericCall.Instance>,
 ): GenericCall.Instance {

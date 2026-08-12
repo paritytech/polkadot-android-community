@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.database.model
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -35,19 +36,27 @@ class FileDownloadLocal(
     val nodeUrl: String,
     val mimeType: String,
     val filePath: String?,
+    @ColumnInfo(defaultValue = "UNRESOLVED")
+    val payloadKind: PayloadKind,
     val downloadedChunks: Int,
     /**
      * Comma-separated hex-encoded blake2b-256 hashes of all chunks.
-     * Populated once after metadata claim. Use [downloadedChunks] as offset on resume.
+     * Populated once the root entry resolves as [PayloadKind.CHUNKED]. Use [downloadedChunks] as offset on resume.
      */
     val chunkHashes: String?,
     val status: Status,
     val errorCategory: ErrorCategory?,
     val errorCause: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    @Embedded
+    val retryState: TransferRetryStateLocal
 ) {
+    enum class PayloadKind {
+        UNRESOLVED, INLINE, CHUNKED
+    }
+
     enum class Status {
-        PENDING, IN_PROGRESS, DONE, FAILED
+        PENDING, IN_PROGRESS, DONE, FAILED, CANCELLED
     }
 
     enum class ErrorCategory {

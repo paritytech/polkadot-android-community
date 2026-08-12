@@ -15,7 +15,5 @@ interface CallStateHolder : CallStateTracker {
     fun updateMediaTracks(tracks: MediaTracks)
     fun observeMediaTracks(): StateFlow<MediaTracks>
     fun updateMediaState(state: MediaState)
-    fun updateSpeakerOn(on: Boolean)
-    fun observeSpeakerOn(): StateFlow<Boolean>
     fun clear()
 }

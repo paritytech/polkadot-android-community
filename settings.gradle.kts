@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google()
         mavenCentral()
@@ -24,7 +25,7 @@ include(":database")
 
 include(":bindings:bandersnatch-crypto")
 include(":bindings:hydra-dx-math")
-include(":bindings:airdrop-vrf")
+include(":bindings:sr25519-vrf")
 
 include(":test-shared")
 

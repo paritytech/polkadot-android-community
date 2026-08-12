@@ -15,7 +15,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.domain.gameResults.GameR
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.gameResults.GameResultsLiveEvent
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
@@ -118,8 +118,8 @@ class GameResultsViewModel @Inject constructor(
         return withTimeoutOrNull(OUTCOME_RESOLVE_HOLD_MS) {
             interactor.subscribeLiveResults(input)
                 .filterIsInstance<GameResultsLiveEvent.UpgradedToPassed>()
-                .first()
-                .input
+                .firstOrNull()
+                ?.input
         } ?: input
     }
 

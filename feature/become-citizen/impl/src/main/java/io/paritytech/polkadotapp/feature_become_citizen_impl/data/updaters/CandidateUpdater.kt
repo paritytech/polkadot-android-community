@@ -20,8 +20,8 @@ class CandidateUpdater @Inject constructor(
     chainRegistry = chainRegistry,
     storageCache = storageCache
 ) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String {
-        return runtime.metadata.proofOfInk.candidates.storageKey(scopeValue.accountIdIn(chain).value)
+        return withRuntime.runtime.metadata.proofOfInk.candidates.storageKey(scopeValue.accountIdIn(chain).value)
     }
 }

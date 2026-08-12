@@ -28,40 +28,39 @@ import java.math.BigInteger
 @JvmInline
 value class ProofOfInkApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.proofOfInk: ProofOfInkApi
     get() = ProofOfInkApi(module(Modules.PROOF_OF_INK))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.designFamilies: QueryableStorageEntry1<BigInteger, TattooFamily>
     get() = storage1("DesignFamilies", binding = { decoded, key -> bindTattooFamily(decoded, key) })
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.candidates: QueryableStorageEntry1<AccountId, ProofOfInkCandidate?>
     get() = storage1("Candidates")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.configuration: QueryableStorageEntry0<TattooGlobalConfiguration>
     get() = storage0("Configuration", binding = { decoded -> bindProofOfInkConfiguration(decoded) })
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.people: QueryableStorageEntry1<PersonId, ProofOfInkPerson>
     get() = storage1("People")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.referralTickets: QueryableStorageEntry1<PersonId, List<ProofOfInkReferralTicket>>
     get() = storage1("ReferralTickets")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.committedDesigns: QueryableStorageEntry2<TattooFamilyIndex, BigInteger, Unit>
     get() = storage2(name = "CommittedDesigns", binding = { _, _, _ -> })
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.pendingInvites: QueryableStorageEntry2<AccountId, AccountId, Unit>
     get() = storage2("PendingInvites")
 
 // Constants
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ProofOfInkApi.maxActiveReferrals: Int
     get() = constant("MaxActiveReferrals")

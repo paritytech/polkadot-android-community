@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_sso_impl.data.model.scale.handshake
 import androidx.annotation.Keep
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.EnumIndex
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
+import io.paritytech.polkadotapp.common.domain.model.scale.X25519PublicKeyScale
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -16,8 +17,7 @@ sealed interface VersionedHandshakeAnswerScale {
 @Keep
 class HandshakeAnswerV2Scale(
     val encryptedData: ByteArray,
-    @FixedLength(65)
-    val tempSharedEncryptionPublicKey: ByteArray,
+    val tempSharedEncryptionPublicKey: X25519PublicKeyScale,
 )
 
 @Serializable
@@ -51,10 +51,8 @@ class HandshakeSuccessV2Scale(
     val rootAccountId: ByteArray,
     @FixedLength(32)
     val identityChatPrivateKey: ByteArray,
-    @FixedLength(65)
-    val ssoEncrPubKey: ByteArray,
-    @FixedLength(65)
-    val deviceEncPubKey: ByteArray,
+    val ssoEncrPubKey: X25519PublicKeyScale,
+    val deviceEncPubKey: X25519PublicKeyScale,
     @FixedLength(32)
     val rootEntropySource: ByteArray,
 )

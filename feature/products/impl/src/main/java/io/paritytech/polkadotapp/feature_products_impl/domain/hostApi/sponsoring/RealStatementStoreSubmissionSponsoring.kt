@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.sponsoring
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.SlotAccountKey
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.deriveAccountId
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.StatementStoreSubmissionSponsoring
@@ -35,6 +36,8 @@ class RealStatementStoreSubmissionSponsoring @Inject constructor(
             return Result.success(Unit)
         }
 
-        return statementStoreSlotAllocator.allocate(slotAccount, OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
+        return with(StalenessReportCollector.NoOp) {
+            statementStoreSlotAllocator.allocate(slotAccount, OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
+        }
     }
 }

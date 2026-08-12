@@ -25,10 +25,24 @@ data class ProductId private constructor(val value: String) {
         }
 
         /**
+         * Construct ProductId from its bare `<name>.dot` form, where `<name>` may itself contain
+         * subdomains. Example: `coinflip.dot`, `arena.coinflip.dot`.
+         */
+        fun fromString(value: String): Result<ProductId> {
+            return if (PRODUCT_ID_PATTERN.matches(value)) {
+                Result.success(ProductId(value))
+            } else {
+                Result.failure(IllegalArgumentException("Not a .dot product id: $value"))
+            }
+        }
+
+        /**
          * Reconstruct ProductId from a stored value (e.g. database).
          * Trusts that the value is already a valid .dot domain.
          */
         fun fromStoredValue(value: String): ProductId = ProductId(value)
+
+        private val PRODUCT_ID_PATTERN = Regex("""([a-z0-9-]+\.)+dot""")
     }
 
     override fun toString(): String {

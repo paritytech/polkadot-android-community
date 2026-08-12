@@ -17,21 +17,25 @@ class FileDownload(
     val filePath: String?,
     val progress: Progress,
     val createdAt: Timestamp
-) {
+) : WithRetryState {
+    override val retryState: HopTransferRetryState
+        get() = progress.retryState
+
     data class Progress(
         val status: Status,
-        val downloadedChunks: Int,
-        val metadata: Metadata,
-        val error: Error?
+        val payload: Payload,
+        val error: Error?,
+        val retryState: HopTransferRetryState
     )
 
-    sealed interface Metadata {
-        data object Pending : Metadata
-        data class Resolved(val chunkHashes: List<String>) : Metadata
+    sealed interface Payload {
+        data object Unresolved : Payload
+        data object Inline : Payload
+        data class Chunked(val chunkHashes: List<String>, val downloadedChunks: Int) : Payload
     }
 
     enum class Status {
-        PENDING, IN_PROGRESS, DONE, FAILED
+        PENDING, IN_PROGRESS, DONE, FAILED, CANCELLED
     }
 
     data class Error(
@@ -65,9 +69,9 @@ class FileDownload(
                 filePath = null,
                 progress = Progress(
                     status = Status.PENDING,
-                    downloadedChunks = 0,
-                    metadata = Metadata.Pending,
-                    error = null
+                    payload = Payload.Unresolved,
+                    error = null,
+                    retryState = HopTransferRetryState.None
                 ),
                 createdAt = System.currentTimeMillis()
             )

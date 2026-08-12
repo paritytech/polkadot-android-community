@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_sso_impl.domain.signTransaction
 
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SignedTransaction
+import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningAccount
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContext
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
 import io.paritytech.polkadotapp.feature_sso_impl.domain.SsoService
@@ -15,6 +16,7 @@ class SsoSigningContext(
     private val request: SsoSessionRequest,
     private val ssoService: SsoService,
     override val signingRequestBody: SigningRequestBody,
+    override val signingAccount: SigningAccount,
 ) : SigningContext {
     override val requesterName: String = sessionData.name
     override val requesterIconUrl: String = sessionData.icon
@@ -23,7 +25,16 @@ class SsoSigningContext(
         Timber.d("Delivering signed result to $requesterName")
         val responseContent = when (signedTransaction) {
             is SignedTransaction.GeneralTransaction -> SsoSessionResponse.Content.SignedGeneralTransaction(signedTransaction.signedTx)
-            is SignedTransaction.WithDedicatedSignature -> SsoSessionResponse.Content.SignedPayload(signedTransaction)
+            is SignedTransaction.Raw -> if (signingRequestBody is SigningRequestBody.RawLegacy) {
+                SsoSessionResponse.Content.SignedRawLegacy(signedTransaction.signature)
+            } else {
+                SsoSessionResponse.Content.SignedPayload(signedTransaction)
+            }
+            is SignedTransaction.PayloadJson -> SsoSessionResponse.Content.SignedPayload(signedTransaction)
+            // Unreachable: SignVrfRequest is served by AccountsProtocol, which owns its own context.
+            is SignedTransaction.Vrf -> return Result.failure(
+                IllegalStateException("VRF results are delivered via AccountsProtocol, not SsoSigningContext")
+            )
         }
         val response = request.responseWith(responseContent)
         return ssoService.sendResponse(response)
@@ -36,6 +47,12 @@ class SsoSigningContext(
         val responseContent = when (signingRequestBody) {
             is SigningRequestBody.Transaction, is SigningRequestBody.Raw -> SsoSessionResponse.Content.FailedToSignTransaction("Rejected")
             is SigningRequestBody.CreateTransaction -> SsoSessionResponse.Content.FailedToCreateTransaction("Rejected")
+            is SigningRequestBody.RawLegacy -> SsoSessionResponse.Content.FailedToSignRawLegacy("Rejected")
+            is SigningRequestBody.CreateTransactionLegacy -> SsoSessionResponse.Content.FailedToCreateTransaction("Rejected")
+            // Unreachable, see deliverSignedResult.
+            is SigningRequestBody.SignVrf -> return Result.failure(
+                IllegalStateException("VRF rejections are delivered via AccountsProtocol, not SsoSigningContext")
+            )
         }
         val response = request.responseWith(responseContent)
         return ssoService.sendResponse(response)

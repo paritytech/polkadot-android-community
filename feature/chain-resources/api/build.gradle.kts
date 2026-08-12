@@ -1,4 +1,5 @@
 plugins {
+    id("polkadotapp.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 

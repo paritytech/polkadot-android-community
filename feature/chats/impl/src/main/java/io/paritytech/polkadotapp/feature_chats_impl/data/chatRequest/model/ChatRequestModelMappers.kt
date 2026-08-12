@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model
 
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.IdentityProof
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.DeviceInfoScale
@@ -17,6 +17,6 @@ fun IdentityProofScale.toDomain(): IdentityProof {
 fun DeviceInfoScale.toDomain(): DeviceInfo {
     return DeviceInfo(
         statementAccountId = statementAccountId.intoAccountId(),
-        encryptionPublicKey = EncodedPublicKey(encryptionPublicKey),
+        encryptionPublicKey = encryptionPublicKey.toDomain().getOrThrow(),
     )
 }

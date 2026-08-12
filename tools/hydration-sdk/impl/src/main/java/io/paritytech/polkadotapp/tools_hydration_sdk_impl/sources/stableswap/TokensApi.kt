@@ -14,11 +14,10 @@ import io.paritytech.polkadotapp.tools_hydration_sdk_impl.assets.HydraDxAssetId
 @JvmInline
 value class TokensApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 val RuntimeMetadata.hydraTokens: TokensApi
     get() = TokensApi(tokens())
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val TokensApi.totalIssuance: QueryableStorageEntry1<HydraDxAssetId, Balance>
     get() = storage1(
         name = "TotalIssuance",

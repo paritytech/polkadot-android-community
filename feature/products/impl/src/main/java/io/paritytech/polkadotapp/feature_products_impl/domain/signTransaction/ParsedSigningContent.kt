@@ -5,4 +5,5 @@ import io.novasama.substrate_sdk_android.runtime.definitions.types.generics.Gene
 sealed interface ParsedSigningContent {
     class Transaction(val call: GenericCall.Instance) : ParsedSigningContent
     object Raw : ParsedSigningContent
+    class Vrf(val transcriptLabel: String) : ParsedSigningContent
 }

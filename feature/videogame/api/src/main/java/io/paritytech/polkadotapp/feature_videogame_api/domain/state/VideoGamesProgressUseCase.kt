@@ -5,9 +5,9 @@ import io.paritytech.polkadotapp.feature_videogame_api.domain.state.model.VideoG
 import kotlinx.coroutines.flow.Flow
 
 interface VideoGamesProgressUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun videoGamesProgressFlow(): Flow<VideoGamesProgress>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun videoGameProgress(): VideoGamesProgress
 }

@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 internal interface VideoGameReportSubmittedUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun observeReportSubmitted(): Flow<Boolean>
 }
 
@@ -32,7 +32,7 @@ internal class RealVideoGameReportSubmittedUseCase @Inject constructor(
         private const val REPORT_SUBMITTED_CACHE_KEY = "RealVideoGameReportSubmittedUseCase.ReportSubmitted"
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun observeReportSubmitted(): Flow<Boolean> = computationalCache
         .useSharedFlow(REPORT_SUBMITTED_CACHE_KEY) {
             val chain = chainRegistry.peopleChain()

@@ -4,6 +4,7 @@ import io.novasama.substrate_sdk_android.encrypt.json.copyBytes
 import io.novasama.substrate_sdk_android.encrypt.xsalsa20poly1305.SecretBox
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.dropBytes
+import io.paritytech.polkadotapp.tools_backup_api.domain.error.CorruptedBackupException
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.Backup
 import io.paritytech.polkadotapp.tools_backup_impl.data.model.EncryptedBackup
 import io.paritytech.polkadotapp.tools_backup_impl.data.model.EncryptionKey
@@ -66,6 +67,10 @@ class ScryptBackupEncryption @Inject constructor(
     override suspend fun decryptBackup(data: EncryptedBackup, key: EncryptionKey): Result<Backup> {
         return runCatching {
             withContext(coroutineDispatchers.computation) {
+                if (data.value.size < SALT_SIZE + NONCE_SIZE) {
+                    throw CorruptedBackupException()
+                }
+
                 val salt = data.value.copyBytes(from = 0, size = SALT_SIZE)
                 val nonce = data.value.copyBytes(from = SALT_SIZE, size = NONCE_SIZE)
                 val encryptedContent = data.value.dropBytes(SALT_SIZE + NONCE_SIZE)
@@ -75,8 +80,7 @@ class ScryptBackupEncryption @Inject constructor(
                 val secret = SecretBox(encryptionSecret).open(nonce, encryptedContent)
 
                 if (secret.isEmpty()) {
-                    val message = "Failed to decrypt backup data with supplied encryption key"
-                    error(message)
+                    throw CorruptedBackupException()
                 }
 
                 Backup(secret)

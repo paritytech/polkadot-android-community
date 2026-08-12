@@ -24,7 +24,7 @@ class StorePhotoMetadataState(
 
     override val evidenceType: EvidenceType = EvidenceType.PHOTO
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(
         authorizedTransactionsBeforeSubmission: BigInteger,
         evidenceHash: String
@@ -47,7 +47,7 @@ class AwaitPhotoMetadataConfirmationState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(): UploadEvidenceState {
         val newParams = SubmitPhotoHashState.Params(evidenceHash = params.evidenceHash)
         return stateFactory.submitPhotoHash(newParams)

@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.compose
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.ClaimUsernameTestTags
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.compose.ClaimButton
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.compose.UsernameTextField
@@ -123,6 +125,10 @@ private fun resolveClaimUsernameTexts(showRecoverOption: Boolean): ClaimUsername
 @Composable
 fun PickUsernameScreen(contract: ClaimUsernameContract) {
     val state by contract.state.collectAsStateWithLifecycle()
+
+    contract.messageEvents.collectAsEffect { context, resId ->
+        Toast.makeText(context, context.getString(resId), Toast.LENGTH_SHORT).show()
+    }
 
     when (state.progress) {
         ClaimUsernameProgress.CREATING,

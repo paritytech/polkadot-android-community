@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_w3spay_impl.domain
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
 import io.paritytech.polkadotapp.chains.util.planksFromAmount
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_w3spay_impl.data.scale.W3sSubmitterPayload
@@ -22,7 +23,7 @@ class W3sPaymentPayloadFactory @Inject constructor(
     suspend fun create(
         amount: BigDecimal,
         topic: ByteArray,
-        merchantKey: ByteArray,
+        merchantKey: X25519PublicKey,
         paymentId: String,
         recipientLabel: String,
     ): SendEnterAmountPayload {
@@ -30,7 +31,7 @@ class W3sPaymentPayloadFactory @Inject constructor(
         val planks = amount.planksFromAmount(precision).value
 
         val submitterPayload = BinaryScale.encodeToByteArray(
-            W3sSubmitterPayload(topic = topic, merchantKey = merchantKey, paymentId = paymentId)
+            W3sSubmitterPayload(topic = topic, merchantKey = merchantKey.bytes.value, paymentId = paymentId)
         )
 
         return SendEnterAmountPayload(

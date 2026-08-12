@@ -20,10 +20,10 @@ class ReferralTicketUpdater @Inject constructor(
     chainRegistry = chainRegistry,
     storageCache = storageCache
 ) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: PersonId?, chain: Chain): String? {
         if (scopeValue == null) return null
 
-        return runtime.metadata.proofOfInk.referralTickets.storageKey(scopeValue)
+        return withRuntime.runtime.metadata.proofOfInk.referralTickets.storageKey(scopeValue)
     }
 }

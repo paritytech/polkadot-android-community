@@ -38,6 +38,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.feeSignerOrThrow
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicSubmissionFailure
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicSubmissionFailureRecovery
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicSubmissionFailureRecoveryStrategy
+import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ResubmitWhenValidFactory
 import io.paritytech.polkadotapp.feature_transactions.api.data.submissionSigner
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.AccountFee
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.ExtrinsicSubmission
@@ -69,6 +70,7 @@ class RealExtrinsicService @Inject constructor(
     private val signerProvider: SignerProvider,
     private val chainEventsRepositoryFactory: ChainEventsRepositoryFactory,
     private val coroutineDispatchers: CoroutineDispatchers,
+    private val resubmitWhenValidFactory: ResubmitWhenValidFactory,
     private val defaultExtensionProviders: Set<@JvmSuppressWildcards DefaultTransactionExtensionProvider>,
 ) : ExtrinsicService {
     override suspend fun submitExtrinsic(
@@ -89,11 +91,12 @@ class RealExtrinsicService @Inject constructor(
         chain: Chain,
         origin: TransactionOrigin,
         options: ExtrinsicService.SubmissionOptions,
-        submissionFailureRecovery: ExtrinsicSubmissionFailureRecoveryStrategy,
+        submissionFailureRecovery: ExtrinsicSubmissionFailureRecoveryStrategy?,
         formExtrinsic: FormExtrinsic
     ): Result<ExtrinsicExecutionResult> {
+        val recovery = submissionFailureRecovery ?: resubmitWhenValidFactory.createForTxInvalidation(chain.id, DEFAULT_RECOVERY_MAX_ATTEMPTS)
         return withContext(coroutineDispatchers.io) {
-            submitAndWatchExtrinsic(chain, origin, options, submissionFailureRecovery, formExtrinsic)
+            submitAndWatchExtrinsic(chain, origin, options, recovery, formExtrinsic)
                 .awaitInBlock()
                 .map { determineExtrinsicOutcome(it, chain) }
         }
@@ -188,7 +191,7 @@ class RealExtrinsicService @Inject constructor(
         )
     }
 
-    context(FlowCollector<ExtrinsicStatus>)
+    context(flowCollector: FlowCollector<ExtrinsicStatus>)
     private suspend fun submitWithRecovery(
         chain: Chain,
         submissionFailureRecovery: ExtrinsicSubmissionFailureRecoveryStrategy,
@@ -217,7 +220,7 @@ class RealExtrinsicService @Inject constructor(
             when (val recovery = submissionFailureRecovery.recoverSubmissionFailure(extrinsic, failedAttempt.cause)) {
                 ExtrinsicSubmissionFailureRecovery.Abort -> {
                     Timber.w("Recovery aborted extrinsic submission on ${chain.id}")
-                    emit(failedAttempt.terminalStatus)
+                    flowCollector.emit(failedAttempt.terminalStatus)
                     break
                 }
 
@@ -242,7 +245,7 @@ class RealExtrinsicService @Inject constructor(
         )
     }
 
-    context(FlowCollector<ExtrinsicStatus>)
+    context(flowCollector: FlowCollector<ExtrinsicStatus>)
     private suspend fun submitOnce(chain: Chain, extrinsic: SendableExtrinsic): FailedAttempt? {
         var terminalFailure: ExtrinsicStatus.Failure? = null
 
@@ -252,7 +255,7 @@ class RealExtrinsicService @Inject constructor(
                 if (status.terminal && status is ExtrinsicStatus.Failure) {
                     terminalFailure = status
                 } else {
-                    emit(status)
+                    flowCollector.emit(status)
                 }
             }
 
@@ -414,5 +417,10 @@ class RealExtrinsicService @Inject constructor(
                 else -> error("Failed to await tx in block: $result")
             }
         }
+    }
+
+    private companion object {
+        // Global default: retry a transiently-invalidated extrinsic for a few blocks before giving up.
+        const val DEFAULT_RECOVERY_MAX_ATTEMPTS = 3
     }
 }

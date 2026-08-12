@@ -130,6 +130,14 @@ sealed class ChatMessageStatementContent {
     ) : ChatMessageStatementContent()
 
     @Serializable
+    @EnumIndex(19)
+    class CompactionCommit(
+        val claimIdentifier: ByteArraySerializable,
+        val claimTicket: ByteArraySerializable,
+        val node: NodeEndpoint
+    ) : ChatMessageStatementContent()
+
+    @Serializable
     @EnumIndex(20)
     class DeviceChatAccepted(
         val requestId: String,

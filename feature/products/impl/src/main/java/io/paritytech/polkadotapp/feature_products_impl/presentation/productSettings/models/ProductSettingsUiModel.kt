@@ -5,4 +5,5 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class ProductSettingsUiModel(
     val name: String,
+    val hasPermissions: Boolean,
 )

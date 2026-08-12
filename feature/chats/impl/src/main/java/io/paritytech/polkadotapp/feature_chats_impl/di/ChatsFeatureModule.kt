@@ -3,9 +3,11 @@ package io.paritytech.polkadotapp.feature_chats_impl.di
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
-import dagger.hilt.android.components.ViewModelComponent
+import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatFaqInteractor
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatSearch.ChatSearchInteractor
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatSearch.RealChatSearchInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.AddContactInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatListInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealAddContactInteractor
@@ -17,10 +19,13 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.search.scan.Con
 import io.paritytech.polkadotapp.feature_scan_api.domain.ScanContentParser
 
 @Module
-@InstallIn(ViewModelComponent::class)
+@InstallIn(SingletonComponent::class)
 interface ChatsFeatureModule {
     @Binds
     fun bindChatListInteractor(impl: RealChatListInteractor): ChatListInteractor
+
+    @Binds
+    fun bindChatSearchInteractor(impl: RealChatSearchInteractor): ChatSearchInteractor
 
     @Binds
     fun bindAddContactInteractor(impl: RealAddContactInteractor): AddContactInteractor

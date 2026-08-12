@@ -23,6 +23,8 @@ import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.mnemonic.MnemonicRevealContract
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -41,7 +43,7 @@ fun MnemonicRevealScreen(contract: MnemonicRevealContract) {
 @Composable
 private fun MnemonicRevealScreenInternal(
     onBackAction: () -> Unit,
-    mnemonic: List<Word>,
+    mnemonic: ImmutableList<Word>,
     isMnemonicHidden: Boolean,
     onRevealMnemonic: () -> Unit,
 ) {
@@ -98,7 +100,7 @@ private fun MnemonicRevealScreenPreview() {
     PolkadotTheme {
         MnemonicRevealScreenInternal(
             onBackAction = {},
-            mnemonic = List(12) { Word(it, "word$it") },
+            mnemonic = List(12) { Word(it, "word$it") }.toImmutableList(),
             isMnemonicHidden = false,
             onRevealMnemonic = {},
         )

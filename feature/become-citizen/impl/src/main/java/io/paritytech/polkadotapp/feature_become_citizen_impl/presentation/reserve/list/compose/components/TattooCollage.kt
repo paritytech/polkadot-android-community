@@ -15,13 +15,14 @@ import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.feature_become_citizen_api.presentation.common.TattooImage
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.compose.components.TattooImageItem
+import kotlinx.collections.immutable.ImmutableList
 
 private val HorizontalCollageSpacing = 8.dp
 private val InBetweenSpacing = 2.dp
 
 @Composable
 internal fun TattoosCollage(
-    tattoos: List<TattooImage>
+    tattoos: ImmutableList<TattooImage>
 ) {
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current

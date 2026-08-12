@@ -7,6 +7,8 @@ import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
+import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
+import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
@@ -15,6 +17,8 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.mapErrorNotInstance
 import io.paritytech.polkadotapp.common.utils.orZero
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.claimLongTermStorage
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.resourcesCalls
 import io.paritytech.polkadotapp.feature_people_api.domain.BandersnatchKeyResolver
@@ -39,6 +43,7 @@ import javax.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
+import io.paritytech.polkadotapp.common.R as RCommon
 
 class RealTransactionStorageSlotAllocator @Inject constructor(
     private val chainRegistry: ChainRegistry,
@@ -49,6 +54,7 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     private val transactionStorageRepository: TransactionStorageRepository,
     private val bandersnatchKeyResolver: BandersnatchKeyResolver,
     private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase,
+    private val chainConnectionRefCounter: ChainConnectionRefCounter,
 ) : TransactionStorageSlotAllocator {
     /**
      * The claim is submitted on the **people** chain, but the resulting allowance is propagated to
@@ -56,39 +62,55 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
      * That is why we read [currentBulletInAllocation] and await visibility via
      * [awaitAllocationVisibleOnBulletIn] against bullet-in, while the extrinsic itself runs on people.
      */
-    override suspend fun allocate(target: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit> {
+    context(diagnostics: StalenessReportCollector)
+    override suspend fun allocate(target: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_allocating) {
         Timber.i("starting allocate for slotAccountKey, strategy=$strategy")
-        return runCatching {
+
+        chainConnectionRefCounter.withConnectionEnabled(
+            chainIds = setOf(knownChains.people, knownChains.bulletIn),
+            label = CONNECTION_LABEL
+        ) {
+            resolveAllocateContext(target).flatMap { ctx ->
+                if (strategy == OnExistingAllocationStrategy.IGNORE && ctx.previousCount > BigInteger.ZERO) {
+                    Timber.i("existing allocation=${ctx.previousCount}; strategy=IGNORE — skipping claim")
+                    return@flatMap Result.success(Unit)
+                }
+                pickFreeCounter(ctx.chain.id, ctx.period, ctx.collection)
+                    .mapError { TransactionStorageSlotAllocationError.NoAllocationAvailable(it) }
+                    .flatMap { counter -> submitClaim(ctx, counter, target) }
+                    .onSuccess {
+                        awaitAllocationVisibleOnBulletIn(target, ctx.previousCount)
+                            .logFailure("Failed to awaitAllocationVisibleOnBulletIn")
+                    }
+            }
+        }
+            .onFailure { Timber.e(it, "allocate failed") }
+            .mapErrorNotInstance<_, TransactionStorageSlotAllocationError> { TransactionStorageSlotAllocationError.Unknown(it) }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun resolveAllocateContext(target: AccountId): Result<AllocateContext> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
+        runCatching {
             val chain = chainRegistry.getChain(knownChains.people)
             val collection = activePeopleCollectionUseCase.getActivePeopleCollection()
             val period = currentPeriod(chain.id)
             val previousCount = currentBulletInAllocation(target)
             Timber.i("chain=${chain.id}, collection=$collection, period=$period, pre-tx allocation=$previousCount")
             AllocateContext(chain, collection, period, previousCount)
-        }.flatMap { ctx ->
-            if (strategy == OnExistingAllocationStrategy.IGNORE && ctx.previousCount > BigInteger.ZERO) {
-                Timber.i("existing allocation=${ctx.previousCount}; strategy=IGNORE — skipping claim")
-                return@flatMap Result.success(Unit)
-            }
-            pickFreeCounter(ctx.chain.id, ctx.period, ctx.collection)
-                .mapError { TransactionStorageSlotAllocationError.NoAllocationAvailable(it) }
-                .flatMap { counter ->
-                    Timber.i("picked free counter=$counter; submitting claim_long_term_storage extrinsic")
-                    val origin = transactionStorageOrigins.asResourcesLongTermStorage(ctx.period, counter, ctx.collection)
-                    extrinsicService.submitExtrinsicAndAwaitExecution(ctx.chain, origin) {
-                        resourcesCalls.claimLongTermStorage(ctx.period, counter, target)
-                    }
-                        .flattenExecutionFailure()
-                        .coerceToUnit()
-                        .onSuccess { Timber.i("extrinsic executed for counter=$counter") }
-                }
-                .onSuccess {
-                    awaitAllocationVisibleOnBulletIn(target, ctx.previousCount)
-                        .logFailure("Failed to awaitAllocationVisibleOnBulletIn")
-                }
         }
-            .onFailure { Timber.e(it, "allocate failed") }
-            .mapErrorNotInstance<_, TransactionStorageSlotAllocationError> { TransactionStorageSlotAllocationError.Unknown(it) }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun submitClaim(ctx: AllocateContext, counter: UByte, target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
+        Timber.i("picked free counter=$counter; submitting claim_long_term_storage extrinsic")
+        val origin = transactionStorageOrigins.asResourcesLongTermStorage(ctx.period, counter, ctx.collection)
+
+        extrinsicService.submitExtrinsicAndAwaitExecution(ctx.chain, origin) {
+            resourcesCalls.claimLongTermStorage(ctx.period, counter, target)
+        }
+            .flattenExecutionFailure()
+            .coerceToUnit()
+            .onSuccess { Timber.i("extrinsic executed for counter=$counter") }
     }
 
     private suspend fun currentBulletInAllocation(target: AccountId): BigInteger {
@@ -98,8 +120,9 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
             .orZero()
     }
 
-    private suspend fun awaitAllocationVisibleOnBulletIn(target: AccountId, previousCount: BigInteger): Result<Unit> {
-        return runCatching {
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun awaitAllocationVisibleOnBulletIn(target: AccountId, previousCount: BigInteger): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_awaiting_bulletin) {
+        runCatching {
             withTimeout(AWAIT_BULLETIN_TIMEOUT) {
                 Timber.i("waiting for bullet-in allocation to increase past $previousCount")
 
@@ -113,22 +136,25 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
         }
     }
 
+    context(diagnostics: StalenessReportCollector)
     private suspend fun pickFreeCounter(
         chainId: ChainId,
         period: UInt,
         collection: PeopleCollection,
-    ): Result<UByte> = runCatching {
-        val maxCounters = longTermStorageSlotRepository.maxClaimsPerPeriod(chainId)
-        Timber.i("scanning $maxCounters counters for period=$period")
-        val aliasesByCounter = (0u until maxCounters.toUInt()).associateWith { c ->
-            val context = BandersnatchContext.longTermStorageClaim(period, c.toUByte())
-            bandersnatchKeyResolver.getAliasInContext(collection, context)
+    ): Result<UByte> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_picking_slot) {
+        runCatching {
+            val maxCounters = longTermStorageSlotRepository.maxClaimsPerPeriod(chainId)
+            Timber.i("scanning $maxCounters counters for period=$period")
+            val aliasesByCounter = (0u until maxCounters.toUInt()).associateWith { c ->
+                val context = BandersnatchContext.longTermStorageClaim(period, c.toUByte())
+                bandersnatchKeyResolver.getAliasInContext(collection, context)
+            }
+            val taken = longTermStorageSlotRepository.spentAliases(chainId, period, aliasesByCounter.values.toList())
+            Timber.i("${taken.size}/$maxCounters counters already claimed")
+            val freeCounter = aliasesByCounter.entries.firstOrNull { (_, alias) -> alias !in taken }
+                ?: error("No more slots available: all $maxCounters counters are claimed for period=$period")
+            freeCounter.key.toUByte()
         }
-        val taken = longTermStorageSlotRepository.spentAliases(chainId, period, aliasesByCounter.values.toList())
-        Timber.i("${taken.size}/$maxCounters counters already claimed")
-        val freeCounter = aliasesByCounter.entries.firstOrNull { (_, alias) -> alias !in taken }
-            ?: error("No more slots available: all $maxCounters counters are claimed for period=$period")
-        freeCounter.key.toUByte()
     }
 
     private suspend fun currentPeriod(chainId: ChainId): UInt {
@@ -145,5 +171,6 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
 
     companion object {
         val AWAIT_BULLETIN_TIMEOUT = 30.seconds
+        private const val CONNECTION_LABEL = "TransactionStorageSlotAllocator"
     }
 }

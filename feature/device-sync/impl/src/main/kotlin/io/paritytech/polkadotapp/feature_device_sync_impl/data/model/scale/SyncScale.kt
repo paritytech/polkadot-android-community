@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.EnumIndex
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
+import io.paritytech.polkadotapp.common.domain.model.scale.X25519PublicKeyScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.LocalMessageScale
 import kotlinx.serialization.Serializable
 
@@ -52,8 +53,7 @@ sealed interface SyncEntityScale {
 class LocalDeviceScale(
     @FixedLength(32)
     val statementAccountId: ByteArray,
-    @FixedLength(65)
-    val encryptionPublicKey: ByteArray,
+    val encryptionPublicKey: X25519PublicKeyScale,
     val status: DeviceStatusScale,
     val lastUpdate: ULong,
 )

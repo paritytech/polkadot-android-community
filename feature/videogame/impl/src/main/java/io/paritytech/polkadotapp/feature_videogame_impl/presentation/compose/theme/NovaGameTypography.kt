@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import io.paritytech.polkadotapp.designsystem.typography.PolkadotFontFamilies
 import io.paritytech.polkadotapp.feature_videogame_impl.R
 
 @OptIn(ExperimentalTextApi::class)
@@ -122,6 +123,25 @@ object NovaGameTypography {
         fontWeight = FontWeight.Black,
         fontSize = 40.sp,
         lineHeight = 40.sp,
+        lineHeightStyle = lineHeightStyle,
+        platformStyle = platformTextStyle,
+    )
+
+    val connectionBadgeLabel = TextStyle(
+        fontFamily = PolkadotFontFamilies.inter,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.24.sp,
+        lineHeightStyle = lineHeightStyle,
+        platformStyle = platformTextStyle,
+    )
+
+    val connectingCountdown = TextStyle(
+        fontFamily = PolkadotFontFamilies.inter,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
+        lineHeight = 22.sp,
         lineHeightStyle = lineHeightStyle,
         platformStyle = platformTextStyle,
     )

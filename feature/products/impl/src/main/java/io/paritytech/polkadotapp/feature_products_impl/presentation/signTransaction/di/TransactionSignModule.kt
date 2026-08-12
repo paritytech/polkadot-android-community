@@ -4,12 +4,17 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.components.ViewModelComponent
+import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningAccount
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContext
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContextHolder
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.CreateTransactionInteractor
+import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.IdentityAccountSigningSource
+import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ProductAccountSigningSource
+import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ProductSigningSource
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.SignPayloadJsonInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.SignRawInteractor
+import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.SignVrfInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.TransactionSignInteractor
 
 @Module
@@ -29,12 +34,24 @@ class TransactionSignModule {
         signingContext: SigningContext,
         signPayloadJsonInteractorFactory: SignPayloadJsonInteractor.Factory,
         signRawInteractorFactory: SignRawInteractor.Factory,
+        signVrfInteractorFactory: SignVrfInteractor.Factory,
         createTransactionInteractorFactory: CreateTransactionInteractor.Factory,
+        productSigningSourceFactory: ProductAccountSigningSource.Factory,
+        identityAccountSigningSource: IdentityAccountSigningSource,
     ): TransactionSignInteractor {
+        // The account was resolved before the screen was shown; map it to the signing source.
+        val signingSource: ProductSigningSource = when (val account = signingContext.signingAccount) {
+            is SigningAccount.Product -> productSigningSourceFactory.create(account.accountId)
+            SigningAccount.IdentityAccount -> identityAccountSigningSource
+        }
+
         return when (val body = signingContext.signingRequestBody) {
-            is SigningRequestBody.Transaction -> signPayloadJsonInteractorFactory.create(body.payload)
-            is SigningRequestBody.Raw -> signRawInteractorFactory.create(body.payload)
-            is SigningRequestBody.CreateTransaction -> createTransactionInteractorFactory.create(body.payload)
+            is SigningRequestBody.Transaction -> signPayloadJsonInteractorFactory.create(body.payload, signingSource)
+            is SigningRequestBody.Raw -> signRawInteractorFactory.create(body.payload.type, signingSource)
+            is SigningRequestBody.SignVrf -> signVrfInteractorFactory.create(body, signingSource)
+            is SigningRequestBody.CreateTransaction -> createTransactionInteractorFactory.create(body.payload, signingSource)
+            is SigningRequestBody.RawLegacy -> signRawInteractorFactory.create(body.payload.type, signingSource)
+            is SigningRequestBody.CreateTransactionLegacy -> createTransactionInteractorFactory.create(body.payload, signingSource)
         }
     }
 }

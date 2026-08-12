@@ -16,8 +16,6 @@ interface PocketRouter : ReturnableRouter {
 
     fun openScanAddressQr()
 
-    fun openScan()
-
     fun openSelectFundAsset()
 
     fun openCollectibles()

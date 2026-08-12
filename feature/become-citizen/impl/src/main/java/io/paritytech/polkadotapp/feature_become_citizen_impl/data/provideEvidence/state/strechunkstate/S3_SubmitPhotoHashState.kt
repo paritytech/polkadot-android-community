@@ -19,9 +19,9 @@ class SubmitPhotoHashState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(): UploadEvidenceState {
-        return if (uploadSession.isFullAllocation()) {
+        return if (transition.uploadSession.isFullAllocation()) {
             stateFactory.storeFirstVideoChunk()
         } else {
             stateFactory.extendAllocation()

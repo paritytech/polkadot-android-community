@@ -25,9 +25,9 @@ class MobCreditUpdater @Inject constructor(
     chainRegistry = chainRegistry,
     storageCache = storageCache
 ) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String? {
         val alias = accountRepository.getCandidateAlias(BandersnatchContext.MOB_RULE)
-        return runtime.metadata.mobRule.credits.storageKey(alias)
+        return withRuntime.runtime.metadata.mobRule.credits.storageKey(alias)
     }
 }

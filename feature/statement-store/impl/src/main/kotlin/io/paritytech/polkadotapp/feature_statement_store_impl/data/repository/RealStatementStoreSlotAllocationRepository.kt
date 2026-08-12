@@ -51,6 +51,10 @@ class RealStatementStoreSlotAllocationRepository @Inject constructor(
         dao.deleteSlot(chainId, collection.name, accountId.value, seq.toInt())
     }
 
+    override suspend fun deleteAllForAccount(chainId: ChainId, accountId: AccountId) {
+        dao.deleteAllForAccount(chainId, accountId.value)
+    }
+
     override suspend fun staleRows(
         chainId: ChainId,
         currentPeriod: UInt,

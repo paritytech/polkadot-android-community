@@ -11,7 +11,7 @@ open class BaseScreenDelegate(
     private val context: () -> Context,
     private val viewModel: () -> BaseViewModel
 ) {
-    context(LifecycleOwner)
+    context(lifecycleOwner: LifecycleOwner)
     fun subscribeViewModelEvents() {
         viewModel().events.observe(::handleEvent)
     }
@@ -51,7 +51,7 @@ class BaseFragmentDelegate(
     }
 }
 
-context(Fragment)
+context(fragment: Fragment)
 fun BaseFragmentDelegate(
     viewModel: () -> BaseViewModel
-): BaseFragmentDelegate = BaseFragmentDelegate(fragment = this@Fragment, viewModel = viewModel)
+): BaseFragmentDelegate = BaseFragmentDelegate(fragment = fragment, viewModel = viewModel)

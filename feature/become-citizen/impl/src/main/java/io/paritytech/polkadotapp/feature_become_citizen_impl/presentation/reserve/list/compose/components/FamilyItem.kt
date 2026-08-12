@@ -16,6 +16,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_become_citizen_api.presentation.common.TattooImage
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.models.TattooFamilyUiIdentifier
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.reserve.list.models.TattooFamilyUiModel
+import kotlinx.collections.immutable.toImmutableList
 import java.math.BigInteger
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -73,7 +74,7 @@ private fun FamilyItemPreview() {
                     identifier = TattooFamilyUiIdentifier.Single(BigInteger.valueOf(1)),
                     name = "Test family",
                     totalCount = 12,
-                    exampleTattoos = List(3) { TattooImage.Empty }
+                    exampleTattoos = List(3) { TattooImage.Empty }.toImmutableList()
                 ),
                 canNavigate = false
             )

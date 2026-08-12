@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,10 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -29,7 +35,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.paritytech.polkadotapp.common.presentation.tabbar.LocalTabBarOffset
+import io.paritytech.polkadotapp.common.presentation.tabbar.TabBarBaseInset
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButtonSize
@@ -39,13 +49,16 @@ import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ReplyPreview
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.AttachFileButton
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.ChatInputField
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.PayButton
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.paymentSubtitle
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatInputUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatRequestAnswerProgress
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatSendMessageInputState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.InputMessageRelation
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.isNotNone
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private val ChatInputMinHeight = 48.dp
@@ -66,9 +79,15 @@ internal fun ChatInputRow(
     onHeightChanged: (Dp) -> Unit,
 ) {
     val density = LocalDensity.current
+    // The input keeps a fixed width (parent - the 16dp nub on the left). As the bar pulls out from the left,
+    // it slides right by the extra intrusion instead of shrinking. The offset is read inside the layout
+    // lambda so the per-frame pull updates never recompose this row.
+    val tabBarOffset by LocalTabBarOffset.current.collectAsStateWithLifecycle(initialValue = TabBarBaseInset)
     PolkadotSurface(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(start = TabBarBaseInset)
+            .offset { IntOffset((tabBarOffset - TabBarBaseInset).coerceAtLeast(0.dp).roundToPx(), 0) }
             .onSizeChanged { size -> onHeightChanged(with(density) { size.height.toDp() }) },
         brush = footerBackgroundBrush(inputState)
     ) {
@@ -196,39 +215,7 @@ private fun SendMessageInput(
             Column {
                 val relation = messageState.relation
 
-                AnimatedVisibility(
-                    visible = relation is InputMessageRelation.Edit
-                ) {
-                    val edit = relation as? InputMessageRelation.Edit
-                    ReplyEditBanner(
-                        modifier = Modifier.padding(
-                            top = PolkadotTheme.spacings.tiny,
-                            start = PolkadotTheme.spacings.tiny,
-                            end = PolkadotTheme.spacings.tiny
-                        ),
-                        title = stringResource(RCommon.string.common_edit),
-                        text = edit?.originalText.orEmpty(),
-                        onClose = onClearEdit
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = relation is InputMessageRelation.Reply
-                ) {
-                    val reply = relation as? InputMessageRelation.Reply
-                    ReplyEditBanner(
-                        modifier = Modifier.padding(
-                            top = PolkadotTheme.spacings.tiny,
-                            start = PolkadotTheme.spacings.tiny,
-                            end = PolkadotTheme.spacings.tiny
-                        ),
-                        title = stringResource(RCommon.string.chat_reply_to, reply?.title.orEmpty()),
-                        // A quoted message with no text is treated as a generic attachment label.
-                        // Interim: reply previews should later use a sealed type that renders per message kind.
-                        text = reply?.text ?: stringResource(RCommon.string.chat_reply_attachment),
-                        onClose = onClearReply
-                    )
-                }
+                RelationBanner(relation, onClearEdit, onClearReply)
 
                 ChatInputField(
                     modifier = Modifier
@@ -244,9 +231,68 @@ private fun SendMessageInput(
 }
 
 @Composable
-private fun ReplyEditBanner(
+private fun ColumnScope.RelationBanner(
+    relation: InputMessageRelation,
+    onClearEdit: () -> Unit,
+    onClearReply: () -> Unit
+) {
+    var lastActiveRelation by remember { mutableStateOf(relation) }
+    if (relation.isNotNone()) {
+        lastActiveRelation = relation
+    }
+
+    AnimatedVisibility(visible = relation.isNotNone()) {
+        val bannerModifier = Modifier.padding(
+            top = PolkadotTheme.spacings.tiny,
+            start = PolkadotTheme.spacings.tiny,
+            end = PolkadotTheme.spacings.tiny
+        )
+
+        when (val active = lastActiveRelation) {
+            is InputMessageRelation.Edit -> TitledBanner(
+                modifier = bannerModifier,
+                title = stringResource(RCommon.string.common_edit),
+                subtitle = active.originalText,
+                onClose = onClearEdit
+            )
+
+            is InputMessageRelation.Reply -> ReplyBanner(
+                modifier = bannerModifier,
+                preview = active.preview,
+                onClose = onClearReply
+            )
+
+            InputMessageRelation.None -> Unit
+        }
+    }
+}
+
+@Composable
+private fun ReplyBanner(
+    preview: ReplyPreview,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val subtitle = when (val content = preview.content) {
+        is ReplyPreview.Content.Text -> content.text
+        is ReplyPreview.Content.Image -> content.caption ?: stringResource(RCommon.string.chat_attachment_name_image)
+        is ReplyPreview.Content.Video -> content.caption ?: stringResource(RCommon.string.chat_attachment_name_video)
+        is ReplyPreview.Content.File -> content.caption ?: content.fileName
+        is ReplyPreview.Content.Payment -> content.paymentSubtitle()
+    }
+
+    TitledBanner(
+        modifier = modifier,
+        title = stringResource(RCommon.string.chat_reply_to, preview.title),
+        subtitle = subtitle,
+        onClose = onClose
+    )
+}
+
+@Composable
+private fun TitledBanner(
     title: String,
-    text: String,
+    subtitle: String,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -282,7 +328,7 @@ private fun ReplyEditBanner(
                 )
 
                 NovaText(
-                    text = text,
+                    text = subtitle,
                     style = PolkadotTheme.typography.body.smallEmphasized,
                     color = PolkadotTheme.colors.fg.primary,
                     maxLines = 2,
@@ -341,9 +387,13 @@ private fun ChatInputRowPreview_WithReply() {
                 messageState = ChatSendMessageInputState(
                     inputMessage = "Hi! asdaksjd\nsecond line",
                     relation = InputMessageRelation.Reply(
-                        messageId = "1",
-                        title = "John Doe",
-                        text = "This is a sample reply message to demonstrate the reply header in the chat input row."
+                        ReplyPreview(
+                            messageId = "1",
+                            title = "John Doe",
+                            content = ReplyPreview.Content.Text(
+                                "This is a sample reply message to demonstrate the reply header in the chat input row."
+                            )
+                        )
                     )
                 ),
                 isChatRequest = false,

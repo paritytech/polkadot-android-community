@@ -21,6 +21,7 @@ import io.paritytech.polkadotapp.design.components.mnemonic.model.Word
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm.models.ConfirmationState
+import kotlinx.collections.immutable.toImmutableList
 
 @Composable
 fun MnemonicConfirmation(
@@ -67,8 +68,8 @@ private fun MnemonicConfirmationPreview() {
     PolkadotTheme {
         MnemonicConfirmation(
             confirmationState = ConfirmationState(
-                addedWords = List(3) { Word(it, "word$it") },
-                allWords = List(12) { Word(it, "word$it") },
+                addedWords = List(3) { Word(it, "word$it") }.toImmutableList(),
+                allWords = List(12) { Word(it, "word$it") }.toImmutableList(),
             ),
             onAdd = {},
             onRemove = {}

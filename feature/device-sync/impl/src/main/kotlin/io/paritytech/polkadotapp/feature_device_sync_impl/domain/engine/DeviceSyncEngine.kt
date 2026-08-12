@@ -49,7 +49,7 @@ class DeviceSyncEngine(
     private val scope: CoroutineScope,
 ) {
     private companion object {
-        private val CONNECT_TIMEOUT = 45.seconds
+        private val CONNECT_TIMEOUT = 30.seconds
         private val RECONNECT_BACKOFF = 5.seconds
     }
 
@@ -82,9 +82,14 @@ class DeviceSyncEngine(
     }
 
     private suspend fun connectionLoop() {
+        val signaling = SyncPeerChannelSignaling(
+            communicationSession = session.communicationSession,
+            scope = scope,
+            onOfferIdDetermined = { ownDevicesJournal.saveLastSyncOfferId(peerStatementAccountId, it) },
+        )
         while (currentCoroutineContext().isActive) {
             try {
-                connectOnce()
+                connectOnce(signaling)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -97,11 +102,7 @@ class DeviceSyncEngine(
         }
     }
 
-    private suspend fun connectOnce() = coroutineScope {
-        val signaling = SyncPeerChannelSignaling(
-            communicationSession = session.communicationSession,
-            onOfferIdDetermined = { ownDevicesJournal.saveLastSyncOfferId(peerStatementAccountId, it) },
-        )
+    private suspend fun connectOnce(signaling: SyncPeerChannelSignaling) = coroutineScope {
         val isInitiator = isInitiator(ourStatementAccountId, peerStatementAccountId)
         val sessionId = pairSessionId(ourStatementAccountId, peerStatementAccountId)
 

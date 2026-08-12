@@ -1,5 +1,9 @@
 package io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components
 
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.add
@@ -11,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import io.paritytech.polkadotapp.common.utils.rememberCurrentTimeMillisWithDelay
@@ -30,10 +35,23 @@ internal fun ChatListContent(
     val hasContent = state.chats.isNotEmpty() || state.hasNewRequests
 
     if (!hasContent) {
-        EmptyScreenState(
-            title = stringResource(RCommon.string.chats_empty_state_title),
-            message = stringResource(RCommon.string.chats_empty_state_message)
-        )
+        // The empty state never scrolls, but SearchRevealContainer drives the reveal from nested
+        // scroll, which only fires when a descendant detects a drag. A state that consumes nothing
+        // makes this a pure gesture source: every delta is forwarded to the container.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .scrollable(
+                    state = rememberScrollableState { 0f },
+                    orientation = Orientation.Vertical,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            EmptyScreenState(
+                title = stringResource(RCommon.string.chats_empty_state_title),
+                message = stringResource(RCommon.string.chats_empty_state_message)
+            )
+        }
     } else {
         val currentTimestamp by rememberCurrentTimeMillisWithDelay(1.minutes)
 

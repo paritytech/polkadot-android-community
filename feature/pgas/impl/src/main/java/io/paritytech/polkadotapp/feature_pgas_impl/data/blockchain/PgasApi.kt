@@ -16,22 +16,21 @@ import java.math.BigInteger
 @JvmInline
 value class PgasApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.pgas: PgasApi
     get() = PgasApi(pgas())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PgasApi.maxClaimsPerPeriodPerPerson: UInt
     get() = constant("MaxClaimsPerPeriodPerPerson")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PgasApi.maxClaimsPerPeriodPerLitePerson: UInt
     get() = constant("MaxClaimsPerPeriodPerLitePerson")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PgasApi.pgasClaimAmount: BigInteger
     get() = module.numberConstant("PgasClaimAmount")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val PgasApi.claimedGasAliases: QueryableStorageEntry2<BigEndianU32Scale, BandersnatchAlias, Unit>
     get() = storage2("ClaimedGasAliases")

@@ -34,7 +34,7 @@ class VideoGameAutoLauncher @Inject constructor(
 ) : AppInitializer {
     private var lastAutoLaunchedGameIndex: GameIndex? = null
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
         combine(
             stateReader.gameSnapshot
@@ -51,7 +51,7 @@ class VideoGameAutoLauncher @Inject constructor(
         }
             .filterNotNull()
             .onEach { snapshot -> autoLaunch(snapshot) }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     private fun autoLaunchableSnapshot(snapshot: VideoGameSnapshot?): VideoGameSnapshot? {

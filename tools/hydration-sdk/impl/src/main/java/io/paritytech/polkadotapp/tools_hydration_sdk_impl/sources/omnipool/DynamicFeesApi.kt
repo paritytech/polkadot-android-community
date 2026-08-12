@@ -16,11 +16,10 @@ import io.paritytech.polkadotapp.tools_hydration_sdk_impl.sources.omnipool.model
 @JvmInline
 value class DynamicFeesApi(override val module: Module) : QueryableModule
 
-context(StorageQueryContext)
 val RuntimeMetadata.dynamicFeesApi: DynamicFeesApi
     get() = DynamicFeesApi(dynamicFees())
 
-context(StorageQueryContext)
+context(storage: StorageQueryContext)
 val DynamicFeesApi.assetFee: QueryableStorageEntry1<HydraDxAssetId, DynamicFee>
     get() = storage1(
         name = "AssetFee",

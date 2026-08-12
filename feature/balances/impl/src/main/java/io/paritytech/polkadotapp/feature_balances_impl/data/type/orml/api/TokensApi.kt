@@ -15,10 +15,9 @@ import io.paritytech.polkadotapp.feature_balances_impl.data.type.orml.model.Orml
 @JvmInline
 internal value class TokensApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 internal val RuntimeMetadata.tokens: TokensApi
     get() = TokensApi(module(Modules.TOKENS))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 internal val TokensApi.accounts: QueryableStorageEntry2<AccountId, UntypedOrmlCurrencyId, OrmlAssetAccount>
     get() = storage2("Accounts")

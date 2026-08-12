@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_products_api.presentation.spaHost
 
 import android.webkit.WebView
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.presentation.screens.MessageDisplay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
  * host-API infrastructure directly.
  */
 interface SpaHost {
-    context(ComputationalScope)
+    context(scope: ComputationalScope, messageDisplay: MessageDisplay)
     fun createSession(initialUrl: String): SpaHostSession
 }
 

@@ -17,10 +17,10 @@ class UsernameOnChainUpdater(
     storageCache: StorageCache,
     scope: Updater.NoChainScope<MetaAccount>,
 ) : SingleStorageKeyUpdater<MetaAccount>(scope, chainRegistry, storageCache) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String {
         val accountId = scopeValue.accountIdIn(usernamesChainProvider.chain())
 
-        return runtime.metadata.resources.consumers.storageKey(accountId)
+        return withRuntime.runtime.metadata.resources.consumers.storageKey(accountId)
     }
 }

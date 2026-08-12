@@ -124,7 +124,6 @@ private fun MessageActionMenuDropdownContent(
 
     Column(
         modifier = Modifier
-            .verticalScroll(rememberScrollState())
             .padding(vertical = if (isLandscape) PolkadotTheme.spacings.mediumIncreased else 48.dp),
         verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
         horizontalAlignment = columnAlignment
@@ -146,27 +145,33 @@ private fun MessageActionMenuDropdownContent(
                 ChatMessageSurfaceStyle.default(textMessage.direction)
             }
 
-            ChatMessageContainer(
-                message = textMessage,
-                grouping = ChatMessageGrouping.Standalone,
-                isHighlighted = false,
-                canBeReplied = false,
-                onMessageAction = { },
-                replyPreview = textMessage.replyPreview,
-                surfaceStyle = surfaceStyle
+            Box(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
             ) {
-                if (isSingleEmoji) {
-                    EmojiOnlyContent(
-                        message = textMessage,
-                        showTimestamp = true,
-                    )
-                } else {
-                    TextMessageContent(
-                        showTimestamp = true,
-                        message = textMessage,
-                        text = textMessage.text,
-                        isEdited = textMessage.isEdited
-                    )
+                ChatMessageContainer(
+                    message = textMessage,
+                    grouping = ChatMessageGrouping.Standalone,
+                    isHighlighted = false,
+                    canBeReplied = false,
+                    onMessageAction = { },
+                    replyPreview = textMessage.replyPreview,
+                    surfaceStyle = surfaceStyle
+                ) {
+                    if (isSingleEmoji) {
+                        EmojiOnlyContent(
+                            message = textMessage,
+                            showTimestamp = true,
+                        )
+                    } else {
+                        TextMessageContent(
+                            showTimestamp = true,
+                            message = textMessage,
+                            text = textMessage.text,
+                            isEdited = textMessage.isEdited
+                        )
+                    }
                 }
             }
         }

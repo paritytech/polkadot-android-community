@@ -19,7 +19,7 @@ class SendValidation @Inject constructor(
     private val tokenAmountMapper: TokenAmountMapper,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider
 ) : Validation<SendValidationPayload> {
-    context(ValidationProcess)
+    context(validationProcess: ValidationProcess)
     override suspend fun validate(payload: SendValidationPayload): ValidationResult<SendValidationPayload> {
         val balance = totalBalanceUseCase.getBalance().getOrElse { return ValidationResult.Error(Throwable("Can't fetch balance")) }
 
@@ -35,7 +35,7 @@ class SendValidation @Inject constructor(
             degraded = tokenAmountMapper.mapFrom((transferAmountPlanks - securedPlanks).withAsset(asset)),
         )
 
-        return when (presentUserInput(action)) {
+        return when (validationProcess.presentUserInput(action)) {
             ConfirmDegradedVouchersDecision.SendPrivatelyOnly ->
                 ValidationResult.Success(payload.copy(value = securedPlanks.amountFromPlanks(asset.precision)))
 
@@ -46,7 +46,7 @@ class SendValidation @Inject constructor(
     }
 }
 
-class ConfirmDegradedVouchersUserAction(
+data class ConfirmDegradedVouchersUserAction(
     val totalTransfer: TokenAmountModel,
     val secured: TokenAmountModel,
     val degraded: TokenAmountModel,

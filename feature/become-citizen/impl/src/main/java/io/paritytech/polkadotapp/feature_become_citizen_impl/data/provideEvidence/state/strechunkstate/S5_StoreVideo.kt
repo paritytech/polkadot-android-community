@@ -25,12 +25,12 @@ class StoreVideoChunkState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun getChunk(): Result<RawEvidenceChunk> {
-        return storage.getRawEvidenceChunk(EvidenceType.VIDEO, params.chunkIndex.index, uploadSession.chunkingConfig.chunkSize)
+        return storage.getRawEvidenceChunk(EvidenceType.VIDEO, params.chunkIndex.index, transition.uploadSession.chunkingConfig.chunkSize)
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(
         authorizedTransactionsBeforeSubmission: BigInteger,
         uploadedChunk: RawEvidenceChunk
@@ -56,7 +56,7 @@ class AwaitVideoChunkConfirmation(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun nextState(): UploadEvidenceState {
         return if (params.chunkIndex.isLast) {
             stateFactory.storeVideoMetadata()

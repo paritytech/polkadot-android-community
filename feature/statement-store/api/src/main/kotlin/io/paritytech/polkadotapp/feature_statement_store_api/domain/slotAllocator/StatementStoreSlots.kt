@@ -63,9 +63,9 @@ fun StatementStoreSlots.findFreeSlot(): CollectionSlot<StatementStoreSlot.Free>?
  * tagged with its collection. Does not filter by the incoming account — callers add their
  * own predicates (e.g. excluding their own slots).
  */
-context(CurrentTimeContext)
+context(currentTimeContext: CurrentTimeContext)
 fun StatementStoreSlots.filterReplaceableSlots(cooldown: Duration): List<CollectionSlot<StatementStoreSlot.Taken>> {
-    val now = currentTime()
+    val now = currentTimeContext.currentTime()
     return perCollection.flatMap { forCollection ->
         forCollection.slots
             .filterIsInstance<StatementStoreSlot.Taken>()

@@ -21,6 +21,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.co
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.ChatMessageSurface
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.LocalChatMessageTimeFormatter
+import kotlinx.collections.immutable.persistentListOf
 import java.util.UUID
 import javax.inject.Inject
 
@@ -50,10 +51,10 @@ class RealTextMessageDrawer @Inject constructor(
                     ReplyPreview(
                         messageId = UUID.randomUUID().toString(),
                         title = repliedTo,
-                        text = repliedText
+                        content = ReplyPreview.Content.Text(repliedText)
                     )
                 } else null,
-                reactions = emptyList(),
+                reactions = persistentListOf(),
                 isEdited = false
             )
 

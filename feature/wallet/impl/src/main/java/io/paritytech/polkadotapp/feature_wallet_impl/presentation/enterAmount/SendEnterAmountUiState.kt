@@ -13,11 +13,24 @@ data class SendEnterAmountUiState(
     val recipient: String?,
     val recipientType: ExtractedAddress.DisplayType?,
     val recipientAvatarColor: AvatarColorScheme,
-    val isSendInProgress: Boolean,
+    val sendProgress: SendProgress,
     val isSendEnabled: Boolean,
     val isAmountLocked: Boolean,
     val debugPlanInfo: SendPlanDebugInfo? = null,
-)
+) {
+    sealed interface SendProgress {
+        data object Idle : SendProgress
+
+        data object Submitting : SendProgress
+
+        data class Settling(val stage: Stage) : SendProgress {
+            enum class Stage {
+                DETECTING,
+                DETECTED
+            }
+        }
+    }
+}
 
 sealed interface SendPlanDebugInfo {
     val strategyName: String

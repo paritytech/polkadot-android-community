@@ -37,16 +37,16 @@ abstract class StoreChunkState(
     private val stateFactory: UploadEvidenceStateFactory,
     val chunkIndex: ChunkIndex,
 ) : EvidenceUploadingNonTerminalState() {
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     abstract suspend fun getChunk(): Result<RawEvidenceChunk>
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     abstract suspend fun nextState(
         authorizedTransactionsBeforeSubmission: BigInteger,
         uploadedChunk: RawEvidenceChunk,
     ): UploadEvidenceState
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
         return getChunk().flatMap { chunk ->
             val unrecoverableFailureReason = validateCanUploadChunk(chunk)
@@ -55,22 +55,22 @@ abstract class StoreChunkState(
                 return@flatMap Result.success(stateFactory.unrecoverableFailureFromCurrent(failureParams))
             }
 
-            val authorizedTransactionsBeforeSubmission = uploadSession.requireCurrentStorageAuthorization().extent.transactionsAllowance
+            val authorizedTransactionsBeforeSubmission = transition.uploadSession.requireCurrentStorageAuthorization().extent.transactionsAllowance
 
             Timber.d("Storing chunk of size ${chunk.value.size} bytes")
 
-            uploadSession.storeEvidence(chunk).map {
+            transition.uploadSession.storeEvidence(chunk).map {
                 nextState(authorizedTransactionsBeforeSubmission, chunk)
             }
         }
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     private suspend fun validateCanUploadChunk(
         chunk: RawEvidenceChunk
     ): EvidenceUploadingFailureReason? {
-        val storageAuthorization = uploadSession.getCurrentStorageAuthorization()
-        val blockNumber = uploadSession.getCurrentBulletInBlockNumber()
+        val storageAuthorization = transition.uploadSession.getCurrentStorageAuthorization()
+        val blockNumber = transition.uploadSession.getCurrentBulletInBlockNumber()
 
         return when {
             storageAuthorization == null -> EvidenceUploadingFailureReason.NO_STORAGE_AUTHORIZATION
@@ -88,10 +88,10 @@ abstract class AwaitChunkConfirmationState(
     private val authorizedTransactionsBeforeSubmission: BigInteger,
     val chunkIndex: ChunkIndex,
 ) : EvidenceUploadingNonTerminalState() {
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     abstract suspend fun nextState(): UploadEvidenceState
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
         return runCatching {
             awaitTransactionStored()
@@ -100,9 +100,9 @@ abstract class AwaitChunkConfirmationState(
         }
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     private suspend fun awaitTransactionStored() {
-        uploadSession.subscriptions.await().bulletIn.authorization.first {
+        transition.uploadSession.subscriptions.await().bulletIn.authorization.first {
             it != null && it.storedTransactionAfter(authorizedTransactionsBeforeSubmission)
         }
     }
@@ -115,13 +115,13 @@ abstract class StoreEvidenceMetadataState(
 ) : StoreChunkState(stateFactory, chunkIndex = ChunkIndex.singleChunk()) {
     abstract val evidenceType: EvidenceType
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     protected abstract suspend fun nextState(
         authorizedTransactionsBeforeSubmission: BigInteger,
         evidenceHash: String
     ): UploadEvidenceState
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     final override suspend fun getChunk(): Result<RawEvidenceChunk> {
         return storage.generateEvidenceMetadata(evidenceType).map { evidenceMetadata ->
             val chunkValue = gson.toJson(evidenceMetadata)
@@ -136,7 +136,7 @@ abstract class StoreEvidenceMetadataState(
         }
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     final override suspend fun nextState(
         authorizedTransactionsBeforeSubmission: BigInteger,
         uploadedChunk: RawEvidenceChunk
@@ -144,12 +144,12 @@ abstract class StoreEvidenceMetadataState(
         return nextState(authorizedTransactionsBeforeSubmission, uploadedChunk.value.calculateHash())
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     private suspend fun EvidenceStorage.generateEvidenceMetadata(type: EvidenceType): Result<EvidenceMetadata> {
         return getRawEvidence(type).map { wholeEvidence ->
             val rootHash = wholeEvidence.value.calculateHash()
 
-            val chunkSize = uploadSession.chunkingConfig.chunkSize.inWholeBytes.toInt()
+            val chunkSize = transition.uploadSession.chunkingConfig.chunkSize.inWholeBytes.toInt()
             val chunkHashes = wholeEvidence.value.chunked(chunkSize).map { it.calculateHash() }
 
             val fileName = storage.getFileName(type)
@@ -169,12 +169,12 @@ abstract class StoreEvidenceMetadataState(
 abstract class SubmitEvidenceHashState(
     private val evidenceHash: String,
 ) : EvidenceUploadingNonTerminalState() {
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     abstract suspend fun nextState(): UploadEvidenceState
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
-        return uploadSession.submitEvidenceHash(evidenceHash.fromHex()).map {
+        return transition.uploadSession.submitEvidenceHash(evidenceHash.fromHex()).map {
             nextState()
         }
     }

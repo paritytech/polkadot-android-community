@@ -115,7 +115,10 @@ class RealCoinageRecyclingUseCaseTest {
 
             val rolledBackCoins = coins.map { it.copy(spentState = Coin.SpentState.NOT_SPENT) }
             verify(coinRepository).saveAll(rolledBackCoins)
-            verify(voucherRepository).removeVouchers(listOf(voucher.ringVrfKeyIndex))
+            verify(voucherRepository).setUsageStateByRingVrfKeyIndices(
+                listOf(voucher.ringVrfKeyIndex),
+                RecyclerVoucher.UsageState.USED_LOCALLY,
+            )
         }
     }
 

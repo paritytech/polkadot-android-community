@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.database.model
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -45,7 +46,9 @@ class FileUploadLocal(
     val status: Status,
     val errorCategory: ErrorCategory?,
     val errorCause: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    @Embedded
+    val retryState: TransferRetryStateLocal
 ) {
     enum class Status {
         PENDING, IN_PROGRESS, DONE, FAILED

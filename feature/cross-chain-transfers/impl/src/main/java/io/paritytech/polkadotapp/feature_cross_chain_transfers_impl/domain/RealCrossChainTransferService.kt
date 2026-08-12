@@ -67,12 +67,12 @@ internal class RealCrossChainTransferService @Inject constructor(
         private const val CONFIGURATION_CACHE = "RealCrossChainTransferService.Configuration"
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun availableDirectionIds(): List<CrossChainTransferDirectionId> {
         return cachedConfiguration().availableDirectionIds()
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getTransferFeatures(directionId: CrossChainTransferDirectionId): CrossChainTransferFeatures {
         val features = cachedConfiguration().transferFeatures(directionId)
         return requireNotNull(features) {
@@ -87,13 +87,13 @@ internal class RealCrossChainTransferService @Inject constructor(
         )
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun requiredRemainingAmountAfterTransfer(directionId: CrossChainTransferDirectionId): Balance {
         val transferConfig = getTransferConfigurationById(directionId)
         return crossChainTransactor.requiredRemainingAmountAfterTransfer(transferConfig)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun estimateMaximumExecutionTime(directionId: CrossChainTransferDirectionId): Duration {
         val transferConfig = getTransferConfigurationById(directionId)
 
@@ -119,7 +119,7 @@ internal class RealCrossChainTransferService @Inject constructor(
         return totalDuration
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun estimateFee(
         transfer: CrossChainTransfer,
     ): Result<CrossChainTransferFee> = withContext(Dispatchers.IO) {
@@ -159,7 +159,7 @@ internal class RealCrossChainTransferService @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun performAndTrackTransfer(
         transfer: CrossChainTransfer,
         sender: MetaAccount
@@ -168,7 +168,7 @@ internal class RealCrossChainTransferService @Inject constructor(
         return crossChainTransactor.performAndTrackTransfer(transferConfiguration, transfer, sender)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun dryRunTransfer(
         transfer: CrossChainTransfer,
         dryRunOrigin: CrossChainTransferDryRunOrigin,
@@ -194,18 +194,18 @@ internal class RealCrossChainTransferService @Inject constructor(
         return toProduceBlockOnOrigin + toProduceBlockOnRelay + toProduceBlockOnDestination
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun getTransferConfigurationById(directionId: CrossChainTransferDirectionId): CrossChainTransferConfiguration {
         val direction = getDirectionById(directionId)
         return getTransferConfiguration(direction)
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun getTransferConfiguration(direction: CrossChainTransferDirection): CrossChainTransferConfiguration {
         return cachedConfiguration().transferConfiguration(direction)!!
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun cachedConfiguration(): CrossChainTransfersConfiguration {
         return computationalCache.useCache(CONFIGURATION_CACHE) {
             val xcmConfig = xcmConfigRepository.awaitXcmConfig()

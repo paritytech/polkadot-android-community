@@ -1,7 +1,8 @@
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 
 plugins {
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.hilt")
 }
 
 android {
@@ -30,9 +31,6 @@ dependencies {
     api(project(":tools:auth:api"))
 
     implementation(project(":tools:common"))
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 
     "gpImplementation"(libs.google.api.client)
     "gpImplementation"(libs.google.play.services.auth)

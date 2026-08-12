@@ -38,9 +38,20 @@ internal object GameColors {
 
     val playerFrameBackground = Color(0xFF232323)
 
+    val tooltipBackground = Color.White
+    val tooltipContent = Color.Black
+
     // Selection +/- overlay tint.
     val selectionPositive = Color(0xFF30D158)
     val selectionNegative = Color(0xFFFF375F)
+
+    // Connection-state indicator; no PolkadotTheme status-green token exists.
+    val connectionConnected = Color(0xFF35C759)
+    val connectionConnecting = Color(0xFFFFB300)
+
+    // "How to play" pill — intentionally identical across all app themes.
+    val howToPlayBackground = Color(0xFF232323)
+    val howToPlayContent = Color.White
 
     // Sub-round progress bar.
     val progressFill = Color(0xFF3D3E80)

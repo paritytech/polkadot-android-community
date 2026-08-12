@@ -13,6 +13,9 @@ import io.paritytech.polkadotapp.feature_videogame_impl.domain.interactor.VideoG
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.models.Vote
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.gameResults.GameResultsPayload
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.voting.models.PlayerVotingUiModel
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -25,7 +28,7 @@ class VideoGameVotingViewModel @Inject constructor(
     private val router: VideoGameRouter
 ) : BaseViewModel(), VideoGameVotingContract {
     private val unknownPlayers = mutableSetOf<AccountId>()
-    override val players = MutableStateFlow<List<PlayerVotingUiModel>>(emptyList())
+    override val players = MutableStateFlow<ImmutableList<PlayerVotingUiModel>>(persistentListOf())
 
     override val inProgress = MutableStateFlow(false)
 
@@ -38,13 +41,14 @@ class VideoGameVotingViewModel @Inject constructor(
             players.value = interactor.getVotesForCurrentGame()
                 .groupBy { it.accountId }
                 .mapNotNull { (accountId, playerVotes) ->
-                    if (playerVotes.all { it.vote == Vote.NotParticipated }) {
+                    val participatedVotes = playerVotes.filterNot { it.vote == Vote.NotParticipated }
+                    if (participatedVotes.isEmpty()) {
                         unknownPlayers.add(accountId)
                         return@mapNotNull null
                     }
 
-                    val (personVotes, notPersonVotes) = playerVotes.partition { it.vote is Vote.Person }
-                    val majority = personVotes.size > notPersonVotes.size
+                    val (personVotes, nonPersonVotes) = participatedVotes.partition { it.vote is Vote.Person }
+                    val majority = personVotes.size > nonPersonVotes.size
 
                     PlayerVotingUiModel(
                         accountId = accountId,
@@ -53,6 +57,7 @@ class VideoGameVotingViewModel @Inject constructor(
                     )
                 }
                 .filter { it.accountId !in bannedIds }
+                .toImmutableList()
         }
     }
 
@@ -61,11 +66,7 @@ class VideoGameVotingViewModel @Inject constructor(
 
         players.updateItem(
             condition = { it == player },
-            updater = {
-                it.copy(
-                    isPerson = !it.isPerson
-                )
-            }
+            updater = { it.copy(isPerson = !it.isPerson) }
         )
     }
 

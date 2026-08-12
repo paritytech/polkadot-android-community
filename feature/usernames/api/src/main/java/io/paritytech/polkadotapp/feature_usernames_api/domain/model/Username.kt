@@ -4,6 +4,8 @@ data class Username private constructor(
     val base: String,
     val index: Int?,
 ) {
+    val isFull: Boolean get() = index == null
+
     fun getDisplayUsername(): String {
         return buildString {
             append(base)

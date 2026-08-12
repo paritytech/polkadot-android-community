@@ -14,14 +14,14 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 interface VideoGameTimelineService {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeTimeline(): Flow<Duration?>
 }
 
 class RealVideoGameTimelineService @Inject constructor(
     private val gameInfoSyncService: VideoGameInfoSyncService
 ) : VideoGameTimelineService {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeTimeline(): Flow<Duration?> = gameInfoSyncService.subscribeCurrentActiveGameInfo()
         .flatMapLatest { gameInfo ->
             if (gameInfo == null) {
@@ -35,5 +35,5 @@ class RealVideoGameTimelineService @Inject constructor(
         }.distinctUntilChanged()
 }
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun VideoGameTimelineService.currentActiveGameTimeline() = subscribeTimeline().filterNotNull()

@@ -26,10 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
@@ -37,10 +40,11 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.colors.PolkadotColorsPalette
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
+import kotlinx.collections.immutable.ImmutableList
 
 @Composable
 internal fun ThemePicker(
-    themes: List<PolkadotAppTheme>,
+    themes: ImmutableList<PolkadotAppTheme>,
     selectedTheme: PolkadotAppTheme,
     onThemeSelected: (PolkadotAppTheme, Offset) -> Unit
 ) {
@@ -98,7 +102,15 @@ private fun Dot(
         modifier = Modifier
             .size(48.dp)
             .onGloballyPositioned { onCenterChanged(it.boundsInRoot().center) }
-            .shadow(elevation = 4.dp, shape = PolkadotTheme.shapes.full)
+            .dropShadow(
+                shape = PolkadotTheme.shapes.full,
+                shadow = Shadow(
+                    radius = 4.dp,
+                    color = Color.Black,
+                    offset = DpOffset(0.dp, 2.dp),
+                    alpha = 0.25f
+                )
+            )
             .clip(PolkadotTheme.shapes.full)
             .background(palette.bg.action.secondary),
         contentAlignment = Alignment.Center

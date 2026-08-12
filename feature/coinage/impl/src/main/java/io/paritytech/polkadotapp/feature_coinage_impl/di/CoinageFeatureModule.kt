@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.RecyclerVouchersInte
 import io.paritytech.polkadotapp.feature_coinage_api.domain.UnloadDelayStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.VoucherAllocator
+import io.paritytech.polkadotapp.feature_coinage_api.domain.debug.CoinageDebugSettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlanner
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentWorkerStarter
@@ -26,6 +27,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoina
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ValidateTransferPlanUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.debug.RealCoinageDebugSettings
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.ConsumedTokenChecker
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.FreeUnloadTokenResolver
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.RealConsumedTokenChecker
@@ -221,4 +223,8 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindCoinageTransactionFactory(impl: CoinageTransactionFactory): CoinageTransaction.Factory
+
+    @Binds
+    @Singleton
+    fun bindCoinageDebugSettings(impl: RealCoinageDebugSettings): CoinageDebugSettings
 }

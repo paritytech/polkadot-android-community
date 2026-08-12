@@ -26,6 +26,7 @@ import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models.VideoGameTutorialState
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models.VideoGameUiState
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models.calculateSugarLevel
+import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models.findHost
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.play.models.toUi
 import io.paritytech.polkadotapp.feature_videogame_impl.service.VideoGameServiceController
 import io.paritytech.polkadotapp.feature_videogame_impl.service.VideoGameStateReader
@@ -138,6 +139,19 @@ class VideoGamePlayViewModel @Inject constructor(
         .onEach { if (it) votingTooltipHasBeenShownThisGame = true }
         .stateInBackground(SharingStarted.Eagerly, false)
 
+    override val noHostTooltipVisible = gameRenderState
+        .map { it.isHostUnavailableDuringHosting() }
+        .distinctUntilChanged()
+        .transformLatest { hostUnavailable ->
+            emit(hostUnavailable)
+            if (hostUnavailable) {
+                delay(VideoGameTimings.NO_HOST_TOOLTIP_DURATION)
+                emit(false)
+            }
+        }
+        .distinctUntilChanged()
+        .stateInBackground(SharingStarted.Eagerly, false)
+
     override val selections = MutableStateFlow(persistentSetOf<AccountId>())
 
     private val myAcceptances = MutableStateFlow(persistentSetOf<AccountId>())
@@ -192,7 +206,7 @@ class VideoGamePlayViewModel @Inject constructor(
     override fun collapse() {
         if (tutorialState.value is VideoGameTutorialState.Shown) {
             hideTutorial()
-        } else {
+        } else if (!isInActiveState()) {
             router.back()
         }
     }
@@ -223,6 +237,14 @@ class VideoGamePlayViewModel @Inject constructor(
     override fun onCleared() {
         serviceController.stop()
         confettiSoundPlayer.release()
+    }
+
+    private fun isInActiveState(): Boolean = when (gameRenderState.value.state) {
+        is VideoGameUiState.HostIntroduction,
+        is VideoGameUiState.Hosting,
+        is VideoGameUiState.HostReset -> true
+
+        else -> false
     }
 
     private fun openVotingWhenGameFinishes() {
@@ -309,6 +331,13 @@ class VideoGamePlayViewModel @Inject constructor(
 
     private fun shouldShowVotingTooltip(): Boolean {
         return !votingTooltipHasBeenShownThisGame
+    }
+
+    private fun VideoGamePlayUiState.isHostUnavailableDuringHosting(): Boolean {
+        if (state !is VideoGameUiState.Hosting) return false
+
+        val host = players.findHost()
+        return host == null || host.connection != PlayerConnectionState.Connected
     }
 
     private fun VideoGamePlayer.toUi(

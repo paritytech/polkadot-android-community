@@ -1,5 +1,6 @@
 plugins {
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -17,9 +18,7 @@ dependencies {
 
     implementation(project(":database"))
 
-    implementation(libs.hilt.android)
     implementation(libs.hilt.androidx.work)
-    ksp(libs.hilt.android.compiler)
     ksp(libs.hilt.androidx.compiler)
 
     implementation(libs.androidx.work.runtime)

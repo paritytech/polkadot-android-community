@@ -4,8 +4,8 @@ import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
-import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
+import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.CurrentTimeContext
 import io.paritytech.polkadotapp.common.utils.flatMap
@@ -67,7 +67,7 @@ class RealAddContactUseCase @Inject constructor(
         val contact = Contact(
             accountId = contactAccountId,
             username = username?.getDisplayUsername(),
-            chatKey = chatKey.toDataByteArray(),
+            chatKey = chatKey.requireX25519PublicKey(),
             sharedSecretDerivationDomain = sharedSecretDerivationDomain,
             ourMetaAccountId = ourMetaAccountId,
             avatarUrl = avatar,
@@ -129,7 +129,7 @@ class RealAddContactUseCase @Inject constructor(
         return Contact(
             accountId = accountId,
             username = username,
-            chatKey = EncodedPublicKey(identifierKey.value),
+            chatKey = identifierKey.x25519OrNull() ?: error("Peer account uses an unsupported chat encryption key type"),
             ourMetaAccountId = ourMetaAccountId,
             avatarUrl = null,
             sharedSecretDerivationDomain = SharedSecretDerivationDomain.CHAT,

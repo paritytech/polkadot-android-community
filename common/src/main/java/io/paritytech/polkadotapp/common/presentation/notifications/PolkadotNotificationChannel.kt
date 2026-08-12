@@ -9,7 +9,8 @@ enum class PolkadotNotificationChannel(
     @param:StringRes val nameRes: Int,
     @param:StringRes val descriptionRes: Int,
     val importance: Int,
-    val vibrationPattern: LongArray? = null
+    val vibrationPattern: LongArray? = null,
+    val isSilent: Boolean = false,
 ) {
     CHAT(
         id = "notification_channel_id_chat",
@@ -19,10 +20,13 @@ enum class PolkadotNotificationChannel(
     ),
 
     CALLS(
-        id = "calls",
+        // Incoming-call ringtone is owned by CallAlertManager, so the channel itself stays silent.
+        // Channel settings are immutable post-creation, hence the id bump from the original "calls".
+        id = "calls_ringtone",
         nameRes = RCommon.string.notification_channel_name_calls,
         descriptionRes = RCommon.string.notification_channel_description_calls,
-        importance = NotificationManagerCompat.IMPORTANCE_MAX
+        importance = NotificationManagerCompat.IMPORTANCE_MAX,
+        isSilent = true,
     ),
 
     VIDEO_GAME(

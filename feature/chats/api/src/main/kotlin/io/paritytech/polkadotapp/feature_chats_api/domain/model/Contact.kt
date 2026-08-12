@@ -2,7 +2,7 @@ package io.paritytech.polkadotapp.feature_chats_api.domain.model
 
 import io.paritytech.polkadotapp.common.data.os.OperatingSystem
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.utils.Identifiable
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
@@ -12,7 +12,7 @@ import kotlin.time.Instant
 data class Contact(
     val accountId: AccountId,
     val username: String?,
-    val chatKey: EncodedPublicKey,
+    val chatKey: X25519PublicKey,
     val ourMetaAccountId: Long,
     val avatarUrl: String?,
     val sharedSecretDerivationDomain: SharedSecretDerivationDomain,

@@ -43,6 +43,8 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.chatWithPlayers.models.ContactStatus
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.chatWithPlayers.models.GamePlayerUiModel
 import io.paritytech.polkadotapp.feature_videogame_impl.presentation.chatWithPlayers.models.PlayerAction
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
 private val AVATAR_SIZE = 81.dp
 private val BUTTON_MIN_SIZE = 88.dp
@@ -80,7 +82,7 @@ private fun ChatWithPlayersContent(
                 is LoadingState.Loading -> LoadingScreenState()
                 is LoadingState.Error -> Unit
                 is LoadingState.Loaded -> PlayersContent(
-                    players = state.data,
+                    players = state.data.toImmutableList(),
                     onPlayerAction = onPlayerAction
                 )
             }
@@ -90,7 +92,7 @@ private fun ChatWithPlayersContent(
 
 @Composable
 private fun PlayersContent(
-    players: List<GamePlayerUiModel>,
+    players: ImmutableList<GamePlayerUiModel>,
     onPlayerAction: (GamePlayerUiModel, PlayerAction) -> Unit
 ) {
     if (players.isEmpty()) {
@@ -120,7 +122,7 @@ private fun EmptyPlayersContent() {
 
 @Composable
 private fun PlayersGrid(
-    players: List<GamePlayerUiModel>,
+    players: ImmutableList<GamePlayerUiModel>,
     onPlayerAction: (GamePlayerUiModel, PlayerAction) -> Unit
 ) {
     LazyVerticalGrid(

@@ -14,10 +14,9 @@ import java.math.BigInteger
 @JvmInline
 value class TimestampRuntimeApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.timestamp: TimestampRuntimeApi
     get() = TimestampRuntimeApi(module(Modules.TIMESTAMP))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val TimestampRuntimeApi.now: QueryableStorageEntry0<BigInteger>
     get() = storage0("Now", binding = ::bindNumber)

@@ -19,36 +19,36 @@ interface QueryableModule {
     val module: Module
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 inline fun <reified T : Any> QueryableModule.storage0(name: String): QueryableStorageEntry0<T> {
     return storage0(name, typeOf<T>())
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 inline fun <reified T : Any> QueryableModule.storage0OrNull(vararg nameCandidates: String): QueryableStorageEntry0<T>? {
     return storage0OrNull(typeOf<T>(), *nameCandidates)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun <T : Any> QueryableModule.storage0(name: String, valueType: KType): QueryableStorageEntry0<T> {
-    return RealQueryableStorageEntry0(module.storage(name), Entry0Encoders.Auto(valueType), runtime)
+    return RealQueryableStorageEntry0(module.storage(name), Entry0Encoders.Auto(valueType), withRuntime.runtime)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun <T : Any> QueryableModule.storage0OrNull(valueType: KType, vararg nameCandidates: String): QueryableStorageEntry0<T>? {
     val storage = module.findStorage(*nameCandidates) ?: return null
-    return RealQueryableStorageEntry0(storage, Entry0Encoders.Auto(valueType), runtime)
+    return RealQueryableStorageEntry0(storage, Entry0Encoders.Auto(valueType), withRuntime.runtime)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun <T : Any> QueryableModule.storage0(
     name: String,
     binding: QueryableStorageBinder0<T>,
 ): QueryableStorageEntry0<T> {
-    return RealQueryableStorageEntry0(module.storage(name), Entry0Encoders.Manual(binding), runtime)
+    return RealQueryableStorageEntry0(module.storage(name), Entry0Encoders.Manual(binding), withRuntime.runtime)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun <I, T> QueryableModule.storage1(
     name: String,
     binding: QueryableStorageBinder1<I, T>,
@@ -56,21 +56,21 @@ fun <I, T> QueryableModule.storage1(
     fromKeyBinding: QueryableStorageFromKeyBinder<I>? = null,
 ): QueryableStorageEntry1<I, T> {
     val encoders = Entry1Encoders.Manual(binding, toKeyBinding, fromKeyBinding)
-    return RealQueryableStorageEntry1(runtime, module.storage(name), encoders)
+    return RealQueryableStorageEntry1(withRuntime.runtime, module.storage(name), encoders)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 inline fun <reified I, reified T> QueryableModule.storage1(name: String): QueryableStorageEntry1<I, T> {
     return storage1(name, typeOf<I>(), typeOf<T>())
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun <I, T> QueryableModule.storage1(name: String, keyType: KType, valueType: KType): QueryableStorageEntry1<I, T> {
     val encoders = Entry1Encoders.Auto<I, T>(keyType, valueType)
-    return RealQueryableStorageEntry1(runtime, module.storage(name), encoders)
+    return RealQueryableStorageEntry1(withRuntime.runtime, module.storage(name), encoders)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun <I1, I2, T : Any> QueryableModule.storage2(
     name: String,
     binding: QueryableStorageBinder2<I1, I2, T>,
@@ -78,7 +78,7 @@ fun <I1, I2, T : Any> QueryableModule.storage2(
     toKey2Binding: QueryableStorageToKeyBinder<I2>? = null,
 ): QueryableStorageEntry2<I1, I2, T> {
     return RealQueryableStorageEntry2(
-        runtimeSnapshot = runtime,
+        runtimeSnapshot = withRuntime.runtime,
         storageEntry = module.storage(name),
         encoders = Entry2Encoders.Manual(
             binding = binding,
@@ -90,18 +90,17 @@ fun <I1, I2, T : Any> QueryableModule.storage2(
     )
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 inline fun <reified I1, reified I2, reified T : Any> QueryableModule.storage2(
     name: String,
 ): QueryableStorageEntry2<I1, I2, T> {
     return RealQueryableStorageEntry2(
-        runtimeSnapshot = runtime,
+        runtimeSnapshot = withRuntime.runtime,
         storageEntry = module.storage(name),
         encoders = Entry2Encoders.Auto(typeOf<I1>(), typeOf<I2>(), typeOf<T>())
     )
 }
 
-context(WithRuntime)
 inline fun <reified I1, reified I2, reified I3, reified T : Any> QueryableModule.storage3(
     name: String
 ): QueryableStorageEntry3<I1, I2, I3, T> {
@@ -114,18 +113,18 @@ inline fun <reified I1, reified I2, reified I3, reified T : Any> QueryableModule
     )
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 inline fun <reified T> QueryableModule.constant(name: String): T {
     val constant = module.constant(name)
-    val dynamicStructure = constant.type?.fromByteArrayOrNull(runtime, constant.value)
+    val dynamicStructure = constant.type?.fromByteArrayOrNull(withRuntime.runtime, constant.value)
 
     return Scale.decode(dynamicStructure)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 inline fun <reified T> QueryableModule.constantOrNull(name: String): T? {
     val constant = module.constantOrNull(name) ?: return null
-    val dynamicStructure = constant.type?.fromByteArrayOrNull(runtime, constant.value)
+    val dynamicStructure = constant.type?.fromByteArrayOrNull(withRuntime.runtime, constant.value)
 
     return Scale.decode(dynamicStructure)
 }

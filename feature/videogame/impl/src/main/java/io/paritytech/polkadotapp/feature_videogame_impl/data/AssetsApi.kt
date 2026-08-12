@@ -14,10 +14,9 @@ import io.paritytech.polkadotapp.feature_xcm_api.multiLocation.RelativeMultiLoca
 @JvmInline
 value class AssetsApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.assets: AssetsApi
     get() = AssetsApi(module("Assets"))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val AssetsApi.assetMetadata: QueryableStorageEntry1<RelativeMultiLocation, OnChainAssetMetadata>
     get() = storage1("Metadata")

@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_w3spay_impl.data.scale
 
 import androidx.annotation.Keep
-import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
+import io.paritytech.polkadotapp.common.domain.model.scale.X25519PublicKeyScale
 import kotlinx.serialization.Serializable
 
 /**
@@ -36,13 +36,12 @@ class W3sPaymentDataV1(
 
 /**
  * ECIES envelope put into the statement `data`: the AES-256-GCM ciphertext (IV ‖ ciphertext ‖ tag)
- * of a SCALE-encoded [W3sPaymentDataV1] together with the ephemeral P256 public key the merchant
+ * of a SCALE-encoded [W3sPaymentDataV1] together with the ephemeral X25519 public key the merchant
  * needs to reconstruct the shared secret. Mirrors the SSO pairing `HandshakeAnswerV1Scale`.
  */
 @Serializable
 @Keep
 class W3sEncryptedPayloadV1(
     val encryptedData: ByteArray,
-    @FixedLength(65)
-    val ephemeralPublicKey: ByteArray,
+    val ephemeralPublicKey: X25519PublicKeyScale,
 )

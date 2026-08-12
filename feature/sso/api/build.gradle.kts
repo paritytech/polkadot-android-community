@@ -1,4 +1,5 @@
 plugins {
+    id("polkadotapp.android.library")
 }
 
 android {
@@ -7,4 +8,6 @@ android {
 
 dependencies {
     api(project(":common"))
+
+    implementation(libs.hilt.android)
 }

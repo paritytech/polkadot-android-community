@@ -20,27 +20,27 @@ class SampleBot @Inject constructor(
     private val data = ChatBotData.sample()
 
     override val id: ChatExtensionId = data.id
-    override val metadata = ChatBotMetadata(data.name)
+    override val metadata = ChatBotMetadata(data.name, icon = null)
 
     override fun customMessageRenderers(): List<CustomChatMessageRenderer<*>> {
         return listOf(EchoMessageRenderer)
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun startBotWork() {
-        scope.launch {
-            setWelcomeMessages { listOf(ChatMessage.Content.Text("Hello, want to chat? I'll echo your messages with a custom style!")) }
+        chatBotContext.scope.launch {
+            chatBotContext.setWelcomeMessages { listOf(ChatMessage.Content.Text("Hello, want to chat? I'll echo your messages with a custom style!")) }
         }
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun onTextMessage(
         message: ChatMessage,
         content: ChatMessage.Content.Text
     ) {
-        scope.launch {
+        chatBotContext.scope.launch {
             val customContent = createEchoContent(content.text)
-            sendMessage(customContent)
+            chatBotContext.sendMessage(customContent)
         }
     }
 

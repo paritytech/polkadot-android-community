@@ -1,5 +1,6 @@
 plugins {
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.hilt")
 }
 
 android {
@@ -11,9 +12,6 @@ dependencies {
 
     implementation(project(":common"))
     implementation(project(":tools:remoteconfig:api"))
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 
     implementation(libs.bundles.squareup.okhttp3)
 }

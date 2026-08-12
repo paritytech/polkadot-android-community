@@ -19,13 +19,13 @@ interface StateMachine<STATE : StateMachine.State<STATE, SIDE_EFFECT, EVENT>, SI
     fun onEvent(event: EVENT)
 
     interface State<STATE : State<STATE, SIDE_EFFECT, EVENT>, SIDE_EFFECT, EVENT> {
-        context(Transition<STATE, SIDE_EFFECT>)
+        context(transition: Transition<STATE, SIDE_EFFECT>)
         suspend fun performTransition(event: EVENT)
 
         /**
          * Called when this state is state-machine's initial state
          */
-        context(Transition<STATE, SIDE_EFFECT>)
+        context(transition: Transition<STATE, SIDE_EFFECT>)
         suspend fun bootstrap() {}
     }
 

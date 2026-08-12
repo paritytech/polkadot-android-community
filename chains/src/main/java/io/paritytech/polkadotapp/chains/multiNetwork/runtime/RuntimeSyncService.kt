@@ -38,6 +38,7 @@ class RuntimeSyncService @Inject constructor(
     private val runtimeFilesCache: RuntimeFilesCache,
     private val chainDao: ChainDao,
     private val runtimeMetadataFetcher: RuntimeMetadataFetcher,
+    private val cacheMigrator: RuntimeCacheMigrator,
 ) : CoroutineScope by CoroutineScope(Dispatchers.Default) {
     companion object {
         private const val MAX_CONCURRENT_UPDATES: Int = 8
@@ -134,7 +135,7 @@ class RuntimeSyncService @Inject constructor(
 
             runtimeFilesCache.saveChainMetadata(chainId, runtimeMetadata)
 
-            chainDao.updateSyncedRuntimeVersion(chainId, runtimeInfo.remoteVersion)
+            chainDao.updateSyncedRuntimeVersion(chainId, runtimeInfo.remoteVersion, cacheMigrator.latestVersion())
 
             runtimeMetadata.md5()
         } else {
@@ -167,5 +168,6 @@ class RuntimeSyncService @Inject constructor(
         syncingChains.remove(chainId)
     }
 
-    private fun ChainRuntimeInfoLocal.shouldSyncMetadata() = syncedVersion != remoteVersion
+    private fun ChainRuntimeInfoLocal.shouldSyncMetadata() =
+        syncedVersion != remoteVersion || cacheMigrator.needsMetadataFetch(localMigratorVersion)
 }

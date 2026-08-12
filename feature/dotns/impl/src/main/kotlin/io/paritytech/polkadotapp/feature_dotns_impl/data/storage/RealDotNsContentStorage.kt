@@ -5,6 +5,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
 import javax.inject.Inject
 
 class RealDotNsContentStorage @Inject constructor(
@@ -36,6 +37,38 @@ class RealDotNsContentStorage @Inject constructor(
                         file.writeBytes(data)
                     }
                 }
+            }
+        }
+    }
+
+    override suspend fun saveContentStreaming(contentHash: ContentHash, write: (CarContentWriter) -> Unit) {
+        withContext(Dispatchers.IO) {
+            val contentPath = File(baseDir, contentHash)
+
+            try {
+                write { path, content -> writeEntry(contentPath, path, content) }
+            } catch (e: Throwable) {
+                contentPath.deleteRecursively()
+                throw e
+            }
+        }
+    }
+
+    private fun writeEntry(contentPath: File, path: String, content: InputStream) {
+        val relativePath = path.removePrefix("/")
+
+        if (relativePath.isEmpty()) {
+            // Single root file archive — save as a plain file
+            baseDir.mkdirs()
+            contentPath.outputStream().use { content.copyTo(it) }
+        } else {
+            // Multi-file archive — save as a directory
+            contentPath.mkdirs()
+
+            val file = File(contentPath, relativePath)
+            file.parentFile?.mkdirs()
+            if (!file.isDirectory) {
+                file.outputStream().use { content.copyTo(it) }
             }
         }
     }

@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.jsRuntime
 
 import android.util.Base64
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import io.paritytech.polkadotapp.common.utils.evaluateJavascript
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.ContainerTransport
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.webView.WebViewJsBridge
@@ -79,6 +81,15 @@ class WebViewRuntime(
             """.trimIndent()
             webViewProvider.accessWebView { it.evaluateJavascript(injector) }
         }
+    }
+
+    override suspend fun injectDocumentStartScript(js: String, allowedOriginRules: Set<String>): Boolean {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return false
+
+        webViewProvider.accessWebView {
+            WebViewCompat.addDocumentStartJavaScript(it, js, allowedOriginRules)
+        }
+        return true
     }
 
     override suspend fun waitForReady() {

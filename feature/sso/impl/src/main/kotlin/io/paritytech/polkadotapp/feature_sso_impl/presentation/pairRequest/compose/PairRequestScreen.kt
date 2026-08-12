@@ -36,6 +36,7 @@ fun PairRequestScreen(contract: PairRequestContract) {
 
     PairRequestScreenInternal(
         state = state,
+        stallReport = { contract.stalenessReport.DisplayReport() },
         onApproveClicked = contract::onApproveClicked,
         onRejectClicked = contract::onRejectClicked
     )
@@ -44,6 +45,7 @@ fun PairRequestScreen(contract: PairRequestContract) {
 @Composable
 private fun PairRequestScreenInternal(
     state: LoadingState<PairRequestUiState>,
+    stallReport: @Composable () -> Unit,
     onApproveClicked: () -> Unit,
     onRejectClicked: () -> Unit,
 ) {
@@ -67,6 +69,7 @@ private fun PairRequestScreenInternal(
                     is PairRequestUiState.Connecting -> ConnectingContent(
                         device = uiState.device,
                         step = uiState.step,
+                        stallReport = stallReport,
                         onCancelClicked = onRejectClicked
                     )
 
@@ -128,6 +131,7 @@ private fun PairRequestConfirmationPreview() {
                     )
                 )
             ),
+            stallReport = {},
             onApproveClicked = {},
             onRejectClicked = {}
         )
@@ -149,6 +153,7 @@ private fun PairRequestConnectingPreview() {
                     step = ConnectingStep.REGISTERING,
                 )
             ),
+            stallReport = {},
             onApproveClicked = {},
             onRejectClicked = {}
         )
@@ -161,6 +166,7 @@ private fun PairRequestLimitReachedPreview() {
     PolkadotTheme {
         PairRequestScreenInternal(
             state = LoadingState.Loaded(PairRequestUiState.LimitReached(totalSlots = 8)),
+            stallReport = {},
             onApproveClicked = {},
             onRejectClicked = {}
         )

@@ -1,10 +1,11 @@
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 
 plugins {
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.compose")
+    id("polkadotapp.android.hilt")
     alias(libs.plugins.kotlin.parcelize)
-    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.dagger.hilt)
 }
 
 android {
@@ -28,9 +29,7 @@ dependencies {
     api(project(":feature:become-citizen:api"))
     implementation(project(":tools:ipfs:api"))
 
-    implementation(libs.hilt.android)
     implementation(libs.hilt.androidx.work)
-    ksp(libs.hilt.android.compiler)
     ksp(libs.hilt.androidx.compiler)
 
     implementation(libs.hilt.lifecycle.viewmodel.compose)

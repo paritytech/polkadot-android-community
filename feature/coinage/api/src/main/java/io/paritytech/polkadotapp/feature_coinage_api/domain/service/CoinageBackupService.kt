@@ -7,12 +7,12 @@ import kotlinx.coroutines.flow.Flow
 interface CoinageBackupService {
     fun subscribeProgress(): Flow<BackupProgress>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun start()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun deepSearch()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun markAsCompleted()
 }

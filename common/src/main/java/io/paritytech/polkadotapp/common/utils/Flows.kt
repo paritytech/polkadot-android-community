@@ -6,6 +6,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
@@ -84,6 +87,26 @@ inline fun <T1, T2, R> Flow<Result<T1>>.combineResult(
 @OptIn(FlowPreview::class)
 fun <T> Flow<T>.debounceIndexed(duration: (index: Int, T) -> Duration): Flow<T> {
     return withIndex().debounce { (index, item) -> duration(index, item) }.map { it.value }
+}
+
+/**
+ * Emits first element from upstream and then emits last element emitted by upstream during specified time window
+ *
+ * ```
+ * flow {
+ *  for (num in 1..15) {
+ *      emit(num)
+ *      delay(25)
+ *  }
+ * }.throttleLatest(100)
+ *  .onEach { println(it) }
+ *  .collect()  // Prints 1, 5, 9, 13, 15
+ *
+ * ```
+ */
+fun <T> Flow<T>.throttleLatest(duration: Duration): Flow<T> = conflate().transform { value ->
+    emit(value)
+    delay(duration)
 }
 
 /**
@@ -245,74 +268,74 @@ private class SendingCollector<T>(
 @Suppress("FunctionName")
 fun <T> OneShotEventChannel() = Channel<T>(Channel.CONFLATED)
 
-context(CoroutineScope)
+context(scope: CoroutineScope)
 fun <T> Flow<T>.share(started: SharingStarted = SharingStarted.Eagerly) =
-    shareIn(this@CoroutineScope, started = started, replay = 1)
+    shareIn(scope, started = started, replay = 1)
 
-context(CoroutineScope)
+context(scope: CoroutineScope)
 fun <T> Flow<T>.shareLazily() =
-    shareIn(this@CoroutineScope, started = SharingStarted.Lazily, replay = 1)
+    shareIn(scope, started = SharingStarted.Lazily, replay = 1)
 
-context(CoroutineScope)
+context(scope: CoroutineScope)
 fun <T> Flow<T>.shareInBackground(started: SharingStarted = SharingStarted.Eagerly) =
     inBackground().share(started)
 
-context(CoroutineScope)
+context(scope: CoroutineScope)
 fun <T> Flow<T>.stateInBackground(
     started: SharingStarted = SharingStarted.Eagerly,
     initialValue: T
-) = inBackground().stateIn(this@CoroutineScope, started, initialValue)
+) = inBackground().stateIn(scope, started, initialValue)
 
-context(CoroutineScope)
+context(scope: CoroutineScope)
 fun <T> Flow<T>.stateInBackgroundWithLoading(
     started: SharingStarted = SharingStarted.Eagerly
 ) = withLoading()
     .inBackground()
-    .stateIn(this@CoroutineScope, started, LoadingState.Loading)
+    .stateIn(scope, started, LoadingState.Loading)
 
-context(CoroutineScope)
+context(scope: CoroutineScope)
 fun <T> Flow<T>.shareWhileSubscribed() = share(SharingStarted.WhileSubscribed())
 
-context (LifecycleOwner)
+context(lifecycleOwner: LifecycleOwner)
 fun <V> Flow<V>.observe(collector: suspend (V) -> Unit) {
-    lifecycleScope.launch {
-        repeatOnLifecycle(Lifecycle.State.RESUMED) {
+    lifecycleOwner.lifecycleScope.launch {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             collect(collector)
         }
     }
 }
 
-context (LifecycleOwner)
+context(lifecycleOwner: LifecycleOwner)
 fun <V> Flow<V>.observeWhenCreated(collector: suspend (V) -> Unit) {
-    lifecycleScope.launch {
-        repeatOnLifecycle(Lifecycle.State.CREATED) {
+    lifecycleOwner.lifecycleScope.launch {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.CREATED) {
             collect(collector)
         }
     }
 }
 
-context(Fragment)
+context(fragment: Fragment)
 fun <V> Flow<V>.observeWhenVisible(collector: suspend (V) -> Unit) {
-    viewLifecycleOwner.lifecycleScope.launch {
-        repeatOnLifecycle(Lifecycle.State.RESUMED) {
+    fragment.viewLifecycleOwner.lifecycleScope.launch {
+        fragment.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             collect(collector)
         }
     }
 }
 
-context(Fragment)
+context(fragment: Fragment)
 fun <V> Flow<V>.observeWhenStarted(collector: suspend (V) -> Unit) {
-    viewLifecycleOwner.lifecycleScope.launch {
-        viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+    fragment.viewLifecycleOwner.lifecycleScope.launch {
+        fragment.viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             collect(collector)
         }
     }
 }
 
-context(Fragment)
+context(fragment: Fragment)
 fun <V> Flow<V>.collectWhenVisible() {
-    viewLifecycleOwner.lifecycleScope.launch {
-        repeatOnLifecycle(Lifecycle.State.RESUMED) {
+    fragment.viewLifecycleOwner.lifecycleScope.launch {
+        fragment.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             collect()
         }
     }
@@ -396,6 +419,20 @@ inline fun <reified T> MutableStateFlow<List<T>>.updateItem(
             mutableList[index] = updater(mutableList[index])
 
             mutableList
+        } else it
+    }
+}
+
+@JvmName("updateItemImmutable")
+inline fun <reified T> MutableStateFlow<ImmutableList<T>>.updateItem(
+    condition: (T) -> Boolean,
+    updater: (T) -> T
+) {
+    update {
+        val index = it.indexOfFirst(condition)
+
+        if (index >= 0) {
+            it.toPersistentList().set(index, updater(it[index]))
         } else it
     }
 }

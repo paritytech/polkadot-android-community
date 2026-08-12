@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_videogame_impl.service
 
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.kilobytes
 import io.paritytech.polkadotapp.common.utils.compareTo
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
@@ -80,7 +81,11 @@ class VideoGamePeerChannel(
     }
 
     private suspend fun connectionMonitor() {
-        val signaling = createSignaling() ?: return
+        val signaling = createSignaling()
+        if (signaling == null) {
+            Timber.w("[VideoGame] game=${gameIndex.value} no signaling for peer $remoteAccountId — connection aborted")
+            return
+        }
 
         val isInitiator = localAccountId.value.compareTo(remoteAccountId.value, unsigned = true) < 0
 
@@ -90,6 +95,7 @@ class VideoGamePeerChannel(
             signaling.sendReconnected(lastOfferId)
         }
 
+        Timber.i("[VideoGame] game=${gameIndex.value} connecting peer $remoteAccountId initiator=$isInitiator")
         currentPeer.value = createAndStartPeer(signaling, isInitiator)
 
         signaling.subscribeReconnected().collect { offerIdToDispose ->
@@ -121,13 +127,18 @@ class VideoGamePeerChannel(
         val peerPublicKey = videoGameRepository.getCommunicationIdentifier(
             chainId = chainRegistry.peopleChain().id,
             accountId = remoteAccountId
-        ).onFailure { Timber.e(it, "Failed to get communication identifier") }
+        ).mapCatching {
+            it?.x25519OrNull() ?: error("Peer has no usable chat encryption key")
+        }.onFailure { Timber.e(it, "Failed to get communication identifier") }
             .getOrNull() ?: return null
 
-        val encryption = communicationEncryptionFactory.create(
-            SharedSecretDerivationDomain.CANDIDATE,
-            peerPublicKey
-        )
+        val encryption = runCatching {
+            communicationEncryptionFactory.create(
+                SharedSecretDerivationDomain.CANDIDATE,
+                peerPublicKey
+            )
+        }.onFailure { Timber.e(it, "Invalid communication identifier of peer $remoteAccountId") }
+            .getOrNull() ?: return null
 
         val communicationSession = communicationSessionCreator.createSession(
             scope = this,

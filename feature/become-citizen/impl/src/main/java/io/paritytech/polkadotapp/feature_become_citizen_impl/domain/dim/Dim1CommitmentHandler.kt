@@ -28,7 +28,7 @@ class Dim1CommitmentHandler @Inject constructor(
 
     override val botId: String = ChatBotData.tattoo().id
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun observeState(): Flow<DimState> =
         tattooProgressStateUseCase.tattooProgressStateFlow()
             .filterResultSuccessNotNull()
@@ -40,7 +40,7 @@ class Dim1CommitmentHandler @Inject constructor(
                 }
             }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun cancel(): Result<Unit> =
         tattooProgressStateUseCase.getTattooProgressState().flatMap { progressState ->
             when (progressState) {

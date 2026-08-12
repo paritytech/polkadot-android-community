@@ -3,6 +3,10 @@ package io.paritytech.polkadotapp.chains.util
 @JvmInline
 value class EncodedArguments private constructor(val encoded: Map<String, Any?>) {
     companion object {
+        fun noArgs(): EncodedArguments {
+            return emptyMap<String, Any?>().intoEncodedArgs()
+        }
+
         inline fun <reified T> autoEncodedArgs(
             argument1: Pair<String, T>,
         ): EncodedArguments {

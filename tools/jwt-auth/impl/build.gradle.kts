@@ -1,17 +1,25 @@
 plugins {
-    alias(libs.plugins.dagger.hilt)
+    id("polkadotapp.android.library")
+    id("polkadotapp.android.hilt")
 }
 
 android {
     namespace = "io.paritytech.polkadotapp.tools_jwt_auth_impl"
+
+    defaultConfig {
+        buildConfigField("boolean", "DISABLE_AUTH", "false")
+    }
+
+    buildTypes {
+        getByName("nightly") {
+            buildConfigField("boolean", "DISABLE_AUTH", "true")
+        }
+    }
 }
 
 dependencies {
     api(project(":tools:jwt-auth:api"))
     implementation(project(":tools:integrity:api"))
-
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
 
     testImplementation(project(":test-shared"))
     testImplementation(libs.junit)

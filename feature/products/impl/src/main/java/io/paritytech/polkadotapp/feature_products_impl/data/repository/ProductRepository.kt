@@ -20,6 +20,8 @@ interface ProductRepository {
 
     suspend fun updateContentHash(id: ProductId, contentHash: String)
 
+    suspend fun updateIcon(id: ProductId, iconUrl: String)
+
     suspend fun deleteProduct(id: ProductId)
 }
 
@@ -42,7 +44,8 @@ class RealProductRepository @Inject constructor(
                 id = id.value,
                 name = name,
                 scriptUrl = scriptUrl,
-                contentHash = null
+                contentHash = null,
+                iconUrl = null
             )
         )
         return id
@@ -54,6 +57,10 @@ class RealProductRepository @Inject constructor(
 
     override suspend fun updateContentHash(id: ProductId, contentHash: String) {
         productDao.updateContentHash(id = id.value, contentHash = contentHash)
+    }
+
+    override suspend fun updateIcon(id: ProductId, iconUrl: String) {
+        productDao.updateIcon(id = id.value, iconUrl = iconUrl)
     }
 
     override suspend fun deleteProduct(id: ProductId) {

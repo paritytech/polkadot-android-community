@@ -29,6 +29,8 @@ interface ProductPermissionRepository {
 
     fun observeAllByProduct(productId: ProductId): Flow<List<ProductPermissionStatus>>
 
+    fun observeHasAnyPermissionRequested(productId: ProductId): Flow<Boolean>
+
     suspend fun revokeAllByProduct(productId: ProductId)
 }
 
@@ -88,6 +90,10 @@ class RealProductPermissionRepository @Inject constructor(
     override fun observeAllByProduct(productId: ProductId): Flow<List<ProductPermissionStatus>> {
         return dao.observeAllByProduct(productId.value)
             .map { grants -> grants.map { it.toDomain() } }
+    }
+
+    override fun observeHasAnyPermissionRequested(productId: ProductId): Flow<Boolean> {
+        return dao.observeHasAnyPermissionRequested(productId.value)
     }
 
     private fun ProductPermissionGrantLocal.toDomain(): ProductPermissionStatus {

@@ -71,12 +71,6 @@ interface CoinDao {
 
     @Query("UPDATE coins SET spentState = :spentState WHERE derivationIndex IN (:indices)")
     suspend fun setSpentStateByDerivationIndices(indices: List<Int>, spentState: CoinLocal.SpentState)
-
-    @Query("DELETE FROM coins WHERE derivationIndex = :derivationIndex")
-    suspend fun removeCoin(derivationIndex: Int)
-
-    @Query("DELETE FROM coins WHERE derivationIndex IN (:indices)")
-    suspend fun removeCoins(indices: List<Int>)
 }
 
 class CoinUpdateLocal(

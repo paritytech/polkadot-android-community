@@ -37,6 +37,7 @@ import io.paritytech.polkadotapp.design.utils.withBold
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.search.AddContactContract
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.search.compose.components.SearchHeader
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.search.models.UserSearchResultUiModel
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.random.Random
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -161,7 +162,7 @@ private fun CenteredMessage(text: String) {
 
 @Composable
 private fun LoadedState(
-    results: List<UserSearchResultUiModel>,
+    results: ImmutableList<UserSearchResultUiModel>,
     loadingContactId: AccountId?,
     onSearchResultClick: (UserSearchResultUiModel) -> Unit,
 ) {

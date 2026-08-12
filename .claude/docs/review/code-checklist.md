@@ -30,6 +30,7 @@ Walk this for every file the diff touches. Cite the rule's doc and section. Tag 
 - **major** — Reusable cross-screen state (amount, fee, recipient) not extracted into a Mixin (interface in `api/`, factory bound in `impl/`).
 - **major** — One-shot UI event from a VM consumed via a hand-rolled `LaunchedEffect(Unit) { flow.collect { ... } }` instead of `Flow<T>.collectAsEffect { ctx, event -> ... }` from `design/utils/Flows.kt`. The extension wraps `repeatOnLifecycle(STARTED)`; the hand-rolled form leaks events while the screen is backgrounded. (See `code/state-management.md § One-shot UI events`.)
 - **minor** — Granular states without a clear independence story; check if they produce inconsistent UI (one updates, another stale).
+- **minor** — Timer/subscription flow at coarser display precision than the rendered value, without `distinctUntilChangedBy { displayKey }` dedup. (`code/state-management.md § Dedup high-frequency flows on the displayed value`)
 
 ## UI / Compose (`code/ui-compose.md`)
 
@@ -52,6 +53,11 @@ Walk this for every file the diff touches. Cite the rule's doc and section. Tag 
 - **major** — `BackHandler` in the Fragment instead of in the screen.
 - **major** — Fully-qualified type used inline (`androidx.compose.ui.graphics.Color` without an import).
 - **major** — VM Contract / state exposes a raw Android framework widget (`View`, `Bitmap`, `Drawable`, `Window`). Use a domain holder; do the framework interop in the screen.
+- **major** — Plain `List`/`Set`/`Map` field in Compose-state, or `ImmutableList<T>` with unstable `T` (sealed model with a plain `List` field, or non-`data class` model). (`code/ui-compose.md § Recomposition and stability`)
+- **major** — Compose-state model **or any of its field types** is a plain `class` without value `equals`. A `data class` whose field is an interface backed by a plain class still won't compare equal — check the leaf types, not just the variant. (`code/ui-compose.md § Recomposition and stability`)
+- **major** — Scroll-derived `State` (`isScrollInProgress`, `layoutInfo`, `derivedStateOf` result) read at the `LazyColumn` host and passed by value, not pushed to the consumer. (`code/ui-compose.md § Recomposition and stability`)
+- **major** — Raw `firstVisibleItemIndex`/`layoutInfo` in composition without `derivedStateOf`. (`code/ui-compose.md § Recomposition and stability`)
+- **major** — Per-item `LaunchedEffect` that mutates the VM and re-emits the list (scroll feedback loop). (`code/ui-compose.md § Recomposition and stability`)
 - **minor** — `WebView` exposed on a VM Contract (e.g. `StateFlow<WebView?>`) where preloading forces VM ownership. Acceptable but prefer a `WebViewSlot` / `WebViewHolder` wrapper (PR #593).
 - **minor** — Compose file >400 lines that should be split into `components/`.
 - **minor** — Per-frame allocations inside a Canvas (data-class copies in a mapNotNull); should back with float arrays.
@@ -67,7 +73,7 @@ Walk this for every file the diff touches. Cite the rule's doc and section. Tag 
 - **major** — Bare `Log.x()` instead of Timber.
 - **major** — Hardcoded magic constant (timeout, retry count, threshold) without an extracted name.
 - **major** — Hand-rolled JSON encoding/decoding (`buildJsonObject { … }` walks, manual `JSONObject`, Gson) instead of `@Serializable` + kotlinx-serialization. Custom wire shapes use a `KSerializer` (PR #593). Rationale: `code/naming-and-hygiene.md § Rules at a glance #10`; parallels the SCALE rule in `code/database-and-scale.md`.
-- **minor** — Comment that restates the code ("// loads the user" on a function called `loadUser`).
+- **major** — Comment that restates the code ("// loads the user" on a function called `loadUser`), or any non-essential comment. Minimal comments are mandatory: keep one only where the code is genuinely specific and a reader could misread it without it (non-obvious invariant, workaround, platform quirk).
 - **minor** — Public method name doesn't reflect what the function actually does.
 - **minor** — Trailing positional `Boolean` parameter without a named call site.
 - **minor** — `Long` for time when `Duration` / `Instant` would do.
@@ -111,6 +117,24 @@ Walk this for every file the diff touches. Cite the rule's doc and section. Tag 
 - **major** — `Worker` enqueued directly from a ViewModel — route through an interactor / domain entry point.
 - **major** — Two cleanup verbs on the state holder (`clear()` and `endSession()`) with subtly different semantics (PR #494).
 - **minor** — Missing `runAttemptCount` cap, unique work name, or `ExistingWorkPolicy`.
+
+## Diagnostics / stall reporting (`code/diagnostics-and-stall-reporting.md`)
+
+- **blocking** — Work driven by `launchWithDiagnostics` (i.e. `viewModelScope`, `Dispatchers.Main.immediate`) doing crypto, parsing or blocking I/O without `withContext(coroutineDispatchers.computation/io)` in the interactor. (`§ Read side — UI integration #5`.)
+- **major** — A new one-shot, user-initiated operation that can stall (extrinsic submission, critical-path chain read, remote handshake, cross-chain wait) with no regions at all. (`§ When this applies`.)
+- **major** — Regions added on the write side with no UI integration: no `StalenessReport` on the ViewModel, no `StalenessReportDisplay` on the Contract, or no `DisplayReport()` on the screen. Half a feature.
+- **major** — `markRegion` wrapping a *collaborator's* call at the call site instead of living in that collaborator's implementation. (`§ Regions belong to the implementation`.)
+- **major** — A `…WithDiagnostics` extension twin added next to an interface method instead of putting `context(diagnostics: StalenessReportCollector)` on the method itself. (`§ Interface methods take the context parameter directly`.)
+- **major** — Two adjacent steps with the same label inside one operation — ordinary chain reads were not collapsed into a single `stall_reading_chain_state` region. (`§ Granularity #2, #5`.)
+- **major** — A region per individual chain read (resolve chain, resolve period, read balance as three steps) where one read region is the rule; the exception is a genuinely huge, stall-prone scan. (`§ Granularity #2, #3`.)
+- **major** — Regions duplicating a progress model the screen already renders (stepper / `ProgressCard` phases named twice). (`§ Granularity #6`.)
+- **major** — Region label hardcoded in Kotlin instead of `common` strings.xml, or a `StalenessReport` UI string added outside it.
+- **major** — Two fields for one report (`private val diagnostics = StalenessReport(this)` plus `override val stalenessReport = diagnostics`). (`§ Read side #1`.)
+- **major** — A prompt that owns an operation and does not answer its waiting caller in `onCleared()`. (`§ Lifetime`.)
+- **minor** — Trailing `…` on a stall label; the row already carries a progress indicator. (`§ Labels`.)
+- **minor** — `startRegion` + manual `end()` where `markRegion` would close the region on throw/cancellation.
+- **minor** — `launch { with(report) { … } }` instead of `launchWithDiagnostics(report) { … }`.
+- **minor** — New `StallReportContent` preview building its own fixture instead of `previewStallReportOperations()` / `previewStallReportSteps()`.
 
 ## Database / SCALE (`code/database-and-scale.md`)
 

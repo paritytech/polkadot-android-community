@@ -34,4 +34,6 @@ interface DebugMenuContract {
     fun onClearJWTTokenClick()
 
     fun onSimulateGameResultsClick()
+
+    fun onCoinageDebugWidgetsToggled(enabled: Boolean)
 }

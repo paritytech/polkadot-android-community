@@ -74,6 +74,7 @@ class SettingsNavigator @Inject constructor(
     }
 
     override fun openScanQr() {
+        if (isCurrentDestination(R.id.scanQrFragment)) return
         performNavigation(R.id.action_global_to_scan_graph)
     }
 

@@ -6,7 +6,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.paritytech.polkadotapp.chains.call.MultiChainRuntimeCallsApi
+import io.paritytech.polkadotapp.chains.call.MultiChainViewFunctionsApi
 import io.paritytech.polkadotapp.chains.call.RealMultiChainRuntimeCallsApi
+import io.paritytech.polkadotapp.chains.call.RealMultiChainViewFunctionsApi
 import io.paritytech.polkadotapp.chains.extrinsic.visitor.call.api.CallTraversal
 import io.paritytech.polkadotapp.chains.extrinsic.visitor.call.impl.RealCallTraversal
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
@@ -132,6 +134,12 @@ internal class RuntimeModule {
     @Provides
     @Singleton
     fun provideMultiChainRuntimeCallsApi(chainRegistry: ChainRegistry): MultiChainRuntimeCallsApi = RealMultiChainRuntimeCallsApi(chainRegistry)
+
+    @Provides
+    @Singleton
+    fun provideMultiChainViewFunctionsApi(
+        multiChainRuntimeCallsApi: MultiChainRuntimeCallsApi
+    ): MultiChainViewFunctionsApi = RealMultiChainViewFunctionsApi(multiChainRuntimeCallsApi)
 
     @Provides
     @Singleton

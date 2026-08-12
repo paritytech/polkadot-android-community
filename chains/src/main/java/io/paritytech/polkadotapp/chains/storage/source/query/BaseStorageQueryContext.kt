@@ -329,10 +329,10 @@ abstract class BaseStorageQueryContext(
         }
     }
 
-    context(StorageEntry)
+    context(storageEntry: StorageEntry)
     private fun StorageUpdate.getOrDefault() = if (value == null) {
         StorageUpdate(
-            value = defaultValue(),
+            value = with(storageEntry) { defaultValue() },
             at = at
         )
     } else this

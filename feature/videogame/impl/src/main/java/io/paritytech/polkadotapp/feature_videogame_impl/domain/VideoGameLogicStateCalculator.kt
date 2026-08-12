@@ -25,7 +25,8 @@ class VideoGameLogicStateCalculator @Inject constructor() {
                     preConnection = createPreConnection(
                         nextRound = firstRound,
                         gameTime = gameTime,
-                        currentStateEndsAt = gameStartsAt
+                        currentStateEndsAt = gameStartsAt,
+                        preConnectWindow = VideoGameTimings.CONNECTION_STAGE_DURATION
                     )
                 ),
                 stages = VideoGameStages.Empty
@@ -91,7 +92,8 @@ class VideoGameLogicStateCalculator @Inject constructor() {
                 preConnection = createPreConnection(
                     nextRound = rounds.getOrNull(index + 1),
                     gameTime = gameTime,
-                    currentStateEndsAt = roundEndsAt
+                    currentStateEndsAt = roundEndsAt,
+                    preConnectWindow = VideoGameTimings.PRE_CONNECTION_TIME
                 )
             )
             if (roundState != null) {
@@ -116,12 +118,13 @@ class VideoGameLogicStateCalculator @Inject constructor() {
     private fun createPreConnection(
         nextRound: VideoGameRound?,
         gameTime: Duration,
-        currentStateEndsAt: Duration
+        currentStateEndsAt: Duration,
+        preConnectWindow: Duration
     ): PreConnection? {
         val nextRoundIn = currentStateEndsAt - gameTime
         if (nextRoundIn.isNegative()) return null
 
-        val shouldPreConnect = nextRoundIn < VideoGameTimings.PRE_CONNECTION_TIME
+        val shouldPreConnect = nextRoundIn < preConnectWindow
 
         return if (nextRound != null && shouldPreConnect) {
             PreConnection(nextRound.players)

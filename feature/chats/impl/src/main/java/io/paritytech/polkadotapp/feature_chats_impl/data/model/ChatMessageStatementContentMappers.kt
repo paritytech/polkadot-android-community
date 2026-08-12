@@ -4,8 +4,10 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.decodeFromByteArray
 import io.paritytech.polkadotapp.common.data.os.OperatingSystem
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
+import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
+import io.paritytech.polkadotapp.common.domain.model.scale.toScale
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.common.utils.encodeToByteArrayCatching
@@ -146,8 +148,14 @@ private fun ChatMessage.Content.toStatementStoreContent(): Result<ChatMessageSta
             is ChatMessage.Content.DataChannelIceCandidate -> ChatMessageStatementContent.DataChannelIceCandidate(offerMessageId, sdp)
             is ChatMessage.Content.DataChannelOffer -> ChatMessageStatementContent.DataChannelOffer(sdp, purpose.toDataChannelPurpose())
             is ChatMessage.Content.DataChannelClosed -> ChatMessageStatementContent.DataChannelClosed(offerMessageId)
-            is ChatMessage.Content.DeviceAdded -> ChatMessageStatementContent.DeviceAdded(statementAccountId, encryptionPublicKey)
+            is ChatMessage.Content.DeviceAdded -> ChatMessageStatementContent.DeviceAdded(statementAccountId, encryptionPublicKey.bytes)
             is ChatMessage.Content.DeviceRemoved -> ChatMessageStatementContent.DeviceRemoved(statementAccountId)
+            is ChatMessage.Content.CompactionCommit -> ChatMessageStatementContent.CompactionCommit(
+                claimIdentifier = claimIdentifier.value,
+                claimTicket = claimTicket.bytes,
+                node = NodeEndpoint.WssUrl(nodeUrl)
+            )
+            is ChatMessage.Content.CompactionUnavailable -> error("CompactionUnavailable is local-only and cannot be sent over network")
         }
     }
 }
@@ -188,8 +196,13 @@ private fun ChatMessageStatementContent.toChatMessageContent(): ChatMessage.Cont
         is ChatMessageStatementContent.DataChannelOffer -> ChatMessage.Content.DataChannelOffer(sdp, purpose.toDomain())
         is ChatMessageStatementContent.DataChannelClosed -> ChatMessage.Content.DataChannelClosed(offerMessageId)
         is ChatMessageStatementContent.RichText -> content.toChatMessageContent()
-        is ChatMessageStatementContent.DeviceAdded -> ChatMessage.Content.DeviceAdded(statementAccountId, encryptionPublicKey)
+        is ChatMessageStatementContent.DeviceAdded -> ChatMessage.Content.DeviceAdded(statementAccountId, encryptionPublicKey.requireX25519PublicKey())
         is ChatMessageStatementContent.DeviceRemoved -> ChatMessage.Content.DeviceRemoved(statementAccountId)
+        is ChatMessageStatementContent.CompactionCommit -> ChatMessage.Content.CompactionCommit(
+            claimIdentifier = claimIdentifier.toDataByteArray(),
+            claimTicket = HopTicket.fromRaw(claimTicket),
+            nodeUrl = node.toNodeUrl()
+        )
     }
 }
 
@@ -356,13 +369,13 @@ private fun ChatMessage.Content.DataChannelOffer.Purpose.toDataChannelPurpose() 
 private fun DeviceInfo.toScale(): DeviceInfoScale {
     return DeviceInfoScale(
         statementAccountId = statementAccountId.value,
-        encryptionPublicKey = encryptionPublicKey.value,
+        encryptionPublicKey = encryptionPublicKey.toScale(),
     )
 }
 
 private fun DeviceInfoScale.toDomain(): DeviceInfo {
     return DeviceInfo(
         statementAccountId = statementAccountId.intoAccountId(),
-        encryptionPublicKey = EncodedPublicKey(encryptionPublicKey),
+        encryptionPublicKey = encryptionPublicKey.toDomain().getOrThrow(),
     )
 }

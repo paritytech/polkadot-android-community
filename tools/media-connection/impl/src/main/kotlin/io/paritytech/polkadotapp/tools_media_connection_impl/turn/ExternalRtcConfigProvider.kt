@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.tools_media_connection_impl.models.ExternalRtcC
 import io.paritytech.polkadotapp.tools_media_connection_impl.models.TurnCredentials
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,9 +32,16 @@ internal class ExternalRtcConfigProvider @Inject constructor(
 
     private suspend fun fetchConfig(now: Instant): ExternalRtcConfig =
         runCancellableCatching {
-            turnApi.issueTurnCredentials(TurnIssueRequestBody(regionHint = null))
+            withTimeoutOrNull(FETCH_TIMEOUT) {
+                turnApi.issueTurnCredentials(TurnIssueRequestBody(regionHint = null))
+            }
         }.fold(
             onSuccess = { response ->
+                if (response == null) {
+                    Timber.w("TURN: fetch timed out after $FETCH_TIMEOUT, using empty list")
+                    return@fold ExternalRtcConfig(turnCredentials = emptyList())
+                }
+
                 val config = response.toExternalRtcConfig()
                 cached = CachedConfig(
                     config = config,
@@ -52,6 +60,7 @@ internal class ExternalRtcConfigProvider @Inject constructor(
 
     companion object {
         private const val EXPIRY_BUFFER_SECONDS = 5
+        private val FETCH_TIMEOUT = 5.seconds
     }
 
     private fun TurnCredentialsResponse.toExternalRtcConfig(): ExternalRtcConfig =

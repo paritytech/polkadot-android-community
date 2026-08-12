@@ -1,17 +1,14 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions
 
 import io.paritytech.polkadotapp.common.utils.InformationSize
-import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.invoke
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapToSet
-import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.data.encryption.CommunicationEncryption
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.IsResponded
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.MessageCompactor
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.CommunicationSessionEvent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
@@ -26,19 +23,13 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.st
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationStateEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.states.Initialization
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-import kotlin.time.Duration.Companion.seconds
 
 class RealCommunicationSession(
     override val localAccount: SessionAccount,
@@ -46,6 +37,7 @@ class RealCommunicationSession(
     private val communicationTransport: CommunicationTransport,
     private val encryption: CommunicationEncryption,
     private val maxStatementSize: InformationSize,
+    private val compactor: MessageCompactor?,
     scope: CoroutineScope
 ) : CommunicationSession, CoroutineScope by scope {
     private val outgoingSessionIdParams: SessionIdParams = createSessionIdParams(localAccount, remoteAccount)
@@ -54,7 +46,7 @@ class RealCommunicationSession(
     override val incomingSessionId = deriveCommunicationTopic(sender = remoteAccount, receiver = localAccount, encryption)
 
     private val stateMachine = StateMachine(
-        initialState = Initialization(emptyList(), maxStatementSize),
+        initialState = Initialization(emptyList(), maxStatementSize, canCompact = compactor != null),
         coroutineScope = this
     )
 
@@ -94,7 +86,15 @@ class RealCommunicationSession(
                 }
 
                 is CommunicationSideEffect.ResponseReceived -> {
-                    handleIncomingResponse(effect.code, effect.respondedMessages)
+                    handleIncomingResponse(effect.respondedMessages)
+                }
+
+                is CommunicationSideEffect.Compact -> {
+                    compactMessages(effect.messages)
+                }
+
+                is CommunicationSideEffect.MessagesCompacted -> {
+                    handleMessagesCompacted(effect.commit, effect.originals)
                 }
 
                 is CommunicationSideEffect.NotifyMessageTooLarge -> {
@@ -104,45 +104,43 @@ class RealCommunicationSession(
         }
     }
 
-    private fun fetchInitialData() {
-        launch {
-            val outgoingEventsDeferred = async { communicationTransport.fetchOutgoing() }
-            val incomingEventsDeferred = async { communicationTransport.fetchIncoming() }
+    private fun fetchInitialData() = launch {
+        val outgoingEventsDeferred = async { communicationTransport.fetchOutgoing() }
+        val incomingEventsDeferred = async { communicationTransport.fetchIncoming() }
 
-            val outgoingEventsResult = outgoingEventsDeferred.await()
-            val incomingEventsResult = incomingEventsDeferred.await()
+        val outgoingEventsResult = outgoingEventsDeferred.await()
+        val incomingEventsResult = incomingEventsDeferred.await()
 
-            val combinedResult = outgoingEventsResult.flatMap { outgoingEvents ->
-                incomingEventsResult.map { incomingEvents ->
-                    outgoingEvents to incomingEvents
-                }
+        val combinedResult = outgoingEventsResult.flatMap { outgoingEvents ->
+            incomingEventsResult.map { incomingEvents ->
+                outgoingEvents to incomingEvents
             }
-
-            combinedResult
-                .onSuccess { (rawOutgoingEvents, rawIncomingEvents) ->
-                    val outgoingEvents = rawOutgoingEvents.sortedByDescending { it.expiry }
-                    val incomingEvents = rawIncomingEvents.sortedByDescending { it.expiry }
-
-                    if (outgoingEvents.hasRequest().not()) {
-                        eventsFlow.emit(CommunicationSessionEvent.SentMessagesNotFound)
-                    }
-
-                    val lastUsedExpiry = outgoingEvents.defaultExpiry()
-                    val outgoingPendingRequest = restoreOutgoingPendingRequest(outgoingEvents, incomingEvents)
-                    val incomingRequests = restoreIncomingRequests(outgoingEvents, incomingEvents)
-
-                    stateMachine.onEvent(
-                        CommunicationStateEvent.InitialDataFetched(
-                            outgoingPendingRequest = outgoingPendingRequest,
-                            incomingRequests = incomingRequests,
-                            lastUsedExpiry = lastUsedExpiry
-                        )
-                    )
-                }
-                .onFailure {
-                    eventsFlow.emit(CommunicationSessionEvent.SessionFailed(it))
-                }
         }
+
+        combinedResult
+            .onSuccess { (rawOutgoingEvents, rawIncomingEvents) ->
+                val outgoingEvents = rawOutgoingEvents.sortedByDescending { it.expiry }
+                val incomingEvents = rawIncomingEvents.sortedByDescending { it.expiry }
+
+                if (outgoingEvents.hasRequest().not()) {
+                    eventsFlow.emit(CommunicationSessionEvent.SentMessagesNotFound)
+                }
+
+                val lastUsedExpiry = outgoingEvents.defaultExpiry()
+                val outgoingPendingRequest = restoreOutgoingPendingRequest(outgoingEvents, incomingEvents)
+                val incomingRequests = restoreIncomingRequests(outgoingEvents, incomingEvents)
+
+                stateMachine.onEvent(
+                    CommunicationStateEvent.InitialDataFetched(
+                        outgoingPendingRequest = outgoingPendingRequest,
+                        incomingRequests = incomingRequests,
+                        lastUsedExpiry = lastUsedExpiry
+                    )
+                )
+            }
+            .onFailure {
+                eventsFlow.emit(CommunicationSessionEvent.SessionFailed(it))
+            }
     }
 
     private fun restoreOutgoingPendingRequest(
@@ -243,8 +241,24 @@ class RealCommunicationSession(
         eventsFlow.emit(CommunicationSessionEvent.NewMessagesReceived(request.requestId, request.messages))
     }
 
-    private fun handleIncomingResponse(code: UByte, messages: List<EncodedMessage>) = launch {
-        eventsFlow.emit(CommunicationSessionEvent.ResponseReceived(code, messages))
+    private fun handleIncomingResponse(messages: List<EncodedMessage>) = launch {
+        eventsFlow.emit(CommunicationSessionEvent.ResponseReceived(messages))
+    }
+
+    private fun compactMessages(messages: List<EncodedMessage>) = launch {
+        checkNotNull(compactor) { "Compact side effect emitted without a compactor" }
+            .compact(messages)
+            .logFailure("Failed to compact messages")
+            .onSuccess { batches ->
+                stateMachine.onEvent(CommunicationStateEvent.CompactionCompleted(batches))
+            }
+            .onFailure {
+                stateMachine.onEvent(CommunicationStateEvent.CompactionFailed)
+            }
+    }
+
+    private fun handleMessagesCompacted(commit: EncodedMessage, originals: List<EncodedMessage>) = launch {
+        eventsFlow.emit(CommunicationSessionEvent.MessagesCompacted(commit, originals))
     }
 
     private fun handleTooLargeMessage(message: EncodedMessage, maxAllowedSize: InformationSize) = launch {
@@ -257,10 +271,6 @@ class RealCommunicationSession(
         stateMachine.onEvent(CommunicationStateEvent.SubmitMessage(message))
     }
 
-    override fun respond(requestId: RequestId, code: UByte) {
-        stateMachine.onEvent(CommunicationStateEvent.SubmitResponse(requestId, code))
-    }
-
     override fun encrypt(data: ByteArray): ByteArray {
         return encryption.encrypt(data)
     }
@@ -271,50 +281,5 @@ class RealCommunicationSession(
 
     override fun generateSharedOutgoingSessionValue(salt: ByteArray): ByteArray {
         return generateSharedSessionValue(salt, outgoingSessionIdParams, encryption)
-    }
-
-    override suspend fun sendMessageAndAwait(message: EncodedMessage): Result<Unit> = coroutineScope {
-        val confirmationJob = createConfirmationJob(message)
-
-        sendMessage(message)
-
-        awaitConfirmation(confirmationJob)
-    }
-
-    private fun CoroutineScope.createConfirmationJob(message: EncodedMessage): Deferred<Result<Unit>> = async {
-        eventsFlow.transform { event ->
-            when {
-                event is CommunicationSessionEvent.SessionFailed -> {
-                    emit(Result.failure(event.error))
-                }
-
-                event is CommunicationSessionEvent.MessagesSentSuccessfully && event.messages.hasMessage(message) -> {
-                    emit(Result.success(Unit))
-                }
-
-                event is CommunicationSessionEvent.MessagesFailedToSend && event.messages.hasMessage(message) -> {
-                    emit(Result.failure(event.error))
-                }
-
-                event is CommunicationSessionEvent.MessageIsTooLarge &&
-                    event.message.contentEquals(message) -> {
-                    emit(Result.failure(IllegalArgumentException("Message is too large")))
-                }
-            }
-        }.first()
-    }
-
-    private fun List<EncodedMessage>.hasMessage(message: EncodedMessage): Boolean {
-        return any { it.contentEquals(message) }
-    }
-
-    private suspend fun awaitConfirmation(confirmationJob: Deferred<Result<Unit>>): Result<Unit> {
-        return runCancellableCatching {
-            withTimeout(15.seconds) {
-                confirmationJob().getOrThrow()
-            }
-        }.onFailure {
-            confirmationJob.cancel()
-        }.coerceToUnit()
     }
 }

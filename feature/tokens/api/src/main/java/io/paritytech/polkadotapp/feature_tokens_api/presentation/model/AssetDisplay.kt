@@ -1,8 +1,10 @@
 package io.paritytech.polkadotapp.feature_tokens_api.presentation.model
 
+import androidx.compose.runtime.Immutable
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 
-class AssetDisplay(
+@Immutable
+data class AssetDisplay(
     val asset: Chain.Asset,
     val displayId: AssetDisplayId,
 )

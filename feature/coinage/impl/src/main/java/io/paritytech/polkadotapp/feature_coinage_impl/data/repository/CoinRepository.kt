@@ -65,10 +65,6 @@ interface CoinRepository {
 
     suspend fun fetchMaxConsolidation(chainId: ChainId): Result<Int>
 
-    suspend fun removeCoin(index: Int)
-
-    suspend fun removeCoins(indices: List<Int>)
-
     suspend fun setSpentStateByDerivationIndices(indices: List<Int>, state: Coin.SpentState)
 }
 
@@ -159,16 +155,6 @@ class RealCoinRepository @Inject constructor(
     override fun subscribeActiveCoins(): Flow<List<Coin>> {
         return coinDao.subscribeAllAgedCoinsWithState(CoinLocal.SpentState.NOT_SPENT)
             .mapList { it.toDomain() }
-    }
-
-    override suspend fun removeCoin(index: Int) {
-        coinDao.removeCoin(index)
-    }
-
-    override suspend fun removeCoins(indices: List<Int>) {
-        if (indices.isEmpty()) return
-
-        coinDao.removeCoins(indices)
     }
 
     override suspend fun setSpentStateByDerivationIndices(indices: List<Int>, state: Coin.SpentState) {

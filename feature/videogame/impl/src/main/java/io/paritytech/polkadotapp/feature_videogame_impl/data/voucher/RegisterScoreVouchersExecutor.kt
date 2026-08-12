@@ -81,7 +81,7 @@ class RegisterScoreVouchersExecutor @Inject constructor(
         }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     private suspend fun getAccountParticipantCredit(): AccountOrPersonData<Balance>? {
         val candidateAccount = accountRepository.getCandidateAccount()
         val chain = chainRegistry.getChain(knownChains.people)
@@ -92,7 +92,7 @@ class RegisterScoreVouchersExecutor @Inject constructor(
             ?.let { AccountOrPersonData.fromAccount(it, accountId) }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     private suspend fun getPersonParticipantCredit(): AccountOrPersonData<Balance>? {
         val candidateAccount = accountRepository.getCandidateAccount()
         val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, BandersnatchContext.SCORE)
@@ -102,9 +102,9 @@ class RegisterScoreVouchersExecutor @Inject constructor(
             ?.let { AccountOrPersonData.fromPerson(it, scoreAlias) }
     }
 
-    context(StorageQueryContext)
+    context(storage: StorageQueryContext)
     private suspend fun getParticipantCredit(participant: OnChainAccountOrPerson): Balance? {
-        val scoreParticipant = metadata.score.participants.query(participant) ?: return null
+        val scoreParticipant = storage.metadata.score.participants.query(participant) ?: return null
         return scoreParticipant.credit
     }
 

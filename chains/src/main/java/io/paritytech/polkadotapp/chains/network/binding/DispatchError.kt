@@ -30,7 +30,7 @@ sealed class DispatchError : Throwable() {
     object Unknown : DispatchError()
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun bindDispatchError(decoded: Any?): DispatchError {
     val asDictEnum = decoded.castToDictEnum()
 
@@ -41,7 +41,7 @@ fun bindDispatchError(decoded: Any?): DispatchError {
             val moduleIndex = bindInt(moduleErrorStruct["index"])
             val errorIndex = bindModuleError(moduleErrorStruct["error"])
 
-            val module = runtime.metadata.module(moduleIndex)
+            val module = withRuntime.runtime.metadata.module(moduleIndex)
             val error = module.error(errorIndex)
 
             DispatchError.Module(module, error)

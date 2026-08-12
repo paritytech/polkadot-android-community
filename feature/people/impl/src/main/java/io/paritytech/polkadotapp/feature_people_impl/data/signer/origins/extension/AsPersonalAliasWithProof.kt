@@ -26,6 +26,6 @@ class AsPersonalAliasWithProof(
             .proofPersonMembership(message, context, chainId, PeopleCollection.People)
             .getOrThrow()
 
-        return AsPersonInfo.AsPersonalAliasWithProof(result.proof, context, result.ringIndex).toEncodableInstance()
+        return AsPersonInfo.AsPersonalAliasWithProof(result.proof, context, result.ringIndex, result.revision).toEncodableInstance()
     }
 }

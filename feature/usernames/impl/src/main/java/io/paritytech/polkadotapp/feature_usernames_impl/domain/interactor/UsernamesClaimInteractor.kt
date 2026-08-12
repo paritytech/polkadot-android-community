@@ -10,7 +10,9 @@ import io.paritytech.polkadotapp.feature_usernames_api.domain.model.AccountOnboa
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.Username
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAccountOnboardingStatusUseCase
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.RecoverUsernameUseCase
+import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameAlreadyClaimedException
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameRepository
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameOutcome
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.CreateClaimParamsUseCase
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.BackupOutcome
@@ -21,7 +23,7 @@ import javax.inject.Inject
 interface UsernamesClaimInteractor {
     suspend fun checkUsernameAvailable(username: Username): Result<UsernameAvailabilityState>
 
-    suspend fun claimUsername(username: Username, preferredDigits: String): Result<Unit>
+    suspend fun claimUsername(username: Username, preferredDigits: String): ClaimUsernameOutcome
 
     suspend fun tryRecoverBackupOrCreateAccount(): Result<BackupOutcome>
 
@@ -53,19 +55,38 @@ class RealUsernamesClaimInteractor @Inject constructor(
         return usernameRepository.checkUsernameAvailable(username)
     }
 
-    override suspend fun claimUsername(username: Username, preferredDigits: String): Result<Unit> {
+    override suspend fun claimUsername(username: Username, preferredDigits: String): ClaimUsernameOutcome {
         return withContext(coroutineDispatchers.io) {
             usernameRepository.getVerifier()
-                .flatMap {
-                    createClaimParamsUseCase(username, it, preferredDigits)
-                }
-                .flatMap {
-                    usernameRepository.claimUsername(it)
-                }
-                .map {
-                    localUsernameStorage.saveValue(it)
-                }
+                .flatMap { createClaimParamsUseCase(username, it, preferredDigits) }
+                .flatMap { usernameRepository.claimUsername(it) }
+                .map { localUsernameStorage.saveValue(it) }
+                .fold(
+                    onSuccess = { ClaimUsernameOutcome.Claimed },
+                    onFailure = { mapClaimFailure(it, username) }
+                )
         }
+    }
+
+    private suspend fun mapClaimFailure(error: Throwable, username: Username): ClaimUsernameOutcome {
+        return if (error is UsernameAlreadyClaimedException) {
+            recoverFromConflict(username)
+        } else {
+            ClaimUsernameOutcome.Failed(error)
+        }
+    }
+
+    private suspend fun recoverFromConflict(username: Username): ClaimUsernameOutcome {
+        return usernameRepository.checkUsernameAvailable(username).fold(
+            onSuccess = { availability ->
+                when (availability) {
+                    is UsernameAvailabilityState.Available -> ClaimUsernameOutcome.SuffixTaken(availability.availableDigits)
+                    UsernameAvailabilityState.Taken,
+                    UsernameAvailabilityState.Invalid -> ClaimUsernameOutcome.Unavailable
+                }
+            },
+            onFailure = { ClaimUsernameOutcome.Failed(it) }
+        )
     }
 
     override suspend fun areAccountsInitialized(): Boolean {

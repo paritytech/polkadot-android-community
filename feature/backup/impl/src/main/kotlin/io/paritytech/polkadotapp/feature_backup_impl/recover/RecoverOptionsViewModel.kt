@@ -39,6 +39,7 @@ class RecoverOptionsViewModel @Inject constructor(
                 when (t) {
                     ImportFromBackupError.Cancelled -> Unit
                     ImportFromBackupError.NotFound -> showError(context.getString(RCommon.string.backup_not_found_error))
+                    ImportFromBackupError.Corrupted -> showError(context.getString(RCommon.string.backup_corrupted_error))
                     is ImportFromBackupError.Unknown -> showError(t.original)
                     else -> showError(t)
                 }

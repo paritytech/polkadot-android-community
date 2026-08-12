@@ -25,7 +25,7 @@ class ContactDeviceFanOutService @Inject constructor(
     private val broadcastDeviceLifecycleUseCase: BroadcastDeviceLifecycleUseCase,
     private val accountRepository: AccountRepository
 ) : AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
         combine(
             accountRepository.walletAccountFlow(),
@@ -38,7 +38,7 @@ class ContactDeviceFanOutService @Inject constructor(
                 pending.filterNot { it.hasPendingChatRequest() }
                     .forEachAsync { fanOutTo(it) }
             }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     // TODO: We can remove this from key: it.hasPendingChatRequest() after we fix TODO in RealIncomingChatRequestProcessor.createNewIncomingRequestChat

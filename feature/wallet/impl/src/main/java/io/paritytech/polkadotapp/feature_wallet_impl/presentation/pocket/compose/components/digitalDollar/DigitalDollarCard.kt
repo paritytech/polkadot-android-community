@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -39,9 +40,13 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrec
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.R
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.balanceDetails.compose.BalanceDetailsBottomSheet
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.LocalCardTilt
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.MotionShineParameters
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.maskedMotionShine
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.CardSizes
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.PocketCardColors
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.icons.DigitalDollarIcon
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketBalanceSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -49,9 +54,11 @@ import io.paritytech.polkadotapp.common.R as RCommon
 fun DigitalDollarCard(
     modifier: Modifier = Modifier,
     card: PocketCardUiModel.DigitalDollar,
-    onSelected: ((PocketCardUiModel.DigitalDollar) -> Unit)? = null
+    onSelected: ((PocketCardUiModel.DigitalDollar) -> Unit)? = null,
+    isExpanded: Boolean
 ) {
     var isBalanceDetailsVisible by remember { mutableStateOf(false) }
+    val tiltState = LocalCardTilt.current
 
     BalanceDetailsBottomSheet(
         isVisible = isBalanceDetailsVisible,
@@ -73,10 +80,11 @@ fun DigitalDollarCard(
         Brush.radialGradient(
             colorStops = arrayOf(
                 0f to PocketCardColors.Primary.copy(alpha = 0.35f),
+                0.5f to PocketCardColors.Primary.copy(alpha = 0.1f),
                 1f to PocketCardColors.Transparent
             ),
             center = Offset.Zero,
-            radius = 1000f
+            radius = 700f
         )
     }
 
@@ -96,18 +104,23 @@ fun DigitalDollarCard(
             Image(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .align(Alignment.CenterEnd),
+                    .align(Alignment.CenterEnd)
+                    .maskedMotionShine(
+                        tiltState = tiltState,
+                        parameters = MotionShineParameters.DigitalDollarCard,
+                        contentAlpha = 0f
+                    ),
                 painter = painterResource(R.drawable.img_digital_dollar_card),
                 contentDescription = null,
                 contentScale = ContentScale.FillHeight
             )
         }
-
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .background(highlightBrush)
         )
+
         Image(
             modifier = Modifier.matchParentSize(),
             painter = painterResource(R.drawable.img_texture_grain_dark),
@@ -115,55 +128,80 @@ fun DigitalDollarCard(
             contentScale = ContentScale.Crop
         )
 
+        val totalBalanceText = LocalTokenAmountFormatter.current
+            .formatTokenAmount(
+                tokenAmount = card.balance,
+                precision = RoundPrecision.FIAT,
+                withSymbol = false
+            )
+
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .padding(PolkadotTheme.spacings.mediumIncreased)
         ) {
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                NovaIcon(
-                    imageVector = DigitalDollarIcon,
-                    tint = PocketCardColors.Primary
-                )
-                HorizontalSpacer { extraSmall }
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    NovaIcon(
+                        imageVector = DigitalDollarIcon,
+                        tint = PocketCardColors.Primary
+                    )
+
+                    HorizontalSpacer { extraSmall }
+
+                    NovaText(
+                        text = stringResource(RCommon.string.pocket_digital_dollar_card_title),
+                        style = PolkadotTheme.typography.title.large,
+                        color = PocketCardColors.Primary
+                    )
+                }
+
                 NovaText(
-                    text = stringResource(RCommon.string.pocket_digital_dollar_card_title),
-                    style = PolkadotTheme.typography.title.large,
+                    modifier = if (isExpanded) Modifier.alpha(0f) else Modifier.pocketBalanceSharedElement(card.id),
+                    text = totalBalanceText,
+                    style = PolkadotTheme.typography.headline.medium,
                     color = PocketCardColors.Primary
                 )
             }
 
-            Column(
-                modifier = Modifier.align(Alignment.BottomStart)
-            ) {
-                val balanceStatus = when {
-                    card.syncInProgress -> BalanceStatus.Syncing
-                    card.notFullyAvailable -> BalanceStatus.AvailableNow
-                    else -> BalanceStatus.Hidden
-                }
-
-                AnimatedContent(
-                    targetState = balanceStatus,
-                    label = "DigitalDollarBalanceStatus"
-                ) { status ->
-                    when (status) {
-                        BalanceStatus.Syncing -> SyncProgress()
-                        BalanceStatus.AvailableNow -> AvailableNowBalance(
-                            amount = card.availableNow,
-                            onBalanceDetails = { isBalanceDetailsVisible = true }
-                        )
-
-                        BalanceStatus.Hidden -> Unit
+            if (isExpanded) {
+                Column(
+                    modifier = Modifier.align(Alignment.BottomStart)
+                ) {
+                    val balanceStatus = when {
+                        card.syncInProgress -> BalanceStatus.Syncing
+                        card.notFullyAvailable -> BalanceStatus.AvailableNow
+                        else -> BalanceStatus.Hidden
                     }
-                }
 
-                NovaText(
-                    text = LocalTokenAmountFormatter.current.formatTokenAmount(card.balance, RoundPrecision.FIAT, withSymbol = false),
-                    style = PolkadotTheme.typography.headline.medium,
-                    color = PocketCardColors.Primary
-                )
+                    AnimatedContent(
+                        targetState = balanceStatus,
+                        label = "DigitalDollarBalanceStatus"
+                    ) { status ->
+                        when (status) {
+                            BalanceStatus.Syncing -> SyncProgress()
+                            BalanceStatus.AvailableNow -> AvailableNowBalance(
+                                amount = card.availableNow,
+                                onBalanceDetails = { isBalanceDetailsVisible = true }
+                            )
+
+                            BalanceStatus.Hidden -> Unit
+                        }
+                    }
+
+                    NovaText(
+                        modifier = Modifier.pocketBalanceSharedElement(card.id),
+                        text = totalBalanceText,
+                        style = PolkadotTheme.typography.headline.medium,
+                        color = PocketCardColors.Primary
+                    )
+                }
             }
         }
     }
@@ -246,7 +284,8 @@ private fun DigitalDollarCardPreview() {
             LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
         ) {
             DigitalDollarCard(
-                card = PocketCardUiModel.DigitalDollar(TokenAmountModel.mock, TokenAmountModel.mock, true)
+                card = PocketCardUiModel.DigitalDollar(TokenAmountModel.mock, TokenAmountModel.mock, true),
+                isExpanded = true
             )
         }
     }

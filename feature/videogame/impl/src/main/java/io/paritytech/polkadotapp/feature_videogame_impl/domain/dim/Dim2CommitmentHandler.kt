@@ -34,7 +34,7 @@ class Dim2CommitmentHandler @Inject constructor(
 
     override val botId: String = ChatBotData.weeklyGame().id
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun observeState(): Flow<DimState> = combine(
         videoGameRegistrationStageUseCase.subscribe(),
         gamesProgressUseCase.videoGamesProgressFlow()
@@ -51,7 +51,7 @@ class Dim2CommitmentHandler @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun cancel(): Result<Unit> = runCatching {
         offboardingOptionUseCase.subscribe().first()
     }.flatMap { option ->

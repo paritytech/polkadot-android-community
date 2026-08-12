@@ -7,14 +7,14 @@ import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 interface WaitForChatExistsUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend operator fun invoke(chatId: ChatId)
 }
 
 class RealWaitForChatExistsUseCase @Inject constructor(
     private val chatEngine: ChatEngine,
 ) : WaitForChatExistsUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend operator fun invoke(chatId: ChatId) {
         chatEngine.subscribeChatSummaries()
             .first { summaries -> summaries.any { it.chatId == chatId } }

@@ -1,17 +1,23 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.productSettings
 
-import io.paritytech.polkadotapp.feature_products_api.model.Product
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductRepository
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class ProductSettingsInteractor @Inject constructor(
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val permissionRepository: ProductPermissionRepository,
 ) {
-    fun observeProduct(productId: ProductId): Flow<Product?> {
-        return productRepository.observeProducts()
-            .map { products -> products.find { it.id == productId } }
+    fun observeProductSettings(productId: ProductId): Flow<ProductSettingsInfo?> {
+        return combine(
+            productRepository.observeProducts().map { products -> products.find { it.id == productId } },
+            permissionRepository.observeHasAnyPermissionRequested(productId),
+        ) { product, hasPermissions ->
+            product?.let { ProductSettingsInfo(it, hasPermissions) }
+        }
     }
 }

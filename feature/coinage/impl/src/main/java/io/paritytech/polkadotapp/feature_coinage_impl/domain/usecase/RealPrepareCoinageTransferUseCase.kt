@@ -8,6 +8,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoina
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferMemoBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlannerFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategyFactory
@@ -35,8 +37,9 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
         val allVouchers = voucherRepository.getActiveVouchers()
 
         return plannerFactory.create()
-            .map { it.plan(amount, allCoins, allVouchers) }
-            .onSuccess { coinageLogD("Outgoing TransferPlan: $it") }
+            .flatMap { it.plan(amount, allCoins, allVouchers) }
+            .onSuccess { coinageLogI("Outgoing TransferPlan: $it") }
+            .onFailure { coinageLogE("Failed to construct transfer plan for amount: $amount", it) }
     }
 
     override suspend fun prepareMemo(plan: TransferPlan): Result<TransferMemo> {

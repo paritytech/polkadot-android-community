@@ -16,8 +16,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,8 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -50,25 +49,33 @@ import kotlin.math.roundToInt
 private val IconSize = 28.dp
 private val NotificationDotSize = 8.dp
 
+private enum class NavBarSlot { Center, Items, Indicator }
+
 @Composable
 fun PolkadotNavigationBar(
     selectedIndex: Int,
     itemCount: Int,
     modifier: Modifier = Modifier,
-    content: @Composable RowScope.() -> Unit
+    shape: Shape = PolkadotTheme.shapes.full,
+    centerContent: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit
 ) {
+    require(centerContent == null || itemCount % 2 == 0) {
+        "PolkadotNavigationBar centerContent requires an even itemCount, but was $itemCount"
+    }
+
     val animatedIndex = animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessMediumLow
+            stiffness = 700f
         ),
         label = "PolkadotNavigationBarSelectedIndex"
     )
 
     PolkadotSurface(
         modifier = modifier,
-        shape = PolkadotTheme.shapes.full,
+        shape = shape,
         color = PolkadotTheme.colors.bg.surface.container,
         border = BorderStroke(
             width = PolkadotTheme.borders.default,
@@ -79,40 +86,64 @@ fun PolkadotNavigationBar(
         val indicatorShape = PolkadotTheme.shapes.full
         val overshoot = PolkadotTheme.spacings.tiny
 
-        Layout(
+        SubcomposeLayout(
             modifier = Modifier.padding(
                 horizontal = PolkadotTheme.spacings.small,
                 vertical = PolkadotTheme.spacings.tiny
-            ),
-            content = {
-                Box(
-                    modifier = Modifier.background(color = indicatorColor, shape = indicatorShape)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    content = content
-                )
-            }
-        ) { measurables, constraints ->
+            )
+        ) { constraints ->
             val overshootPx = overshoot.roundToPx()
-            val itemsPlaceable = measurables[1].measure(constraints)
-            val height = itemsPlaceable.height
-            val slotWidth = itemsPlaceable.width.toFloat() / itemCount.coerceAtLeast(1)
-            val indicatorWidth = (slotWidth + overshootPx * 2).roundToInt().coerceAtLeast(0)
-            val indicatorPlaceable = measurables[0].measure(Constraints.fixed(indicatorWidth, height))
+            val width = constraints.maxWidth
 
-            layout(itemsPlaceable.width, height) {
-                val x = (slotWidth * animatedIndex.value - overshootPx).roundToInt()
-                indicatorPlaceable.place(x, 0)
-                itemsPlaceable.place(0, 0)
+            val centerPlaceable = centerContent?.let {
+                subcompose(NavBarSlot.Center, it).first()
+                    .measure(constraints.copy(minWidth = 0, minHeight = 0))
+            }
+            val centerWidth = centerPlaceable?.width ?: 0
+            val halfWidth = (width - centerWidth) / 2
+            val itemsWidth = if (centerPlaceable != null) halfWidth * 2 else width
+            val slotWidth = itemsWidth.toFloat() / itemCount.coerceAtLeast(1)
+
+            val itemSlotWidth = slotWidth.roundToInt()
+            val itemPlaceables = subcompose(NavBarSlot.Items, content).map {
+                it.measure(constraints.copy(minWidth = itemSlotWidth, maxWidth = itemSlotWidth))
+            }
+
+            val height = maxOf(
+                itemPlaceables.maxOfOrNull { it.height } ?: 0,
+                centerPlaceable?.height ?: 0
+            )
+
+            val indicatorWidth = (slotWidth + overshootPx * 2).roundToInt().coerceAtLeast(0)
+            val indicatorPlaceable = subcompose(NavBarSlot.Indicator) {
+                Box(modifier = Modifier.background(color = indicatorColor, shape = indicatorShape))
+            }.first().measure(Constraints.fixed(indicatorWidth, height))
+
+            val halfCount = itemCount / 2
+
+            layout(width, height) {
+                val gapOffset = if (centerPlaceable != null) {
+                    val gapFraction = (animatedIndex.value - (halfCount - 1)).coerceIn(0f, 1f)
+                    centerWidth * gapFraction
+                } else {
+                    0f
+                }
+                val indicatorX = (slotWidth * animatedIndex.value + gapOffset - overshootPx).roundToInt()
+                indicatorPlaceable.place(indicatorX, 0)
+
+                itemPlaceables.forEachIndexed { index, placeable ->
+                    val gap = if (centerPlaceable != null && index >= halfCount) centerWidth else 0
+                    placeable.place((slotWidth * index).roundToInt() + gap, (height - placeable.height) / 2)
+                }
+
+                centerPlaceable?.place(halfWidth, (height - centerPlaceable.height) / 2)
             }
         }
     }
 }
 
 @Composable
-fun RowScope.PolkadotNavigationBarItem(
+fun PolkadotNavigationBarItem(
     selected: Boolean,
     onClick: () -> Unit,
     icon: ImageVector,
@@ -127,7 +158,6 @@ fun RowScope.PolkadotNavigationBarItem(
 
     Column(
         modifier = Modifier
-            .weight(1f)
             .clickable(
                 onClick = onClick,
                 indication = null,
@@ -206,6 +236,53 @@ private fun PolkadotNavigationBarPreview() {
                     .padding(PolkadotTheme.spacings.extraMedium),
                 selectedIndex = selectedIndex,
                 itemCount = tabs.size
+            ) {
+                tabs.forEachIndexed { index, (title, icon) ->
+                    PolkadotNavigationBarItem(
+                        selected = selectedIndex == index,
+                        onClick = { selectedIndex = index },
+                        icon = icon,
+                        label = title,
+                        hasNotification = title == "Settings"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun PolkadotNavigationBarCenterPreview() {
+    val tabs = listOf(
+        "Chats" to NovaIcons.ChatFilled,
+        "Pocket" to NovaIcons.MoneyFilled,
+        "Explore" to NovaIcons.Search,
+        "Settings" to NovaIcons.Settings
+    )
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    PolkadotTheme {
+        Box(
+            modifier = Modifier.background(Color.Black)
+        ) {
+            PolkadotNavigationBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(PolkadotTheme.spacings.extraMedium),
+                selectedIndex = selectedIndex,
+                itemCount = tabs.size,
+                centerContent = {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = PolkadotTheme.spacings.small)
+                            .size(IconSize)
+                            .background(
+                                color = PolkadotTheme.colors.bg.surface.nested,
+                                shape = CircleShape
+                            )
+                    )
+                }
             ) {
                 tabs.forEachIndexed { index, (title, icon) ->
                     PolkadotNavigationBarItem(

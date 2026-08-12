@@ -7,6 +7,7 @@ import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.chains.util.scaleEncodeBinary
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.HexString
+import io.paritytech.polkadotapp.common.utils.awaitTrue
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_products_api.model.JsUiEvent
@@ -26,6 +27,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.serialization.JsWi
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.ChatWebViewProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -54,12 +56,12 @@ class HostApiProductsScriptExecutor @AssistedInject constructor(
 
     private var session: HostApiSession? = null
     private var scope: CoroutineScope? = null
-    private var initialized = false
+    private val initialized = MutableStateFlow(false)
 
     override suspend fun initializeBot(botApi: ProductsBotApi, scope: CoroutineScope): Result<Unit> = runCatching {
         this.scope = scope
         mutex.withLock {
-            if (initialized) return@withLock
+            if (initialized.value) return@withLock
 
             val webViewProvider = chatWebViewProviderFactory.create(productId, scope)
             val webViewRuntime = WebViewRuntime(webViewProvider)
@@ -72,7 +74,6 @@ class HostApiProductsScriptExecutor @AssistedInject constructor(
             val allGroups: List<HostCallHandlerGroup> = sharedGroups + chatGroup + chatRenderWidgetHostCalls
 
             val environment = HostApiEnvironment(
-                navigationPolicy = navigationPolicy,
                 injectionStrategy = ExplicitInjection(),
                 handlerGroups = allGroups,
             )
@@ -85,14 +86,14 @@ class HostApiProductsScriptExecutor @AssistedInject constructor(
                 .logFailure("Failed to load script for product: $productId")
 
             this.session = hostApiSession
-            initialized = true
+            initialized.value = true
 
             Timber.d("Initialized HostApi script executor for product: $productId")
         }
     }
 
     override suspend fun onUserMessage(text: String): Result<Unit> = runCatching {
-        requireInitialized()
+        awaitInitialized()
         val escapedText = text.escapeForJs()
         session!!.evaluateScript("dispatchUserMessage('', '$escapedText')")
             .onFailure { Timber.e(it, "Failed to call onUserMessage for product: $productId") }
@@ -118,7 +119,7 @@ class HostApiProductsScriptExecutor @AssistedInject constructor(
     override fun dispatchEvent(event: JsUiEvent) {
         scope?.launch {
             try {
-                requireInitialized()
+                awaitInitialized()
                 val escapedMessageId = event.messageId.escapeForJs()
                 val escapedActionId = event.actionId.escapeForJs()
                 val escapedPayload = encodePayload(event).escapeForJs()
@@ -129,8 +130,8 @@ class HostApiProductsScriptExecutor @AssistedInject constructor(
         }
     }
 
-    private fun requireInitialized() {
-        check(initialized) { "Script executor not initialized for product: $productId" }
+    private suspend fun awaitInitialized() {
+        initialized.awaitTrue()
     }
 
     private suspend fun startRendering(
@@ -138,7 +139,7 @@ class HostApiProductsScriptExecutor @AssistedInject constructor(
         messageType: String,
         messageData: DataByteArray,
     ): Result<Unit> = runCatching {
-        requireInitialized()
+        awaitInitialized()
         val js = buildInitiateRenderingJs(messageType, messageData, messageId)
         session!!.evaluateScript(js)
     }

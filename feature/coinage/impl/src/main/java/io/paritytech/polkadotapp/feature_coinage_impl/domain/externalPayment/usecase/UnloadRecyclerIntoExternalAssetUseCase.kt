@@ -52,7 +52,7 @@ import javax.inject.Inject
  * Unloads a set of recycler vouchers into an external-asset balance on the given destination
  * account. When [surplus] is zero, dispatches Coinage.unload_recycler_into_external_asset per
  * (exponent, recyclerIndex) group. When non-zero, picks a single group that can carry the
- * surplus and dispatches Coinage.unload_recycler_into_external_asset_and_vouchers for it,
+ * surplus and dispatches Coinage.unload_recycler_into_external_asset_and_loaded_coins for it,
  * folding the surplus back into freshly-minted vouchers in the same call.
  */
 interface UnloadRecyclerIntoExternalAssetUseCase {
@@ -113,7 +113,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         }
     }
 
-    context(CoinageBalanceConversionContext)
+    context(coinageContext: CoinageBalanceConversionContext)
     private suspend fun prepareGroups(
         chain: Chain,
         vouchers: List<RecyclerVoucher>,
@@ -144,7 +144,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
             }
     }
 
-    context(CoinageBalanceConversionContext)
+    context(coinageContext: CoinageBalanceConversionContext)
     private suspend fun resolveMixedSetup(
         grouped: Map<RecyclerKey, List<RecyclerVoucher>>,
         surplus: Balance,
@@ -166,7 +166,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
             .flatMap { voucherAllocator.allocateAll(it) }
     }
 
-    context(CoinageBalanceConversionContext)
+    context(coinageContext: CoinageBalanceConversionContext)
     private fun buildGroups(
         grouped: Map<RecyclerKey, List<RecyclerVoucher>>,
         resolvedTokens: List<FreeUnloadTokenResolver.ResolvedUnloadToken>,
@@ -223,7 +223,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
 
         return extrinsicService.submitExtrinsicAndAwaitExecution(chain = chain, origin = origin) {
             if (group.mixedOutput != null) {
-                unloadRecyclerIntoExternalAssetAndVouchers(group, aliases, destination)
+                unloadRecyclerIntoExternalAssetAndLoadedCoins(group, aliases, destination)
             } else {
                 unloadRecyclerIntoExternalAsset(group, aliases, destination)
             }
@@ -241,10 +241,11 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         val vouchersToRollback = failures.flatMap { (group, _) -> group.vouchers }
         rollbackUsageState(vouchersToRollback)
 
-        // Freshly-minted vouchers were never registered on-chain when the mixed call fails — give the indices back.
+        // Freshly-minted vouchers were never registered on-chain when the mixed call fails — retire them
+        // (USED_LOCALLY) rather than delete, so their ring-vrf-key indices are never reused.
         val mintedToRollback = failures.flatMap { (group, _) -> group.mixedOutput?.newVouchers.orEmpty() }
         if (mintedToRollback.isNotEmpty()) {
-            voucherAllocator.deallocate(mintedToRollback.map { it.ringVrfKeyIndex })
+            markVouchersUsedLocally(mintedToRollback)
         }
 
         return Result.failure(failures.first().second.exceptionOrNull()!!)
@@ -287,16 +288,16 @@ private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAsset(
     )
 )
 
-private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAssetAndVouchers(
+private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAssetAndLoadedCoins(
     group: UnloadGroup,
     aliases: List<BandersnatchAlias>,
     destination: AccountId,
 ): ExtrinsicBuilder {
-    val mixedOutput = requireNotNull(group.mixedOutput) { "mixedOutput required for and_vouchers call" }
+    val mixedOutput = requireNotNull(group.mixedOutput) { "mixedOutput required for and_loaded_coins call" }
 
     return call(
         moduleName = "Coinage",
-        callName = "unload_recycler_into_external_asset_and_vouchers",
+        callName = "unload_recycler_into_external_asset_and_loaded_coins",
         arguments = autoEncodedArgs(
             "aliases" to aliases,
             "value" to group.recyclerKey.exponent,
@@ -304,7 +305,7 @@ private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAssetAndVouchers(
             "revision" to group.revision,
             "to" to destination,
             "external_asset_amount" to mixedOutput.externalAssetAmount,
-            "new_vouchers" to mixedOutput.newVouchers.map {
+            "loaded_coins" to mixedOutput.newVouchers.map {
                 NewVoucherEntry(value = it.recyclerValue, memberKey = it.ringVrfPublicKey)
             },
         )

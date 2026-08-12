@@ -74,9 +74,9 @@ fun Chain.Asset.Type.Assets.hasSameId(runtimeSnapshot: RuntimeSnapshot, dynamicI
         .getOrDefault(false)
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 fun Chain.Asset.Type.Assets.prepareIdForEncoding(): UntypedAssetsAssetId {
-    return prepareIdForEncoding(runtime)
+    return prepareIdForEncoding(withRuntime.runtime)
 }
 
 fun Chain.Asset.Type.Assets.palletNameOrDefault(): String {

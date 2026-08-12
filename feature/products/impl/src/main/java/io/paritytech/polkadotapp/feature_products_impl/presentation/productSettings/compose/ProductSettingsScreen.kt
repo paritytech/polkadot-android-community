@@ -66,16 +66,18 @@ private fun ProductSettingsScreenInternal(
 
                         ProductSettingsHeader(uiModel)
 
-                        VerticalSpacer { large }
+                        if (uiModel.hasPermissions) {
+                            VerticalSpacer { large }
 
-                        ProductSettingsSection(
-                            title = stringResource(RCommon.string.product_settings_section_privacy).uppercase()
-                        )
+                            ProductSettingsSection(
+                                title = stringResource(RCommon.string.product_settings_section_privacy).uppercase()
+                            )
 
-                        ProductSettingsItem(
-                            title = stringResource(RCommon.string.product_settings_permissions),
-                            onClick = onPermissionsClick
-                        )
+                            ProductSettingsItem(
+                                title = stringResource(RCommon.string.product_settings_permissions),
+                                onClick = onPermissionsClick
+                            )
+                        }
                     }
                 }
                 .onLoading {
@@ -93,6 +95,7 @@ private fun ProductSettingsScreenPreview() {
             state = LoadingState.Loaded(
                 ProductSettingsUiModel(
                     name = "Web3 Summit",
+                    hasPermissions = true,
                 )
             ),
             onBack = {},

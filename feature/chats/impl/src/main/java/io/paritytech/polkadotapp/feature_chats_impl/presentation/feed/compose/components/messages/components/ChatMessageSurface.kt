@@ -9,10 +9,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalHapticFeedback
 import io.paritytech.polkadotapp.common.utils.longPressIgnoreChildren
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
@@ -39,6 +41,7 @@ fun ChatMessageSurface(
 
     val coordinatesRef = rememberCoordinatesHolder()
     val currentOnLongPress by rememberUpdatedState(onLongPress)
+    val haptics = LocalHapticFeedback.current
 
     val clickModifier = if (onLongPress != null) {
         Modifier
@@ -47,6 +50,7 @@ fun ChatMessageSurface(
                 longPressIgnoreChildren {
                     val coords = coordinatesRef.value
                     if (coords != null && coords.isAttached) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         currentOnLongPress?.invoke(MessageLayoutInfo(coords.positionInWindow(), coords.size))
                     }
                 }

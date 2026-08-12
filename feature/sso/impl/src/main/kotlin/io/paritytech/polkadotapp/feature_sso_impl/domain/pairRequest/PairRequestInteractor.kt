@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_sso_impl.domain.pairRequest
 
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_sso_api.domain.devices.RegisterDeviceProgress
 import io.paritytech.polkadotapp.feature_sso_api.domain.devices.RegisterDeviceUseCase
 import io.paritytech.polkadotapp.feature_sso_api.domain.devices.SyncDeviceProgress
@@ -18,6 +19,7 @@ class PairRequestInteractor @Inject constructor(
     private val registerDeviceUseCase: RegisterDeviceUseCase,
     private val syncDeviceUseCase: SyncDeviceUseCase,
 ) {
+    context(diagnostics: StalenessReportCollector)
     fun approveHandshake(offer: HandshakeOffer): Flow<DeviceOnboardingProgress> {
         val deviceStatementAccountId = offer.device.statementAccountId
 

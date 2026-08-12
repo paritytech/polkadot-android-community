@@ -34,13 +34,15 @@ import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.compose.components.EvidenceInstructionItemBlock
 import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.common.models.EvidenceInstructionItem
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun EvidenceInstructionScreen(
     onClose: () -> Unit,
     icon: ImageVector,
     title: String,
-    items: List<EvidenceInstructionItem>,
+    items: ImmutableList<EvidenceInstructionItem>,
     actionText: String,
     onActionClick: () -> Unit
 ) {
@@ -152,7 +154,7 @@ private fun EvidenceInstructionScreenPreview() {
             onClose = {},
             icon = NovaIcons.Close,
             title = "Video Recording Instructions",
-            items = listOf(
+            items = persistentListOf(
                 EvidenceInstructionItem(
                     titleRes = 1,
                     descriptionRes = 21

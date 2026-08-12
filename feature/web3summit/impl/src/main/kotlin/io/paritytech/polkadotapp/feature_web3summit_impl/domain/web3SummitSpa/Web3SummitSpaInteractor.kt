@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_web3summit_impl.domain.web3SummitSpa
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toSubstrateAddress
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 import io.paritytech.polkadotapp.feature_products_api.domain.ProductAccountIdProvider
 import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
 import io.paritytech.polkadotapp.feature_web3summit_impl.data.config.Web3SummitConfigProvider
@@ -25,7 +26,7 @@ class Web3SummitSpaInteractor @Inject constructor(
         return configProvider.getConfig().flatMap { config ->
             val productAccountIdSpec = ProductAccountId(
                 productId = config.productId.value,
-                derivationIndex = 0,
+                index = DerivationIndex32.default(),
             )
             productAccountIdProvider.deriveAccountId(productAccountIdSpec)
                 .flatMap { pollUntilCheckedIn(it) }

@@ -15,10 +15,9 @@ import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
 @JvmInline
 value class MembersSubscriberApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.membersSubscriber: MembersSubscriberApi
     get() = MembersSubscriberApi(module(Modules.MEMBERS_SUBSCRIBER))
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val MembersSubscriberApi.ringRoots: QueryableStorageEntry2<RingCollectionId, RingIndex, List<RingCommitmentRecord>>
     get() = storage2("RingRoots")

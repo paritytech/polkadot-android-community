@@ -21,6 +21,9 @@ interface ProductPermissionGrantDao {
     @Query("SELECT * FROM product_permission_grants WHERE productId = :productId")
     fun observeAllByProduct(productId: String): Flow<List<ProductPermissionGrantLocal>>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM product_permission_grants WHERE productId = :productId)")
+    fun observeHasAnyPermissionRequested(productId: String): Flow<Boolean>
+
     @Insert(onConflict = REPLACE)
     suspend fun insert(grant: ProductPermissionGrantLocal)
 

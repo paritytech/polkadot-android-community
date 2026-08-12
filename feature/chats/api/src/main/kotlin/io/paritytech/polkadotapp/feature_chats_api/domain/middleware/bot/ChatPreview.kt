@@ -14,7 +14,7 @@ interface CustomChatPreviewDelegate<T> {
 }
 
 interface CustomChatPreviewDataProvider<T> {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun provide(): Flow<ChatPreview.Custom<T>?>
 }
 

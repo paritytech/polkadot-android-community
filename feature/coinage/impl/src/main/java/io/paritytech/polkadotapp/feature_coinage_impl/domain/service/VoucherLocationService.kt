@@ -40,7 +40,7 @@ class VoucherLocationService @Inject constructor(
     private val voucherRepository: VoucherRepository,
     private val membersRepository: MembersRepository,
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun start() {
         val chainId = chainAssetProvider.chainId()
 
@@ -52,7 +52,7 @@ class VoucherLocationService @Inject constructor(
             .onEach { (positions, ringStatuses) ->
                 voucherRepository.updateLocations(resolveLocations(positions, ringStatuses))
             }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     private fun subscribeVoucherPositions(chainId: ChainId): Flow<VoucherPositions> {

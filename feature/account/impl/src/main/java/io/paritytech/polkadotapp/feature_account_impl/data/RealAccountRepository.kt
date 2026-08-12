@@ -18,6 +18,8 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.BandersnatchSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.getAliasInContext
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.requireMetaAccountPassphrase
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.AccountDerivationProvider
+import io.paritytech.polkadotapp.feature_account_api.domain.model.AliasAccountDerivationOverride
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SubstrateCryptoType
 import io.paritytech.polkadotapp.feature_account_api.domain.model.toEncryption
@@ -44,6 +46,8 @@ class RealAccountRepository @Inject constructor(
     private val accountSecretsStorage: AccountSecretsStorage,
     private val accountSecretsFactory: AccountSecretsFactory,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
+    private val aliasDerivationOverrides: Set<@JvmSuppressWildcards AliasAccountDerivationOverride>,
+    private val accountDerivationProviders: Map<MetaAccount.Purpose, @JvmSuppressWildcards AccountDerivationProvider>,
 ) : AccountRepository {
     companion object {
         private val DEFAULT_SUBSTRATE_CRYPTO_TYPE = SubstrateCryptoType.SR25519
@@ -147,7 +151,7 @@ class RealAccountRepository @Inject constructor(
             mnemonic = mnemonic,
             purpose = MetaAccount.Purpose.ALIAS,
             aliasContext = context,
-            derivationPath = JunctionDecoder.HARD_SEPARATOR + context.stringValue
+            derivationPath = context.aliasAccountDerivationPath()
         )
 
         return metaAccountDao.getAliasAccount(context.value)!!.toDomain()
@@ -163,13 +167,17 @@ class RealAccountRepository @Inject constructor(
         return secrets.substrateKeyPair.publicKey.substrateAccountId()
     }
 
+    private fun BandersnatchContext.aliasAccountDerivationPath(): String {
+        val derivationOverride = aliasDerivationOverrides.find { it.context.stringValue == stringValue }
+
+        return derivationOverride?.derivationPath ?: (JunctionDecoder.HARD_SEPARATOR + stringValue)
+    }
+
     private fun MetaAccount.Purpose.derivationPath(): String {
-        return when (this) {
-            MetaAccount.Purpose.CANDIDATE -> "//candidate"
-            MetaAccount.Purpose.WALLET -> "//wallet"
-            MetaAccount.Purpose.DEPOSIT -> "//wallet/deposit"
-            MetaAccount.Purpose.ALIAS -> throw IllegalStateException("Use context.value as derivation path")
-        }
+        val provider = accountDerivationProviders[this]
+            ?: throw IllegalStateException("No derivation provider contributed for purpose $this")
+
+        return provider.provideDerivationPath()
     }
 
     private fun MetaAccount.Purpose.toLocal(): MetaAccountLocal.PurposeLocal {

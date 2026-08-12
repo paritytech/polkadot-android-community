@@ -42,11 +42,11 @@ import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 interface VideoGameInfoSyncService {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeCurrentActiveGameInfo(): Flow<VideoGameInfo?>
 }
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 suspend fun VideoGameInfoSyncService.getCurrentActiveGameInfo(): VideoGameInfo {
     return subscribeCurrentActiveGameInfo().filterNotNull().first()
 }
@@ -65,7 +65,7 @@ class RealVideoGameInfoSyncService @Inject constructor(
 
     private suspend fun peopleChain() = chainRegistry.getChain(knownChains.people)
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeCurrentActiveGameInfo(): Flow<VideoGameInfo?> = computationalCache
         .useSharedFlow(CACHE_KEY) { cachingScope ->
             with(cachingScope) {
@@ -73,7 +73,7 @@ class RealVideoGameInfoSyncService @Inject constructor(
             }
         }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun subscribeCurrentActiveGameInfoInternal(): Flow<VideoGameInfo?> = flowOfAll {
         val chain = peopleChain()
         val candidateAccount = accountRepository.getCandidateAccount()
@@ -104,7 +104,7 @@ class RealVideoGameInfoSyncService @Inject constructor(
                     rounds = it.rounds,
                     preferredMaxGroupSize = it.maxGroupSize,
                     state = state,
-                    airdropScheduled = it.airdropScheduled ?: false,
+                    airdropScheduled = it.airdropScheduled,
                 )
             }
         }

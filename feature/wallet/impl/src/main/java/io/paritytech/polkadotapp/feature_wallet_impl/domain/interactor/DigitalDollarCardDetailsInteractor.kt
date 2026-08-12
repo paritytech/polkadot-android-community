@@ -26,11 +26,11 @@ import io.paritytech.polkadotapp.feature_transfers_api.domain.usecase.TestnetFun
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.AssetInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import javax.inject.Inject
 
 class DigitalDollarCardDetailsInteractor @Inject constructor(
@@ -66,10 +66,10 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
 
     fun observeBackupProgress(): Flow<BackupProgress> = coinageBackupService.subscribeProgress()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun startDeepSearch() = coinageBackupService.deepSearch()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun markBackupCompleted() = coinageBackupService.markAsCompleted()
 
     suspend fun autoFundAvailable() = environment != TestnetEnvironment.PRODUCTION
@@ -84,7 +84,15 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
         val recipientAccountId = accountRepository.getDepositAccount().accountIdIn(chainAsset.chain)
 
         return testnetFundUseCase(chainAsset, topUpAmount, recipientAccountId)
-            .map { autoConvertDepositService.currentDeposit.filter { it?.status is AutoConvertDeposit.Status.Done }.first() }
+            .mapCatching {
+                val terminalStatus = autoConvertDepositService.currentDeposit
+                    .mapNotNull { it?.status }
+                    .first { it is AutoConvertDeposit.Status.Done || it is AutoConvertDeposit.Status.Failure }
+
+                if (terminalStatus is AutoConvertDeposit.Status.Failure) {
+                    throw terminalStatus.reason
+                }
+            }
     }
 
     suspend fun makeAllVouchersReady() = coinageTestHelperUseCase.makeAllVouchersReady()

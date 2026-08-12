@@ -1,4 +1,5 @@
 plugins {
+    id("polkadotapp.android.library")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
 }
@@ -13,4 +14,6 @@ dependencies {
     api(project(":bindings:bandersnatch-crypto"))
 
     api(libs.nova.substrate.sdk)
+
+    implementation(libs.hilt.android)
 }

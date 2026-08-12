@@ -37,12 +37,13 @@ class RealSharingManager @Inject constructor(
 
     override fun shareText(text: String) {
         val activity = contextManager.requireActivity()
-        val intent = ShareCompat.IntentBuilder(activity)
+
+        val sendIntent = ShareCompat.IntentBuilder(activity)
             .setType("text/plain")
             .setText(text)
             .intent
 
-        activity.startActivity(intent)
+        activity.startActivity(Intent.createChooser(sendIntent, null))
     }
 
     override fun shareCalendarEvent(sharing: EventCalendarSharing) {

@@ -31,6 +31,7 @@ interface CommunicationSessionCreator {
         remoteAccount: SessionAccount.Remote,
         encryption: CommunicationEncryption,
         maxStatementSize: InformationSize,
+        compactor: MessageCompactor? = null,
     ): CommunicationSession
 
     /**
@@ -45,5 +46,6 @@ interface CommunicationSessionCreator {
         perDeviceEncryption: CommunicationEncryption,
         identityChatDomain: SharedSecretDerivationDomain,
         maxStatementSize: InformationSize,
+        compactor: MessageCompactor? = null,
     ): CommunicationSession
 }

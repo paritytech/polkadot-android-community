@@ -8,9 +8,9 @@ interface DimCommitmentHandler {
 
     val botId: String
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun observeState(): Flow<DimState>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun cancel(): Result<Unit>
 }

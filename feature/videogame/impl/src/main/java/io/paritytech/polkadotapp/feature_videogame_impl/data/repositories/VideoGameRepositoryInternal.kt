@@ -24,11 +24,15 @@ import io.paritytech.polkadotapp.chains.storage.source.queryCatching
 import io.paritytech.polkadotapp.common.data.memory.ComputationalCache
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.data.memory.useSharedFlow
+import io.paritytech.polkadotapp.common.domain.model.AccountEcdhKey
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.*
+import io.paritytech.polkadotapp.common.utils.scale.encodeOnChain
+import io.paritytech.polkadotapp.common.utils.scale.toDomain
+import io.paritytech.polkadotapp.common.utils.scale.toScale
 import io.paritytech.polkadotapp.database.dao.VideoGameVoteDao
 import io.paritytech.polkadotapp.feature_balances_api.data.type.TokenBalanceTypeRegistry
 import io.paritytech.polkadotapp.feature_people_api.data.signer.origins.PeopleOrigins
@@ -87,7 +91,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 interface VideoGameRepositoryInternal {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeGameInfoAtBlock(chainId: ChainId): Flow<AtBlock<OnChainVideoGameInfo?>>
 
     fun subscribePlayer(
@@ -105,7 +109,7 @@ interface VideoGameRepositoryInternal {
         player: OnChainAccountOrPerson
     ): Flow<OnChainArchivedPlayer?>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeGamesSchedule(chainId: ChainId): Flow<List<OnChainVideoGameSchedule>>
 
     suspend fun getPlayersByIndexes(
@@ -151,7 +155,7 @@ interface VideoGameRepositoryInternal {
     suspend fun registerViaInvitation(
         issuedInvitation: IssuedInvitation,
         chain: Chain,
-        publicKey: EncodedPublicKey,
+        publicKey: AccountEcdhKey,
         submission: VideoGameTrackedSubmission,
         airdrop: AirdropProof?,
     ): Result<Unit>
@@ -159,7 +163,7 @@ interface VideoGameRepositoryInternal {
     suspend fun registerWithAccount(
         chain: Chain,
         needCredibilityProof: Boolean,
-        publicKey: EncodedPublicKey,
+        publicKey: AccountEcdhKey,
         submission: VideoGameTrackedSubmission,
         airdrop: AirdropProof?,
     ): Result<Unit>
@@ -194,10 +198,10 @@ interface VideoGameRepositoryInternal {
     suspend fun getCommunicationIdentifier(
         chainId: ChainId,
         accountId: AccountId
-    ): Result<EncodedPublicKey?>
+    ): Result<AccountEcdhKey?>
 }
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun VideoGameRepositoryInternal.subscribeGameInfo(chainId: ChainId): Flow<OnChainVideoGameInfo?> {
     return subscribeGameInfoAtBlock(chainId).map { it.value }
 }
@@ -254,7 +258,7 @@ class RealVideoGameRepository @Inject constructor(
     private val computationalCache: ComputationalCache,
     private val signedOrigins: SignedOrigins,
 ) : VideoGameRepositoryInternal, VideoGameRepository {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeGameInfoAtBlock(chainId: ChainId): Flow<AtBlock<OnChainVideoGameInfo?>> {
         return computationalCache.useSharedFlow("GameInfoAtBlock", chainId) {
             remoteStorageDataSource.subscribe(chainId) {
@@ -293,7 +297,7 @@ class RealVideoGameRepository @Inject constructor(
         }
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeGamesSchedule(chainId: ChainId): Flow<List<OnChainVideoGameSchedule>> {
         return computationalCache.useSharedFlow("GamesSchedule", chainId) {
             remoteStorageDataSource.subscribe(chainId) {
@@ -391,13 +395,13 @@ class RealVideoGameRepository @Inject constructor(
     override suspend fun registerViaInvitation(
         issuedInvitation: IssuedInvitation,
         chain: Chain,
-        publicKey: EncodedPublicKey,
+        publicKey: AccountEcdhKey,
         submission: VideoGameTrackedSubmission,
         airdrop: AirdropProof?,
     ): Result<Unit> {
         return submitTracked(chain, signedOrigins.candidate(), submission) {
             videoGame.signUpWithInvitation(
-                identifierKey = publicKey.value,
+                identifierKey = publicKey.toScale().encodeOnChain(),
                 inviter = issuedInvitation.inviter,
                 ticket = issuedInvitation.ticket,
                 signature = issuedInvitation.signature,
@@ -409,14 +413,14 @@ class RealVideoGameRepository @Inject constructor(
     override suspend fun registerWithAccount(
         chain: Chain,
         needCredibilityProof: Boolean,
-        publicKey: EncodedPublicKey,
+        publicKey: AccountEcdhKey,
         submission: VideoGameTrackedSubmission,
         airdrop: AirdropProof?,
     ): Result<Unit> {
         val origin = registerWithAccountOrigin(needCredibilityProof)
 
         return submitTracked(chain, origin, submission) {
-            videoGame.signUpWithAccount(publicKey.value, airdrop = airdrop?.toAirdropVrf())
+            videoGame.signUpWithAccount(publicKey.toScale().encodeOnChain(), airdrop = airdrop?.toAirdropVrf())
         }
     }
 
@@ -606,10 +610,10 @@ class RealVideoGameRepository @Inject constructor(
     override suspend fun getCommunicationIdentifier(
         chainId: ChainId,
         accountId: AccountId
-    ): Result<EncodedPublicKey?> {
+    ): Result<AccountEcdhKey?> {
         return remoteStorageDataSource.queryCatching(chainId, at = null) {
             metadata.videoGame.communicationIdentifiers.query(accountId)
-        }
+        }.mapCatching { it?.toDomain()?.getOrThrow() }
     }
 
     private suspend fun getRegistrationDeposit(chain: Chain, asset: Chain.Asset): ChainAssetWithAmount {

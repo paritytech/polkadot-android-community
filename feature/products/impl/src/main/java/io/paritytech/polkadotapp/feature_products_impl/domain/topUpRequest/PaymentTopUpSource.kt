@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest
 
 import io.paritytech.polkadotapp.common.domain.model.EncodedPrivateKey
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 
 /**
  * Where the funds for a RFC-0006 top-up come from. Mirrors the `PaymentTopUpSource` enum from the
@@ -9,7 +10,7 @@ import io.paritytech.polkadotapp.common.domain.model.EncodedPrivateKey
  * product's accounts).
  */
 sealed interface PaymentTopUpSource {
-    data class ProductAccount(val derivationIndex: Int) : PaymentTopUpSource
+    data class ProductAccount(val index: DerivationIndex32) : PaymentTopUpSource
 
     data class PrivateKey(val key: EncodedPrivateKey) : PaymentTopUpSource
 

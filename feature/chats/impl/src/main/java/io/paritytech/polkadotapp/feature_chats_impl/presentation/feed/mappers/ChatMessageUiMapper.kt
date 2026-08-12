@@ -58,6 +58,7 @@ class ChatMessageUiMapper @Inject constructor(
                         reactedByUser = reactions.any { it.origin.isUser() }
                     )
                 }
+                .toImmutableList()
 
             val revision = revisions[message.id]
             val latestContent = revision?.content ?: message.content
@@ -94,41 +95,51 @@ class ChatMessageUiMapper @Inject constructor(
         message: ChatMessageUiModel,
         originDisplayResolver: MessageOriginDisplayResolver,
     ): InputMessageRelation.Reply? {
-        return when (message) {
-            is ChatMessageUiModel.Text -> {
-                InputMessageRelation.Reply(
-                    messageId = message.id,
-                    title = originDisplayResolver.displayOf(message.origin).name,
-                    text = message.text
-                )
+        val title = originDisplayResolver.displayOf(message.origin).name
+
+        val content = when (message) {
+            is ChatMessageUiModel.Text -> ReplyPreview.Content.Text(message.text)
+
+            is ChatMessageUiModel.ChatRequest -> ReplyPreview.Content.Text(message.welcomeText ?: return null)
+
+            is ChatMessageUiModel.Multimedia -> when (message.type) {
+                is ChatMessageUiModel.Multimedia.MultimediaType.Image ->
+                    ReplyPreview.Content.Image(thumbnailUri = message.uri, caption = message.text)
+
+                is ChatMessageUiModel.Multimedia.MultimediaType.Video ->
+                    ReplyPreview.Content.Video(thumbnailUri = message.uri, caption = message.text)
             }
 
-            is ChatMessageUiModel.ChatRequest -> {
-                InputMessageRelation.Reply(
-                    messageId = message.id,
-                    title = originDisplayResolver.displayOf(message.origin).name,
-                    text = message.welcomeText ?: return null
-                )
-            }
+            is ChatMessageUiModel.File -> ReplyPreview.Content.File(fileName = message.fileName, caption = message.text)
 
-            is ChatMessageUiModel.Multimedia -> {
-                InputMessageRelation.Reply(
-                    messageId = message.id,
-                    title = originDisplayResolver.displayOf(message.origin).name,
-                    text = message.text
-                )
-            }
+            is ChatMessageUiModel.CoinagePayment -> ReplyPreview.Content.Payment(message.amount, message.direction)
 
-            is ChatMessageUiModel.File -> {
-                InputMessageRelation.Reply(
-                    messageId = message.id,
-                    title = originDisplayResolver.displayOf(message.origin).name,
-                    text = message.text
-                )
-            }
-
-            else -> null
+            else -> return null
         }
+
+        return InputMessageRelation.Reply(
+            ReplyPreview(
+                messageId = message.id,
+                title = title,
+                content = content
+            )
+        )
+    }
+
+    suspend fun createReplyRelationFor(
+        message: ChatMessage,
+        originDisplayResolver: MessageOriginDisplayResolver
+    ): InputMessageRelation.Reply? {
+        val content = message.content.toReplyPreviewContent(message.direction, helper) ?: return null
+        val title = originDisplayResolver.displayOf(message.origin).name
+
+        return InputMessageRelation.Reply(
+            ReplyPreview(
+                messageId = message.id,
+                title = title,
+                content = content
+            )
+        )
     }
 
     private suspend fun ChatMessage.toUi(
@@ -137,7 +148,7 @@ class ChatMessageUiMapper @Inject constructor(
         messagesById: Map<String, ChatMessage>,
         revisions: Map<ChatMessageId, MessageRevision>,
         originDisplayResolver: MessageOriginDisplayResolver,
-        messageReactions: List<ChatMessageUiModel.Reaction>,
+        messageReactions: ImmutableList<ChatMessageUiModel.Reaction>,
         customMessageRenderers: Map<String, CustomChatMessageRenderer<*>>,
         callContext: CallResolutionContext
     ): ChatMessageUiModel? {
@@ -154,6 +165,7 @@ class ChatMessageUiMapper @Inject constructor(
                 messagesById = messagesById,
                 revisions = revisions,
                 originDisplayResolver = originDisplayResolver,
+                mappingHelper = helper,
                 messageReactions = messageReactions
             )
 
@@ -173,6 +185,7 @@ class ChatMessageUiMapper @Inject constructor(
                 messagesById = messagesById,
                 revisions = revisions,
                 originDisplayResolver = originDisplayResolver,
+                mappingHelper = helper,
                 messageReactions = messageReactions,
                 isEdited = isEdited
             )
@@ -193,6 +206,14 @@ class ChatMessageUiMapper @Inject constructor(
             }
 
             is ChatMessage.Content.Unsupported -> ChatMessageUiModel.Unsupported(
+                id = id,
+                timestamp = timestamp,
+                direction = direction,
+                status = status,
+                origin = origin,
+            )
+
+            is ChatMessage.Content.CompactionUnavailable -> ChatMessageUiModel.CompactionUnavailable(
                 id = id,
                 timestamp = timestamp,
                 direction = direction,
@@ -237,6 +258,7 @@ class ChatMessageUiMapper @Inject constructor(
             is ChatMessage.Content.DataChannelClosed,
             is ChatMessage.Content.DeviceAdded,
             is ChatMessage.Content.DeviceRemoved,
+            is ChatMessage.Content.CompactionCommit,
             is ChatMessage.Content.Edited -> null
 
             is ChatMessage.Content.Custom<*> -> {
@@ -285,7 +307,7 @@ class ChatMessageUiMapper @Inject constructor(
             message = message,
             userReactedEmojis = userReactedEmojis,
             canLeaveReactions = chatMenuActionsProvider.canLeaveMenuReactions(userInputState),
-            allowedMenuActions = chatMenuActionsProvider.getMessageActions(message, userInputState),
+            allowedMenuActions = chatMenuActionsProvider.getMessageActions(message, userInputState).toImmutableList(),
         )
     }
 }
@@ -297,6 +319,7 @@ private fun ChatMessage.Status.toUi(): ChatMessageUiModel.Status {
 
         ChatMessage.Status.IS_SENT -> ChatMessageUiModel.Status.SENT
         ChatMessage.Status.IS_READ -> ChatMessageUiModel.Status.READ
+        ChatMessage.Status.DELIVERY_FAILED -> ChatMessageUiModel.Status.FAILED
     }
 }
 
@@ -307,7 +330,7 @@ private fun ChatMessageDirection.toUi(): ChatMessageUiModel.Direction {
     }
 }
 
-private fun mapText(
+private suspend fun mapText(
     message: ChatMessage,
     content: ChatMessage.Content.Text,
     isEdited: Boolean,
@@ -316,13 +339,15 @@ private fun mapText(
     messagesById: Map<String, ChatMessage>,
     revisions: Map<ChatMessageId, MessageRevision>,
     originDisplayResolver: MessageOriginDisplayResolver,
-    messageReactions: List<ChatMessageUiModel.Reaction>
+    mappingHelper: ChatMessageMappingHelper,
+    messageReactions: ImmutableList<ChatMessageUiModel.Reaction>
 ): ChatMessageUiModel.Text {
     val replyPreview = buildReplyPreview(
         message = message,
         allMessages = messagesById,
         revisions = revisions,
-        originDisplayResolver = originDisplayResolver
+        originDisplayResolver = originDisplayResolver,
+        mappingHelper = mappingHelper
     )
 
     return ChatMessageUiModel.Text(
@@ -343,7 +368,7 @@ private fun mapChatRequest(
     content: ChatMessage.Content.ChatRequest,
     direction: ChatMessageUiModel.Direction,
     status: ChatMessageUiModel.Status,
-    messageReactions: List<ChatMessageUiModel.Reaction>
+    messageReactions: ImmutableList<ChatMessageUiModel.Reaction>
 ): ChatMessageUiModel.ChatRequest {
     return ChatMessageUiModel.ChatRequest(
         id = message.id,
@@ -356,7 +381,7 @@ private fun mapChatRequest(
     )
 }
 
-private fun mapRichText(
+private suspend fun mapRichText(
     message: ChatMessage,
     content: ChatMessage.Content.RichText,
     direction: ChatMessageUiModel.Direction,
@@ -364,14 +389,16 @@ private fun mapRichText(
     messagesById: Map<String, ChatMessage>,
     revisions: Map<ChatMessageId, MessageRevision>,
     originDisplayResolver: MessageOriginDisplayResolver,
+    mappingHelper: ChatMessageMappingHelper,
     isEdited: Boolean,
-    messageReactions: List<ChatMessageUiModel.Reaction>
+    messageReactions: ImmutableList<ChatMessageUiModel.Reaction>
 ): ChatMessageUiModel? {
     val replyPreview = buildReplyPreview(
         message = message,
         allMessages = messagesById,
         revisions = revisions,
-        originDisplayResolver = originDisplayResolver
+        originDisplayResolver = originDisplayResolver,
+        mappingHelper = mappingHelper
     )
 
     return mapAttachmentToUi(
@@ -392,7 +419,7 @@ private fun mapAttachmentToUi(
     attachment: Attachment?,
     direction: ChatMessageUiModel.Direction,
     status: ChatMessageUiModel.Status,
-    messageReactions: List<ChatMessageUiModel.Reaction>,
+    messageReactions: ImmutableList<ChatMessageUiModel.Reaction>,
     isEdited: Boolean,
     replyPreview: ReplyPreview?,
 ): ChatMessageUiModel? {
@@ -421,9 +448,9 @@ private fun mapAttachmentToUi(
             status = status,
             uri = attachment.uri,
             text = text,
+            replyPreview = replyPreview,
             type = ChatMessageUiModel.Multimedia.MultimediaType.Image(height = meta.height, width = meta.width),
             blurHash = meta.blurHash,
-            uploadState = null,
             origin = message.origin,
             reactions = messageReactions,
             isEdited = isEdited
@@ -436,9 +463,9 @@ private fun mapAttachmentToUi(
             status = status,
             uri = attachment.uri,
             text = text,
+            replyPreview = replyPreview,
             type = ChatMessageUiModel.Multimedia.MultimediaType.Video(kotlin.time.Duration.ZERO),
             blurHash = meta.blurHash,
-            uploadState = null,
             origin = message.origin,
             reactions = messageReactions,
             isEdited = isEdited
@@ -505,11 +532,12 @@ private fun constructEmojiReactionGroup(
     )
 }
 
-private fun buildReplyPreview(
+private suspend fun buildReplyPreview(
     message: ChatMessage,
     allMessages: Map<String, ChatMessage>,
     revisions: Map<ChatMessageId, MessageRevision>,
     originDisplayResolver: MessageOriginDisplayResolver,
+    mappingHelper: ChatMessageMappingHelper,
 ): ReplyPreview? {
     val repliedId = message.replyToMessageId ?: return null
     val repliedMessage = allMessages[repliedId] ?: return null
@@ -517,35 +545,64 @@ private fun buildReplyPreview(
     val revision = revisions[repliedId]
     val content = revision?.content ?: repliedMessage.content
 
-    val text = when (content) {
-        is ChatMessage.Content.Text -> content.text
-        is ChatMessage.Content.ChatRequest -> content.welcome?.text ?: return null
-        is ChatMessage.Content.RichText -> content.text.nullIfEmpty()
-
-        is ChatMessage.Content.ChatAccepted,
-        is ChatMessage.Content.DeviceChatAccepted,
-        ChatMessage.Content.ContactAdded,
-        is ChatMessage.Content.Custom<*>,
-        is ChatMessage.Content.Edited,
-        ChatMessage.Content.LeftChat,
-        is ChatMessage.Content.CoinagePayment,
-        is ChatMessage.Content.Reacted,
-        is ChatMessage.Content.ReactionRemoved,
-        is ChatMessage.Content.Token,
-        is ChatMessage.Content.Unsupported,
-        is ChatMessage.Content.DataChannelAnswer,
-        is ChatMessage.Content.DataChannelIceCandidate,
-        is ChatMessage.Content.DataChannelOffer,
-        is ChatMessage.Content.DataChannelClosed,
-        is ChatMessage.Content.DeviceAdded,
-        is ChatMessage.Content.DeviceRemoved -> return null
-    }
-
+    val previewContent = content.toReplyPreviewContent(repliedMessage.direction, mappingHelper) ?: return null
     val title = originDisplayResolver.displayOf(repliedMessage.origin).name
 
     return ReplyPreview(
         messageId = repliedMessage.id,
         title = title,
-        text = text
+        content = previewContent
     )
+}
+
+private suspend fun ChatMessage.Content.toReplyPreviewContent(
+    direction: ChatMessageDirection,
+    mappingHelper: ChatMessageMappingHelper
+): ReplyPreview.Content? = when (this) {
+    is ChatMessage.Content.Text -> ReplyPreview.Content.Text(text)
+    is ChatMessage.Content.ChatRequest -> welcome?.text?.let { ReplyPreview.Content.Text(it) }
+    is ChatMessage.Content.RichText -> toReplyPreviewContent()
+    is ChatMessage.Content.CoinagePayment -> ReplyPreview.Content.Payment(mappingHelper.extractTokenAmount(this), direction.toUi())
+
+    is ChatMessage.Content.ChatAccepted,
+    is ChatMessage.Content.DeviceChatAccepted,
+    ChatMessage.Content.ContactAdded,
+    is ChatMessage.Content.Custom<*>,
+    is ChatMessage.Content.Edited,
+    ChatMessage.Content.LeftChat,
+    is ChatMessage.Content.Reacted,
+    is ChatMessage.Content.ReactionRemoved,
+    is ChatMessage.Content.Token,
+    is ChatMessage.Content.Unsupported,
+    is ChatMessage.Content.DataChannelAnswer,
+    is ChatMessage.Content.DataChannelIceCandidate,
+    is ChatMessage.Content.DataChannelOffer,
+    is ChatMessage.Content.DataChannelClosed,
+    is ChatMessage.Content.DeviceAdded,
+    is ChatMessage.Content.DeviceRemoved,
+    is ChatMessage.Content.CompactionCommit,
+    is ChatMessage.Content.CompactionUnavailable -> null
+}
+
+private fun ChatMessage.Content.RichText.toReplyPreviewContent(): ReplyPreview.Content {
+    val caption = text.nullIfEmpty()
+
+    return when (val meta = attachments.firstOrNull()?.meta) {
+        is Attachment.Meta.Image -> ReplyPreview.Content.Image(
+            thumbnailUri = attachments.first().uri,
+            caption = caption
+        )
+
+        is Attachment.Meta.Video -> ReplyPreview.Content.Video(
+            thumbnailUri = attachments.first().uri,
+            caption = caption
+        )
+
+        is Attachment.Meta.General -> ReplyPreview.Content.File(
+            fileName = meta.fileName,
+            caption = caption
+        )
+
+        null -> ReplyPreview.Content.Text(caption.orEmpty())
+    }
 }

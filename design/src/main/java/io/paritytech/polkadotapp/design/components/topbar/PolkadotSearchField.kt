@@ -12,6 +12,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -29,6 +31,7 @@ import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.text.PolkadotInputField
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.conditionalNotNull
 
 private val SearchLeadingIconSize = 48.dp
 
@@ -38,10 +41,12 @@ fun PolkadotSearchField(
     onValueChange: (String) -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     placeholder: String? = null,
     leadingIcon: ImageVector = NovaIcons.Search,
     onLeadingClick: (() -> Unit)? = null,
     imeAction: ImeAction = ImeAction.Search,
+    focusRequester: FocusRequester? = null,
 ) {
     val placeholderContent: (@Composable () -> Unit)? = placeholder?.let { text ->
         {
@@ -84,15 +89,18 @@ fun PolkadotSearchField(
                 ) {
                     NovaIcon(
                         imageVector = leadingIcon,
-                        tint = PolkadotTheme.colors.fg.primary,
+                        tint = PolkadotTheme.colors.fg.tertiary,
                     )
                 }
             }
 
             PolkadotInputField(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .conditionalNotNull(focusRequester) { focusRequester(it) },
                 value = value,
                 onValueChange = onValueChange,
+                enabled = enabled,
                 placeholder = placeholderContent,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(

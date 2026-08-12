@@ -42,12 +42,12 @@ suspend inline fun <T> StorageSharedRequestsBuilderFactory.withSubscription(
     }
 }
 
-context(CoroutineScope)
+context(scope: CoroutineScope)
 suspend inline fun <T> StorageSharedRequestsBuilderFactory.withSubscription(
     chainId: ChainId,
     builderAction: (StorageSharedRequestsBuilder) -> T
 ): T {
-    return withSubscription(this@CoroutineScope, chainId, builderAction)
+    return withSubscription(scope, chainId, builderAction)
 }
 
 class StorageSharedRequestsBuilder(

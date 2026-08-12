@@ -42,11 +42,12 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageAct
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageLayoutInfo
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.isUnread
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.*
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.CompactionUnavailableMessage
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.ContactAddedMessage
-import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.MultimediaMessage
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.PaymentMessage
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.TextMessage
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.UnsupportedMessage
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.multimedia.MultimediaMessage
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.separators.GroupDateSeparator
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.separators.NewMessagesSeparator
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatMessagesState
@@ -103,7 +104,7 @@ internal fun ChatFeed(
 
     // A styled (Prizes) date separator shows the absolute date instead of "Today"/"Yesterday".
     val useRelativeDateLabels = dateSeparatorStyle == null
-    val stickyHeaderInfo by rememberStickyHeaderInfo(
+    val stickyHeaderInfoState = rememberStickyHeaderInfo(
         lazyListState = lazyListState,
         messages = chatMessagesState.messages,
         itemIndexOffset = itemIndexOffset,
@@ -193,6 +194,7 @@ internal fun ChatFeed(
                             grouping = grouping,
                             isHighlighted = isHighlighted,
                             username = username,
+                            canBeReplied = isInputEnabled,
                             onMessageAction = onMessageAction,
                             onLongPress = { layoutInfo -> onMessageLongPress(message, layoutInfo) },
                             customBubbleStyle = customBubbleStyle,
@@ -204,6 +206,7 @@ internal fun ChatFeed(
                             showTimestamp = showTimestamps,
                             grouping = grouping,
                             isHighlighted = isHighlighted,
+                            canBeReplied = isInputEnabled,
                             onMessageAction = onMessageAction,
                             onLongPress = { layoutInfo -> onMessageLongPress(message, layoutInfo) },
                             customBubbleStyle = customBubbleStyle,
@@ -212,6 +215,15 @@ internal fun ChatFeed(
                         )
 
                         is ChatMessageUiModel.Unsupported -> UnsupportedMessage(
+                            modifier = messageModifier,
+                            message = message,
+                            showTimestamp = showTimestamps,
+                            grouping = grouping,
+                            isHighlighted = isHighlighted,
+                            customBubbleStyle = customBubbleStyle,
+                        )
+
+                        is ChatMessageUiModel.CompactionUnavailable -> CompactionUnavailableMessage(
                             modifier = messageModifier,
                             message = message,
                             showTimestamp = showTimestamps,
@@ -276,7 +288,7 @@ internal fun ChatFeed(
                             anchorTimestamp,
                             useRelativeLabels = useRelativeDateLabels,
                         ),
-                        isHidden = stickyHeaderInfo == null || stickyHeaderInfo?.messageIndex == index,
+                        isHidden = stickyHeaderInfoState.value == null || stickyHeaderInfoState.value?.messageIndex == index,
                         style = dateSeparatorStyle,
                     )
                 }
@@ -290,8 +302,8 @@ internal fun ChatFeed(
         }
 
         FloatingDateLabelOverlay(
-            stickyHeaderInfo = stickyHeaderInfo,
-            isScrolling = lazyListState.isScrollInProgress,
+            stickyHeaderInfo = stickyHeaderInfoState,
+            lazyListState = lazyListState,
             style = dateSeparatorStyle,
         )
 

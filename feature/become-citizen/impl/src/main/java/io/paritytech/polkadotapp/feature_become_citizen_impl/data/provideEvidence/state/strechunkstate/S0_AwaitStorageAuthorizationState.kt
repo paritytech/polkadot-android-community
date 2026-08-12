@@ -19,23 +19,23 @@ class AwaitStorageAuthorizationState(
 
     override val id = ID
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     override suspend fun performNonTerminalTransition(): Result<UploadEvidenceState> {
         awaitStorageAuthorization()
 
         return Result.success(determineNextState())
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     private suspend fun awaitStorageAuthorization() {
-        uploadSession.subscriptions.await().bulletIn.authorization.first {
+        transition.uploadSession.subscriptions.await().bulletIn.authorization.first {
             it != null && it.extent.transactionsAllowance.isPositive()
         }
     }
 
-    context(UploadEvidenceState.Transition)
+    context(transition: UploadEvidenceState.Transition)
     private suspend fun determineNextState(): UploadEvidenceState {
-        val allocation = uploadSession.getCurrentAllocation()
+        val allocation = transition.uploadSession.getCurrentAllocation()
 
         return when (allocation) {
             ProofOfInkAllocation.Initial -> stateFactory.storeFirstPhotoChunk()

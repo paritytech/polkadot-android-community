@@ -124,7 +124,7 @@ class AirdropRegistrationGateTest {
         maxGroupSize = 4,
         rounds = 1,
         state = OnChainVideoGameState.PlayerProcess,
-        airdropScheduled = airdropScheduled,
+        airdropsScheduled = if (airdropScheduled) 1 else 0,
     )
 
     // AirdropEventId is a value class; a bare any() unboxes to null and NPEs. Register a permissive

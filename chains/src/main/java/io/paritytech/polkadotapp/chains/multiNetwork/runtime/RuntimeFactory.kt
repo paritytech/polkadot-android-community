@@ -82,14 +82,13 @@ class RuntimeFactory @Inject constructor(
             val metadataReader = RuntimeMetadataReader.readOpaque(runtimeMetadataRaw)
 
             Timber.d("Constructing metadata of version ${metadataReader.metadataVersion} for chain $chainId")
-            val schema = metadataReader.metadataPostV14.schema
 
             val typePreset =
                 if (metadataReader.metadataVersion < 14) {
                     v13Preset()
                 } else {
                     TypesParserV14.parse(
-                        lookup = metadataReader.metadata[schema.lookup],
+                        lookup = metadataReader.lookup,
                         typePreset = v14Preset(),
                         typeMapping = allSiTypeMappings()
                     )

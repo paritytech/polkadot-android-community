@@ -12,7 +12,6 @@ import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.m
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.UsernamesChainProvider
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameParams
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
-import io.paritytech.polkadotapp.tools_integrity_api.exception.mapToIntegrityIfNeeded
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -84,7 +83,7 @@ class RealUsernameRepository @Inject constructor(
                 api.claimUsername(request)
             }
                 .map { Username.fromFullValue(it.username) }
-                .mapError(::mapToIntegrityIfNeeded)
+                .mapError(::mapClaimUsernameError)
         }
     }
 }

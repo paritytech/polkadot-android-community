@@ -20,9 +20,9 @@ class PersonalIdentityUpdater @Inject constructor(
     storageCache: StorageCache,
     private val accountRepository: AccountRepository,
 ) : SingleStorageKeyUpdater<MetaAccount>(accountUpdateScope, chainRegistry, storageCache) {
-    context(WithRuntime)
+    context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String? {
         val alias = accountRepository.getCandidateAlias(BandersnatchContext.IDENTITY)
-        return runtime.metadata.identity.personIdentities.storageKey(alias)
+        return withRuntime.runtime.metadata.identity.personIdentities.storageKey(alias)
     }
 }

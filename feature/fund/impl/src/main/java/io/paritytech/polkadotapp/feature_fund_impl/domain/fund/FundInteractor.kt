@@ -19,7 +19,7 @@ interface FundInteractor {
 
     suspend fun fundingCredentials(assetId: FullChainAssetId): FundCredentials
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun depositTerms(fullChainAssetId: FullChainAssetId): Result<DepositTerms>
 }
 
@@ -30,7 +30,7 @@ class RealFundInteractor @Inject constructor(
 ) : FundInteractor {
     override fun currentDeposit() = autoConvertDepositService.currentDeposit
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun depositTerms(fullChainAssetId: FullChainAssetId): Result<DepositTerms> {
         val asset = chainRegistry.asset(fullChainAssetId)
         return autoConvertDepositService.depositTerms(asset)

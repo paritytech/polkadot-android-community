@@ -5,11 +5,19 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.GenesisHash
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentStatus
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocationOutcome
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ProductProofContext
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RegisteredRingVrfKey
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingLocation
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingVrfKeyDisclosure
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingVrfProof
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.VrfSignature
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.VrfTranscriptItem
 import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SignedTransaction
@@ -48,7 +56,45 @@ interface ProductsBotApi {
 
     suspend fun accountGet(callingProductId: ProductId, productAccountId: ProductAccountId): Result<ProductAccountResult>
 
-    suspend fun accountGetAlias(callingProductId: ProductId, productAccountId: ProductAccountId): Result<ContextualAlias>
+    suspend fun registerRingVrfKey(
+        callingProductId: ProductId,
+        index: DerivationIndex32,
+        ring: RingLocation,
+    ): Result<DataByteArray>
+
+    suspend fun listRingVrfKeys(
+        callingProductId: ProductId,
+        owner: ProductId,
+        disclosure: RingVrfKeyDisclosure,
+    ): Result<List<RegisteredRingVrfKey>>
+
+    suspend fun ringVrfSign(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        message: ByteArray,
+    ): Result<ByteArray>
+
+    suspend fun accountGetAlias(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        context: ProductProofContext,
+        ring: RingLocation,
+    ): Result<ContextualAlias>
+
+    suspend fun accountCreateProof(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        context: ProductProofContext,
+        ring: RingLocation,
+        message: ByteArray,
+    ): Result<RingVrfProof>
+
+    suspend fun accountSignVrf(
+        callingProductId: ProductId,
+        account: ProductAccountId,
+        transcriptLabel: ByteArray,
+        items: List<VrfTranscriptItem>,
+    ): Result<VrfSignature>
 
     suspend fun getUserId(callingProductId: ProductId): Result<GetUserIdResult>
 
@@ -62,13 +108,23 @@ interface ProductsBotApi {
 
     suspend fun signCreateTransaction(signingRequestBody: SigningRequestBody.CreateTransaction): Result<SignedTransaction.GeneralTransaction>
 
+    suspend fun signRawLegacy(signingRequestBody: SigningRequestBody.RawLegacy): Result<SignedTransaction.Raw>
+
+    suspend fun signCreateTransactionLegacy(
+        signingRequestBody: SigningRequestBody.CreateTransactionLegacy,
+    ): Result<SignedTransaction.GeneralTransaction>
+
     suspend fun getLegacyAccounts(): Result<List<LegacyAccountResult>>
 
     suspend fun lookupPreimage(hash: ByteArray): Result<ByteArray>
 
     suspend fun submitPreimage(callingProductId: ProductId, data: ByteArray): Result<String>
 
-    suspend fun createStatementProof(statementBody: Statement.Body): Result<StatementStoreMessageProof>
+    suspend fun createStatementProof(
+        callingProductId: ProductId,
+        productAccountId: ProductAccountId,
+        statementBody: Statement.Body,
+    ): Result<StatementStoreMessageProof>
 
     suspend fun createStatementProofAuthorized(
         callingProductId: ProductId,
@@ -86,6 +142,12 @@ interface ProductsBotApi {
         callingProductId: ProductId,
         requests: List<RemotePermissionRequest>,
     ): Result<Boolean>
+
+    /**
+     * Gates a product's use of WebRTC. Consumes a one-time grant issued by a preceding
+     * [requestRemotePermissions] call, or prompts the user when none is available.
+     */
+    suspend fun allowWebRtcAccess(callingProductId: ProductId): Result<Boolean>
 
     @OptIn(ExperimentalTime::class)
     suspend fun publishNotification(

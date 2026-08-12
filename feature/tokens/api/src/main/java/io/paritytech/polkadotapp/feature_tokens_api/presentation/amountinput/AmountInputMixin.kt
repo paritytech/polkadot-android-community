@@ -25,14 +25,14 @@ interface AmountInputMixin {
     fun setNewInput(amountInput: AmountInput)
 }
 
-context(ComputationalScope)
+context(scope: ComputationalScope)
 fun AmountInputMixin.Factory.create(
     asset: suspend () -> Chain.Asset,
     roundPrecision: RoundPrecision,
     availableBalanceProvider: AvailableBalanceProvider,
 ): AmountInputMixin =
     create(
-        coroutineScope = this@ComputationalScope,
+        coroutineScope = scope,
         roundPrecision = roundPrecision,
         asset = asset,
         availableBalanceProvider = availableBalanceProvider

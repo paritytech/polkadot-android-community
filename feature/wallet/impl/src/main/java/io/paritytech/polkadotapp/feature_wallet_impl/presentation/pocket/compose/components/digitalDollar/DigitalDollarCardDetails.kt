@@ -33,7 +33,6 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowDownward
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpwards
-import io.paritytech.polkadotapp.design.components.icon.vectors.Scanner
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
@@ -81,8 +80,7 @@ fun DigitalDollarCardDetails(
         onShareLogsClick = viewModel::onShareLogsClick,
         onForceRecycleClick = viewModel::onForceRecycleClick,
         onBackupUpdateClick = viewModel::onBackupUpdateClick,
-        onBackupCloseClick = viewModel::onBackupCloseClick,
-        onOpenScanner = viewModel::openScanner
+        onBackupCloseClick = viewModel::onBackupCloseClick
     )
 }
 
@@ -100,8 +98,7 @@ private fun DigitalDollarCardDetailsContent(
     onShareLogsClick: () -> Unit,
     onForceRecycleClick: (Coin) -> Unit,
     onBackupUpdateClick: () -> Unit,
-    onBackupCloseClick: () -> Unit,
-    onOpenScanner: () -> Unit
+    onBackupCloseClick: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize()
@@ -109,13 +106,7 @@ private fun DigitalDollarCardDetailsContent(
         PolkadotTopBar(
             title = stringResource(RCommon.string.pocket_digital_dollar_title),
             navigationAction = rememberTopBarAction(onBack),
-            titleAlignment = TopBarTitleAlignment.Center,
-            actions = persistentListOf(
-                rememberTopBarAction(
-                    action = onOpenScanner,
-                    icon = NovaIcons.Scanner
-                )
-            )
+            titleAlignment = TopBarTitleAlignment.Center
         )
 
         Column(
@@ -127,7 +118,8 @@ private fun DigitalDollarCardDetailsContent(
         ) {
             DigitalDollarCard(
                 modifier = Modifier.pocketCardSharedElement(cardIndex),
-                card = card
+                card = card,
+                isExpanded = true
             )
 
             VerticalSpacer { mediumIncreased }
@@ -281,8 +273,8 @@ private fun DigitalDollarCardDetailsPreview() {
                             spendableSecuredBalance = TokenAmountModel.mock,
                             spendableDegradedBalance = TokenAmountModel.mock,
                             pendingBalance = TokenAmountModel.mock,
-                            coinList = emptyList(),
-                            voucherList = emptyList()
+                            coinList = persistentListOf(),
+                            voucherList = persistentListOf()
                         ),
                         autoFundAvailable = true,
                         fundInProgress = false,
@@ -299,8 +291,7 @@ private fun DigitalDollarCardDetailsPreview() {
                 onShareLogsClick = {},
                 onForceRecycleClick = {},
                 onBackupUpdateClick = {},
-                onBackupCloseClick = {},
-                onOpenScanner = {}
+                onBackupCloseClick = {}
             )
         }
     }

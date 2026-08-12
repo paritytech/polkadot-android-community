@@ -13,6 +13,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.persistentMapOf
 
 @Composable
 fun NovaText(
@@ -57,7 +59,7 @@ fun NovaText(
     minLines: Int = 1,
     onTextLayout: (TextLayoutResult) -> Unit = {},
     style: TextStyle = LocalTextStyle.current,
-    inlineContent: Map<String, InlineTextContent> = mapOf(),
+    inlineContent: ImmutableMap<String, InlineTextContent> = persistentMapOf(),
     autoSize: TextAutoSize? = null
 ) {
     Text(

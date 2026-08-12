@@ -1,3 +1,7 @@
+plugins {
+    id("polkadotapp.android.library")
+}
+
 android {
     namespace = "io.paritytech.polkadotapp.feature_account_impl"
 }
@@ -9,4 +13,6 @@ dependencies {
     ksp(libs.hilt.android.compiler)
 
     implementation(project(":database"))
+
+    testImplementation(project(":test-shared"))
 }

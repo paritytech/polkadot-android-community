@@ -34,4 +34,5 @@ private fun getSecondaryText(successScoring: SuccessPastGameScoring) = when (suc
     }
 
     SuccessPastGameScoring.ReachedPersonhood -> stringResource(R.string.chat_bot_weekly_game_result_success_personhood_description)
+    SuccessPastGameScoring.AlreadyReachedPersonhood -> ""
 }

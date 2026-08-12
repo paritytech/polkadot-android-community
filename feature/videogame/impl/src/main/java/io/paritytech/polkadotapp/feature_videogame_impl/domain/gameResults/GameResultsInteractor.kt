@@ -41,16 +41,16 @@ internal const val PASS_THRESHOLD = 6
  * [resolveUsernameAvailability] is the async answer to `flow.username_availability_needed`.
  */
 interface GameResultsInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun buildGameResults(): GameResultsInput
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribeLiveResults(initialInput: GameResultsInput): Flow<GameResultsLiveEvent>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun resolveUsernameAvailability(name: String): UsernameAvailability
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun claimAirdropPrize(claim: AirdropClaimParams?): Result<Unit>
 }
 
@@ -68,7 +68,7 @@ class RealGameResultsInteractor @Inject constructor(
     private val attestationContextResolver: AttestationContextResolver,
     private val gameResultsLiveUpdater: GameResultsLiveUpdater,
 ) : GameResultsInteractor {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun buildGameResults(): GameResultsInput {
         val consumer = currentConsumerInfoOrNull()
         val localUsername = usernameOfAccountUseCase.getUsername()
@@ -107,11 +107,11 @@ class RealGameResultsInteractor @Inject constructor(
         )
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribeLiveResults(initialInput: GameResultsInput): Flow<GameResultsLiveEvent> =
         gameResultsLiveUpdater.liveResults(initialInput)
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun claimAirdropPrize(claim: AirdropClaimParams?): Result<Unit> {
         // Use the params captured when the context resolved at results-build time — NOT a fresh
         // resolve. By claim time the game is over, so re-resolving the roster/player returns null and
@@ -222,7 +222,7 @@ class RealGameResultsInteractor @Inject constructor(
         )
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun resolveUsernameAvailability(name: String): UsernameAvailability {
         return checkUsernameAvailabilityUseCase(name)
             .logFailure("[GameResults] username availability lookup failed for '$name'")
@@ -244,7 +244,7 @@ class RealGameResultsInteractor @Inject constructor(
         return participant.recognition.isRecognized() || participant.reachedPersonhoodLastAttendance
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private suspend fun currentConsumerInfoOrNull() = runCatching {
         val account = playingAccountUseCase.getOurPlayerAccountId()
         val chainId = chainRegistry.peopleChain().id

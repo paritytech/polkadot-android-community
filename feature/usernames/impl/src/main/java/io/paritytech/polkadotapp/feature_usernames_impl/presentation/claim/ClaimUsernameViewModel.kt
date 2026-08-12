@@ -9,12 +9,17 @@ import io.paritytech.polkadotapp.feature_usernames_api.presentation.MIN_USERNAME
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.DigitsFieldState
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.interactor.UsernamesClaimInteractor
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameOutcome
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.UsernamesRouter
 import io.paritytech.polkadotapp.feature_web3summit_api.presentation.PostOnboardingFlow
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.BackupOutcome
 import io.paritytech.polkadotapp.tools_integrity_api.exception.IntegrityException
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -27,6 +32,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
+import io.paritytech.polkadotapp.common.R as RCommon
 
 private const val MAX_USERNAME_LENGTH = 29
 private const val MAX_DIGITS_LENGTH = 2
@@ -38,6 +44,9 @@ class ClaimUsernameViewModel @Inject constructor(
     private val postOnboardingFlow: PostOnboardingFlow,
 ) : BaseViewModel(), ClaimUsernameContract {
     override val state = MutableStateFlow(ClaimUsernameState())
+
+    private val _messageEvents = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+    override val messageEvents: SharedFlow<Int> = _messageEvents
 
     init {
         observeUsernameChanges()
@@ -91,7 +100,7 @@ class ClaimUsernameViewModel @Inject constructor(
                 state.update {
                     it.copy(
                         fieldState = UsernameFieldState.NEUTRAL,
-                        availableDigits = emptyList(),
+                        availableDigits = persistentListOf(),
                         digitsFieldState = DigitsFieldState.Hidden
                     )
                 }
@@ -103,7 +112,7 @@ class ClaimUsernameViewModel @Inject constructor(
                                 state.update {
                                     it.copy(
                                         fieldState = UsernameFieldState.AVAILABLE,
-                                        availableDigits = availabilityState.availableDigits,
+                                        availableDigits = availabilityState.availableDigits.toImmutableList(),
                                         digitsFieldState = if (firstDigits.isNotEmpty()) {
                                             DigitsFieldState.Visible(digits = firstDigits, isValid = true)
                                         } else {
@@ -140,7 +149,7 @@ class ClaimUsernameViewModel @Inject constructor(
                 it.copy(
                     username = newValue,
                     fieldState = UsernameFieldState.NEUTRAL,
-                    availableDigits = emptyList(),
+                    availableDigits = persistentListOf(),
                     digitsFieldState = DigitsFieldState.Hidden
                 )
             }
@@ -200,13 +209,43 @@ class ClaimUsernameViewModel @Inject constructor(
                 .getOrDefault(false)
 
             if (isAvailable) {
-                interactor.claimUsername(baseUsername, preferredDigits)
-                    .onFailure {
-                        state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
-                        handleClaimError(it)
-                    }
+                handleClaimOutcome(interactor.claimUsername(baseUsername, preferredDigits))
             } else {
                 state.update { it.copy(progress = ClaimUsernameProgress.NONE, fieldState = UsernameFieldState.TAKEN) }
+            }
+        }
+    }
+
+    private suspend fun handleClaimOutcome(outcome: ClaimUsernameOutcome) {
+        when (outcome) {
+            ClaimUsernameOutcome.Claimed -> Unit
+            is ClaimUsernameOutcome.SuffixTaken -> {
+                val firstDigits = outcome.freshDigits.firstOrNull().orEmpty()
+                state.update {
+                    it.copy(
+                        progress = ClaimUsernameProgress.NONE,
+                        fieldState = UsernameFieldState.AVAILABLE,
+                        availableDigits = outcome.freshDigits.toImmutableList(),
+                        digitsFieldState = if (firstDigits.isNotEmpty()) {
+                            DigitsFieldState.Visible(digits = firstDigits, isValid = true)
+                        } else {
+                            DigitsFieldState.Hidden
+                        }
+                    )
+                }
+                _messageEvents.emit(RCommon.string.pick_username_just_claimed_new_digit)
+            }
+
+            ClaimUsernameOutcome.Unavailable -> {
+                state.update {
+                    it.copy(progress = ClaimUsernameProgress.NONE, fieldState = UsernameFieldState.TAKEN)
+                }
+                _messageEvents.emit(RCommon.string.pick_username_just_claimed_taken)
+            }
+
+            is ClaimUsernameOutcome.Failed -> {
+                state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
+                handleClaimError(outcome.error)
             }
         }
     }
@@ -228,7 +267,7 @@ class ClaimUsernameViewModel @Inject constructor(
             it.copy(
                 username = "",
                 fieldState = UsernameFieldState.NEUTRAL,
-                availableDigits = emptyList(),
+                availableDigits = persistentListOf(),
                 digitsFieldState = DigitsFieldState.Hidden
             )
         }

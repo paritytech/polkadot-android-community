@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_products_impl.domain.hostApi
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsRuntime.JsRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * The scripts that need to be injected into a [JsRuntime].
@@ -56,25 +57,44 @@ class ExplicitInjection : ContainerInjectionStrategy {
 }
 
 /**
- * SPA/Explore: inject on every page load via [PageLifecycleSource] callback.
+ * SPA/Explore: install the host bridge/container before product scripts run.
  *
- * Sequence: wire callback → loadInitialPage (triggers callback → scripts injected).
+ * Preferred path is document-start injection ([JsRuntime.injectDocumentStartScript]): the bridge +
+ * container run before any page script on every navigation, so the product can never call into the
+ * host API before it loads. If the runtime can't support document-start (e.g. an old WebView provider), fall back to the
+ * legacy [PageLifecycleSource] callback, which re-injects on each `onPageStarted` but races with the
+ * page's own scripts.
+ *
  * After [setup] returns, the first page has started loading with injection active.
  *
- * @param pageLifecycleSource provides the page lifecycle hook
- * @param coroutineScope scope for launching suspend work from the synchronous callback
+ * @param pageLifecycleSource page lifecycle hook used only by the fallback path
+ * @param coroutineScope scope for launching suspend work from the synchronous fallback callback
  */
 class PageLoadInjection(
     private val pageLifecycleSource: PageLifecycleSource,
     private val coroutineScope: CoroutineScope,
 ) : ContainerInjectionStrategy {
     override suspend fun setup(scriptPayload: ScriptPayload, runtime: JsRuntime, loadInitialPage: suspend () -> Unit) {
-        pageLifecycleSource.addOnPageStartedListener { url ->
-            coroutineScope.launch {
-                runtime.evaluate(scriptPayload.bridgeJs)
-                runtime.evaluate(scriptPayload.containerJs)
+        val combinedScript = scriptPayload.bridgeJs + "\n" + scriptPayload.containerJs
+        val documentStartActive = runtime.injectDocumentStartScript(combinedScript, ALLOWED_ORIGIN_RULES)
+
+        if (documentStartActive) {
+            Timber.d("Using document-start injection (DOCUMENT_START_SCRIPT supported)")
+        } else {
+            Timber.w("Document-start unsupported, falling back to onPageStarted injection")
+            pageLifecycleSource.addOnPageStartedListener { url ->
+                coroutineScope.launch {
+                    runtime.evaluate(scriptPayload.bridgeJs)
+                    runtime.evaluate(scriptPayload.containerJs)
+                }
             }
         }
+
         loadInitialPage()
+    }
+
+    private companion object {
+        // Host-trusted bridge injected into every navigated product page, regardless of origin.
+        val ALLOWED_ORIGIN_RULES = setOf("*")
     }
 }

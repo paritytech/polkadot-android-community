@@ -17,7 +17,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val FALLBACK_MAX_HASH_COUNT = 250
-private const val MAX_FINALITY_LAG = 5
+private const val FINALITY_BUFFER = 5
 private const val MORTAL_PERIOD = 5 * 60 * 1000
 
 @Singleton
@@ -41,13 +41,19 @@ class MortalityConstructor @Inject constructor(
         val currentNumber = currentHeader().number
         val finalizedNumber = finalizedHeader().number
 
-        val startBlockNumber = if (currentNumber - finalizedNumber > MAX_FINALITY_LAG) currentNumber else finalizedNumber
+        // Always anchor against the finalized block. Anchoring to a non-finalized (best) block is reorg-prone:
+        // a reorg changes the era's birth-block hash, which is part of the signed payload, so the runtime
+        // rejects the tx as BadProof. Finalized blocks never reorg, so the anchor stays valid.
+        val startBlockNumber = finalizedNumber
 
         val blockHashCount = chainStateRepository.blockHashCount(chainId)?.toInt()
 
         val blockTime = chainStateRepository.expectedBlockTime(chainId).inWholeMilliseconds.toInt()
 
-        val mortalPeriod = MORTAL_PERIOD / blockTime + MAX_FINALITY_LAG
+        // Extend the era to cover the finalized->best gap, so a tx anchored at the (older) finalized block still
+        // lives the intended duration from the current best block. Still capped by blockHashCount below.
+        val finalityLag = (currentNumber - finalizedNumber).coerceAtLeast(0)
+        val mortalPeriod = MORTAL_PERIOD / blockTime + finalityLag + FINALITY_BUFFER
 
         val unmappedPeriod = min(blockHashCount ?: FALLBACK_MAX_HASH_COUNT, mortalPeriod)
 

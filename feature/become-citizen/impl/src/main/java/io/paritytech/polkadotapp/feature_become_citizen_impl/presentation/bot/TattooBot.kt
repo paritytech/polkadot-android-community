@@ -42,7 +42,7 @@ class TattooBot @Inject constructor(
     private val data = ChatBotData.tattoo()
 
     override val id: ChatExtensionId = data.id
-    override val metadata = ChatBotMetadata(data.name)
+    override val metadata = ChatBotMetadata(data.name, icon = null)
 
     override val customFooterRenderer: CustomChatFooterRenderer = TattooBotFooterRenderer()
 
@@ -50,12 +50,12 @@ class TattooBot @Inject constructor(
         return listOf(usernameUpgradedRenderer, selectedTattooRenderer, evidenceProvidedMessageRenderer)
     }
 
-    context(ChatBotContext)
+    context(chatBotContext: ChatBotContext)
     override fun startBotWork() {
-        interactor.startUpdateSystems().launchIn(scope)
+        interactor.startUpdateSystems().launchIn(chatBotContext.scope)
 
-        scope.launch {
-            setWelcomeMessages { createWelcomeMessages() }
+        chatBotContext.scope.launch {
+            chatBotContext.setWelcomeMessages { createWelcomeMessages() }
 
             usernameUpgradedMessageProcessor.launchSendingMessages()
             tattooProgressMessageProcessor.launchSendingMessages()

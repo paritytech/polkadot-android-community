@@ -24,6 +24,10 @@ Built on Nova-prefixed wrappers over Material3. Every screen follows the public-
 18. **`minor`** — Symmetric padding by default (top/bottom both `spacingN`); aids component reuse.
 19. **`minor`** — Compose file > ~400 lines should split into `components/`.
 20. **`minor`** — Odd pixel sizes (3.dp, 5.dp) will subpixel-jump on different DPIs.
+21. **`major`** — UI-state collections are `ImmutableList` / `ImmutableSet` / `ImmutableMap`, **and** the element type is stable. `ImmutableList<T>` is unstable when `T` is unstable.
+22. **`major`** — Presentation models held in Compose state are `data class` (value `equals`), never a plain `class` without `equals`.
+23. **`major`** — Read frequently-changing `State` (scroll offset, animation/drag progress) at the lowest composable that uses it, and put raw derived reads behind `derivedStateOf` — never let a high-frequency read recompose a parent subtree. (Scroll example: `code/ui-compose.md § Recomposition and stability`.)
+24. **`major`** — An effect's callback must not mutate state that re-feeds the same composable's inputs (recomposition loop) — e.g. a per-item `LaunchedEffect` updating the VM-backed list it iterates.
 
 ---
 
@@ -414,6 +418,25 @@ foo/compose/
 ```
 
 PR #503 / #504 specifically flagged oversized single-file Composables.
+
+---
+
+## Recomposition and stability
+
+Keep composables skippable; read scroll state at the lowest scope. Measure with the Compose compiler report (`stable`/`unstable` per param) + Layout Inspector — don't reason statically.
+
+- **Collections** — `ImmutableList`/`Set`/`Map`, never plain `List`, in any UI-state field. Element type must be stable too: `ImmutableList<T>` is unstable if `T` is. One plain `List` field in a sealed subtype taints the parent → the whole screen `StateFlow`. Convert at the boundary (`.toImmutableList()`, `persistentListOf()`).
+- **Value equals (transitive)** — Compose-state models are `data class`, **and so are their field types**. A `data class` whose field is an interface backed by a plain `class` (no `equals`) still won't compare equal — `data class` on the variant alone does nothing if a leaf field's impl is a plain class.
+- **State at lowest scope** — pass `State` (or `LazyListState`) down and read it in the small consumer, not at a parent that wraps a big subtree. Reading a scroll/animation `State` high up recomposes everything below it on every tick.
+- **`derivedStateOf` for derived reads** — wrap a frequently-changing derived read so it notifies only when the result changes. (Scroll: `firstVisibleItemIndex`/`layoutInfo` change every frame; direct reads recompose every frame.)
+- **No effect that feeds its own input** — an effect whose callback writes back into the state driving it loops. Common case: a per-item `LaunchedEffect` that mutates the VM-backed list it iterates (also fires on prefetch, not real visibility). Drive it from one `snapshotFlow { … }` instead.
+
+```kotlin
+// ✗ val items: List<Item>            ✓ val items: ImmutableList<Item>
+// ✗ class FooUiModel(...)            ✓ data class FooUiModel(...)
+// ✗ Overlay(info = state.value, isScrolling = list.isScrollInProgress)
+// ✓ Overlay(info = state, lazyListState = list)   // read inside the consumer
+```
 
 ---
 

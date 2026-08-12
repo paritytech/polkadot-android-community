@@ -15,6 +15,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.getChainOrNull
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.util.wssNodes
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.common.utils.flatMap
@@ -22,24 +23,33 @@ import io.paritytech.polkadotapp.common.utils.flowOfAll
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.design.theme.AppThemeSelector
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
-import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
-import io.paritytech.polkadotapp.feature_products_api.domain.GetContextualAliasUseCase
+import io.paritytech.polkadotapp.feature_products_api.domain.ProductRequestAccountResolver
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AccountsProtocol
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AllocationOutcome
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocationOutcome
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.OnExistingAllowancePolicy
-import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.requestResourceAllocation
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ProductProofContext
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RegisteredRingVrfKey
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingLocation
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingVrfKeyDisclosure
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingVrfProof
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.VrfSignature
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.VrfTranscriptItem
 import io.paritytech.polkadotapp.feature_products_api.domain.deriveEntropy.DeriveEntropyUseCase
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.PreimageSubmitSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.StatementStoreSubmissionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
+import io.paritytech.polkadotapp.feature_products_api.model.signing.SignedTransaction
+import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningAccount
+import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
 import io.paritytech.polkadotapp.feature_products_impl.domain.ProductAccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.allowance.AllowanceKeyUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.allowance.AllowanceResourceKind
@@ -52,9 +62,14 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermissionDeniedException
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.RemotePermissionRequest
+import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ProductSigningScreenLauncher
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.ExecuteTopUpUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpSource
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpAcknowledgement
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpClaimResult
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpRequestContext
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpRequestContextHolder
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpSource
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
 import io.paritytech.polkadotapp.feature_statement_store_api.data.StatementStoreService
@@ -81,9 +96,7 @@ class HostApiInteractor @Inject constructor(
     private val usernameOfAccountUseCase: UsernameOfAccountUseCase,
     private val chainRegistry: ChainRegistry,
     private val connectionSecrets: ConnectionSecrets,
-    private val getContextualAliasUseCase: GetContextualAliasUseCase,
     private val permissionGuard: ProductPermissionGuard,
-    private val accountRepository: AccountRepository,
     private val ipfsContentLookup: IpfsContentLookup,
     private val statementStoreService: StatementStoreService,
     private val statementStoreMessageProverFactory: StatementStoreMessageProver.Factory,
@@ -93,6 +106,7 @@ class HostApiInteractor @Inject constructor(
     private val externalPaymentService: ExternalPaymentService,
     private val paymentRequestContextHolder: PaymentRequestContextHolder,
     private val topUpRequestContextHolder: TopUpRequestContextHolder,
+    private val executeTopUpUseCase: ExecuteTopUpUseCase,
     private val productsRouter: ProductsRouter,
     private val signedOrigins: SignedOrigins,
     private val accountsProtocol: AccountsProtocol,
@@ -101,6 +115,8 @@ class HostApiInteractor @Inject constructor(
     private val preimageSubmitSponsoring: PreimageSubmitSponsoring,
     private val statementStoreSubmissionSponsoring: StatementStoreSubmissionSponsoring,
     private val appThemeSelector: AppThemeSelector,
+    private val productRequestAccountResolver: ProductRequestAccountResolver,
+    private val productSigningScreenLauncher: ProductSigningScreenLauncher,
 ) {
     fun subscribeTheme(): Flow<ProductTheme> {
         return appThemeSelector.selectedTheme.map(PolkadotAppTheme::toProductTheme)
@@ -149,6 +165,45 @@ class HostApiInteractor @Inject constructor(
         emptyList()
     }
 
+    /**
+     * Opens the signing confirmation screen for [signingRequestBody] and awaits the user's decision.
+     * For legacy requests the supplied account is reverse-resolved first; an unresolved account is
+     * rejected before any UI is shown.
+     */
+    suspend fun openSigningScreen(
+        callingProductId: ProductId,
+        signingRequestBody: SigningRequestBody,
+    ): Result<SignedTransaction> {
+        return signingAccountFor(signingRequestBody).flatMap { signingAccount ->
+            productSigningScreenLauncher.awaitDecision(
+                requesterName = callingProductId.value,
+                requesterIconUrl = "",
+                signingRequestBody = signingRequestBody,
+                signingAccount = signingAccount,
+            )
+        }
+    }
+
+    /**
+     * RFC-0023 `host_account_sign_vrf`. Authorization is a per-call user confirmation, owned by
+     * [AccountsProtocol.signVrf] so the SSO Account-Holder path shares it.
+     */
+    suspend fun signVrf(
+        callingProductId: ProductId,
+        account: ProductAccountId,
+        transcriptLabel: ByteArray,
+        items: List<VrfTranscriptItem>,
+    ): Result<VrfSignature> {
+        return accountsProtocol.signVrf(callingProductId, account, transcriptLabel, items)
+    }
+
+    private suspend fun signingAccountFor(signingRequestBody: SigningRequestBody): Result<SigningAccount> {
+        return when (signingRequestBody) {
+            is SigningRequestBody.ProductAccountSigning -> Result.success(SigningAccount.Product(signingRequestBody.account))
+            is SigningRequestBody.LegacyAccountSigning -> productRequestAccountResolver.resolve(signingRequestBody.account)
+        }
+    }
+
     suspend fun lookupPreimage(hash: ByteArray): Result<ByteArray> {
         return ipfsContentLookup.lookupRawHash(hash)
     }
@@ -164,12 +219,19 @@ class HostApiInteractor @Inject constructor(
             .flatMap { origin -> transactionStorageService.store(data, origin) }
     }
 
-    // TODO remove once all products have migrated to createStatementProofAuthorized.
-    @Deprecated("Use createStatementProofAuthorized — this signs with the wallet account, not the per-product allowance.")
-    suspend fun createStatementProof(statementBody: Statement.Body): Result<StatementStoreMessageProof> = runCatching {
-        val walletAccount = accountRepository.getWalletAccount()
-        val prover = statementStoreMessageProverFactory.createKeyPairProver(walletAccount)
-        prover.generateMessageProof(statementBody)
+    suspend fun createStatementProof(
+        callingProductId: ProductId,
+        productAccountId: ProductAccountId,
+        statementBody: Statement.Body,
+    ): Result<StatementStoreMessageProof> {
+        val permission = ProductPermission.AccountAccess(productAccountId.productId)
+        if (!permissionGuard.requestPermission(callingProductId, permission)) {
+            return Result.failure(ProductPermissionDeniedException(permission))
+        }
+
+        return productAccountDerivationUseCase.deriveKeypair(productAccountId)
+            .map(statementStoreMessageProverFactory::createKeyPairProver)
+            .mapCatching { prover -> prover.generateMessageProof(statementBody) }
     }
 
     suspend fun createStatementProofAuthorized(
@@ -229,6 +291,11 @@ class HostApiInteractor @Inject constructor(
     ): Result<Boolean> = runCatching {
         val permissions = requests.flatMap { it.toDomainPermissions() }
         permissionGuard.requestPermissionsBatched(callingProductId, permissions)
+    }
+
+    suspend fun allowWebRtcAccess(callingProductId: ProductId): Result<Boolean> {
+        val permission = ProductPermission.RemotePermission.WebRtcAccess
+        return Result.success(permissionGuard.consumePermission(callingProductId, permission))
     }
 
     suspend fun submitStatement(callingProductId: ProductId, statement: Statement): Result<Unit> {
@@ -342,33 +409,61 @@ class HostApiInteractor @Inject constructor(
         val contextSource = resolveTopUpSource(callingProductId, source)
             .getOrElse { return Result.failure(it) }
 
-        val context = TopUpRequestContext(
-            productId = callingProductId,
-            amount = amount,
-            source = contextSource,
+        // Claim silently — only surface the prompt to acknowledge a failure or an amount mismatch.
+        return executeTopUpUseCase.claim(contextSource, amount).fold(
+            onSuccess = { result -> handleTopUpSuccess(amount, callingProductId, result) },
+            onFailure = { reason -> handleTopUpFailure(reason, callingProductId) },
         )
+    }
+
+    private suspend fun handleTopUpFailure(reason: Throwable, productId: ProductId): Result<Unit> {
+        val error = reason.message ?: reason::class.simpleName.orEmpty()
+        acknowledge(TopUpAcknowledgement.Failure(productId, error))
+        return Result.failure(reason)
+    }
+
+    private suspend fun handleTopUpSuccess(
+        expected: Balance,
+        productId: ProductId,
+        result: TopUpClaimResult
+    ): Result<Unit> {
+        return when (result) {
+            TopUpClaimResult.Exact -> Result.success(Unit)
+
+            is TopUpClaimResult.Partial -> {
+                acknowledge(
+                    TopUpAcknowledgement.PartialPayment(
+                        productId = productId,
+                        requested = expected,
+                        credited = result.credited,
+                    )
+                )
+                Result.failure(PaymentTopUpPartialPaymentException(result.credited))
+            }
+        }
+    }
+
+    private suspend fun acknowledge(acknowledgement: TopUpAcknowledgement) {
+        val context = TopUpRequestContext(acknowledgement)
         topUpRequestContextHolder.set(context)
         productsRouter.openTopUpRequestPrompt()
-        return when (val outcome = context.awaitOutcome()) {
-            TopUpRequestContext.Outcome.Claimed -> Result.success(Unit)
-            is TopUpRequestContext.Outcome.Failed -> Result.failure(outcome.reason)
-        }
+        context.awaitDismissed()
     }
 
     private suspend fun resolveTopUpSource(
         callingProductId: ProductId,
         source: PaymentTopUpSource,
-    ): Result<TopUpRequestContext.Source> = when (source) {
+    ): Result<TopUpSource> = when (source) {
         is PaymentTopUpSource.ProductAccount -> {
-            val productAccountId = ProductAccountId(productId = callingProductId.value, derivationIndex = source.derivationIndex)
+            val productAccountId = ProductAccountId(productId = callingProductId.value, index = source.index)
             productAccountDerivationUseCase.deriveTransactionSignerSource(productAccountId)
-                .map { TopUpRequestContext.Source.Onboard(it) }
+                .map { TopUpSource.Onboard(it) }
         }
 
         is PaymentTopUpSource.PrivateKey -> signedOrigins.signedTransactionSourceSr25519PrivateKey(source.key)
-            .map { TopUpRequestContext.Source.Onboard(it) }
+            .map { TopUpSource.Onboard(it) }
 
-        is PaymentTopUpSource.Coins -> Result.success(TopUpRequestContext.Source.Coins(source.secretKeys))
+        is PaymentTopUpSource.Coins -> Result.success(TopUpSource.Coins(source.secretKeys))
     }
 
     suspend fun deriveEntropy(callingProductId: ProductId, key: ByteArray): Result<ByteArray> {
@@ -386,13 +481,47 @@ class HostApiInteractor @Inject constructor(
             .map { PaymentBalance(available = it.totalBalance) }
     }
 
-    suspend fun accountGetAlias(callingProductId: ProductId, productAccountId: ProductAccountId): Result<ContextualAlias> {
-        val permission = ProductPermission.AccountAccess(productAccountId.productId)
-        if (!permissionGuard.requestPermission(callingProductId, permission)) {
-            return Result.failure(ProductPermissionDeniedException(permission))
-        }
+    suspend fun registerRingVrfKey(
+        callingProductId: ProductId,
+        index: DerivationIndex32,
+        ring: RingLocation,
+    ): Result<DataByteArray> {
+        return accountsProtocol.registerRingVrfKey(callingProductId, index, ring)
+    }
 
-        return getContextualAliasUseCase.getAlias(productAccountId)
+    suspend fun listRingVrfKeys(
+        callingProductId: ProductId,
+        owner: ProductId,
+        disclosure: RingVrfKeyDisclosure,
+    ): Result<List<RegisteredRingVrfKey>> {
+        return accountsProtocol.listRingVrfKeys(callingProductId, owner, disclosure)
+    }
+
+    suspend fun ringVrfSign(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        message: ByteArray,
+    ): Result<ByteArray> {
+        return accountsProtocol.ringVrfSign(callingProductId, keyHandle, message)
+    }
+
+    suspend fun accountGetAlias(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        context: ProductProofContext,
+        ring: RingLocation,
+    ): Result<ContextualAlias> {
+        return accountsProtocol.getContextualAlias(callingProductId, keyHandle, context, ring)
+    }
+
+    suspend fun accountCreateProof(
+        callingProductId: ProductId,
+        keyHandle: ProductAccountId,
+        context: ProductProofContext,
+        ring: RingLocation,
+        message: ByteArray,
+    ): Result<RingVrfProof> {
+        return accountsProtocol.createProof(callingProductId, keyHandle, context, ring, message)
     }
 }
 
@@ -420,6 +549,13 @@ private val Color.isLight: Boolean
 object InsufficientBalanceException : RuntimeException("insufficient balance")
 
 object PaymentRejectedException : RuntimeException("payment rejected")
+
+/**
+ * Message must be literal "PartialPayment:<credited-planks>" — load-bearing token matched and
+ * parsed by JS-side `handlePaymentTopUp` to rebuild `PaymentTopUpErr.PartialPayment`.
+ */
+class PaymentTopUpPartialPaymentException(val credited: Balance) :
+    RuntimeException("PartialPayment:${credited.value}")
 
 class AllowanceDeniedException(val kind: AllowanceResourceKind) :
     RuntimeException("allowance allocation rejected by user for $kind")

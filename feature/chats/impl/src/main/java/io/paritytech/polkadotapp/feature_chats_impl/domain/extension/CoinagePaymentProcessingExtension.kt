@@ -30,32 +30,32 @@ class CoinagePaymentProcessingExtension @Inject constructor(
 
     override val activationStateExternallyControlled: Boolean = false
 
-    context(ChatExtensionContext)
+    context(chatExtensionContext: ChatExtensionContext)
     override fun startGlobalWork() {
         // Retry unfinished work from previous session
-        scope.launch {
-            getUnprocessedMessages(contentTypes = listOf(CoinagePayment::class))
+        chatExtensionContext.scope.launch {
+            chatExtensionContext.getUnprocessedMessages(contentTypes = listOf(CoinagePayment::class))
                 .forEach { message -> processPayment(message) }
         }
 
         // Subscribe to ALL new payment messages (any room, background)
-        subscribeNewMessages(contentTypes = listOf(CoinagePayment::class))
+        chatExtensionContext.subscribeNewMessages(contentTypes = listOf(CoinagePayment::class))
             .onEach { message -> processPayment(message) }
-            .launchIn(scope)
+            .launchIn(chatExtensionContext.scope)
     }
 
-    context(ChatExtensionContext)
+    context(chatExtensionContext: ChatExtensionContext)
     private fun processPayment(message: ChatMessage) {
         val content = message.paymentContentOrNull() ?: return
 
         Timber.tag("CoinageTransfer").d("Start processing for message ${message.id}")
 
-        scope.launch {
+        chatExtensionContext.scope.launch {
             val pastDetection = coinageTransferDetectionRepository.getCoinageTransferDetection(message.id)
             when {
                 pastDetection?.isTerminal() == true -> {
                     modifyPaymentContent(message, pastDetection)
-                    markMessageProcessed(message)
+                    with(chatExtensionContext) { markMessageProcessed(message) }
                     return@launch
                 }
 
@@ -64,7 +64,7 @@ class CoinagePaymentProcessingExtension @Inject constructor(
         }
     }
 
-    context(ChatExtensionContext)
+    context(chatExtensionContext: ChatExtensionContext)
     private suspend fun proceedDetection(
         chatMessage: ChatMessage,
         content: CoinagePayment,
@@ -78,23 +78,27 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             .collect { detection ->
                 modifyPaymentContent(chatMessage, detection)
 
+                if (detection is CoinageTransferDetection.Transferred) {
+                    logTransferCompleted(chatMessage, detection)
+                }
+
                 if (detection !is CoinageTransferDetection.Detecting) {
                     coinageTransferDetectionRepository.saveCoinageTransferDetection(chatMessage.id, detection)
                 }
 
                 if (detection.isTerminal()) {
-                    markMessageProcessed(chatMessage)
+                    with(chatExtensionContext) { markMessageProcessed(chatMessage) }
                 }
             }
     }
 
-    context(ChatExtensionContext)
+    context(chatExtensionContext: ChatExtensionContext)
     private suspend fun modifyPaymentContent(message: ChatMessage, detection: CoinageTransferDetection) {
         val content = message.paymentContentOrNull() ?: return
 
         val newContent = content.copy(status = detection.toPaymentStatus())
 
-        modifyMessage(message.chatId, message.id, newContent)
+        chatExtensionContext.modifyMessage(message.chatId, message.id, newContent)
     }
 
     private fun CoinageTransferDetection.toPaymentStatus(): Status {
@@ -105,5 +109,18 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             is CoinageTransferDetection.Error.Detection -> Status.FailedDetection
             is CoinageTransferDetection.Error.Transfer -> Status.FailedTransfer
         }
+    }
+
+    private fun logTransferCompleted(
+        message: ChatMessage,
+        detection: CoinageTransferDetection.Transferred
+    ) {
+        val logMessage = if (message.isIncoming) {
+            "Successfully claimed coinage send content for ${message.id}"
+        } else {
+            "Send verified and claimed for message ${message.id}"
+        }
+
+        Timber.tag("CoinageTransfer").d("$logMessage, amountPlanks=${detection.amount.value}")
     }
 }

@@ -58,6 +58,12 @@ interface StatementStoreSlotAllocationRepository {
     )
 
     /**
+     * Drops every row owned by [accountId] on [chainId], across all collections and periods.
+     * Local accounting only — any slot the account still holds on-chain is left to expire.
+     */
+    suspend fun deleteAllForAccount(chainId: ChainId, accountId: AccountId)
+
+    /**
      * All rows on [chainId] whose `latestRenewedPeriod` is strictly less than
      * [currentPeriod], regardless of collection — renewal can migrate a row into any
      * available collection, so staleness is not scoped by collection.

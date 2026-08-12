@@ -17,15 +17,14 @@ import io.paritytech.polkadotapp.feature_balances_impl.data.type.assets.model.As
 @JvmInline
 internal value class AssetsApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 internal fun RuntimeMetadata.assets(palletName: String): AssetsApi {
     return AssetsApi(module(palletName))
 }
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 internal val AssetsApi.asset: QueryableStorageEntry1<UntypedAssetsAssetId, AssetsAssetDetails>
     get() = storage1("Asset")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 internal val AssetsApi.account: QueryableStorageEntry2<UntypedAssetsAssetId, AccountId, AssetsAccount>
     get() = storage2("Account")

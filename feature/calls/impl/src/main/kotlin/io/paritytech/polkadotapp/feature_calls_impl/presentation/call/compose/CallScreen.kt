@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,7 +28,9 @@ import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.KeepScreenOn
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.CallViewModel
+import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.compose.components.CallAudioDeviceSheet
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.compose.components.CallControlsRow
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.compose.components.CallerInfo
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.compose.components.LocalVideoPreview
@@ -33,6 +38,7 @@ import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.compose.co
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.models.CallUiState
 import io.paritytech.polkadotapp.feature_calls_impl.presentation.call.models.CallerDisplayUiModel
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoTrack
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 
@@ -45,6 +51,12 @@ fun CallScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val callerDisplay by viewModel.callerDisplay.collectAsStateWithLifecycle()
+
+    (state as? CallUiState.InProgress)?.let { state ->
+        if (state.cameraOn || state.remoteCameraOn) {
+            KeepScreenOn()
+        }
+    }
 
     LaunchedEffect(state is CallUiState.Terminal) {
         if (state is CallUiState.Terminal) {
@@ -99,15 +111,27 @@ fun CallScreen(
         }
     }
 
+    var audioSheetVisible by remember { mutableStateOf(false) }
+
     CallScreenContent(
         onBack = closeCallScreen,
         state = state,
         callerDisplay = callerDisplay,
         onAccept = onAccept,
-        onToggleSpeaker = viewModel::toggleSpeaker,
+        onAudioClick = { audioSheetVisible = true },
         onToggleCamera = onToggleCamera,
         onToggleMicrophone = viewModel::toggleMicrophone,
         onEndCall = viewModel::endCall,
+    )
+
+    CallAudioDeviceSheet(
+        isVisible = audioSheetVisible,
+        devices = (state as? CallUiState.InProgress)?.audioDevices ?: persistentListOf(),
+        onSelect = { deviceId ->
+            viewModel.selectAudioDevice(deviceId)
+            audioSheetVisible = false
+        },
+        onDismiss = { audioSheetVisible = false },
     )
 }
 
@@ -117,7 +141,7 @@ private fun CallScreenContent(
     state: CallUiState,
     callerDisplay: CallerDisplayUiModel,
     onAccept: () -> Unit,
-    onToggleSpeaker: () -> Unit,
+    onAudioClick: () -> Unit,
     onToggleCamera: () -> Unit,
     onToggleMicrophone: () -> Unit,
     onEndCall: () -> Unit,
@@ -190,7 +214,7 @@ private fun CallScreenContent(
                 CallControlsRow(
                     state = state,
                     onAccept = onAccept,
-                    onToggleSpeaker = onToggleSpeaker,
+                    onAudioClick = onAudioClick,
                     onToggleCamera = onToggleCamera,
                     onToggleMicrophone = onToggleMicrophone,
                     onEndCall = onEndCall,

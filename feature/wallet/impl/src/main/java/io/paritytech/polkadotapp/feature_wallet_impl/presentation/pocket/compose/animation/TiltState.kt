@@ -9,48 +9,49 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
-// Normalized device tilt for the holographic card, ported from the designer's GyroShineTest.
-// x: -1 (left) .. 0 .. 1 (right) — from roll.
-// y:  0 .. 1 (neutral hold) .. 2 — from pitch (1 is the rest pose, so layers sit centered at entry).
+// Normalized device tilt for the holographic card:
+// both axes are -1..1 relative to a neutral hold captured after a short warmup, so "centre" matches
+// however the user naturally holds the phone. (delayedX, delayedY) is a lagged copy of the same tilt,
+// used by trailing layers (the wordmark foil) so they follow the background by a beat.
 @Immutable
-data class TiltState(val x: Float, val y: Float)
+data class TiltState(
+    val x: Float,
+    val y: Float,
+    val delayedX: Float,
+    val delayedY: Float
+)
 
-// Roll/pitch deltas (radians) that map to the full ±1 (x) / 0..2 (y) range; beyond, the tilt clamps. Pitch
-// is a tighter span than roll (designer values); pitch is measured as a delta from PITCH_NEUTRAL_RAD.
-private const val MAX_ROLL_DELTA_RAD = 0.58f
-private const val MAX_PITCH_DELTA_RAD = 0.28f
+// Sensor frames skipped before the neutral reference is captured, so it locks onto the user's hold.
+private const val WARMUP_FRAMES = 15
 
-// Neutral pitch (radians) = the rest pose where tilt.y == 1. The designer's "0" is the phone held at ~45°
-// from flat (a natural mid hold), not lying flat. Sign is device-frame dependent — flip if the vertical
-// response is inverted on device.
-private const val PITCH_NEUTRAL_RAD = -0.785f
+// Gravity delta (in g) that maps to the full ±1 tilt range; beyond it the tilt clamps.
+private const val SENSITIVITY = 0.30f
 
-// Per-event lerp toward the latest sensor reading; lower = heavier/smoother.
-private const val SMOOTHING = 0.28f
+// Per-event lerp toward the latest reading; larger = snappier.
+private const val SMOOTHING = 0.55f
 
-// Accelerometer fallback divisor (m/s² -> normalized) when no rotation-vector sensor exists.
-private const val ACCEL_NORMALIZER = 8f
+// Lag of the delayed tilt; smaller = the wordmark trails further behind.
+private const val DELAY_SMOOTHING = 0.10f
 
 // Static neutral tilt, used when no provider is present (e.g. @Preview) so cards still render.
-private val ZeroTilt: State<TiltState> = mutableStateOf(TiltState(0f, 1f))
+private val ZeroTilt: State<TiltState> = mutableStateOf(TiltState(0f, 0f, 0f, 0f))
 
 // Screen-scoped device tilt, shared by the list + details member cards through composition. PocketScreen
 // provides the single live source so both cards read the same tilt and stay continuous across the
-// shared-element transition. Read it inside graphicsLayer { } to keep updates off the recomposition path.
-val LocalCardTilt = staticCompositionLocalOf { ZeroTilt }
+// shared-element transition. Read it inside draw lambdas to keep updates off the recomposition path.
+val LocalCardTilt = compositionLocalOf { ZeroTilt }
 
-// Creates the live tilt source, owned by the calling composition. Reads absolute device orientation from the
-// fused game-rotation-vector sensor (gyro + accelerometer), normalizes roll/pitch into the TiltState range
-// and smooths it. Falls back to ROTATION_VECTOR, then raw ACCELEROMETER.
+// Creates the live tilt source, owned by the calling composition. Reads the device gravity vector,
+// captures a neutral reference after a short warmup and smooths the normalized delta.
 @Composable
 fun rememberCardTilt(): State<TiltState> {
     val context = LocalContext.current.applicationContext
@@ -84,27 +85,38 @@ fun rememberCardTilt(): State<TiltState> {
 // One owner per composition (no ref-count): the sensor is registered while the screen is started and
 // unregistered when it stops or the holder leaves composition.
 private class TiltSource {
-    val tilt = mutableStateOf(TiltState(0f, 1f))
+    val tilt = mutableStateOf(TiltState(0f, 0f, 0f, 0f))
 
     // Smoothed on the sensor thread; tilt state is a snapshot write so reads stay consistent.
-    private var smoothedX = 0f
-    private var smoothedY = 1f
+    private var tiltX = 0f
+    private var tiltY = 0f
+    private var delayedX = 0f
+    private var delayedY = 0f
+
+    private var referenceX = 0f
+    private var referenceY = 0f
+    private var hasReference = false
+    private var warmupFrames = 0
 
     private var sensorManager: SensorManager? = null
     private var listener: SensorEventListener? = null
-
-    private val rotationMatrix = FloatArray(9)
-    private val orientationAngles = FloatArray(3)
 
     fun start(context: Context) {
         if (listener != null) return
 
         val manager = context.getSystemService<SensorManager>() ?: return
-        val sensor = manager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
-            ?: manager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        val sensor = manager.getDefaultSensor(Sensor.TYPE_GRAVITY)
             ?: manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             ?: return
         sensorManager = manager
+
+        hasReference = false
+        warmupFrames = 0
+        tiltX = 0f
+        tiltY = 0f
+        delayedX = 0f
+        delayedY = 0f
+        tilt.value = TiltState(0f, 0f, 0f, 0f)
 
         listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) = onSensorEvent(event)
@@ -120,35 +132,35 @@ private class TiltSource {
     }
 
     private fun onSensorEvent(event: SensorEvent) {
-        var targetX = 0f
-        var normalizedY = 0f
+        // Android's gravity sensor reports m/s² pointing away from the ground; Core Motion reports g
+        // pointing toward it. Negate + normalize.
+        val gx = -event.values[0] / SensorManager.GRAVITY_EARTH
+        val gy = -event.values[1] / SensorManager.GRAVITY_EARTH
 
-        when (event.sensor.type) {
-            Sensor.TYPE_GAME_ROTATION_VECTOR, Sensor.TYPE_ROTATION_VECTOR -> {
-                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                SensorManager.getOrientation(rotationMatrix, orientationAngles)
-                val pitch = orientationAngles[1]
-                val roll = orientationAngles[2]
-                targetX = (roll / MAX_ROLL_DELTA_RAD).coerceIn(-1f, 1f)
-                normalizedY = (-(pitch - PITCH_NEUTRAL_RAD) / MAX_PITCH_DELTA_RAD).coerceIn(-1f, 1f)
+        if (!hasReference) {
+            warmupFrames++
+            if (warmupFrames >= WARMUP_FRAMES) {
+                referenceX = gx
+                referenceY = gy
+                hasReference = true
             }
-
-            Sensor.TYPE_ACCELEROMETER -> {
-                val ax = event.values[0]
-                val ay = event.values[1]
-                targetX = (-ax / ACCEL_NORMALIZER).coerceIn(-1f, 1f)
-                normalizedY = (ay / ACCEL_NORMALIZER).coerceIn(-1f, 1f)
-            }
+            return
         }
 
-        val targetY = 1f + normalizedY
+        val targetX = ((gx - referenceX) / SENSITIVITY).coerceIn(-1f, 1f)
+        val targetY = ((referenceY - gy) / SENSITIVITY).coerceIn(-1f, 1f)
 
-        smoothedX += (targetX - smoothedX) * SMOOTHING
-        smoothedY += (targetY - smoothedY) * SMOOTHING
+        tiltX += (targetX - tiltX) * SMOOTHING
+        tiltY += (targetY - tiltY) * SMOOTHING
+
+        delayedX += (tiltX - delayedX) * DELAY_SMOOTHING
+        delayedY += (tiltY - delayedY) * DELAY_SMOOTHING
 
         tilt.value = TiltState(
-            x = smoothedX.coerceIn(-1f, 1f),
-            y = smoothedY.coerceIn(0f, 2f)
+            x = tiltX,
+            y = tiltY,
+            delayedX = delayedX,
+            delayedY = delayedY
         )
     }
 }

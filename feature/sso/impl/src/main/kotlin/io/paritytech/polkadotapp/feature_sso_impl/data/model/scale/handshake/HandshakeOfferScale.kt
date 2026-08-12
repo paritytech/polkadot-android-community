@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_sso_impl.data.model.scale.handshake
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.EnumIndex
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
+import io.paritytech.polkadotapp.common.domain.model.scale.X25519PublicKeyScale
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -21,8 +22,7 @@ class HandshakeProposalV2Scale(
 class DeviceScale(
     @FixedLength(32)
     val statementAccountId: ByteArray,
-    @FixedLength(65)
-    val encryptionPublicKey: ByteArray,
+    val encryptionPublicKey: X25519PublicKeyScale,
 )
 
 @Serializable

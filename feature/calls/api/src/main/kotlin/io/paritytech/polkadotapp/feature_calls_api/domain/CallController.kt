@@ -11,5 +11,5 @@ interface CallController {
     fun endCall()
     fun setCameraEnabled(enabled: Boolean)
     fun setMicrophoneEnabled(enabled: Boolean)
-    fun setSpeakerphoneOn(enabled: Boolean)
+    fun selectAudioDevice(deviceId: Int)
 }

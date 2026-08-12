@@ -5,21 +5,24 @@ import io.novasama.substrate_sdk_android.wsrpc.subscription.response.Subscriptio
 sealed class ExtrinsicStatus(val terminal: Boolean) {
     sealed interface Failure
 
+    sealed interface Submitted {
+        val extrinsicHash: String
+    }
+
     data class FailedToSubmit(val exception: Throwable) : ExtrinsicStatus(terminal = true), Failure
 
-    sealed class Submitted(val extrinsicHash: String, terminal: Boolean) : ExtrinsicStatus(terminal)
+    data class Ready(override val extrinsicHash: String) : ExtrinsicStatus(terminal = false), Submitted
 
-    class Ready(extrinsicHash: String) : Submitted(extrinsicHash, terminal = false)
+    data class Broadcast(override val extrinsicHash: String) : ExtrinsicStatus(terminal = false), Submitted
 
-    class Broadcast(extrinsicHash: String) : Submitted(extrinsicHash, terminal = false)
+    data class InBlock(val blockHash: String, override val extrinsicHash: String) : ExtrinsicStatus(terminal = false), Submitted
 
-    class InBlock(val blockHash: String, extrinsicHash: String) : Submitted(extrinsicHash, terminal = false)
+    data class Finalized(val blockHash: String, override val extrinsicHash: String) : ExtrinsicStatus(terminal = true), Submitted
 
-    class Finalized(val blockHash: String, extrinsicHash: String) : Submitted(extrinsicHash, terminal = true)
+    data class Invalid(override val extrinsicHash: String) : ExtrinsicStatus(terminal = true), Submitted, Failure
 
-    class Invalid(extrinsicHash: String) : Submitted(extrinsicHash, terminal = true), Failure
-
-    class Other(extrinsicHash: String) : Submitted(extrinsicHash, terminal = false)
+    // rawStatus preserves the unmapped node status (dropped/usurped/retracted/future/…) for diagnostics.
+    data class Other(val rawStatus: String, override val extrinsicHash: String) : ExtrinsicStatus(terminal = false), Submitted
 }
 
 private const val STATUS_READY = "ready"
@@ -39,9 +42,9 @@ fun SubscriptionChange.asExtrinsicStatus(extrinsicHash: String): ExtrinsicStatus
                 STATUS_IN_BLOCK in result -> ExtrinsicStatus.InBlock(extractBlockHash(result, STATUS_IN_BLOCK), extrinsicHash)
                 STATUS_FINALIZED in result -> ExtrinsicStatus.Finalized(extractBlockHash(result, STATUS_FINALIZED), extrinsicHash)
                 STATUS_FINALITY_TIMEOUT in result -> ExtrinsicStatus.Finalized(extractBlockHash(result, STATUS_FINALITY_TIMEOUT), extrinsicHash)
-                else -> ExtrinsicStatus.Other(extrinsicHash)
+                else -> ExtrinsicStatus.Other(rawStatus = result.toString(), extrinsicHash = extrinsicHash)
             }
-        else -> ExtrinsicStatus.Other(extrinsicHash)
+        else -> ExtrinsicStatus.Other(rawStatus = result.toString(), extrinsicHash = extrinsicHash)
     }
 }
 

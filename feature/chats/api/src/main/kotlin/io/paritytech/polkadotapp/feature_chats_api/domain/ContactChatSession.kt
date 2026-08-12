@@ -10,5 +10,4 @@ interface ContactChatSession {
     val outgoingPushId: ChatPushId
 
     suspend fun sendToken(token: String)
-    suspend fun sendLeftChatMessageAndAwait(): Result<Unit>
 }

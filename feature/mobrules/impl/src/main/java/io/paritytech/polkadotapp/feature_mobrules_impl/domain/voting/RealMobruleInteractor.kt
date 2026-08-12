@@ -57,7 +57,7 @@ interface MobruleInteractor {
 
     fun observeCanUseMobruleAlias(): Flow<Boolean>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun getActiveDimChatId(): ChatId?
 }
 
@@ -84,7 +84,7 @@ class RealMobruleInteractor @Inject constructor(
     override fun observeCanUseMobruleAlias(): Flow<Boolean> =
         personStatusUseCase.canUseAliasFlow(BandersnatchContext.MOB_RULE)
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun getActiveDimChatId(): ChatId? {
         return dimCommitmentHandlers.firstNotNullOfOrNull { handler ->
             val state = handler.observeState().first()

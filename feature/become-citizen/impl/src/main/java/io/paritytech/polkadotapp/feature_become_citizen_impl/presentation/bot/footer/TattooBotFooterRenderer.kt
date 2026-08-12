@@ -21,6 +21,7 @@ import io.paritytech.polkadotapp.feature_become_citizen_impl.presentation.bot.mo
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBotData
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatFooterRenderer
 import io.paritytech.polkadotapp.feature_chats_api.presentation.faq.compose.FaqQuestions
+import kotlinx.collections.immutable.toImmutableList
 import io.paritytech.polkadotapp.common.R as RCommon
 
 class TattooBotFooterRenderer : CustomChatFooterRenderer {
@@ -47,7 +48,7 @@ class TattooBotFooterRenderer : CustomChatFooterRenderer {
                         .fillMaxWidth()
                         .padding(horizontal = PolkadotTheme.spacings.mediumIncreased),
                     botId = ChatBotData.tattoo().id,
-                    allQuestions = TattooBotQuestion.entries
+                    allQuestions = TattooBotQuestion.entries.toImmutableList()
                 )
             }
 

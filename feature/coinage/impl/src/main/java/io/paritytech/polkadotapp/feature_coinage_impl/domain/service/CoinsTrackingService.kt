@@ -23,7 +23,7 @@ class CoinsTrackingService @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val coinRepository: CoinRepository
 ) {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun start() {
         val asset = chainAssetProvider.asset()
 
@@ -37,7 +37,7 @@ class CoinsTrackingService @Inject constructor(
                         coinRepository.updateCoins(coins.toAgeUpdates(it))
                     }
             }
-            .launchIn(this@ComputationalScope)
+            .launchIn(scope)
     }
 
     private fun List<Coin>.toAgeUpdates(onChainData: Map<AccountId, OnChainCoinInfo?>) = mapNotNull { coin ->

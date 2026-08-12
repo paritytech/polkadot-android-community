@@ -29,6 +29,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.DeleteRoomUseC
 import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.GetContactsUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
 import io.paritytech.polkadotapp.feature_chats_api.presentation.TextMessageDrawer
+import io.paritytech.polkadotapp.feature_chats_api.presentation.transfer.MultimediaMessageController
 import io.paritytech.polkadotapp.feature_chats_impl.data.attachment.GeneralAttachmentMetaBuilder
 import io.paritytech.polkadotapp.feature_chats_impl.data.attachment.ImageAttachmentMetaBuilder
 import io.paritytech.polkadotapp.feature_chats_impl.data.attachment.TypedAttachmentMetaBuilder
@@ -37,26 +38,33 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.ChatRequestProver
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.RealChatRequestCrypto
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.RealChatRequestProver
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransferResumeInitializer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.CompressImages
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadPreProcessor
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatMessageNotificationSentRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatPushNotificationHandler
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.RealChatMessageNotificationSentRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.RealIncomingChatPushDecoder
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageProcessingRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRoomRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSearchRecentsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.CoinageTransferDetectionRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.CompactionExpansionRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.MessageRevisionRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ProcessedChatMessageRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatMessageProcessingRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatRoomRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatSearchRecentsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealCoinageTransferDetectionRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealCompactionExpansionRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealMessageRevisionRepository
@@ -112,6 +120,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.RealC
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.initialization.ContactSessionChainBridge
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.initialization.ContactSessionLifecycleBinder
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.initialization.RealContactChatSessionManagerInitializer
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.transfer.MultimediaMessageStateHolder
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.ContactDeviceProvider
 import io.paritytech.polkadotapp.tools_push_notifications_api.PushNotificationHandler
 import javax.inject.Singleton
@@ -154,6 +163,9 @@ internal interface ChatsFeatureApiModule {
     fun bindChatMessageRepository(impl: RealChatMessageRepository): ChatMessageRepository
 
     @Binds
+    fun bindCompactionExpansionRepository(impl: RealCompactionExpansionRepository): CompactionExpansionRepository
+
+    @Binds
     fun bindChatSessionManager(impl: RealContactChatSessionManager): ContactChatSessionManager
 
     @Binds
@@ -166,6 +178,12 @@ internal interface ChatsFeatureApiModule {
 
     @Binds
     fun bindChatActiveTracker(impl: RealChatActiveTracker): ChatActiveTracker
+
+    @Binds
+    fun bindChatDraftRepository(impl: RealChatDraftRepository): ChatDraftRepository
+
+    @Binds
+    fun bindChatSearchRecentsRepository(impl: RealChatSearchRecentsRepository): ChatSearchRecentsRepository
 
     @Binds
     fun bindChatActiveTrackerInternal(impl: RealChatActiveTracker): ChatActiveTrackerInternal
@@ -313,5 +331,13 @@ internal interface ChatsFeatureApiModule {
     fun bindContactChatSessionManagerInitializer(impl: RealContactChatSessionManagerInitializer): AppInitializer
 
     @Binds
+    @IntoSet
+    fun bindHopTransferResumeInitializer(impl: HopTransferResumeInitializer): AppInitializer
+
+    @Binds
     fun bindTextMessageDrawer(impl: RealTextMessageDrawer): TextMessageDrawer
+
+    @Binds
+    @Singleton
+    fun bindMultimediaMessageController(impl: MultimediaMessageStateHolder): MultimediaMessageController
 }

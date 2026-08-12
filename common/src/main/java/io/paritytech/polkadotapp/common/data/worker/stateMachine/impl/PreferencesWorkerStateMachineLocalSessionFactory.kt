@@ -78,7 +78,7 @@ private class PreferencesWorkerStateMachineLocalSession<S : WorkerStateMachineSt
         }
     }
 
-    context(Editor)
+    context(editor: Editor)
     private fun saveStateInTransaction(idKey: String, paramKey: String, state: S) {
         saveStateId(idKey, state.id)
 
@@ -96,13 +96,13 @@ private class PreferencesWorkerStateMachineLocalSession<S : WorkerStateMachineSt
         "No state key found: $idKey"
     }
 
-    context(Editor)
-    private fun saveStateId(idKey: String, stateId: String) = putString(idKey, stateId)
+    context(editor: Editor)
+    private fun saveStateId(idKey: String, stateId: String) = editor.putString(idKey, stateId)
 
-    context(Editor)
+    context(editor: Editor)
     private fun saveStateParams(idKey: String, params: Any?) {
         val serializedParams = gson.toJson(params)
-        putString(idKey, serializedParams)
+        editor.putString(idKey, serializedParams)
     }
 
     private inner class StateStore(

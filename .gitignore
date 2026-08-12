@@ -68,3 +68,5 @@ token*
 
 # Sentry Config File
 sentry.properties
+
+.serena/

@@ -1,17 +1,17 @@
 package io.paritytech.polkadotapp.tools_media_connection_impl.media
 
 import android.content.Context
+import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.VideoEncodingProfile
+import io.paritytech.polkadotapp.tools_media_connection_impl.WebRtcCore
 import org.webrtc.AudioTrack
-import org.webrtc.EglBase
-import org.webrtc.PeerConnectionFactory
 import org.webrtc.VideoTrack
 
-class SharedMediaTrackProvider(
+internal class SharedMediaTrackProvider(
     context: Context,
-    eglBase: EglBase,
-    peerConnectionFactory: PeerConnectionFactory
+    webRtcCore: WebRtcCore,
+    videoProfile: VideoEncodingProfile?
 ) : MediaTrackProvider {
-    private val default = DefaultMediaTrackProvider(context, eglBase, peerConnectionFactory)
+    private val default = DefaultMediaTrackProvider(context, webRtcCore, videoProfile)
 
     override suspend fun getOrCreateVideoTrack(): VideoTrack = default.getOrCreateVideoTrack()
 

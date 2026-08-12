@@ -10,7 +10,7 @@ class DispatchErrorWithPostInfo(
     val error: DispatchError
 ) {
     companion object {
-        context(WithRuntime)
+        context(withRuntime: WithRuntime)
         fun bind(decodedInstance: Any?): DispatchErrorWithPostInfo {
             val asStruct = decodedInstance.castToStruct()
 

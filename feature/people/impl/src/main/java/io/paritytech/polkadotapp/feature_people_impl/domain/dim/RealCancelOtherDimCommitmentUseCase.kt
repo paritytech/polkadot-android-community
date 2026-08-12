@@ -9,8 +9,7 @@ import javax.inject.Inject
 class RealCancelOtherDimCommitmentUseCase @Inject constructor(
     private val handlers: Set<@JvmSuppressWildcards DimCommitmentHandler>
 ) : CancelOtherDimCommitmentUseCase {
-    context(ComputationalScope)
-
+    context(scope: ComputationalScope)
     override suspend fun invoke(currentDim: DimId): Result<Unit> {
         val otherCanceller = handlers.find { it.dimId != currentDim }
             ?: return Result.failure(IllegalStateException("No other DIMs (non $currentDim) found for cancellation."))

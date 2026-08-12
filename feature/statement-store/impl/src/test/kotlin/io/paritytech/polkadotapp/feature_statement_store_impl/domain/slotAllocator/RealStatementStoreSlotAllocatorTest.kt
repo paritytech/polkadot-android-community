@@ -3,11 +3,13 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAllocator
 
 import android.content.Context
+import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.OnExistingAllocationStrategy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.SlotPriority
@@ -65,6 +67,7 @@ class RealStatementStoreSlotAllocatorTest {
         mock(StatementStoreSlotAllocationRepository::class.java)
     private val renewer: StatementStoreSlotRenewer = mock(StatementStoreSlotRenewer::class.java)
     private val lock = StatementStoreSlotRenewalLock()
+    private val knownChains = KnownChains(people = chainId, assetHub = "assetHub", bulletIn = "bulletIn", hydration = null)
 
     private val allocator = RealStatementStoreSlotAllocator(
         appContext = appContext,
@@ -73,6 +76,7 @@ class RealStatementStoreSlotAllocatorTest {
         statementStoreSlotRepository = slotRepository,
         slotLoader = slotLoader,
         contextResolver = contextResolver,
+        knownChains = knownChains,
         allocationRepository = allocationRepository,
         renewer = renewer,
         renewalLock = lock,
@@ -92,7 +96,7 @@ class RealStatementStoreSlotAllocatorTest {
         withNoStaleAllocations()
         withSlotTakenBy(target)
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
+        val result = allocate(OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
 
         assertSuccess(result)
         verifyNoAllocationInsertions()
@@ -106,7 +110,7 @@ class RealStatementStoreSlotAllocatorTest {
         withStaleAllocationsFor(target)
         withSlotTakenBy(target)
 
-        allocator.allocate(target, OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
+        allocate(OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
 
         assertRenewerInvokedWith(priorityAccount = target)
     }
@@ -116,7 +120,7 @@ class RealStatementStoreSlotAllocatorTest {
         withNoStaleAllocations()
         withSlotTakenBy(target)
 
-        allocator.allocate(target, OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
+        allocate(OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
 
         assertRenewerNotInvoked()
     }
@@ -128,7 +132,7 @@ class RealStatementStoreSlotAllocatorTest {
         withSlotTakenBy(accountHigh)
         withTrackedPriorities(accountHigh to SlotPriority.High)
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
 
         assertNoAllocationAvailable(result)
         verifyNoAllocationInsertions()
@@ -144,7 +148,7 @@ class RealStatementStoreSlotAllocatorTest {
         withTrackedPriorities(accountNormal to SlotPriority.Normal)
         withSuccessfulSubmission()
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
 
         assertSuccess(result)
         verifySlotDeletedFor(accountNormal, seq = 0u)
@@ -159,7 +163,7 @@ class RealStatementStoreSlotAllocatorTest {
         withTrackedPriorities(accountHigh to SlotPriority.High)
         withSuccessfulSubmission()
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
 
         assertSuccess(result)
         verifySlotDeletedFor(accountHigh, seq = 0u)
@@ -177,7 +181,7 @@ class RealStatementStoreSlotAllocatorTest {
         )
         withSuccessfulSubmission()
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
 
         assertSuccess(result)
         verifySlotDeletedFor(accountNormal, seq = 1u)
@@ -192,7 +196,7 @@ class RealStatementStoreSlotAllocatorTest {
         // No tracked priority for accountUntracked → bulk map returns empty → allocator treats as Normal.
         withSuccessfulSubmission()
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
 
         assertSuccess(result)
         verifySlotDeletedFor(accountUntracked, seq = 0u)
@@ -204,11 +208,20 @@ class RealStatementStoreSlotAllocatorTest {
         withFreeSlot()
         withSuccessfulSubmission()
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
 
         assertSuccess(result)
         verifyNoEvictionPerformed()
         verifyAllocationInsertedFor(target, seq = 0u, priority = SlotPriority.High)
+    }
+
+    @Test
+    fun `deallocateAllSlots drops every local row of the target without touching the chain`() = runBlocking<Unit> {
+        val result = allocator.deallocateAllSlots(target)
+
+        assertSuccess(result)
+        verify(allocationRepository, times(1)).deleteAllForAccount(eq(chainId), eq(target))
+        verifyNoExtrinsicSubmitted()
     }
 
     // -- multi-collection tests --
@@ -223,7 +236,7 @@ class RealStatementStoreSlotAllocatorTest {
         )
         withSuccessfulSubmission()
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
 
         assertSuccess(result)
         verifyNoEvictionPerformed()
@@ -239,7 +252,7 @@ class RealStatementStoreSlotAllocatorTest {
             StatementSlotsForCollection(liteCollection, takenSlots(target)),
         )
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
+        val result = allocate(OnExistingAllocationStrategy.IGNORE, SlotPriority.Normal)
 
         assertSuccess(result)
         verifyNoAllocationInsertions()
@@ -261,7 +274,7 @@ class RealStatementStoreSlotAllocatorTest {
         )
         withSuccessfulSubmission()
 
-        val result = allocator.allocate(target, OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
 
         assertSuccess(result)
         verifySlotDeletedFor(accountNormal, seq = 0u, inCollection = liteCollection)
@@ -417,4 +430,8 @@ class RealStatementStoreSlotAllocatorTest {
         blockHash = "0xblk",
         outcome = ExtrinsicDispatch.Ok(emittedEvents = emptyList()),
     )
+
+    private suspend fun allocate(strategy: OnExistingAllocationStrategy, priority: SlotPriority): Result<Unit> {
+        return with(StalenessReportCollector.NoOp) { allocator.allocate(target, strategy, priority) }
+    }
 }

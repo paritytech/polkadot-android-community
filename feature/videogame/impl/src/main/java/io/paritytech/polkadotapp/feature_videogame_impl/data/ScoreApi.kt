@@ -12,18 +12,17 @@ import io.paritytech.polkadotapp.feature_vouchers_api.data.model.PrivacyVoucherD
 @JvmInline
 value class ScoreApi(override val module: Module) : QueryableModule
 
-context(WithRuntime)
 val RuntimeMetadata.score: ScoreApi
     get() = ScoreApi(score())
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ScoreApi.participants: QueryableStorageEntry1<OnChainAccountOrPerson, OnChainParticipant>
     get() = storage1("Participants")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ScoreApi.personhoodThreshold: QueryableStorageEntry0<Int>
     get() = storage0("PersonhoodThreshold")
 
-context(WithRuntime)
+context(withRuntime: WithRuntime)
 val ScoreApi.voucherType: PrivacyVoucherDenominationType
     get() = constant("VoucherType")

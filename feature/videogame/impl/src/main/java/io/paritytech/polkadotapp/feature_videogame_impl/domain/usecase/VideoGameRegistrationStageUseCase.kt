@@ -45,10 +45,10 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 interface VideoGameRegistrationStageUseCase {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun subscribe(): Flow<VideoGameRegistrationStage>
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun get(): VideoGameRegistrationStage
 }
 
@@ -67,7 +67,7 @@ class RealVideoGameRegistrationStageUseCase @Inject constructor(
         private const val GAME_REGISTRATION_STAGE_CACHE_KEY = "11a97355-42ee-49ce-b859-67f70695dd82"
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override fun subscribe(): Flow<VideoGameRegistrationStage> = computationalCache
         .useSharedFlow(GAME_REGISTRATION_STAGE_CACHE_KEY) {
             withFlowScope {
@@ -92,7 +92,7 @@ class RealVideoGameRegistrationStageUseCase @Inject constructor(
             }
         }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     override suspend fun get(): VideoGameRegistrationStage {
         return subscribe().first()
     }
@@ -114,14 +114,14 @@ class RealVideoGameRegistrationStageUseCase @Inject constructor(
         else -> scoreParticipant.recognition is OnChainVideoGameRecognition.ExternallyRecognized
     }
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     private fun createFlowForGameRecognized(
         chain: Chain,
         asset: Chain.Asset,
         accountId: AccountId,
         account: MetaAccount
     ): Flow<VideoGameRegistrationStage> {
-        val getDeposit = async(start = CoroutineStart.LAZY) {
+        val getDeposit = scope.async(start = CoroutineStart.LAZY) {
             asset.withAmount(videoGameRepository.getRegistrationRequiredAmount(chain, asset))
         }
 

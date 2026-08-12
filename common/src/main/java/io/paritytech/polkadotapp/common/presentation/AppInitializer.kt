@@ -13,6 +13,6 @@ import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
  * the failure and continues with the rest.
  */
 interface AppInitializer {
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun initialize(): Result<Unit>
 }

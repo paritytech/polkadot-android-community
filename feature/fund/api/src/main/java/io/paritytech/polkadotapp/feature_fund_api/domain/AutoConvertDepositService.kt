@@ -24,12 +24,12 @@ interface AutoConvertDepositService {
     /**
      * Should be called once per session
      */
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun startObserveAndConvert()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     fun initiateDepositTermsWarmUp()
 
-    context(ComputationalScope)
+    context(scope: ComputationalScope)
     suspend fun depositTerms(chainAsset: Chain.Asset): Result<DepositTerms>
 }

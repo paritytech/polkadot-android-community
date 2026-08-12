@@ -17,7 +17,7 @@ class CallDryRunEffects(
     override val forwardedXcms: ForwardedXcms
 ) : DryRunEffects {
     companion object {
-        context(WithRuntime)
+        context(withRuntime: WithRuntime)
         fun bind(decodedInstance: Any?): CallDryRunEffects {
             val asStruct = decodedInstance.castToStruct()
             return CallDryRunEffects(

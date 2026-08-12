@@ -12,7 +12,7 @@ interface WorkerStateMachineState<SELF : WorkerStateMachineState<SELF, TRANSITIO
         val params: P
     }
 
-    context(TRANSITION)
+    context(transition: TRANSITION)
     suspend fun performTransition(): TransitionResult<SELF>
 
     sealed class TransitionResult<out S : WorkerStateMachineState<out S, *>> {
@@ -42,17 +42,17 @@ interface WorkerStateMachineState<SELF : WorkerStateMachineState<SELF, TRANSITIO
 }
 
 abstract class TerminalState<S : WorkerStateMachineState<S, T>, T> : WorkerStateMachineState<S, T> {
-    context(T)
+    context(transition: T)
     final override suspend fun performTransition(): TransitionResult<S> {
         return TransitionResult.StateTerminal
     }
 }
 
 abstract class NonTerminalState<S : WorkerStateMachineState<S, T>, T> : WorkerStateMachineState<S, T> {
-    context(T)
+    context(transition: T)
     protected abstract suspend fun performNonTerminalTransition(): Result<S>
 
-    context(T)
+    context(transition: T)
     final override suspend fun performTransition(): TransitionResult<S> {
         return TransitionResult.TransitionPerformed(performNonTerminalTransition())
     }
