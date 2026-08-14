@@ -69,4 +69,9 @@ token*
 # Sentry Config File
 sentry.properties
 
+# Sync tooling, not part of this repo. The upstream repo is still on
+# io.pcf.polkadotapp; this script applies the rename during each sync into this
+# repo, so it lives in the sync working copy and must never be committed here.
+developer-tools/rename-pcf-to-paritytech.sh
+
 .serena/
