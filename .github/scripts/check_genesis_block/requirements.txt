@@ -4,7 +4,7 @@ certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
 cytoolz==1.1.0
-ecdsa==0.19.1
+ecdsa==0.19.2
 eth-hash==0.7.1
 eth-keys==0.7.0
 eth-typing==5.2.1
