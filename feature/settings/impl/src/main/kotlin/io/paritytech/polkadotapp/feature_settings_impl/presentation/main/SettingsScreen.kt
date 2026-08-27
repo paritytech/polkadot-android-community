@@ -115,11 +115,13 @@ private fun SettingsScreenInternal(
                         onClick = onBackupClick,
                         isBackupMissing = state.isBackupMissing
                     )
-                    SettingsMenuItem(
-                        icon = NovaIcons.GridOutlined,
-                        title = stringResource(RCommon.string.settings_products),
-                        onClick = onProductsClick
-                    )
+                    if (state.productSettingsEnabled) {
+                        SettingsMenuItem(
+                            icon = NovaIcons.GridOutlined,
+                            title = stringResource(RCommon.string.settings_products),
+                            onClick = onProductsClick
+                        )
+                    }
                     SettingsMenuItem(
                         icon = NovaIcons.BlockOutlined,
                         title = stringResource(RCommon.string.settings_blocked_contacts),
@@ -194,6 +196,7 @@ private fun SettingsScreenPreview() {
                 isDebug = true,
                 debugMenuEnabled = true,
                 linkedDevicesEnabled = true,
+                productSettingsEnabled = true,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
                 isBackupMissing = false,
                 hasBlockedUsers = false

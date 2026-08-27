@@ -16,7 +16,8 @@ object FeatureFlags {
 
             FeatureOption.BROWSE_TAB,
             FeatureOption.CHAT_EXTENSIONS,
-            FeatureOption.LINKED_DEVICES -> fullFeatured
+            FeatureOption.LINKED_DEVICES,
+            FeatureOption.PRODUCT_SETTINGS -> fullFeatured
 
             FeatureOption.ALLOW_SHORT_EVIDENCE_VIDEO -> BuildConfig.ALLOW_SHORT_EVIDENCE_VIDEO
             FeatureOption.SAMPLE_BOT -> BuildConfig.SAMPLE_BOT
@@ -40,7 +41,8 @@ enum class FeatureOption {
     DEBUG_MENU,
     BROWSE_TAB,
     CHAT_EXTENSIONS,
-    LINKED_DEVICES
+    LINKED_DEVICES,
+    PRODUCT_SETTINGS
 }
 
 val FeatureOption.isEnabled

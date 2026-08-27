@@ -30,6 +30,7 @@ class SettingsViewModel @Inject constructor(
             isDebug = BuildConfig.DEBUG,
             debugMenuEnabled = FeatureOption.DEBUG_MENU.isEnabled,
             linkedDevicesEnabled = FeatureOption.LINKED_DEVICES.isEnabled,
+            productSettingsEnabled = FeatureOption.PRODUCT_SETTINGS.isEnabled,
             selectedTheme = selectedTheme,
             isBackupMissing = !backupExists,
             hasBlockedUsers = hasBlockedUsers
@@ -42,6 +43,7 @@ class SettingsViewModel @Inject constructor(
                 isDebug = BuildConfig.DEBUG,
                 debugMenuEnabled = FeatureOption.DEBUG_MENU.isEnabled,
                 linkedDevicesEnabled = FeatureOption.LINKED_DEVICES.isEnabled,
+                productSettingsEnabled = FeatureOption.PRODUCT_SETTINGS.isEnabled,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
                 isBackupMissing = false,
                 hasBlockedUsers = false
