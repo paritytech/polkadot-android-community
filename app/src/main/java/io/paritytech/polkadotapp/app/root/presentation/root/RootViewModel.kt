@@ -2,16 +2,17 @@ package io.paritytech.polkadotapp.app.root.presentation.root
 
 import android.net.Uri
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.app.root.domain.RootInteractor
 import io.paritytech.polkadotapp.app.root.presentation.main.BottomNavHeightProvider
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
 import io.paritytech.polkadotapp.common.presentation.deeplink.flatten
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.OneShotEventChannel
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.feature_chats_api.domain.chatRequest.ChatRequestServiceCoordinator
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBotStateController
@@ -89,7 +90,9 @@ class RootViewModel @Inject constructor(
 
         watchSsoEvents()
         launch { chatRequestServiceCoordinator.runChatRequestServices() }
-        launch { chatBotStateController.activateDefaultBots() }
+        if (FeatureOption.CHAT_EXTENSIONS.isEnabled) {
+            launch { chatBotStateController.activateDefaultBots() }
+        }
 
         launch { rootInteractor.printAccountAddresses() }
 
@@ -100,7 +103,7 @@ class RootViewModel @Inject constructor(
 
     private suspend fun warmUpWebProducts() {
         web3SummitWarmUpService.warmUpWeb3SummitContent()
-        if (BuildConfig.BROWSE_TAB_ENABLED) {
+        if (FeatureOption.BROWSE_TAB.isEnabled) {
             exploreProductsService.warmUpExploreLoading()
         }
     }

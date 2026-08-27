@@ -16,8 +16,10 @@ android {
         buildConfigField("boolean", "TESTNET_FUND_ENABLED", "true")
         buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "true")
+        buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "SAMPLE_BOT", "true")
         buildConfigField("boolean", "BROWSE_TAB_ENABLED", "true")
+        buildConfigField("boolean", "CHAT_EXTENSIONS_ENABLED", "true")
     }
 
     buildTypes {
@@ -31,6 +33,7 @@ android {
             buildConfigField("boolean", "TESTNET_FUND_ENABLED", "false")
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
         }
         getByName("nightly") {
@@ -45,8 +48,10 @@ android {
             buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
             buildConfigField("boolean", "BROWSE_TAB_ENABLED", "false")
+            buildConfigField("boolean", "CHAT_EXTENSIONS_ENABLED", "false")
         }
     }
 }
