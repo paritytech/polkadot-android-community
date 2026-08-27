@@ -3,6 +3,8 @@ package io.paritytech.polkadotapp.app.root.domain
 import io.paritytech.polkadotapp.app.root.domain.debug.VerifyUsernameOnChainUseCase
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.common.BuildConfig
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.wrapIntoResult
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -43,12 +45,17 @@ class RealRootInteractor @Inject constructor(
     private val devResetCoordinator: DevResetCoordinator,
 ) : RootInteractor {
     override fun startUpdateSystems(): Flow<*> {
-        return merge(
-            walletBalancesUpdateSystem.updateSystem.start(),
-            candidateBalancesUpdateSystem.updateSystem.start(),
-            usernameUpdateSystem.updateSystem.start(),
-            peopleUpdateSystem.updateSystem.start()
-        ).wrapIntoResult()
+        val updateSystems = buildList {
+            add(walletBalancesUpdateSystem.updateSystem.start())
+            add(candidateBalancesUpdateSystem.updateSystem.start())
+            add(usernameUpdateSystem.updateSystem.start())
+
+            if (FeatureOption.PERSONHOOD.isEnabled) {
+                add(peopleUpdateSystem.updateSystem.start())
+            }
+        }
+
+        return updateSystems.merge().wrapIntoResult()
             .logFailure("Unexpected failure when syncing balances")
     }
 
