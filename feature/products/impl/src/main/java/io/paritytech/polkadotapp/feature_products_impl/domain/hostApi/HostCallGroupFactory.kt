@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGro
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.ChatHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.EntropyHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.HostCallHandlerGroup
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.LocaleHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.NavigationHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.NotificationHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.PaymentHostCalls
@@ -58,6 +59,7 @@ class HostCallGroupFactory @Inject constructor(
         UserIdHostCalls(botApi, productIdProvider),
         AllowanceHostCalls(botApi, productIdProvider),
         ThemeHostCalls(botApi),
+        LocaleHostCalls(botApi),
     )
 
     /**

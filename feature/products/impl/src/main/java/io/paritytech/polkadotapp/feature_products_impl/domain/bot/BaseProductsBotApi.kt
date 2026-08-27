@@ -203,6 +203,10 @@ abstract class BaseProductsBotApi(
         return hostApiInteractor.subscribePaymentStatus(callingProductId, paymentId)
     }
 
+    override fun subscribeLocale(): Flow<String> {
+        return hostApiInteractor.subscribeLocale()
+    }
+
     override fun subscribeTheme(): Flow<ProductTheme> {
         return hostApiInteractor.subscribeTheme()
     }

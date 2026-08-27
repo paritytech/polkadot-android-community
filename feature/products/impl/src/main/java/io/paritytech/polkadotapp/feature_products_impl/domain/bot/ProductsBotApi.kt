@@ -187,4 +187,6 @@ interface ProductsBotApi {
     fun subscribeChatRooms(): Flow<List<ProductChatRoom>>
 
     fun subscribeTheme(): Flow<ProductTheme>
+
+    fun subscribeLocale(): Flow<String>
 }

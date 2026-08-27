@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flowOfAll
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.design.theme.AppThemeSelector
+import io.paritytech.polkadotapp.feature_settings_api.AppLanguageProvider
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentService
@@ -115,11 +116,16 @@ class HostApiInteractor @Inject constructor(
     private val preimageSubmitSponsoring: PreimageSubmitSponsoring,
     private val statementStoreSubmissionSponsoring: StatementStoreSubmissionSponsoring,
     private val appThemeSelector: AppThemeSelector,
+    private val appLanguageProvider: AppLanguageProvider,
     private val productRequestAccountResolver: ProductRequestAccountResolver,
     private val productSigningScreenLauncher: ProductSigningScreenLauncher,
 ) {
     fun subscribeTheme(): Flow<ProductTheme> {
         return appThemeSelector.selectedTheme.map(PolkadotAppTheme::toProductTheme)
+    }
+
+    fun subscribeLocale(): Flow<String> {
+        return appLanguageProvider.selectedLanguageCode
     }
 
     suspend fun accountGet(callingProductId: ProductId, productAccountId: ProductAccountId): Result<ProductAccountResult> {
