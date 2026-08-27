@@ -3,7 +3,9 @@ package io.paritytech.polkadotapp.common.utils
 import io.paritytech.polkadotapp.common.BuildConfig
 
 object FeatureFlags {
-    private val fullFeatured = !BuildConfig.SAFETY_MODE
+    private const val SAFETY_NET_BUILD_TYPE = "safetynet"
+
+    private val fullFeatured = BuildConfig.BUILD_TYPE != SAFETY_NET_BUILD_TYPE
 
     fun isEnabled(feature: FeatureOption): Boolean {
         return when (feature) {
@@ -18,7 +20,8 @@ object FeatureFlags {
             FeatureOption.CHAT_EXTENSIONS,
             FeatureOption.LINKED_DEVICES,
             FeatureOption.PRODUCT_SETTINGS,
-            FeatureOption.PERSONHOOD -> fullFeatured
+            FeatureOption.PERSONHOOD,
+            FeatureOption.COLLECTIBLES -> fullFeatured
 
             FeatureOption.ALLOW_SHORT_EVIDENCE_VIDEO -> BuildConfig.ALLOW_SHORT_EVIDENCE_VIDEO
             FeatureOption.SAMPLE_BOT -> BuildConfig.SAMPLE_BOT
@@ -44,7 +47,8 @@ enum class FeatureOption {
     CHAT_EXTENSIONS,
     LINKED_DEVICES,
     PRODUCT_SETTINGS,
-    PERSONHOOD
+    PERSONHOOD,
+    COLLECTIBLES
 }
 
 val FeatureOption.isEnabled

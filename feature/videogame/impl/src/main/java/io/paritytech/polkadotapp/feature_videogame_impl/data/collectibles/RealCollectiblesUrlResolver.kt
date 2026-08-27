@@ -2,7 +2,9 @@ package io.paritytech.polkadotapp.feature_videogame_impl.data.collectibles
 
 import android.net.Uri
 import androidx.core.net.toUri
+import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.flatRecover
+import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
 import io.paritytech.polkadotapp.feature_videogame_api.domain.collectibles.CollectiblesUrlResolver
@@ -22,6 +24,8 @@ class RealCollectiblesUrlResolver @Inject constructor(
     }
 
     private suspend fun isEnabled(): Boolean {
+        if (FeatureOption.COLLECTIBLES.isDisabled) return false
+
         return remoteConfigService.getSyncedBoolean(ENABLED_KEY)
             .logFailure("Reading remote config flag $ENABLED_KEY failed")
             .getOrDefault(false)
