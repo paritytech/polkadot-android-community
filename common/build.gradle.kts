@@ -18,8 +18,7 @@ android {
         buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "SAMPLE_BOT", "true")
-        buildConfigField("boolean", "BROWSE_TAB_ENABLED", "true")
-        buildConfigField("boolean", "CHAT_EXTENSIONS_ENABLED", "true")
+        buildConfigField("boolean", "SAFETY_MODE", "false")
     }
 
     buildTypes {
@@ -50,8 +49,7 @@ android {
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
-            buildConfigField("boolean", "BROWSE_TAB_ENABLED", "false")
-            buildConfigField("boolean", "CHAT_EXTENSIONS_ENABLED", "false")
+            buildConfigField("boolean", "SAFETY_MODE", "true")
         }
     }
 }

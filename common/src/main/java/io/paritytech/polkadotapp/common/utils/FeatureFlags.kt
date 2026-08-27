@@ -3,19 +3,26 @@ package io.paritytech.polkadotapp.common.utils
 import io.paritytech.polkadotapp.common.BuildConfig
 
 object FeatureFlags {
+    private val fullFeatured = !BuildConfig.SAFETY_MODE
+
     fun isEnabled(feature: FeatureOption): Boolean {
         return when (feature) {
-            FeatureOption.ALLOW_SHORT_EVIDENCE_VIDEO -> BuildConfig.ALLOW_SHORT_EVIDENCE_VIDEO
-            FeatureOption.SHOW_MOB_RULE_CASE_FOR_DEVELOPMENT -> BuildConfig.DEBUG
-            FeatureOption.SHORT_WORKER_BACKOFF -> BuildConfig.DEBUG
-            FeatureOption.LOW_BATTERY_EVIDENCE_PROVISION -> BuildConfig.DEBUG
+            FeatureOption.SHOW_MOB_RULE_CASE_FOR_DEVELOPMENT,
+            FeatureOption.SHORT_WORKER_BACKOFF,
+            FeatureOption.LOW_BATTERY_EVIDENCE_PROVISION,
             FeatureOption.SKIP_MOBRULE_CASE -> BuildConfig.DEBUG
+
+            FeatureOption.DEBUG_MENU -> BuildConfig.DEBUG && fullFeatured
+
+            FeatureOption.BROWSE_TAB,
+            FeatureOption.CHAT_EXTENSIONS,
+            FeatureOption.LINKED_DEVICES -> fullFeatured
+
+            FeatureOption.ALLOW_SHORT_EVIDENCE_VIDEO -> BuildConfig.ALLOW_SHORT_EVIDENCE_VIDEO
             FeatureOption.SAMPLE_BOT -> BuildConfig.SAMPLE_BOT
             FeatureOption.DIM1_BOT_BY_DEFAULT -> BuildConfig.DIM1_BOT_BY_DEFAULT
             FeatureOption.DIM2_BOT_BY_DEFAULT -> BuildConfig.DIM2_BOT_BY_DEFAULT
             FeatureOption.PEER_BOT_BY_DEFAULT -> BuildConfig.PEER_BOT_BY_DEFAULT
-            FeatureOption.BROWSE_TAB -> BuildConfig.BROWSE_TAB_ENABLED
-            FeatureOption.CHAT_EXTENSIONS -> BuildConfig.CHAT_EXTENSIONS_ENABLED
         }
     }
 }
@@ -30,8 +37,10 @@ enum class FeatureOption {
     DIM1_BOT_BY_DEFAULT,
     DIM2_BOT_BY_DEFAULT,
     PEER_BOT_BY_DEFAULT,
+    DEBUG_MENU,
     BROWSE_TAB,
-    CHAT_EXTENSIONS
+    CHAT_EXTENSIONS,
+    LINKED_DEVICES
 }
 
 val FeatureOption.isEnabled
