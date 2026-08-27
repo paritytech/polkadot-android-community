@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.app.root.presentation.root
 
 import android.net.Uri
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.app.root.domain.RootInteractor
 import io.paritytech.polkadotapp.app.root.presentation.main.BottomNavHeightProvider
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
@@ -99,7 +100,9 @@ class RootViewModel @Inject constructor(
 
     private suspend fun warmUpWebProducts() {
         web3SummitWarmUpService.warmUpWeb3SummitContent()
-        exploreProductsService.warmUpExploreLoading()
+        if (BuildConfig.BROWSE_TAB_ENABLED) {
+            exploreProductsService.warmUpExploreLoading()
+        }
     }
 
     private fun watchWeb3SummitEnd() {

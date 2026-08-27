@@ -66,6 +66,9 @@ private fun configureAndroidExtension(extension: BaseExtension) = with(extension
         create("nightly") {
             initWith(getByName("debug"))
         }
+        create("safetynet") {
+            initWith(getByName("nightly"))
+        }
     }
 }
 

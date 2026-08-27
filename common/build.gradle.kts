@@ -17,6 +17,7 @@ android {
         buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "SAMPLE_BOT", "true")
+        buildConfigField("boolean", "BROWSE_TAB_ENABLED", "true")
     }
 
     buildTypes {
@@ -38,6 +39,14 @@ android {
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
+        }
+        getByName("safetynet") {
+            buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
+            buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
+            buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "SAMPLE_BOT", "false")
+            buildConfigField("boolean", "BROWSE_TAB_ENABLED", "false")
         }
     }
 }

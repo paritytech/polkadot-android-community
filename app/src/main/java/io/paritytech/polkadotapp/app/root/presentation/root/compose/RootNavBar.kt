@@ -107,6 +107,8 @@ fun RootNavBar(
     onScanClicked: () -> Unit,
     onScannerTooltipDismiss: () -> Unit,
 ) {
+    val availableTabs = BottomTab.availableEntries
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -133,8 +135,8 @@ fun RootNavBar(
         }
 
         PolkadotNavigationBar(
-            selectedIndex = currentTab.ordinal,
-            itemCount = BottomTab.entries.size,
+            selectedIndex = availableTabs.indexOf(currentTab).coerceAtLeast(0),
+            itemCount = availableTabs.size,
             shape = RoundedCornerShape(NavBarCornerRadius),
             centerContent = {
                 CenterPill(
@@ -147,7 +149,7 @@ fun RootNavBar(
                 )
             },
         ) {
-            BottomTab.entries.fastForEach { tab ->
+            availableTabs.fastForEach { tab ->
                 PolkadotNavigationBarItem(
                     selected = tab == currentTab,
                     onClick = { onTabSelected(tab) },
