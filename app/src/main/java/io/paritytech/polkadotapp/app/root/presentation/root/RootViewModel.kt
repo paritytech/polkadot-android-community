@@ -147,6 +147,8 @@ class RootViewModel @Inject constructor(
     }
 
     private fun watchSsoEvents() {
-        ssoService.watchSsoEvents().launchIn(this)
+        if (FeatureOption.LINKED_DEVICES.isEnabled) {
+            ssoService.watchSsoEvents().launchIn(this)
+        }
     }
 }
