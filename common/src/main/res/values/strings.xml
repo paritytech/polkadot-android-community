@@ -1435,6 +1435,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_digital_dollar_title">Balance Card</string>
     <string name="pocket_digital_dollar_card_title">CASH</string>
     <string name="pocket_digital_dollar_send_button">Send CASH</string>
+    <string name="pocket_digital_dollar_faucet_top_up">Faucet Top Up</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
 

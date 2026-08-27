@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.util.planksFromAmount
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.data.network.TestnetEnvironment
 import io.paritytech.polkadotapp.common.utils.filterResultSuccess
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.getDepositAccount
@@ -18,8 +19,10 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyc
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestHelperUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
 import io.paritytech.polkadotapp.feature_fund_api.domain.model.AutoConvertDeposit
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transfers_api.domain.usecase.TestnetFundUseCase
@@ -45,12 +48,18 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     private val autoConvertDepositService: AutoConvertDepositService,
     private val shareCoinageLogsUseCase: ShareCoinageLogsUseCase,
     private val coinageRecyclingUseCase: CoinageRecyclingUseCase,
-    private val coinageBackupService: CoinageBackupService
+    private val coinageBackupService: CoinageBackupService,
+    private val dotNsTldProvider: DotNsTldProvider
 ) {
     companion object {
         private val TOP_UP_AMOUNT = 150.toBigDecimal()
         private val NIGHTLY_TOP_UP_AMOUNT = 10.toBigDecimal()
+
+        private const val GET_CASH_PRODUCT_NAME = "getcash"
     }
+
+    suspend fun getCashProductId(): Result<ProductId> = dotNsTldProvider.getTld()
+        .flatMap { tld -> ProductId.fromString("$GET_CASH_PRODUCT_NAME${tld.suffix}", tld) }
 
     fun observeAssetInfo(): Flow<AssetInfo> = flow {
         val asset = chainAssetProvider.asset()
