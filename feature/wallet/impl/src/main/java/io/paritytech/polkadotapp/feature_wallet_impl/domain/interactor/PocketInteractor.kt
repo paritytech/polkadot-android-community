@@ -4,7 +4,9 @@ import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.filterResultSuccess
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -65,5 +68,9 @@ class PocketInteractor @Inject constructor(
         .map { it.username.getDisplayUsername() }
 
     context(scope: ComputationalScope)
-    fun observeRank(): Flow<PocketRank> = gamesProgressUseCase.videoGamesProgressFlow().map { it.toPocketRank() }
+    fun observeRank(): Flow<PocketRank> = if (FeatureOption.PERSONHOOD.isEnabled) {
+        gamesProgressUseCase.videoGamesProgressFlow().map { it.toPocketRank() }
+    } else {
+        flowOf(PocketRank.Basic)
+    }
 }

@@ -3,9 +3,7 @@ package io.paritytech.polkadotapp.common.utils
 import io.paritytech.polkadotapp.common.BuildConfig
 
 object FeatureFlags {
-    private const val SAFETY_NET_BUILD_TYPE = "safetynet"
-
-    private val fullFeatured = BuildConfig.BUILD_TYPE != SAFETY_NET_BUILD_TYPE
+    private val fullFeatured = !BuildConfig.SAFETY_MODE
 
     fun isEnabled(feature: FeatureOption): Boolean {
         return when (feature) {

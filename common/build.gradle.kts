@@ -18,6 +18,7 @@ android {
         buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "SAMPLE_BOT", "true")
+        buildConfigField("boolean", "SAFETY_MODE", "false")
     }
 
     buildTypes {
@@ -42,6 +43,7 @@ android {
             buildConfigField("boolean", "SAMPLE_BOT", "false")
         }
         getByName("safetynet") {
+            buildConfigField("boolean", "SAFETY_MODE", "true")
             buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
             buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
