@@ -22,7 +22,7 @@ one or more channels. The app is built with Gradle, has native Rust components
 environment variables (see §5). The typical flow is:
 
 1. Provision the toolchain (§2).
-2. Provide a signing keystore (§3). For the `gp` edition also provide a Firebase `google-services.json` (§4); `vanilla` does not require it.
+2. Provide a signing keystore (§3) and a Firebase `google-services.json` (§4) — both editions need it, because Remote Config is required for the app to run.
 3. Set the required environment variables / secrets (§5).
 4. Build the edition you want to ship (§6).
 5. Deliver the artifact through a channel of your choice (§7):
@@ -36,16 +36,23 @@ The app ships two parallel distribution tracks:
 | Edition | Target | Services | Channel |
 |---------|--------|----------|---------|
 | `gp` | Standard Android / Google Play | Google Mobile Services (GMS), Firebase, Play Integrity | Google Play Store (AAB/APK) |
-| `vanilla` | **GrapheneOS** and other GMS-free environments | No Google services | Sideloadable APK (GitHub Releases, direct link, etc.) |
+| `vanilla` | **GrapheneOS** and other GMS-free environments | No Google Play Services; Firebase Remote Config only | Sideloadable APK (GitHub Releases, direct link, etc.) |
 
 The `vanilla` edition is a first-class release track aimed at privacy-focused users
 running [GrapheneOS](https://grapheneos.org/). It carries the same core app
 functionality and is fully operational without Google Play Services. Google Sign-In,
 Firebase Auth, Firebase Analytics, and Firebase Crashlytics are excluded from the
-`vanilla` APK. Firebase Messaging and Firebase App Check remain as compile-time
+`vanilla` APK.
+
+Both editions do initialize the default `FirebaseApp`, because **Firebase Remote
+Config is required for the app to function** (`tools/remoteconfig:impl` drives feature
+gates, endpoints, and transaction extension versions). Remote Config does not depend on
+Google Play Services being present on the device — it reaches the Firebase REST
+endpoints directly and identifies the install through Firebase Installations — so it
+works on GrapheneOS. Firebase Messaging and Firebase App Check remain compile-time
 transitive dependencies (from `tools/push-notifications:impl` and
-`tools/integrity:impl`) but are not initialized at runtime — no `google-services.json`
-is provided for `vanilla` variants, so Firebase auto-initialization skips silently.
+`tools/integrity:impl`) but stay inert in `vanilla`: FCM token auto-init is switched
+off in `app/src/vanilla/AndroidManifest.xml`, and App Check has no injection sites.
 
 The `vanilla` edition is distributed as a standalone APK alongside, not instead of,
 the Google Play version.
@@ -128,28 +135,32 @@ Provided via the signing environment variables in §5
 
 ## 4. `google-services.json` (Firebase)
 
-> **`gp` edition only.** The `vanilla`/GrapheneOS build does not use Firebase or any
-> Google services and therefore does **not** require `google-services.json`. Skip this
-> section if you are building only `vanilla` builds.
+> **Required by both editions.** Firebase Remote Config is mandatory for the app to
+> run, so `vanilla`/GrapheneOS builds need this file too. Without it the Google
+> Services plugin fails the build.
 
-The `gp` edition applies the Google Services + Firebase Crashlytics/Analytics plugins,
-so a `google-services.json` must be present in the `gp` flavor source set:
+Place `google-services.json` in the `app` module root so that a single file covers
+every flavor and build type:
 
 ```
-app/src/gp/google-services.json
+app/google-services.json
 ```
 
-Placing it in the flavor source set (rather than per-build-type) means a single file
-covers all `gp` build types (`gpDebug`, `gpNightly`, `gpRelease`). The build disables
-Google Services processing tasks for `vanilla` variants, so those variants neither
-look for nor require this file.
+The module root is the plugin's fallback location, so `gpDebug`, `gpNightly`,
+`gpRelease` and their `vanilla` counterparts all resolve to it. A flavor-specific
+`app/src/gp/google-services.json` still takes precedence for `gp` variants if you
+need to point the two editions at different Firebase projects.
+
+`vanilla` needs no separate Firebase app registration: product flavors add no
+`applicationIdSuffix` (only build types do), so both editions share the same
+application ids and therefore the same `google-services.json` entries.
 
 Obtain it from **your own** Firebase project (Project settings → Your apps →
 Android app → download `google-services.json`). In CI decode it into this path
 before the build:
 
 ```bash
-echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/src/gp/google-services.json
+echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
 ```
 
 ---
@@ -302,14 +313,16 @@ Outputs land in `app/build/outputs/apk/gp/<buildType>/`.
 
 ### 6.2 `vanilla` edition (GrapheneOS / GMS-free)
 
-The `vanilla` edition produces an APK with **no Google services dependency**: no
-Firebase, no Play Integrity, no GMS-backed Sign-In. It is designed to run correctly
-on [GrapheneOS](https://grapheneos.org/) and any other Android distribution that
-does not ship Google Play Services.
+The `vanilla` edition produces an APK with **no Google Play Services dependency**: no
+Play Integrity, no GMS-backed Sign-In, no Analytics or Crashlytics. It is designed to
+run correctly on [GrapheneOS](https://grapheneos.org/) and any other Android
+distribution that does not ship Google Play Services. Firebase Remote Config is the
+one Firebase service it keeps, because the app cannot function without it; it needs no
+Play Services on the device.
 
 Prerequisites that differ from the `gp` edition:
 
-- **No `google-services.json` required** — skip §4.
+- **`google-services.json` still required** — see §4; Remote Config needs it.
 - **`GOOGLE_OAUTH_ID` not required** — `tools/auth/impl` uses a no-op implementation for `vanilla`.
 - **`GOOGLE_PROJECT_ID` not required** — scoped to the `gp` flavor in `tools/integrity/impl`.
 - All other secrets (signing, `W3S_AUTH_KEY`, Sentry, optional endpoint variables) apply identically.
@@ -438,14 +451,14 @@ jobs:
       # ... install Android SDK, NDK r29, Rust + targets, Clang, Node, Python (see §2)
       - run: |
           echo "${{ secrets.DEV_KEYSTORE_BASE64 }}" | base64 --decode > develop_key.jks
-          # gp edition only — vanilla builds do not require google-services.json
-          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > app/src/gp/google-services.json
+          # both editions — Remote Config requires google-services.json
+          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > app/google-services.json
       - name: Build
         env:
           NIGHTLY_FUNDING_MNEMONIC: ${{ secrets.NIGHTLY_FUNDING_MNEMONIC }}
         run: ./gradlew assembleGpDebug --no-daemon --stacktrace
-      # To build the vanilla edition instead, omit GOOGLE_SERVICES_JSON_BASE64,
-      # GOOGLE_OAUTH_ID, and GOOGLE_PROJECT_ID, then run:
+      # To build the vanilla edition instead, omit GOOGLE_OAUTH_ID and
+      # GOOGLE_PROJECT_ID (GOOGLE_SERVICES_JSON_BASE64 is still needed), then run:
       # - run: ./gradlew assembleVanillaDebug --no-daemon --stacktrace
 ```
 

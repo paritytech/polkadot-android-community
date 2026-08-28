@@ -27,9 +27,8 @@ runs:
         set -euo pipefail
         umask 077
 
-        mkdir -p ./app/src/gp
         printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > \
-          ./app/src/gp/google-services.json
+          ./app/google-services.json
 
     - name: Create signing keystore
       if: inputs.keystore_file_base64 != ''

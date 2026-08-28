@@ -91,12 +91,6 @@ android {
     }
 }
 
-tasks.configureEach {
-    if (name.startsWith("processVanilla") && name.endsWith("GoogleServices")) {
-        enabled = false
-    }
-}
-
 dependencies {
     implementation(libs.hilt.androidx.work)
     ksp(libs.hilt.androidx.compiler)
