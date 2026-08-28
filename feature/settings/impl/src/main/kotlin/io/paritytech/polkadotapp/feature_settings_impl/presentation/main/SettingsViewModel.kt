@@ -1,11 +1,9 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main
 
-import android.os.Build
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.design.theme.AppThemeSelector
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
-import io.paritytech.polkadotapp.feature_settings_impl.BuildConfig
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
 import io.paritytech.polkadotapp.feature_settings_impl.domain.settings.SettingsInteractor
 import kotlinx.coroutines.flow.SharingStarted
