@@ -18,6 +18,7 @@ interface SettingsRouter : ReturnableRouter {
     fun openScanQr()
     fun openContactChat(accountId: AccountId)
     fun openNotificationSettings()
+    fun openLanguageSettings()
     fun openPrivacyPolicy()
     fun openTermsOfUse()
     fun openThemes()

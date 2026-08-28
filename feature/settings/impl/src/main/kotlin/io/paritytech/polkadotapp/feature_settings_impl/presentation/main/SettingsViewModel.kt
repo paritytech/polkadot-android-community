@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main
 
+import android.os.Build
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.design.theme.AppThemeSelector
@@ -25,7 +26,6 @@ class SettingsViewModel @Inject constructor(
         appThemeSelector.selectedTheme
     ) { backupExists, hasBlockedUsers, selectedTheme ->
         SettingsUiState(
-            isDebug = BuildConfig.DEBUG,
             selectedTheme = selectedTheme,
             isBackupMissing = !backupExists,
             hasBlockedUsers = hasBlockedUsers
@@ -35,7 +35,6 @@ class SettingsViewModel @Inject constructor(
             scope = this,
             started = SharingStarted.Eagerly,
             initialValue = SettingsUiState(
-                isDebug = BuildConfig.DEBUG,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
                 isBackupMissing = false,
                 hasBlockedUsers = false
@@ -68,6 +67,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onNotificationsClick() {
         router.openNotificationSettings()
+    }
+
+    fun onLanguageClick() {
+        router.openLanguageSettings()
     }
 
     fun onThemeClick() {

@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.app.root.navigation.LegalUrls
 import io.paritytech.polkadotapp.app.root.navigation.NavigationHolder
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.presentation.BrowserNavigator
+import io.paritytech.polkadotapp.common.utils.openAppLanguageSettings
 import io.paritytech.polkadotapp.common.utils.openAppNotificationSettings
 import io.paritytech.polkadotapp.common.utils.toPayloadBundle
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictPayload
@@ -83,6 +84,10 @@ class SettingsNavigator @Inject constructor(
 
     override fun openNotificationSettings() {
         context.openAppNotificationSettings()
+    }
+
+    override fun openLanguageSettings() {
+        context.openAppLanguageSettings()
     }
 
     override fun openPrivacyPolicy() {
