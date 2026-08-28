@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.feature_account_api.data.repository.getCandidat
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_balances_api.data.updaters.CandidateBalancesUpdateSystem
 import io.paritytech.polkadotapp.feature_balances_api.data.updaters.WalletBalancesUpdateSystem
+import io.paritytech.polkadotapp.feature_coinage_api.data.updaters.CoinageUpdateSystem
 import io.paritytech.polkadotapp.feature_dotns_gateway_api.data.updaters.DotNsGatewayUpdateSystem
 import io.paritytech.polkadotapp.feature_people_api.data.updaters.PeopleUpdateSystem
 import io.paritytech.polkadotapp.feature_prices_api.domain.SyncPricesUseCase
@@ -39,6 +40,7 @@ class RealRootInteractor @Inject constructor(
     private val peopleUpdateSystem: PeopleUpdateSystem,
     private val usernameUpdateSystem: UsernameUpdateSystem,
     private val dotNsGatewayUpdateSystem: DotNsGatewayUpdateSystem,
+    private val coinageUpdateSystem: CoinageUpdateSystem,
     private val chainRegistry: ChainRegistry,
     private val accountRepository: AccountRepository,
     private val verifyUsernameOnChainUseCase: VerifyUsernameOnChainUseCase,
@@ -50,7 +52,8 @@ class RealRootInteractor @Inject constructor(
             candidateBalancesUpdateSystem.updateSystem.start(),
             peopleUpdateSystem.updateSystem.start(),
             usernameUpdateSystem.updateSystem.start(),
-            dotNsGatewayUpdateSystem.updateSystem.start()
+            dotNsGatewayUpdateSystem.updateSystem.start(),
+            coinageUpdateSystem.updateSystem.start()
         ).wrapIntoResult()
             .logFailure("Unexpected failure when syncing balances")
     }
