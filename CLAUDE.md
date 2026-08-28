@@ -2,6 +2,14 @@
 
 This file is intentionally **thin**. Detailed architecture and code rules are in `.claude/docs/` and are lazy-loaded by skills, not auto-included here.
 
+## Build prerequisites
+
+The build **fails at configuration time** until the TrUAPI Rust core checkout resolves, because `:feature:products:impl` depends on `:bindings:truapi-host` in every variant. Run `scripts/setup-truapi.py` once: it clones `paritytech/host-rust-core` at the `truapi_ref` pin from `.github/actions/install/action.yaml` and writes `truapi.dir` to `local.properties`. Re-run it after the pin moves.
+
+`FIRESTORE_DATABASE_ID` must also be in `local.properties`, or configuration fails before anything compiles. It is a CI secret, so ask for the value.
+
+JDK 21. `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"` if `java` is not on PATH.
+
 ## How to work on this codebase
 
 1. **Plan first** with `/architect`. Loads `.claude/docs/architecture/*.md` on demand. Output is a plan that names modules touched, seams used, layer placement, and north-star alignment.

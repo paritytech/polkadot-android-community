@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_products_api.presentation.spaHost
 import android.webkit.WebView
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.screens.MessageDisplay
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -24,6 +25,15 @@ interface SpaHost {
 
 interface SpaHostSession {
     val webView: StateFlow<WebView?>
+
+    /** Current page URL, updated as the product navigates between `.dot` domains. */
+    val currentUrl: StateFlow<String>
+
+    /** Page load progress for the hosted product, for a progress indicator. */
+    val loadProgress: StateFlow<DotNsLoadProgress>
+
+    /** Current page title, updated as the product navigates. */
+    val title: StateFlow<String>
 
     fun pauseConnections()
 

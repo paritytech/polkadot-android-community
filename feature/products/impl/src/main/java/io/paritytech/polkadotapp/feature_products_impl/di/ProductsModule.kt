@@ -1,10 +1,14 @@
 package io.paritytech.polkadotapp.feature_products_impl.di
 
+import android.content.Context
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
+import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
@@ -14,6 +18,7 @@ import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.Ac
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.MembersRingLocator
 import io.paritytech.polkadotapp.feature_products_api.domain.browser.ProductSessionController
 import io.paritytech.polkadotapp.feature_products_api.domain.deriveEntropy.DeriveEntropyUseCase
+import io.paritytech.polkadotapp.feature_products_api.domain.runtime.ProductRuntimeSettings
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.PreimageSubmitSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.StatementStoreSubmissionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.TransactionSponsoring
@@ -75,6 +80,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.product.RealProduc
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.RealProductScriptResolver
 import io.paritytech.polkadotapp.feature_products_impl.domain.productBotManagement.ProductBotManagementInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.productBotManagement.RealProductBotManagementInteractor
+import io.paritytech.polkadotapp.feature_products_impl.domain.runtime.PrefsProductRuntimeSettings
 import io.paritytech.polkadotapp.feature_products_impl.domain.search.ProductChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.serialization.JsWidgetSerializer
 import io.paritytech.polkadotapp.feature_products_impl.domain.serialization.ScaleWidgetSerializer
@@ -85,12 +91,38 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.RealE
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.RealResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.ProductServingHostResolver
-import io.paritytech.polkadotapp.feature_products_impl.presentation.spaHost.RealSpaHost
+import io.paritytech.polkadotapp.feature_products_impl.presentation.spaHost.RuntimeSelectingSpaHost
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 internal interface ProductsModule {
+    companion object {
+        @Provides
+        @Singleton
+        @TrUAPIChainHttpClient
+        fun provideTrUAPIChainHttpClient(shared: OkHttpClient): OkHttpClient =
+            shared.newBuilder()
+                // Chain sockets are long-lived subscriptions: the shared client's
+                // read timeout would kill them when idle, so detect dead peers
+                // with pings instead. newBuilder keeps the shared pool/dispatcher.
+                .readTimeout(0, TimeUnit.SECONDS)
+                .pingInterval(CHAIN_SOCKET_PING_SECONDS, TimeUnit.SECONDS)
+                .build()
+
+        private const val CHAIN_SOCKET_PING_SECONDS = 30L
+
+        @Provides
+        @Singleton
+        fun provideProductRuntimeSettings(@ApplicationContext context: Context): ProductRuntimeSettings =
+            PrefsProductRuntimeSettings(
+                prefs = context.getSharedPreferences("product_runtime_settings", Context.MODE_PRIVATE),
+                isDebugBuild = BuildConfig.DEBUG,
+            )
+    }
+
     @Binds
     @Singleton
     fun bindWidgetSerializer(impl: ScaleWidgetSerializer): JsWidgetSerializer
@@ -105,7 +137,7 @@ internal interface ProductsModule {
 
     @Binds
     @Singleton
-    fun bindSpaHost(impl: RealSpaHost): SpaHost
+    fun bindSpaHost(impl: RuntimeSelectingSpaHost): SpaHost
 
     @Binds
     @Singleton

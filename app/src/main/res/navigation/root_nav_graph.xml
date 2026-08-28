@@ -333,6 +333,14 @@
         android:id="@+id/action_global_to_topUpRequestBottomSheet"
         app:destination="@id/topUpRequestBottomSheet" />
 
+    <dialog
+        android:id="@+id/truapiConfirmationBottomSheet"
+        android:name="io.paritytech.polkadotapp.feature_products_impl.presentation.truapiConfirm.TrUAPIConfirmationBottomSheet" />
+
+    <action
+        android:id="@+id/action_global_to_truapiConfirmationBottomSheet"
+        app:destination="@id/truapiConfirmationBottomSheet" />
+
     <action
         android:id="@+id/action_global_to_resourceAllocationRequestBottomSheet"
         app:destination="@id/resourceAllocationRequestBottomSheet" />
