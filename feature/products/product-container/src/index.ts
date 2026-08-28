@@ -570,6 +570,17 @@ container.handleThemeSubscribe((_params, send, interrupt) => {
   );
 });
 
+// --- Locale ---
+
+container.handleLocaleSubscribe((_params, send, interrupt) => {
+  return subscribeNative(
+    'localeSubscribe',
+    {},
+    (payload: { languageTag: string }) => send({ languageTag: payload.languageTag }),
+    () => interrupt(),
+  );
+});
+
 // --- Request Login ---
 
 container.handleRequestLogin((_reason, { ok }) => ok('alreadyConnected'));
