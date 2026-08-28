@@ -19,6 +19,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.BlockOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.FileOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.GlobeAltFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.GridOutlined
+import io.paritytech.polkadotapp.design.components.icon.vectors.Language
 import io.paritytech.polkadotapp.design.components.icon.vectors.LaptopOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.NotificationsBellOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.PaletteOutlined
@@ -106,7 +107,7 @@ private fun SettingsScreenInternal(
                     )
                     if (state.isLanguageSettingsAvailable) {
                         SettingsMenuItem(
-                            icon = NovaIcons.GlobeAltFilled,
+                            icon = NovaIcons.Language,
                             title = stringResource(RCommon.string.settings_language),
                             onClick = onLanguageClick
                         )
