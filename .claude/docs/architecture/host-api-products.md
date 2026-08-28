@@ -16,7 +16,7 @@ per session by `ProductRuntimeSettings` (debug toggle, default native).
 8. **`major`** — Factory-of-factory-of-factory chain — collapse to single `Factory.create(scope, config)`.
 9. **`major`** — TrUAPI bridge logic reimplemented on the Android side instead of delegated to `HostApiInteractor` (signing, permissions, chain, theme). `ProductTrUAPIHostBridge` is a thin adapter, not a second dispatch layer.
 10. **`major`** — A `HostBridge` callback violating the threading contract: prompt-driven suspend callbacks may stay pending on a user decision; dispatcher-thread callbacks must return promptly and never block (see § Threading contract).
-11. **`major`** — A `UserConfirmationReview` variant mapped in `ConfirmationReviewMapping` without coverage in `ConfirmationReviewMappingTest`, or a non-signing variant routed anywhere except the fail-closed `null` path.
+11. **`major`** — A `UserConfirmationReview` variant mapped in `ConfirmationReviewMapping` without coverage in `ConfirmationReviewMappingTest`, or a variant routed anywhere except its native flow in `TrUAPIConfirmationLauncher` (permission-gated reviews through `ProductPermissionGuard`; signing, cross-product proof and resource allocation onto the native sheets, confirm-only).
 12. **`major`** — Runtime selection decided anywhere other than `ProductRuntimeSettings` read at session creation (no mid-session switching, no per-feature overrides).
 13. **`minor`** — Inlining "derive product id from URL" at a call site when the `CallingProductIdProvider` abstraction is already in scope.
 
@@ -215,6 +215,15 @@ is **exhaustive with no catch-all**, so a variant added upstream breaks the
 compile instead of silently becoming a denial, and **fail-closed** on a payload
 it cannot describe. Every variant is covered by
 `ConfirmationReviewMappingTest`.
+
+`TrUAPIConfirmationLauncher` then routes each confirmation to the exact native
+flow the equivalent host API call would take: permission-gated reviews through
+`ProductPermissionGuard` (so grants persist and short-circuit exactly as they
+do natively), `CreateProof` through the one-time cross-product proof prompt,
+and signing / resource allocation onto the app's own sheets. The sheets are
+**confirm-only** on this path — the core owns the action and performs it after
+a yes, so the native contexts' work-lambdas are never run. There is no
+TrUAPI-specific confirmation UI.
 
 ### Threading contract
 

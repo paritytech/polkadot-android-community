@@ -41,11 +41,10 @@ import io.paritytech.polkadotapp.feature_products_api.model.signing.SignedTransa
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningAccount
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
 import io.paritytech.polkadotapp.feature_products_impl.domain.accountsProtocol.registry.RingVrfKeyRegistry
-import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofContext
-import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofContextHolder
+import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofRequester
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission
-import io.paritytech.polkadotapp.feature_products_impl.domain.resourceAllocationRequest.ResourceAllocationRequestContext
+import io.paritytech.polkadotapp.feature_products_impl.domain.resourceAllocationRequest.NativeResourceAllocationRequestContext
 import io.paritytech.polkadotapp.feature_products_impl.domain.resourceAllocationRequest.ResourceAllocationRequestContextHolder
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ProductSigningScreenLauncher
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
@@ -61,7 +60,7 @@ class RealAccountsProtocol @Inject constructor(
     private val ringVrfKeyRegistry: RingVrfKeyRegistry,
     private val ringVrfKeySource: RingVrfKeySource,
     private val permissionGuard: ProductPermissionGuard,
-    private val crossProductProofContextHolder: CrossProductProofContextHolder,
+    private val crossProductProofRequester: CrossProductProofRequester,
     private val productSigningScreenLauncher: ProductSigningScreenLauncher,
 ) : AccountsProtocol {
     override suspend fun registerRingVrfKey(
@@ -217,37 +216,26 @@ class RealAccountsProtocol @Inject constructor(
         message: ByteArray,
     ): Boolean {
         val owner = ProductId.fromStoredValue(keyHandle.productId)
-        if (owner == callingProductId) return true
 
-        return awaitCrossProductApproval(callingProductId, owner, keyHandle.index, message)
+        return crossProductProofRequester.awaitApproval(
+            callingProduct = callingProductId,
+            onBehalfOf = owner,
+            suffix = keyHandle.index,
+            message = message.toDataByteArray(),
+        )
     }
 
-    // A cross-product proof is a one-time action: always prompt with the action details, never persist.
     private suspend fun awaitCrossProductProofApproval(
         callingProductId: ProductId,
         context: ProductProofContext,
         message: ByteArray,
     ): Boolean {
-        if (context.productId == callingProductId) return true
-
-        return awaitCrossProductApproval(callingProductId, context.productId, context.suffix, message)
-    }
-
-    private suspend fun awaitCrossProductApproval(
-        callingProductId: ProductId,
-        onBehalfOf: ProductId,
-        suffix: DerivationIndex32,
-        message: ByteArray,
-    ): Boolean {
-        val proofContext = CrossProductProofContext(
+        return crossProductProofRequester.awaitApproval(
             callingProduct = callingProductId,
-            onBehalfOf = onBehalfOf,
-            suffix = suffix,
+            onBehalfOf = context.productId,
+            suffix = context.suffix,
             message = message.toDataByteArray(),
         )
-        crossProductProofContextHolder.set(proofContext)
-        productsRouter.openCrossProductProofPrompt()
-        return proofContext.awaitDecision() is CrossProductProofContext.Decision.Approved
     }
 
     private suspend fun MemberSource.contextualAlias(context: BandersnatchContext): ContextualAlias = when (this) {
@@ -338,7 +326,7 @@ class RealAccountsProtocol @Inject constructor(
     ): List<ApAllocationOutcome> {
         if (resources.isEmpty()) return emptyList()
 
-        val context = ResourceAllocationRequestContext(
+        val context = NativeResourceAllocationRequestContext(
             productId = callingProduct,
             resources = resources,
             onExisting = onExisting,

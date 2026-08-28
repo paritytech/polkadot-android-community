@@ -95,7 +95,7 @@ Walk this checklist for any file path that touches an architectural seam. Cite t
 - **major** — Multi-room product implemented as multiple `ChatExtension`s instead of a single `ProductChatExtension` with multi-room behavior.
 - **major** — TrUAPI bridge logic reimplemented on the Kotlin side instead of delegated to `HostApiInteractor` (`ProductTrUAPIHostBridge` is a thin adapter; the Rust core dispatches).
 - **major** — A `HostBridge` callback violating the threading contract: dispatcher-thread callbacks blocking, or UI touched off the main thread (see `host-api-products.md`).
-- **major** — A `UserConfirmationReview` variant mapped without coverage in `ConfirmationReviewMappingTest`, or a non-signing variant routed anywhere but the fail-closed `null` path.
+- **major** — A `UserConfirmationReview` variant mapped without coverage in `ConfirmationReviewMappingTest`, or a variant routed anywhere but its native flow in `TrUAPIConfirmationLauncher` (permission-gated reviews through `ProductPermissionGuard`; signing, cross-product proof and resource allocation onto the native sheets, confirm-only).
 - **major** — Runtime selection decided anywhere other than `ProductRuntimeSettings` read at session creation.
 - **major** — `NavigationPolicy` branching on URL string inside the policy (classification is external via `CoreNavigateClassifier`).
 

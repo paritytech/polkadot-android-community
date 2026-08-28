@@ -29,6 +29,11 @@ class PermissionPromptViewModel @Inject constructor(
         permissionContext.deliver(decision)
         router.back()
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        permissionContext.onAbandoned()
+    }
 }
 
 private fun ProductPermissionContext.toUiState(): PermissionPromptUiState {

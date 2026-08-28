@@ -3,81 +3,83 @@ package io.paritytech.polkadotapp.feature_products_impl.domain.truapi
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningAccount
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContextHolder
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
+import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofRequester
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionGuard
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission
+import io.paritytech.polkadotapp.feature_products_impl.domain.resourceAllocationRequest.ResourceAllocationRequestContextHolder
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * One in-flight confirmation and the answer the core is waiting on.
+ * Routes a core-initiated confirmation to the exact native flow the equivalent
+ * host API call would take, and awaits the user's decision. The core awaits on
+ * a blocking-pool thread, and suspending there does not stall other TrUAPI
+ * traffic, so a prompt may stay open for as long as the user takes.
  *
- * The core awaits [TrUAPIConfirmation] decisions on a blocking-pool thread, and
- * suspending there does not stall other TrUAPI traffic, so the prompt may stay
- * open for as long as the user takes.
+ * Permission-gated reviews go through [ProductPermissionGuard], so grants
+ * persist and short-circuit exactly as they do natively — an already-granted
+ * permission answers yes with no prompt at all.
  */
-class TrUAPIConfirmationContext(val confirmation: TrUAPIConfirmation.Prompt) {
-    private val decision = CompletableDeferred<Boolean>()
-
-    fun approve() {
-        decision.complete(true)
-    }
-
-    /** Also the answer for a dismissed sheet, so an abandoned prompt fails closed. */
-    fun reject() {
-        decision.complete(false)
-    }
-
-    suspend fun await(): Boolean = decision.await()
-}
-
-/**
- * Parks the in-flight confirmation for the screen to pick up.
- *
- * Mirrors `SigningContextHolder`, including its owner-guarded clear: a prompt's
- * ViewModel is cleared after the dismiss animation, by which time the holder may
- * already carry the next request.
- */
-@Singleton
-class TrUAPIConfirmationContextHolder @Inject constructor() {
-    private var context: TrUAPIConfirmationContext? = null
-
-    fun set(context: TrUAPIConfirmationContext) {
-        this.context = context
-    }
-
-    fun get(): TrUAPIConfirmationContext? = context
-
-    fun clear(owner: TrUAPIConfirmationContext) {
-        if (context === owner) {
-            context = null
-        }
-    }
-}
-
-/**
- * Opens the confirmation prompt for a core-initiated action and awaits the
- * user's decision.
- */
-// Singleton because the holder is: a launcher per bridge would mean one mutex
-// per tab, and up to MAX_LIVE_TABS + Explore bridges racing on the shared holder.
+// Singleton because the holders are: a launcher per bridge would mean one mutex
+// per tab, and up to MAX_LIVE_TABS + Explore bridges racing on the shared holders.
 @Singleton
 class TrUAPIConfirmationLauncher @Inject constructor(
-    private val holder: TrUAPIConfirmationContextHolder,
     private val signingContextHolder: SigningContextHolder,
+    private val resourceAllocationContextHolder: ResourceAllocationRequestContextHolder,
+    private val permissionGuard: ProductPermissionGuard,
+    private val crossProductProofRequester: CrossProductProofRequester,
     private val productsRouter: ProductsRouter,
 ) {
-    // The core fires confirmUserAction concurrently and the holder carries one
-    // context, so an overlapping request would overwrite it and strand the
-    // first caller. Released even if the sheet is dismissed: onCleared rejects.
-    private val oneAtATime = Mutex()
+    // The core fires confirmUserAction concurrently and each holder carries one
+    // context, so an overlapping sheet-backed request would overwrite it and
+    // strand the first caller. Only the two flows that park a context here take
+    // it: the permission guard and the proof requester serialize themselves,
+    // and an already-granted permission must answer instantly, as natively,
+    // rather than queue behind another bridge's open sheet.
+    private val oneSheetAtATime = Mutex()
 
-    suspend fun awaitDecision(confirmation: TrUAPIConfirmation): Boolean = oneAtATime.withLock {
-        when (confirmation) {
-            is TrUAPIConfirmation.Signing -> awaitSigningDecision(confirmation)
-            is TrUAPIConfirmation.Prompt -> awaitPromptDecision(confirmation)
-        }
+    suspend fun awaitDecision(confirmation: TrUAPIConfirmation): Boolean = when (confirmation) {
+        is TrUAPIConfirmation.Signing -> oneSheetAtATime.withLock { awaitSigningDecision(confirmation) }
+        is TrUAPIConfirmation.Prompt -> awaitPromptDecision(confirmation)
+    }
+
+    private suspend fun awaitPromptDecision(confirmation: TrUAPIConfirmation.Prompt): Boolean = when (confirmation) {
+        is TrUAPIConfirmation.StatementSign -> permissionGuard.requestPermission(
+            confirmation.callingProductId,
+            ProductPermission.AccountAccess(confirmation.accountOwner.value),
+        )
+
+        is TrUAPIConfirmation.AccountAlias -> permissionGuard.requestPermission(
+            confirmation.callingProductId,
+            ProductPermission.AccountAccess(confirmation.contextOwner.value),
+        )
+
+        is TrUAPIConfirmation.CreateProof -> crossProductProofRequester.awaitApproval(
+            callingProduct = confirmation.callingProductId,
+            onBehalfOf = confirmation.contextOwner,
+            suffix = confirmation.suffix,
+            message = confirmation.message,
+        )
+
+        is TrUAPIConfirmation.IdentityDisclosure -> permissionGuard.requestPermission(
+            confirmation.productId,
+            ProductPermission.UserIdentityAccess,
+        )
+
+        is TrUAPIConfirmation.ResourceAllocation -> awaitResourceAllocationDecision(confirmation)
+
+        is TrUAPIConfirmation.PreimageSubmit -> permissionGuard.consumePermission(
+            confirmation.callingProductId,
+            ProductPermission.RemotePermission.PreimageSubmitAccess,
+        )
+
+        is TrUAPIConfirmation.AccountAccess -> permissionGuard.requestPermission(
+            confirmation.requestingProductId,
+            ProductPermission.AccountAccess(confirmation.targetProductId.value),
+        )
     }
 
     // The app's own signing sheet, so a core-initiated signature is reviewed the
@@ -90,14 +92,26 @@ class TrUAPIConfirmationLauncher @Inject constructor(
         )
         signingContextHolder.set(context)
         productsRouter.openSignTransaction()
-        return context.await()
+        val approved = context.await()
+        // Holding the lock until the sheet is gone keeps a queued confirmation
+        // from pushing its sheet under the one still animating out.
+        context.awaitDismissal()
+        return approved
     }
 
-    private suspend fun awaitPromptDecision(confirmation: TrUAPIConfirmation.Prompt): Boolean {
-        val context = TrUAPIConfirmationContext(confirmation)
-        holder.set(context)
-        productsRouter.openTrUAPIConfirmation()
-        return context.await()
+    // Nothing to confirm for an empty request; the native path returns early too.
+    private suspend fun awaitResourceAllocationDecision(
+        confirmation: TrUAPIConfirmation.ResourceAllocation,
+    ): Boolean = confirmation.resources.isEmpty() || oneSheetAtATime.withLock {
+        val context = TrUAPIResourceAllocationContext(
+            productId = confirmation.callingProductId,
+            resources = confirmation.resources,
+        )
+        resourceAllocationContextHolder.set(context)
+        productsRouter.openResourceAllocationRequestPrompt()
+        val approved = context.await()
+        context.awaitDismissal()
+        approved
     }
 }
 

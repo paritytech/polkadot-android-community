@@ -23,6 +23,7 @@ class TrUAPISigningContext(
     override val requesterIconUrl: String = ""
 
     private val decision = CompletableDeferred<Boolean>()
+    private val dismissed = CompletableDeferred<Unit>()
 
     override suspend fun approve(sign: suspend () -> Result<SignedTransaction>): Result<Unit> {
         decision.complete(true)
@@ -38,11 +39,16 @@ class TrUAPISigningContext(
     /**
      * A dismissed sheet has to answer, or the core waits forever and the
      * launcher's mutex holds every later confirmation behind it. A no-op once
-     * a decision landed.
+     * a decision landed, except for marking the sheet dismissed: the launcher
+     * only moves on once the sheet is actually gone, so a queued confirmation
+     * cannot push its sheet under the one still animating out.
      */
     override fun onAbandoned() {
         decision.complete(false)
+        dismissed.complete(Unit)
     }
 
     suspend fun await(): Boolean = decision.await()
+
+    suspend fun awaitDismissal() = dismissed.await()
 }
