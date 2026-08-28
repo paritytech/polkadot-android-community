@@ -34,6 +34,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.FreeUnloadTokenResolver
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenResolverFactory
@@ -84,6 +85,10 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase = mockk()
     private val peopleMembershipProver: PeopleMembershipProver = mockk()
 
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider = mockk {
+        coEvery { instanceId() } returns Result.success(0u)
+    }
+
     private val useCase = RealUnloadRecyclerIntoExternalAssetUseCase(
         rpcCalls = rpcCalls,
         extrinsicService = extrinsicService,
@@ -101,6 +106,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
         peopleMembershipProver = peopleMembershipProver,
         chainAssetProvider = chainAssetProvider,
+        coinageInstanceIdProvider = coinageInstanceIdProvider,
     )
 
     /** The alias each voucher signs with is a native bandersnatch call; only the seam matters here. */

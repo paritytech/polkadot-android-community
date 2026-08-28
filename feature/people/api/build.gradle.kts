@@ -18,4 +18,6 @@ dependencies {
     api(project(":feature:members:api"))
 
     implementation(libs.hilt.android)
+
+    testImplementation(project(":test-shared"))
 }

@@ -143,13 +143,14 @@ class RealStatementStoreSlotAllocator @Inject constructor(
         priority: SlotPriority,
     ): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
         Timber.i("allocate: picked seq=${pick.seq} in ${pick.collection}, evictedAccount=${pick.evictedAccount}; submitting")
-        val origin = statementStoreOrigins.asResourcesStatementStoreSlot(context.period, pick.seq, pick.collection)
-
-        extrinsicService.submitExtrinsicAndAwaitExecution(context.chain, origin) {
-            resourcesCalls.setStatementStoreAccount(context.period, pick.seq, target)
-        }
-            .flattenExecutionFailure()
-            .coerceToUnit()
+        statementStoreOrigins.asResourcesStatementStoreSlot(context.period, pick.seq, pick.collection)
+            .flatMap { origin ->
+                extrinsicService.submitExtrinsicAndAwaitExecution(context.chain, origin) {
+                    resourcesCalls.setStatementStoreAccount(context.period, pick.seq, target)
+                }
+                    .flattenExecutionFailure()
+                    .coerceToUnit()
+            }
             .mapCatching {
                 pick.evictedAccount?.let { evicted ->
                     allocationRepository.deleteSlot(context.chain.id, pick.collection, evicted, pick.seq)

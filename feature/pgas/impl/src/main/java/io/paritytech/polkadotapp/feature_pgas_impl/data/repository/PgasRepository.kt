@@ -8,6 +8,8 @@ import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasClaimSpec
 interface PgasRepository : PgasClaimSpec {
     suspend fun maxClaimsPerPeriod(chainId: ChainId, collection: PeopleCollection): UInt
 
+    suspend fun networkSuffix(chainId: ChainId): Result<ByteArray>
+
     suspend fun claimedAliases(
         chainId: ChainId,
         period: UInt,

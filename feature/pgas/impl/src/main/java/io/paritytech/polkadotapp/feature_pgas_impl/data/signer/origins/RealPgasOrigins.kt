@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
 import io.paritytech.polkadotapp.feature_pgas_impl.data.extension.AsPgas
 import io.paritytech.polkadotapp.feature_pgas_impl.data.extension.pgasClaim
+import io.paritytech.polkadotapp.feature_pgas_impl.data.repository.PgasRepository
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.SetTransactionExtensionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
@@ -20,19 +21,25 @@ class RealPgasOrigins @Inject constructor(
     private val membersSubscriberRepository: MembersSubscriberRepository,
     private val chainRegistry: ChainRegistry,
     private val chainStateRepository: ChainStateRepository,
+    private val pgasRepository: PgasRepository,
 ) : PgasOrigins {
-    override suspend fun asPgasClaim(period: UInt, slotIndex: UInt, collection: PeopleCollection): TransactionOrigin {
-        val context = BandersnatchContext.pgasClaim(period, slotIndex)
-        val extension = AsPgas(
-            period = period,
-            context = context,
-            collection = collection,
-            peopleMembershipProver = peopleMembershipProver,
-            membersRepository = membersRepository,
-            membersSubscriberRepository = membersSubscriberRepository,
-            chainRegistry = chainRegistry,
-            chainStateRepository = chainStateRepository,
-        )
-        return SetTransactionExtensionOrigin(TransactionSignerSource.None, extension)
+    override suspend fun asPgasClaim(
+        period: UInt,
+        slotIndex: UInt,
+        collection: PeopleCollection,
+    ): Result<TransactionOrigin> {
+        return pgasRepository.networkSuffix(chainRegistry.assetHub().id).map { networkSuffix ->
+            val extension = AsPgas(
+                period = period,
+                context = BandersnatchContext.pgasClaim(networkSuffix, period, slotIndex),
+                collection = collection,
+                peopleMembershipProver = peopleMembershipProver,
+                membersRepository = membersRepository,
+                membersSubscriberRepository = membersSubscriberRepository,
+                chainRegistry = chainRegistry,
+                chainStateRepository = chainStateRepository,
+            )
+            SetTransactionExtensionOrigin(TransactionSignerSource.None, extension)
+        }
     }
 }

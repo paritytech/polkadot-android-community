@@ -15,6 +15,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_pgas_impl.data.blockchain.claimedGasAliases
 import io.paritytech.polkadotapp.feature_pgas_impl.data.blockchain.maxClaimsPerPeriodPerLitePerson
 import io.paritytech.polkadotapp.feature_pgas_impl.data.blockchain.maxClaimsPerPeriodPerPerson
+import io.paritytech.polkadotapp.feature_pgas_impl.data.blockchain.networkSuffix
 import io.paritytech.polkadotapp.feature_pgas_impl.data.blockchain.pgas
 import io.paritytech.polkadotapp.feature_pgas_impl.data.blockchain.pgasClaimAmount
 import javax.inject.Inject
@@ -30,6 +31,12 @@ class RealPgasRepository @Inject constructor(
                 PeopleCollection.LitePeople -> runtime.metadata.pgas.maxClaimsPerPeriodPerLitePerson
             }
         }
+    }
+
+    override suspend fun networkSuffix(chainId: ChainId): Result<ByteArray> = runCatching {
+        chainRegistry.withRuntime(chainId) {
+            runtime.metadata.pgas.networkSuffix
+        } ?: error("Pgas.Suffix constant is missing — runtime does not support product contexts")
     }
 
     override suspend fun claimedAliases(

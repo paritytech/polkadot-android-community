@@ -1,10 +1,12 @@
 package io.paritytech.polkadotapp.feature_chain_resources_api.data.api
 
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.serializers.ByteArraySerializable
 import io.novasama.substrate_sdk_android.runtime.metadata.RuntimeMetadata
 import io.novasama.substrate_sdk_android.runtime.metadata.module.Module
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableModule
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry0
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry1
+import io.paritytech.polkadotapp.chains.storage.source.query.api.constantOrNull
 import io.paritytech.polkadotapp.chains.storage.source.query.api.storage0
 import io.paritytech.polkadotapp.chains.storage.source.query.api.storage1
 import io.paritytech.polkadotapp.chains.util.WithRuntime
@@ -35,3 +37,7 @@ val ResourcesApi.usernameReservationQueue: QueryableStorageEntry1<String, List<O
 context(withRuntime: WithRuntime)
 val ResourcesApi.reservationDuration: QueryableStorageEntry0<BigInteger>
     get() = storage0("UsernameReservationDuration")
+
+context(withRuntime: WithRuntime)
+val ResourcesApi.networkSuffix: ByteArraySerializable?
+    get() = constantOrNull("Suffix")

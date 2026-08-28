@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.extension.ClaimLongTermStorage
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.extension.longTermStorageClaim
+import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.repository.LongTermStorageSlotRepository
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.SetTransactionExtensionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
@@ -14,19 +15,21 @@ import javax.inject.Inject
 class RealTransactionStorageOrigins @Inject constructor(
     private val peopleMembershipProver: PeopleMembershipProver,
     private val chainRegistry: ChainRegistry,
+    private val longTermStorageSlotRepository: LongTermStorageSlotRepository,
 ) : TransactionStorageOrigins {
     override suspend fun asResourcesLongTermStorage(
         period: UInt,
         counter: UByte,
         collection: PeopleCollection,
-    ): TransactionOrigin {
-        val context = BandersnatchContext.longTermStorageClaim(period, counter)
-        val extension = ClaimLongTermStorage(
-            context = context,
-            collection = collection,
-            peopleMembershipProver = peopleMembershipProver,
-            chainRegistry = chainRegistry,
-        )
-        return SetTransactionExtensionOrigin(TransactionSignerSource.None, extension)
+    ): Result<TransactionOrigin> {
+        return longTermStorageSlotRepository.networkSuffix(chainRegistry.peopleChain().id).map { networkSuffix ->
+            val extension = ClaimLongTermStorage(
+                context = BandersnatchContext.longTermStorageClaim(networkSuffix, period, counter),
+                collection = collection,
+                peopleMembershipProver = peopleMembershipProver,
+                chainRegistry = chainRegistry,
+            )
+            SetTransactionExtensionOrigin(TransactionSignerSource.None, extension)
+        }
     }
 }

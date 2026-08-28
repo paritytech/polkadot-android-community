@@ -43,8 +43,10 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.RealFreeUnloa
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.RealUnloadTokenPeriodCalculator
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenPeriodCalculator
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinageInstanceRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.ExponentBoundsRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealCoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealCoinageInstanceRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealExponentBoundsRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealRecyclerProofDataProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealVoucherRepository
@@ -52,9 +54,11 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RecyclerPr
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.CoinageSigningContextProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.RealCoinageSigningContextProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.CoinageAssetUnitStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.CoinsBackupLastIndexStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.CoinsDeepBackupCompletedStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.CoinsInitialBackupCompletedStorage
+import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RealCoinageAssetUnitStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RealCoinsBackupLastIndexStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RealCoinsDeepBackupCompletedStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RealCoinsInitialBackupCompletedStorage
@@ -128,6 +132,12 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindVouchersBackupLastIndexStorage(impl: RealVouchersBackupLastIndexStorage): VouchersBackupLastIndexStorage
+
+    @Binds
+    fun bindCoinageAssetUnitStorage(impl: RealCoinageAssetUnitStorage): CoinageAssetUnitStorage
+
+    @Binds
+    fun bindCoinageInstanceRepository(impl: RealCoinageInstanceRepository): CoinageInstanceRepository
 
     @Binds
     fun bindCoinKeypairDerivation(impl: RealCoinKeypairDerivation): CoinKeypairDerivation

@@ -1,14 +1,18 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.data.extension
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
-import io.paritytech.polkadotapp.bandersnatch_crypto.intoBandersnatchContext
-import io.paritytech.polkadotapp.common.utils.padEnd
-import io.paritytech.polkadotapp.common.utils.toBigEndianByteArray
+import io.paritytech.polkadotapp.common.utils.toLittleEndianBytes
+import io.paritytech.polkadotapp.feature_people_api.domain.personhoodProductContext
+import io.paritytech.polkadotapp.feature_people_api.domain.personhoodSystemSuffix
 
-internal fun BandersnatchContext.Companion.statementStoreSlot(period: UInt, seq: UInt): BandersnatchContext {
-    val contextBytes = "SSS_SLOT:".encodeToByteArray() +
-        period.toInt().toBigEndianByteArray() +
-        seq.toInt().toBigEndianByteArray()
+private const val STATEMENT_STORE_SLOT_FAMILY = 2u
 
-    return contextBytes.padEnd(32, padding = 0x20).intoBandersnatchContext()
+internal fun BandersnatchContext.Companion.statementStoreSlot(
+    networkSuffix: ByteArray,
+    period: UInt,
+    seq: UInt
+): BandersnatchContext {
+    val suffix = personhoodSystemSuffix(STATEMENT_STORE_SLOT_FAMILY, period, seq.toLittleEndianBytes())
+
+    return personhoodProductContext(networkSuffix, suffix)
 }

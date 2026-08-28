@@ -1,11 +1,13 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain
 
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.serializers.ByteArraySerializable
 import io.novasama.substrate_sdk_android.runtime.metadata.RuntimeMetadata
 import io.novasama.substrate_sdk_android.runtime.metadata.module.Module
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchAlias
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableModule
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry2
 import io.paritytech.polkadotapp.chains.storage.source.query.api.constant
+import io.paritytech.polkadotapp.chains.storage.source.query.api.constantOrNull
 import io.paritytech.polkadotapp.chains.storage.source.query.api.storage2
 import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.chains.util.resources
@@ -29,6 +31,10 @@ val StatementStoreResourcesApi.liteStmtStoreSlotsPerPeriod: UInt
 context(withRuntime: WithRuntime)
 val StatementStoreResourcesApi.stmtStoreReplacementCooldown: UInt
     get() = constant("StmtStoreReplacementCooldown")
+
+context(withRuntime: WithRuntime)
+val StatementStoreResourcesApi.networkSuffix: ByteArraySerializable?
+    get() = constantOrNull("Suffix")
 
 context(withRuntime: WithRuntime)
 val StatementStoreResourcesApi.statementStoreAllowances: QueryableStorageEntry2<BigEndianU32Scale, BandersnatchAlias, StmtStoreAllowanceEntry>

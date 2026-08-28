@@ -33,8 +33,9 @@ class StatementStoreSlotLoader @Inject constructor(
         collection: PeopleCollection,
     ): StatementSlotsForCollection {
         val maxSlots = statementStoreSlotRepository.maxSlotsPerPeriod(context.chain.id, collection)
+        val networkSuffix = statementStoreSlotRepository.networkSuffix(context.chain.id).getOrThrow()
         val aliasesByIndex = (0u until maxSlots).associateWith { seq ->
-            val ctx = BandersnatchContext.statementStoreSlot(context.period, seq)
+            val ctx = BandersnatchContext.statementStoreSlot(networkSuffix, context.period, seq)
             bandersnatchKeyResolver.getAliasInContext(collection, ctx)
         }
         val taken = statementStoreSlotRepository.allowanceEntries(context.chain.id, context.period, aliasesByIndex.values)

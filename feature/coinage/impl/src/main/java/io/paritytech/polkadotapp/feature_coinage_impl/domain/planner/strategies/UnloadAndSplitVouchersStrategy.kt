@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.chains.network.binding.BlockHash
 import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
 import io.paritytech.polkadotapp.chains.util.EncodedArguments.Companion.autoEncodedArgs
 import io.paritytech.polkadotapp.chains.util.call
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapIndexedAsync
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
@@ -20,6 +21,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.FreeUnloadTokenResolver
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenResolverFactory
@@ -54,7 +56,8 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
-    private val peopleMembershipProver: PeopleMembershipProver
+    private val peopleMembershipProver: PeopleMembershipProver,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider
 ) {
     fun create(
         payload: StrategyType.UnloadAndSplit,
@@ -76,7 +79,8 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
         coinageTransactionFactory = coinageTransactionFactory,
         breakdownUseCase = breakdownUseCase,
         balanceConverterUseCase = balanceConverterUseCase,
-        peopleMembershipProver = peopleMembershipProver
+        peopleMembershipProver = peopleMembershipProver,
+        coinageInstanceIdProvider = coinageInstanceIdProvider
     )
 }
 
@@ -96,7 +100,8 @@ class UnloadAndSplitVouchersStrategy(
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
-    private val peopleMembershipProver: PeopleMembershipProver
+    private val peopleMembershipProver: PeopleMembershipProver,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider
 ) : TransferStrategy {
     private val vouchers = payload.vouchersToUnload
     private val recipientAmount = payload.recipientAmount
@@ -202,7 +207,7 @@ class UnloadAndSplitVouchersStrategy(
         personProver: PrecomputedPersonMembershipProver,
         recyclerRevisionBlockHash: BlockHash,
         revision: RingRevision
-    ) = run {
+    ) = coinageInstanceIdProvider.instanceId().flatMap { instanceId ->
         val destinations = outputCoins.toSplitDestinations()
         val origin = makeOriginDefinition(batch.vouchers, unloadToken, recyclerRevisionBlockHash, personProver)
         val aliases = buildAliases(batch.vouchers)
@@ -216,6 +221,7 @@ class UnloadAndSplitVouchersStrategy(
                     moduleName = "Coinage",
                     callName = "unload_recycler_into_coins",
                     arguments = autoEncodedArgs(
+                        "instance_id" to instanceId.toLong(),
                         "aliases" to aliases,
                         "value" to batch.recyclerKey.exponent,
                         "index" to batch.recyclerKey.recyclerIndex,

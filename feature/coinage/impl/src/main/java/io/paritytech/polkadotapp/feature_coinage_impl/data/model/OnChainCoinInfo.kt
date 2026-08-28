@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 @Keep
 @Serializable
 class OnChainCoinInfo(
+    val instanceId: Int,
     val value: Int,
     val age: Int
 )

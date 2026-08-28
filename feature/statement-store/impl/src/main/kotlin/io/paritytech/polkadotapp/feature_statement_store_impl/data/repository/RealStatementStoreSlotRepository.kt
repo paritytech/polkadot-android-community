@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.common.utils.scale.BigEndianU32Scale
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.liteStmtStoreSlotsPerPeriod
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.model.StmtStoreAllowanceEntry
+import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.networkSuffix
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.statementStoreAllowances
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.statementStoreResources
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.stmtStoreReplacementCooldown
@@ -29,6 +30,12 @@ class RealStatementStoreSlotRepository @Inject constructor(
                 PeopleCollection.LitePeople -> runtime.metadata.statementStoreResources.liteStmtStoreSlotsPerPeriod
             }
         }
+    }
+
+    override suspend fun networkSuffix(chainId: ChainId): Result<ByteArray> = runCatching {
+        chainRegistry.withRuntime(chainId) {
+            runtime.metadata.statementStoreResources.networkSuffix
+        } ?: error("Resources.Suffix constant is missing — runtime does not support product contexts")
     }
 
     override suspend fun replacementCooldown(chainId: ChainId): Duration {

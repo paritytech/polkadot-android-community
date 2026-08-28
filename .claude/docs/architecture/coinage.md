@@ -80,3 +80,4 @@ If a new feature crosses any of these, name the alignment in the architect plan.
 | External-payment state machine | `feature/coinage/impl/.../domain/externalPayment/state/` |
 | Coinage worker | `feature/coinage/impl/.../data/worker/` (`code/workers-and-background-sync.md`) |
 | DB changes (CoinLocal, VoucherLocal) | follow `code/database-and-scale.md` |
+| Instance id config | `CoinageInstanceIdProvider` (remote config `coinage_instance_id`, fallback 0 — the genesis instance of the external asset) |

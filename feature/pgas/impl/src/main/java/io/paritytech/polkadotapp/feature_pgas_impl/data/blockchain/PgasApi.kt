@@ -1,11 +1,13 @@
 package io.paritytech.polkadotapp.feature_pgas_impl.data.blockchain
 
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.serializers.ByteArraySerializable
 import io.novasama.substrate_sdk_android.runtime.metadata.RuntimeMetadata
 import io.novasama.substrate_sdk_android.runtime.metadata.module.Module
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchAlias
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableModule
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry2
 import io.paritytech.polkadotapp.chains.storage.source.query.api.constant
+import io.paritytech.polkadotapp.chains.storage.source.query.api.constantOrNull
 import io.paritytech.polkadotapp.chains.storage.source.query.api.storage2
 import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.chains.util.numberConstant
@@ -30,6 +32,10 @@ val PgasApi.maxClaimsPerPeriodPerLitePerson: UInt
 context(withRuntime: WithRuntime)
 val PgasApi.pgasClaimAmount: BigInteger
     get() = module.numberConstant("PgasClaimAmount")
+
+context(withRuntime: WithRuntime)
+val PgasApi.networkSuffix: ByteArraySerializable?
+    get() = constantOrNull("Suffix")
 
 context(withRuntime: WithRuntime)
 val PgasApi.claimedGasAliases: QueryableStorageEntry2<BigEndianU32Scale, BandersnatchAlias, Unit>
