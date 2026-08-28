@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.common.utils.CurrencyConfig
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Info
@@ -156,7 +157,7 @@ fun DigitalDollarCard(
                     HorizontalSpacer { extraSmall }
 
                     NovaText(
-                        text = stringResource(RCommon.string.pocket_digital_dollar_card_title),
+                        text = stringResource(RCommon.string.pocket_digital_dollar_card_title, CurrencyConfig.symbol),
                         style = PolkadotTheme.typography.title.large,
                         color = PocketCardColors.Primary
                     )

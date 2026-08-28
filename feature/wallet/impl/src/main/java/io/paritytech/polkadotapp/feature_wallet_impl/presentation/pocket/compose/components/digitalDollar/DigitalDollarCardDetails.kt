@@ -26,6 +26,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.loading.onLoaded
+import io.paritytech.polkadotapp.common.utils.CurrencyConfig
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotButton
@@ -279,7 +280,7 @@ private fun SendCashButton(
                 imageVector = NovaIcons.ArrowUpwards
             )
 
-            NovaText(stringResource(RCommon.string.pocket_digital_dollar_send_button))
+            NovaText(stringResource(RCommon.string.pocket_digital_dollar_send_button, CurrencyConfig.symbol))
         }
     }
 }

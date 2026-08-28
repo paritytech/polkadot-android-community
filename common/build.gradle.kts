@@ -1,13 +1,19 @@
+import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
+
 plugins {
     id("polkadotapp.android.library")
     id("polkadotapp.android.compose")
     alias(libs.plugins.kotlin.serialization)
 }
 
+val localProperties = gradleLocalProperties(rootDir, providers)
+
 android {
     namespace = "io.paritytech.polkadotapp.common"
 
     defaultConfig {
+        buildConfigString("CURRENCY_SYMBOL", localProperties.readSecretOrDefault("CURRENCY_SYMBOL", "CASH"))
+
         buildConfigField("String", "TESTNET_ENVIRONMENT", "\"TESTNET\"")
         buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "true")
         buildConfigField("boolean", "DIM1_ENABLED", "true")
