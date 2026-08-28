@@ -37,4 +37,11 @@ interface TransactionStorageRepository {
      * Runtime constant `AuthorizationPeriod` — duration of one authorization window in blocks.
      */
     suspend fun authorizationPeriod(chainId: ChainId): Result<BlockNumber>
+
+    /**
+     * Calls `HopRuntimeApi.can_account_promote(who, data_len)` on the Bullet-In chain. The HOP node applies
+     * the same check to `hop_submit`. The runtime returns `true` when the account holds an unexpired
+     * `TransactionStorage` authorization; the spent extent and `data_len` are not checked.
+     */
+    suspend fun canAccountPromote(chainId: ChainId, accountId: AccountId, dataLength: UInt): Result<Boolean>
 }

@@ -17,10 +17,20 @@ data class TransactionStorageAuthorization(
 data class TransactionStorageExtent(
     val transactions: BigIntegerSerializable,
     val transactionsAllowance: BigIntegerSerializable,
-    val bytesPermanent: BigIntegerSerializable,
     val bytes: BigIntegerSerializable,
+    val extra: TransactionStorageExtentExtra,
     val bytesAllowance: BigIntegerSerializable
 )
+
+// Mirrors Bulletin `AuthorizationExtent<Extra>` with `Extra = PermanentExtent { bytes_permanent }`
+// (bulletin-paseo runtime >= 1_000_026).
+@Serializable
+data class TransactionStorageExtentExtra(
+    val bytesPermanent: BigIntegerSerializable
+)
+
+val TransactionStorageExtent.bytesPermanent: BigInteger
+    get() = extra.bytesPermanent
 
 val TransactionStorageExtent.remainingTransactions: BigInteger
     get() = (transactionsAllowance - transactions).atLeastZero()

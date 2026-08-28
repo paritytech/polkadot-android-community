@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
+import io.paritytech.polkadotapp.chains.network.rpc.RpcCalls
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
@@ -36,6 +37,8 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.flattenExecutionFailure
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import java.math.BigInteger
@@ -55,6 +58,7 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     private val bandersnatchKeyResolver: BandersnatchKeyResolver,
     private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
+    private val rpcCalls: RpcCalls,
 ) : TransactionStorageSlotAllocator {
     /**
      * The claim is submitted on the **people** chain, but the resulting allowance is propagated to
@@ -75,9 +79,9 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
                     Timber.i("existing allocation=${ctx.previousCount}; strategy=IGNORE — skipping claim")
                     return@flatMap Result.success(Unit)
                 }
-                pickFreeCounter(ctx.chain.id, ctx.period, ctx.collection)
+                pickFreeCounter(ctx.claim.chain.id, ctx.claim.period, ctx.claim.collection)
                     .mapError { TransactionStorageSlotAllocationError.NoAllocationAvailable(it) }
-                    .flatMap { counter -> submitClaim(ctx, counter, target) }
+                    .flatMap { counter -> submitClaim(ctx.claim, counter, target) }
                     .onSuccess {
                         awaitAllocationVisibleOnBulletIn(target, ctx.previousCount)
                             .logFailure("Failed to awaitAllocationVisibleOnBulletIn")
@@ -88,23 +92,84 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
             .mapErrorNotInstance<_, TransactionStorageSlotAllocationError> { TransactionStorageSlotAllocationError.Unknown(it) }
     }
 
+    /**
+     * Uses `HopRuntimeApi.can_account_promote` instead of the `Authorizations` storage entry: HOP promotion
+     * requires an unexpired authorization; the remaining extent is not checked. A failed runtime call fails
+     * the result and does not trigger a claim.
+     */
     context(diagnostics: StalenessReportCollector)
-    private suspend fun resolveAllocateContext(target: AccountId): Result<AllocateContext> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
+    override suspend fun ensurePromotable(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_allocating) {
+        Timber.i("ensuring active bullet-in authorization for HOP promotion")
+
+        chainConnectionRefCounter.withConnectionEnabled(
+            chainIds = setOf(knownChains.people, knownChains.bulletIn),
+            label = CONNECTION_LABEL
+        ) {
+            canPromote(target).flatMap { promotable ->
+                if (promotable) {
+                    Timber.i("active authorization present on bullet-in — skipping claim")
+                    return@flatMap Result.success(Unit)
+                }
+                resolveClaimContext().flatMap { ctx ->
+                    pickFreeCounter(ctx.chain.id, ctx.period, ctx.collection)
+                        .mapError { TransactionStorageSlotAllocationError.NoAllocationAvailable(it) }
+                        .flatMap { counter -> submitClaim(ctx, counter, target) }
+                        .flatMap { awaitPromotableOnBulletIn(target) }
+                }
+            }
+        }
+            .onFailure { Timber.e(it, "ensurePromotable failed") }
+            .mapErrorNotInstance<_, TransactionStorageSlotAllocationError> { TransactionStorageSlotAllocationError.Unknown(it) }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun canPromote(target: AccountId): Result<Boolean> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
+        transactionStorageRepository.canAccountPromote(knownChains.bulletIn, target, dataLength = 0u)
+            .onSuccess { Timber.i("can_account_promote=$it") }
+    }
+
+    /** Evaluates `can_account_promote` once immediately and then on every new bullet-in head. */
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun awaitPromotableOnBulletIn(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_awaiting_bulletin) {
         runCatching {
-            val chain = chainRegistry.getChain(knownChains.people)
-            val collection = activePeopleCollectionUseCase.getActivePeopleCollection()
-            val period = currentPeriod(chain.id)
-            val previousCount = currentBulletInAllocation(target)
-            Timber.i("chain=${chain.id}, collection=$collection, period=$period, pre-tx allocation=$previousCount")
-            AllocateContext(chain, collection, period, previousCount)
+            withTimeout(AWAIT_PROMOTABLE_TIMEOUT) {
+                Timber.i("waiting for bullet-in to report the authorization active")
+
+                rpcCalls.subscribeNewHeads(knownChains.bulletIn)
+                    .map { }
+                    .onStart { emit(Unit) }
+                    .map { transactionStorageRepository.canAccountPromote(knownChains.bulletIn, target, dataLength = 0u).getOrThrow() }
+                    .first { it }
+
+                Timber.i("authorization active on bullet-in")
+            }
         }
     }
 
     context(diagnostics: StalenessReportCollector)
-    private suspend fun submitClaim(ctx: AllocateContext, counter: UByte, target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
+    private suspend fun resolveClaimContext(): Result<ClaimContext> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
+        runCatching {
+            val chain = chainRegistry.getChain(knownChains.people)
+            val collection = activePeopleCollectionUseCase.getActivePeopleCollection()
+            val period = currentPeriod(chain.id)
+            Timber.i("chain=${chain.id}, collection=$collection, period=$period")
+            ClaimContext(chain, collection, period)
+        }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun resolveAllocateContext(target: AccountId): Result<AllocateContext> {
+        return resolveClaimContext().mapCatching { claim ->
+            val previousCount = currentBulletInAllocation(target)
+            Timber.i("pre-tx allocation=$previousCount")
+            AllocateContext(claim, previousCount)
+        }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun submitClaim(ctx: ClaimContext, counter: UByte, target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
         Timber.i("picked free counter=$counter; submitting claim_long_term_storage extrinsic")
         val origin = transactionStorageOrigins.asResourcesLongTermStorage(ctx.period, counter, ctx.collection)
-
         extrinsicService.submitExtrinsicAndAwaitExecution(ctx.chain, origin) {
             resourcesCalls.claimLongTermStorage(ctx.period, counter, target)
         }
@@ -162,15 +227,20 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
         return (Clock.System.now().epochSeconds / periodSeconds).toUInt()
     }
 
-    private data class AllocateContext(
+    private data class ClaimContext(
         val chain: Chain,
         val collection: PeopleCollection,
         val period: UInt,
+    )
+
+    private data class AllocateContext(
+        val claim: ClaimContext,
         val previousCount: BigInteger,
     )
 
     companion object {
         val AWAIT_BULLETIN_TIMEOUT = 30.seconds
+        val AWAIT_PROMOTABLE_TIMEOUT = 60.seconds
         private const val CONNECTION_LABEL = "TransactionStorageSlotAllocator"
     }
 }

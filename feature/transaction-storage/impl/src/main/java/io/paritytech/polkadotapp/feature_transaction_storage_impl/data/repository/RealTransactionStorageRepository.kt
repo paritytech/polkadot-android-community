@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_transaction_storage_impl.data.repository
 
+import io.paritytech.polkadotapp.chains.call.MultiChainRuntimeCallsApi
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.multiNetwork.withRuntime
@@ -16,6 +17,8 @@ import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.Transact
 import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.model.TransactionStorageAuthorization
 import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.model.TransactionStorageAuthorizationScope
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.authorizations
+import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.canAccountPromote
+import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.hop
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.transactionStorage
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -23,6 +26,7 @@ import javax.inject.Inject
 class RealTransactionStorageRepository @Inject constructor(
     private val chainRegistry: ChainRegistry,
     private val storageDataSources: StorageDataSources,
+    private val multiChainRuntimeCallsApi: MultiChainRuntimeCallsApi,
 ) : TransactionStorageRepository {
     override suspend fun getAuthorization(
         chainId: ChainId,
@@ -51,6 +55,12 @@ class RealTransactionStorageRepository @Inject constructor(
                     .numberConstant("AuthorizationPeriod")
                     .toBlockNumber()
             }
+        }
+    }
+
+    override suspend fun canAccountPromote(chainId: ChainId, accountId: AccountId, dataLength: UInt): Result<Boolean> {
+        return runCatching {
+            multiChainRuntimeCallsApi.forChain(chainId).hop.canAccountPromote(accountId, dataLength)
         }
     }
 }
