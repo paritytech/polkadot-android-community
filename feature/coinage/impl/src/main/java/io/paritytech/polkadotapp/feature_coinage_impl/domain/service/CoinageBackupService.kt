@@ -13,10 +13,8 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.newaccount.New
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin.Age
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin.SpentState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.UsageState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.toRingCollectionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBackupService
@@ -201,9 +199,10 @@ class RealCoinageBackupService @Inject constructor(
         Coin(
             derivationIndex = coinAccountsToCheck[accountId] ?: return@mapNotNull null,
             valueExponent = ValueExponent(onChainInfo.value),
-            spentState = SpentState.NOT_SPENT,
             accountId = accountId,
-            age = Age.Known(onChainInfo.age)
+            // Recovered from a read that found it, so it is on chain by construction.
+            age = Age.Known(onChainInfo.age),
+            isOnChain = true
         )
     }
 
@@ -332,8 +331,7 @@ class RealCoinageBackupService @Inject constructor(
             location = onChainInfo.getVoucherLocation(),
             allocatedAt = System.currentTimeMillis(),
             delayUnloadUntil = System.currentTimeMillis(),
-            ringHasEnoughRingMembersToWithdraw = false,
-            usageState = UsageState.NOT_USED
+            ringHasEnoughRingMembersToWithdraw = false
         )
     }
 

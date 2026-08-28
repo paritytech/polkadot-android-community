@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
@@ -21,6 +22,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionR
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.data.worker.stateMachine.executeUntilPossible
 import io.paritytech.polkadotapp.common.data.worker.stateMachine.toWorkerResult
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.repository.ExternalPaymentRepository
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -59,14 +61,18 @@ class ExternalPaymentWorker @AssistedInject constructor(
     private val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     override suspend fun doWork(): Result {
+        coinageLogD("External payment worker run started")
+
         return chainConnectionRefCounter.withConnectionEnabled(chainAssetProvider.chainId(), "ExternalPaymentWorker") {
             processExternalPayments()
-        }
+        }.also { coinageLogD("External payment worker run finished result=$it") }
     }
 
     private suspend fun processExternalPayments(): Result {
         while (true) {
             val pending = repository.getNextPending() ?: return Result.success()
+
+            coinageLogD("External payment processing payment=${pending.id} stage=${pending.stage}")
 
             val outcome = stateMachineFactory.create(pending.id)
                 .executeUntilPossible()
@@ -90,7 +96,7 @@ class ExternalPaymentWorker @AssistedInject constructor(
             .setOngoing(true)
             .build()
 
-        return ForegroundInfo(NOTIFICATION_ID, notification)
+        return ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
 
     private fun createChannel(): String {

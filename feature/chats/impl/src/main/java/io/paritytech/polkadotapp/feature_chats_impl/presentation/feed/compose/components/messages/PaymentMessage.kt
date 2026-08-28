@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -217,6 +219,8 @@ private fun PaymentStatusIndicator(
         NovaIcons.ArrowUpward
     }
 
+    val formatter = LocalTokenAmountFormatter.current
+
     val icon: ImageVector?
     val text: String
     val color: Color
@@ -248,6 +252,15 @@ private fun PaymentStatusIndicator(
                 } else {
                     RCommon.string.chat_payment_status_detected_on_chain_sender
                 }
+            )
+            color = baseStatusColor
+        }
+
+        status is ChatMessageUiModel.CoinagePayment.Status.PartiallyClaimed -> {
+            icon = arrowIcon
+            text = stringResource(
+                RCommon.string.chat_payment_status_partially_claimed,
+                formatter.formatTokenAmount(status.claimed, RoundPrecision.DEFAULT)
             )
             color = baseStatusColor
         }
@@ -292,13 +305,13 @@ private fun PaymentStatusIndicator(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Preview(showBackground = true, backgroundColor = 0xFF000000, heightDp = PREVIEW_HEIGHT)
 @Composable
 private fun IncomingMessagesPreview() {
     MessagesPreview(direction = ChatMessageUiModel.Direction.INCOMING)
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Preview(showBackground = true, backgroundColor = 0xFF000000, heightDp = PREVIEW_HEIGHT)
 @Composable
 private fun OutcomingMessagesPreview() {
     MessagesPreview(direction = ChatMessageUiModel.Direction.OUTGOING)
@@ -312,7 +325,9 @@ private fun MessagesPreview(direction: ChatMessageUiModel.Direction) {
             LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 PaymentMessagePreview(
@@ -325,11 +340,27 @@ private fun MessagesPreview(direction: ChatMessageUiModel.Direction) {
                 )
                 PaymentMessagePreview(
                     direction = direction,
-                    paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Transferred(TokenAmountModel.mock),
+                    paymentStatus = ChatMessageUiModel.CoinagePayment.Status.PartiallyClaimed(
+                        TokenAmountModel.mock(value = 500)
+                    ),
                 )
                 PaymentMessagePreview(
                     direction = direction,
+                    paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Transferred(TokenAmountModel.mock),
+                )
+                // Claiming ended short: the amount is struck through and the shortfall called out. Only a
+                // finished claim reaches this, which is what keeps it off the screen while a retry is due.
+                PaymentMessagePreview(
+                    direction = direction,
                     paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Transferred(TokenAmountModel.mock(value = 500)),
+                )
+                PaymentMessagePreview(
+                    direction = direction,
+                    paymentStatus = ChatMessageUiModel.CoinagePayment.Status.FailedDetection,
+                )
+                PaymentMessagePreview(
+                    direction = direction,
+                    paymentStatus = ChatMessageUiModel.CoinagePayment.Status.FailedTransfer,
                 )
                 PaymentMessagePreview(
                     direction = direction,
@@ -367,3 +398,6 @@ private fun PaymentMessagePreview(
         onLongPress = {}
     )
 }
+
+/** Tall enough for the whole status gallery; the scroll is for the interactive preview. */
+private const val PREVIEW_HEIGHT = 1400

@@ -127,7 +127,7 @@ class TransferPlannerTest {
     @Test
     fun `Non-spendable coin - is ignored consistently so a valid unload plan is produced`() = runBlocking {
         // Regression: a NOT_SPENT but past-recycling-age coin (age >= 16) is excluded by exact-match
-        // (findSubsetSum filters canBeSpent) but was previously INCLUDED by coverage
+        // (findSubsetSum filters by age) but was previously INCLUDED by coverage
         // (findMaxCoinCoverage did not filter). Coverage then reached the amount exactly
         // (restAmount == 0) and crashed with IllegalStateException("Not needed to split coins").
         // The non-spendable coin must be ignored everywhere, leaving a valid unload plan.
@@ -263,8 +263,8 @@ class TransferPlannerTest {
         return Coin(
             derivationIndex = coinIndexCounter++,
             valueExponent = ValueExponent(exponent),
-            age = Coin.Age.Known(ageKnown),
-            spentState = if (isSpent) Coin.SpentState.SPENT_ON_CHAIN else Coin.SpentState.NOT_SPENT,
+            age = if (isSpent) Coin.Age.Unknown else Coin.Age.Known(ageKnown),
+            isOnChain = true,
             accountId = emptySubstrateAccountId()
         )
     }
@@ -286,7 +286,6 @@ class TransferPlannerTest {
             location = Location.InRecycler(index),
             allocatedAt = 0L,
             delayUnloadUntil = delayUnloadUntil,
-            usageState = RecyclerVoucher.UsageState.NOT_USED,
             ringHasEnoughRingMembersToWithdraw = enoughMembers
         )
     }

@@ -5,9 +5,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers as BuiltInDispatchers
 
+interface CoroutineDispatchers {
+    val main: CoroutineDispatcher
+    val io: CoroutineDispatcher
+    val computation: CoroutineDispatcher
+}
+
 @Singleton
-class CoroutineDispatchers @Inject constructor() {
-    val main: CoroutineDispatcher = BuiltInDispatchers.Main
-    val io: CoroutineDispatcher = BuiltInDispatchers.IO
-    val computation: CoroutineDispatcher = BuiltInDispatchers.Default
+class RealCoroutineDispatchers @Inject constructor() : CoroutineDispatchers {
+    override val main: CoroutineDispatcher = BuiltInDispatchers.Main
+    override val io: CoroutineDispatcher = BuiltInDispatchers.IO
+    override val computation: CoroutineDispatcher = BuiltInDispatchers.Default
 }

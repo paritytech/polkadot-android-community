@@ -394,6 +394,22 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="claim_username_recovered_header">Account restored</string>
     <string name="claim_username_recovered_description">Claim a username - it\'s how people find, pay, and message you.</string>
 
+    <string name="registration_queue_title">You\'re almost there</string>
+    <string name="registration_queue_description">The queue helps us protect the service from bots and fake mass sign-ups. It keeps access safe and fair for everyone.</string>
+    <string name="registration_queue_position_caption">Your position</string>
+    <string name="registration_queue_why_waiting">Why am I waiting?</string>
+    <string name="registration_queue_why_title">Why is there a queue?</string>
+    <string name="registration_queue_why_description">We use a queue to protect the service from bots, scripts, and automated mass sign-ups</string>
+    <string name="registration_queue_why_point_secure">Keep the system secure</string>
+    <string name="registration_queue_why_point_fair">Make access fair for real users</string>
+    <string name="registration_queue_why_point_abuse">Prevent abuse and overload</string>
+
+    <string name="claim_unavailable_title">Device verification isn\'t available</string>
+    <string name="claim_unavailable_description">Free username claims require device verification, but this device doesn\'t support the required verification method.</string>
+
+    <string name="integrity_failed_title">App safety check failed</string>
+    <string name="integrity_failed_description">We couldn\'t confirm that this app is safe to use on this device</string>
+
     <string name="backup_override_title">Replacing this backup is permanent.</string>
     <string name="backup_override_description">The account, money, collectables and all information tied to this backup will be lost unless you\'ve already written down the recovery phrase.</string>
     <string name="backup_override_confirmation">I\'ve written down the recovery phrase for the old account.</string>
@@ -474,6 +490,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
 
     <string name="coinage_recycling_worker_notification_title">Coin recycling</string>
     <string name="coinage_recycling_worker_notification_message">Recycling aged coins to keep your wallet healthy</string>
+
+    <string name="coinage_recovery_worker_notification_title">Confirming payments</string>
+    <string name="coinage_recovery_worker_notification_message">Waiting for your recent payments to settle on chain</string>
 
     <string name="revoke_payments_toolbar_title">Revoke Payments</string>
     <string name="revoke_payments_title">Revoke pending payments?</string>
@@ -1046,6 +1065,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_payment_status_detected_on_chain_sender">Sent, pending claim</string>
     <string name="chat_payment_status_detected_on_chain_recipient">Claiming…</string>
     <string name="chat_payment_status_claimed">Claimed</string>
+    <string name="chat_payment_status_partially_claimed">Claimed %1$s, waiting for the rest…</string>
     <string name="chat_payment_status_not_detected">Transaction failed</string>
     <string name="chat_payment_status_failed">Invalid transaction</string>
     <string name="chat_payment_amount_differs">Amount received differs from amount sent</string>

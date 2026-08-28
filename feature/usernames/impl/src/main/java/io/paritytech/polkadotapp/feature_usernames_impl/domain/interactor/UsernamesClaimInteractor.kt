@@ -12,9 +12,10 @@ import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAcc
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.RecoverUsernameUseCase
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameAlreadyClaimedException
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameRepository
+import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.QueuedClaimStorage
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameOutcome
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
-import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.AdoptWalletBackendAuthUseCase
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameClaimResult
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.CreateClaimParamsUseCase
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.BackupOutcome
 import kotlinx.coroutines.flow.Flow
@@ -42,8 +43,8 @@ class RealUsernamesClaimInteractor @Inject constructor(
     private val usernameRepository: UsernameRepository,
     private val coroutineDispatchers: CoroutineDispatchers,
     private val localUsernameStorage: LocalUsernameStorage,
+    private val queuedClaimStorage: QueuedClaimStorage,
     private val createClaimParamsUseCase: CreateClaimParamsUseCase,
-    private val adoptWalletBackendAuthUseCase: AdoptWalletBackendAuthUseCase,
     private val observeAccountOnboardingStatusUseCase: ObserveAccountOnboardingStatusUseCase,
     private val tryRecoverFromBackupAndCreateAccountUseCase: TryRecoverFromBackupAndCreateAccountUseCase,
     private val accountRepository: AccountRepository,
@@ -59,18 +60,29 @@ class RealUsernamesClaimInteractor @Inject constructor(
 
     override suspend fun claimUsername(username: Username, preferredDigits: String): ClaimUsernameOutcome {
         return withContext(coroutineDispatchers.io) {
-            // The backend only registers a username for the account that
-            // authenticated the request, so switch backend auth over to the
-            // wallet key before claiming (device-uniqueness-backend #77).
-            runCatching { adoptWalletBackendAuthUseCase() }
-                .flatMap { usernameRepository.getVerifier() }
+            usernameRepository.getVerifier()
                 .flatMap { createClaimParamsUseCase(username, it, preferredDigits) }
                 .flatMap { usernameRepository.claimUsername(it) }
-                .map { localUsernameStorage.saveValue(it) }
                 .fold(
-                    onSuccess = { ClaimUsernameOutcome.Claimed },
+                    onSuccess = { handleClaimResult(it) },
                     onFailure = { mapClaimFailure(it, username) }
                 )
+        }
+    }
+
+    private suspend fun handleClaimResult(result: UsernameClaimResult): ClaimUsernameOutcome {
+        return when (result) {
+            is UsernameClaimResult.Registered -> {
+                localUsernameStorage.saveValue(result.username)
+                ClaimUsernameOutcome.Claimed
+            }
+
+            is UsernameClaimResult.Queued -> {
+                queuedClaimStorage.saveValue(result.username)
+                ClaimUsernameOutcome.Queued
+            }
+
+            UsernameClaimResult.PaymentRequired -> ClaimUsernameOutcome.PaymentRequired
         }
     }
 

@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_become_citizen_impl.data.provideEvidence.upload
 
+import io.novasama.substrate_sdk_android.runtime.extrinsic.ExtrinsicVersion
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchSignature
 import io.paritytech.polkadotapp.chains.di.RemoteSourceQualifier
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
@@ -43,7 +44,6 @@ import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.Transact
 import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.model.TransactionStorageAuthorization
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicExecutionResult
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
-import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicVersion
 import io.paritytech.polkadotapp.feature_transactions.api.data.FormExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.SignedOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.ExtrinsicSubmission

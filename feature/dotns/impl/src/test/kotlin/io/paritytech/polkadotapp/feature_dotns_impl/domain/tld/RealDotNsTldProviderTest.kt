@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.feature_dotns_impl.domain.tld
 
-import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.DotNsContractApi
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.DotNsTldStorage
@@ -19,7 +19,7 @@ class RealDotNsTldProviderTest {
     private val storage = FakeDotNsTldStorage()
 
     private val provider by lazy {
-        RealDotNsTldProvider(contractApi, storage, CoroutineDispatchers())
+        RealDotNsTldProvider(contractApi, storage, RealCoroutineDispatchers())
     }
 
     @Test

@@ -90,7 +90,8 @@ class ChatRoomDaoTest {
                 content = content.encodeToByteArray(),
                 replyToMessageId = null,
                 isInternal = false
-            )
+            ),
+            onSaved = {},
         )
     }
 

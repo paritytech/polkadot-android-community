@@ -5,16 +5,18 @@ import io.paritytech.polkadotapp.common.utils.currentTimestampFlow
 import io.paritytech.polkadotapp.common.utils.transformPair
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.formatCoinsToBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.formatVouchersToBalance
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.canBeSpent
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUse
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUseSecured
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isAwaitingRecycling
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isMinting
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isOnboarding
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isSelectable
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -26,7 +28,7 @@ private val TOTAL_BALANCE_UPDATE_INTERVAL = 6.seconds
 
 class RealTotalBalanceUseCase @Inject constructor(
     private val coinRepository: CoinRepository,
-    private val voucherRepository: VoucherRepository,
+    private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase
 ) : TotalBalanceUseCase {
     override fun subscribeTotalBalance(): Flow<Result<CoinageBalance>> {
@@ -34,8 +36,8 @@ class RealTotalBalanceUseCase @Inject constructor(
 
         return combine(
             currentTimestampFlow(interval = TOTAL_BALANCE_UPDATE_INTERVAL),
-            coinRepository.subscribeAllNotSpentCoins(),
-            voucherRepository.subscribeAllNotUsedVouchers()
+            coinageAssetsUseCase.subscribeCoins(),
+            coinageAssetsUseCase.subscribeVouchers()
         ) { currentTimeMillis, coins, vouchers ->
             calculateCoinageBalance(coins, vouchers, currentTimeMillis, recyclingAge)
         }.distinctUntilChanged()
@@ -43,34 +45,48 @@ class RealTotalBalanceUseCase @Inject constructor(
 
     override suspend fun getBalance(): Result<CoinageBalance> {
         return calculateCoinageBalance(
-            coins = coinRepository.getAllNotSpentCoins(),
-            vouchers = voucherRepository.getAllNotUsedVouchers(),
+            coins = coinageAssetsUseCase.getCoins(),
+            vouchers = coinageAssetsUseCase.getVouchers(),
             currentTimeMillis = System.currentTimeMillis(),
             recyclingAge = coinRepository.getCoinRecyclingAge(),
         )
     }
 
     @VisibleForTesting
+    /**
+     * A locked or already-consumed asset counts nowhere; of the rest, presence decides spendable from
+     * pending, and absence is only pending while the transaction minting it is still live.
+     */
     internal suspend fun calculateCoinageBalance(
-        coins: List<Coin>,
-        vouchers: List<RecyclerVoucher>,
+        coins: List<TrackedCoin>,
+        vouchers: List<TrackedVoucher>,
         currentTimeMillis: Timestamp,
         recyclingAge: Int,
     ): Result<CoinageBalance> = coinageBalanceConverterUseCase.create()
         .map { conversionContext ->
-            val (spendableCoinsBalance, pendingCoinsBalance) = coins
-                .partition { it.canBeSpent(recyclableAge = recyclingAge) }
-                .transformPair { conversionContext.formatCoinsToBalance(it) }
+            val spendableCoinsBalance = conversionContext.formatCoinsToBalance(
+                coins.filter { it.isSelectable(recyclingAge) }.map { it.coin }
+            )
+            val pendingCoinsBalance = conversionContext.formatCoinsToBalance(
+                coins.filter { it.isMinting() || it.isAwaitingRecycling(recyclingAge) }.map { it.coin }
+            )
 
-            val (readyVouchers, notReadyVouchers) = vouchers.partition { it.isReadyToUse() }
+            val (readyVouchers, unreadyVouchers) = vouchers
+                .filter { it.state.isFree }
+                .partition { it.isSelectable() }
 
             val (securedVouchersBalance, degradedVouchersBalance) = readyVouchers
+                .map { it.voucher }
                 .partition { it.isReadyToUseSecured(currentTimeMillis) }
                 .transformPair { conversionContext.formatVouchersToBalance(it) }
 
             val spendableSecuredBalance = spendableCoinsBalance + securedVouchersBalance
 
-            val unreadyVouchersBalance = conversionContext.formatVouchersToBalance(notReadyVouchers)
+            // As for coins: an asset that is not usable counts as pending only while it is still on its
+            // way. A voucher whose minting transaction failed is on its way nowhere.
+            val unreadyVouchersBalance = conversionContext.formatVouchersToBalance(
+                unreadyVouchers.filter { it.isOnboarding() || it.isMinting() }.map { it.voucher }
+            )
             val pendingBalance = unreadyVouchersBalance + pendingCoinsBalance
 
             CoinageBalance(

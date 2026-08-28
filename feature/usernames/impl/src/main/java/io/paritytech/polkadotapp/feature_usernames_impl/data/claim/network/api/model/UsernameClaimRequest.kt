@@ -11,5 +11,13 @@ class UsernameClaimRequest(
     val proofOfOwnership: String,
     val consumerRegistrationSignature: String,
     val identifierKey: String,
-    val preferredDigits: String? = null,
+    val preferredDigits: String?,
+    val dotns: UsernameClaimDotNsRequest?,
+)
+
+@Keep
+class UsernameClaimDotNsRequest(
+    val signature: String,
+    val signedAt: Long,
+    val reservedUsername: String?
 )

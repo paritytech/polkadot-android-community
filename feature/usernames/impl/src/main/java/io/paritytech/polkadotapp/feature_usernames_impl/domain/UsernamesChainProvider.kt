@@ -16,7 +16,7 @@ class RealUsernamesChainProvider @Inject constructor(
     knownChains: KnownChains,
     private val chainRegistry: ChainRegistry,
 ) : UsernamesChainProvider {
-    override val chainId: ChainId = knownChains.people
+    override val chainId: ChainId = knownChains.assetHub
 
     override suspend fun chain(): Chain = chainRegistry.getChain(chainId)
 }

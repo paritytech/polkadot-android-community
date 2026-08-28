@@ -89,6 +89,7 @@ dependencies {
     implementation(libs.squareup.okhttp3.core)
 
     testImplementation(project(":test-shared"))
+    testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

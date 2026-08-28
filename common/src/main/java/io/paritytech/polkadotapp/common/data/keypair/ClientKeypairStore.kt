@@ -12,18 +12,6 @@ import javax.inject.Singleton
 
 interface ClientKeypairStore {
     fun getOrGenerate(): Sr25519Keypair
-
-    /**
-     * Replace the stored backend-auth keypair.
-     *
-     * The device-uniqueness-backend refuses a username registration whose
-     * `candidateAccountId` is not the authenticated subject (403, #77), so the
-     * wallet's own keypair has to become the auth identity before the claim.
-     * Call this from a normal coroutine (see UsernameRepository.claimUsername),
-     * never from the auth interceptor: this store is read while minting a JWT,
-     * on a thread that BearerTokenAuthenticator may already be blocking on.
-     */
-    fun adopt(keypair: Sr25519Keypair)
 }
 
 @Singleton
@@ -47,13 +35,6 @@ class RealClientKeypairStore @Inject constructor(
         persist(fresh)
         cached = fresh
         return fresh
-    }
-
-    @Synchronized
-    override fun adopt(keypair: Sr25519Keypair) {
-        if (cached?.publicKey.contentEquals(keypair.publicKey)) return
-        persist(keypair)
-        cached = keypair
     }
 
     private fun readPersisted(): Sr25519Keypair? {

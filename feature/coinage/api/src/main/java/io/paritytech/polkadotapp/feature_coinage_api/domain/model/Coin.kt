@@ -8,20 +8,29 @@ data class Coin(
     val derivationIndex: DerivationIndex,
     val valueExponent: ValueExponent,
     val age: Age,
-    val spentState: SpentState,
+    val isOnChain: Boolean,
     val accountId: AccountId
 ) {
+    /**
+     * The last age the chain was seen to hold for this coin, and never cleared once known.
+     *
+     * Presence is [isOnChain] and lives apart from this on purpose. Reading the two off one value cannot
+     * tell a coin that is not there from one nothing has looked at yet, and those call for opposite
+     * conclusions: the first says a peer took it, the second says it is too early to say anything.
+     */
     sealed interface Age {
         data object Unknown : Age
         data class Known(val value: Int) : Age
     }
-
-    enum class SpentState {
-        SPENT_LOCALLY,
-        SPENT_ON_CHAIN,
-        NOT_SPENT
-    }
 }
+
+/**
+ * Whether the chain has ever been seen to hold this coin.
+ *
+ * False means nothing has observed it yet, so its absence is ignorance rather than evidence — no conclusion
+ * that rests on the coin being gone may be drawn.
+ */
+val Coin.hasEverBeenOnChain: Boolean get() = age is Coin.Age.Known
 
 fun Coin.knownAgeOrThrow() = age as Coin.Age.Known
 
@@ -34,17 +43,6 @@ fun Coin.isAgeValidToSpend(recyclableAge: Int) = when (age) {
 
 fun Coin.ageOrDefault() = (this.age as? Coin.Age.Known)?.value ?: -1
 
-fun Coin.canBeSpent(recyclableAge: Int) = !isSpent() && isAgeValidToSpend(recyclableAge)
-
 fun List<Coin>.filterSpendable(recyclableAge: Int): List<Coin> {
-    return filter { it.canBeSpent(recyclableAge) }
-}
-
-fun Coin.notSpent() = !isSpent()
-
-fun Coin.isSpent() = when (spentState) {
-    Coin.SpentState.SPENT_LOCALLY,
-    Coin.SpentState.SPENT_ON_CHAIN -> true
-
-    Coin.SpentState.NOT_SPENT -> false
+    return filter { it.isAgeValidToSpend(recyclableAge) }
 }

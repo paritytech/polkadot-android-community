@@ -44,10 +44,6 @@
         android:name="io.paritytech.polkadotapp.feature_settings_impl.presentation.deviceDetails.DeviceDetailsFragment"
         android:label="DeviceDetailsFragment" />
 
-    <fragment
-        android:id="@+id/forceReclaimFragment"
-        android:name="io.paritytech.polkadotapp.feature_settings_impl.presentation.forceReclaim.ForceReclaimFragment"
-        android:label="ForceReclaimFragment" />
 
     <fragment
         android:id="@+id/LanguageFragment"
@@ -158,6 +154,24 @@
 
     <action
         android:id="@+id/action_global_to_claim_username_graph"
+        app:destination="@id/claim_username_graph"
+        app:popUpTo="@id/root_nav_graph"
+        app:popUpToInclusive="true" />
+
+    <action
+        android:id="@+id/action_global_to_registration_queue"
+        app:destination="@id/claim_username_graph"
+        app:popUpTo="@id/root_nav_graph"
+        app:popUpToInclusive="true" />
+
+    <action
+        android:id="@+id/action_global_to_claim_unavailable"
+        app:destination="@id/claim_username_graph"
+        app:popUpTo="@id/root_nav_graph"
+        app:popUpToInclusive="true" />
+
+    <action
+        android:id="@+id/action_global_to_integrity_failed"
         app:destination="@id/claim_username_graph"
         app:popUpTo="@id/root_nav_graph"
         app:popUpToInclusive="true" />
@@ -276,9 +290,6 @@
         android:id="@+id/action_global_to_deviceDetailsFragment"
         app:destination="@id/deviceDetailsFragment" />
 
-    <action
-        android:id="@+id/action_global_to_forceReclaimFragment"
-        app:destination="@id/forceReclaimFragment" />
 
     <action
         android:id="@+id/action_global_to_commit_to_tattoo_graph"

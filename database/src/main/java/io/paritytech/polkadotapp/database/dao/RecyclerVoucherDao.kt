@@ -8,8 +8,8 @@ import androidx.room.Transaction
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
 import kotlinx.coroutines.flow.Flow
 
-private const val VOUCHERS_IN_RECYCLER_QUERY = "SELECT * FROM RECYCLER_VOUCHERS WHERE locationRecyclerIndex IS NOT NULL AND usageState IS :usageState"
-private const val VOUCHERS_BY_STATE_QUERY = "SELECT * FROM recycler_vouchers WHERE usageState IS :usageState"
+private const val VOUCHERS_IN_RECYCLER_QUERY = "SELECT * FROM recycler_vouchers WHERE locationRecyclerIndex IS NOT NULL"
+private const val ALL_VOUCHERS_QUERY = "SELECT * FROM recycler_vouchers"
 
 @Dao
 interface RecyclerVoucherDao {
@@ -65,12 +65,6 @@ interface RecyclerVoucherDao {
         }
     }
 
-    @Query("UPDATE recycler_vouchers SET usageState = :usageState WHERE ringVrfKeyIndex = :ringVrfKeyIndex")
-    suspend fun setUsageStateByRingVrfKeyIndex(ringVrfKeyIndex: Int, usageState: RecyclerVoucherLocal.UsageState)
-
-    @Query("UPDATE recycler_vouchers SET usageState = :usageState WHERE ringVrfKeyIndex IN (:indices)")
-    suspend fun setUsageStateByRingVrfKeyIndices(indices: List<Int>, usageState: RecyclerVoucherLocal.UsageState)
-
     @Query("SELECT * FROM recycler_vouchers WHERE ringVrfKeyIndex IN (:indices)")
     suspend fun getByRingVrfKeyIndices(indices: List<Int>): List<RecyclerVoucherLocal>
 
@@ -78,16 +72,16 @@ interface RecyclerVoucherDao {
     suspend fun getMaxRingVrfKeyIndex(): Int?
 
     @Query(VOUCHERS_IN_RECYCLER_QUERY)
-    suspend fun getVouchersInRecyclerByUsageState(usageState: RecyclerVoucherLocal.UsageState): List<RecyclerVoucherLocal>
+    suspend fun getVouchersInRecycler(): List<RecyclerVoucherLocal>
 
     @Query(VOUCHERS_IN_RECYCLER_QUERY)
-    fun subscribeVouchersInRecyclerByUsageState(usageState: RecyclerVoucherLocal.UsageState): Flow<List<RecyclerVoucherLocal>>
+    fun subscribeVouchersInRecycler(): Flow<List<RecyclerVoucherLocal>>
 
-    @Query(VOUCHERS_BY_STATE_QUERY)
-    suspend fun getAllVouchersByUsageState(usageState: RecyclerVoucherLocal.UsageState): List<RecyclerVoucherLocal>
+    @Query(ALL_VOUCHERS_QUERY)
+    suspend fun getAllVouchers(): List<RecyclerVoucherLocal>
 
-    @Query(VOUCHERS_BY_STATE_QUERY)
-    fun subscribeAllVouchersByUsageState(usageState: RecyclerVoucherLocal.UsageState): Flow<List<RecyclerVoucherLocal>>
+    @Query(ALL_VOUCHERS_QUERY)
+    fun subscribeAllVouchers(): Flow<List<RecyclerVoucherLocal>>
 }
 
 class RecyclerVoucherLocationUpdate(

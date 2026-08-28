@@ -58,10 +58,6 @@ class SettingsViewModel @Inject constructor(
         router.openLinkedDevices()
     }
 
-    fun onForceReclaimClick() {
-        router.openForceReclaim()
-    }
-
     fun onPrivacyPolicyClick() {
         router.openPrivacyPolicy()
     }

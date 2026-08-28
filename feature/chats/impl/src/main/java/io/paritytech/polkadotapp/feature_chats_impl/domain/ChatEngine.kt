@@ -430,7 +430,8 @@ class ChatEngine @Inject constructor(
         messageId: ChatMessageId,
         chatId: ChatId,
         content: ChatMessage.Content,
-        replyToMessageId: String?
+        replyToMessageId: String?,
+        onSaved: suspend () -> Unit,
     ): ChatMessage {
         val initialStatus = determineInitialMessageStatus(chatId)
         val message = ChatMessage.new(
@@ -441,7 +442,7 @@ class ChatEngine @Inject constructor(
             status = initialStatus,
             replyToMessageId = replyToMessageId
         )
-        saveMessage(message)
+        saveMessage(message, onSaved = onSaved)
         return message
     }
 
@@ -499,9 +500,10 @@ class ChatEngine @Inject constructor(
     suspend fun saveMessage(
         chatMessage: ChatMessage,
         onConflict: ChatMessageSaveConflictStrategy = ChatMessageSaveConflictStrategy.REPLACE,
+        onSaved: suspend () -> Unit = {},
     ): Boolean {
         val customContentDecoder = getCustomContentDecoder(chatMessage.chatId)
-        return chatMessageRepository.saveMessage(chatMessage, customContentDecoder, onConflict)
+        return chatMessageRepository.saveMessage(chatMessage, customContentDecoder, onConflict, onSaved)
             .also { saved ->
                 if (saved) {
                     messageSaveProcessors.forEach { it.onMessageSaved(chatMessage) }

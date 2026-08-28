@@ -7,7 +7,7 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_dotns_impl.data.config.DotNsConfigProvider
 import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.abi.EvmContractCaller
-import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.abi.NameHash
+import io.paritytech.polkadotapp.feature_revive_api.NameHash
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
 import javax.inject.Inject
 

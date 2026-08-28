@@ -11,14 +11,14 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.Vouc
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.filterSpendable
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUse
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import javax.inject.Inject
 
 class RealExternalPaymentPlanner @Inject constructor(
-    private val voucherRepository: VoucherRepository,
+    private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val coinRepository: CoinRepository,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase,
 ) : ExternalPaymentPlanner {
@@ -37,8 +37,8 @@ class RealExternalPaymentPlanner @Inject constructor(
 
     context(coinageContext: CoinageBalanceConversionContext)
     private suspend fun determinePlan(amount: Balance): ExternalPaymentPlan {
-        val activeVouchers = voucherRepository.getActiveVouchers()
-        val availableVouchers = activeVouchers.filter { it.isReadyToUse() }
+        val activeVouchers = coinageAssetsUseCase.getSelectableVouchers()
+        val availableVouchers = activeVouchers.filter { it.isInRecycler() }
 
         if (availableVouchers.totalBalance() >= amount) {
             val offboarding = pickVoucherForOffboardingOrThrow(availableVouchers, target = amount)
@@ -51,7 +51,7 @@ class RealExternalPaymentPlanner @Inject constructor(
         }
 
         val deficit = amount - activeVouchers.totalBalance()
-        val activeCoins = coinRepository.getActiveCoins()
+        val activeCoins = coinageAssetsUseCase.getSelectableCoins()
         val availableCoins = activeCoins.filterSpendable(coinRepository.getCoinRecyclingAge())
 
         if (availableCoins.totalBalance() >= deficit) {

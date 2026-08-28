@@ -15,7 +15,6 @@ data class RecyclerVoucher(
     val allocatedAt: Timestamp,
     val delayUnloadUntil: Timestamp,
     val ringHasEnoughRingMembersToWithdraw: Boolean,
-    val usageState: UsageState
 ) {
     sealed interface Location {
         data object Unknown : Location
@@ -23,12 +22,6 @@ data class RecyclerVoucher(
         data class InRecycler(
             val recyclerIndex: RecyclerIndex
         ) : Location
-    }
-
-    enum class UsageState {
-        USED_LOCALLY,
-        USED_ON_CHAIN,
-        NOT_USED
     }
 }
 
@@ -40,14 +33,14 @@ fun RecyclerVoucher.recyclerLocationOrThrow() = location as RecyclerVoucher.Loca
 
 private fun RecyclerVoucher.canBeUnloadedAt(timestamp: Timestamp) = delayUnloadUntil < timestamp
 
-fun RecyclerVoucher.isNotUsed() = usageState == RecyclerVoucher.UsageState.NOT_USED
-
-fun RecyclerVoucher.isReadyToUse() = isNotUsed() && isInRecycler()
-
+/**
+ * Spendable without giving anything away. Neither missing half stops the voucher being used — an unload
+ * before its delay, or from a ring too small to hide it, only makes it easier to link back to the coin it
+ * came from — so both merely lower it to degraded.
+ */
 fun RecyclerVoucher.isReadyToUseSecured(timestamp: Timestamp) =
-    // !!! Do not forget to also enabled ignored tests in RealTotalBalanceUseCaseTest and TransferPlannerTest
-    isReadyToUse() && canBeUnloadedAt(timestamp) && ringHasEnoughRingMembersToWithdraw
+    isInRecycler() && canBeUnloadedAt(timestamp) && ringHasEnoughRingMembersToWithdraw
 
-fun List<RecyclerVoucher>.filterIsReadyToUse(): List<RecyclerVoucher> {
-    return filter { it.isReadyToUse() }
+fun List<RecyclerVoucher>.filterInRecycler(): List<RecyclerVoucher> {
+    return filter { it.isInRecycler() }
 }

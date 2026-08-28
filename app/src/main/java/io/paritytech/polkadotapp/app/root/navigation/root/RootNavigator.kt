@@ -24,7 +24,11 @@ class RootNavigator @Inject constructor(
 
     override fun openActiveProduct() = performNavigation(R.id.action_global_to_spaBrowserFragment)
 
-    override fun openClaimUsername() = performNavigation(R.id.action_global_to_claim_username_graph)
+    override fun openClaimUsername() = performNavigationToGraph(
+        actionId = R.id.action_global_to_claim_username_graph,
+        graphId = R.id.claim_username_graph,
+        startDestinationId = R.id.claimUsernameFragment
+    )
 
     override fun openDebugMenu() = performNavigation(R.id.action_global_to_debug_menu)
 

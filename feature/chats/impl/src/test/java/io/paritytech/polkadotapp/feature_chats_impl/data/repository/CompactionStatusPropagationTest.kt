@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.repository
 
-import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.database.dao.ChatMessageCompactionDao
 import io.paritytech.polkadotapp.database.dao.ChatMessageDao
 import io.paritytech.polkadotapp.database.dao.ChatMessageReactionDao
@@ -26,7 +26,7 @@ class CompactionStatusPropagationTest {
         chatMessageCompactionDao = chatMessageCompactionDao,
         chatMessageReactionDao = chatMessageReactionDao,
         chatRoomRepository = chatRoomRepository,
-        coroutineDispatchers = CoroutineDispatchers()
+        coroutineDispatchers = RealCoroutineDispatchers()
     )
 
     @Test

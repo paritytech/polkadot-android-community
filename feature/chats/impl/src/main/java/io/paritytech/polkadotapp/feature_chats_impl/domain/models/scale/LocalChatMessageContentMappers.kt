@@ -208,6 +208,7 @@ private fun OfferPurpose.toDomain(): ChatMessage.Content.DataChannelOffer.Purpos
 private fun CoinagePaymentStatusLocal.toDomain(): ChatMessage.Content.CoinagePayment.Status = when (this) {
     is CoinagePaymentStatusLocal.Detecting -> ChatMessage.Content.CoinagePayment.Status.Detecting
     is CoinagePaymentStatusLocal.Detected -> ChatMessage.Content.CoinagePayment.Status.Detected(detected)
+    is CoinagePaymentStatusLocal.PartiallyClaimed -> ChatMessage.Content.CoinagePayment.Status.PartiallyClaimed(claimed)
     is CoinagePaymentStatusLocal.Transferred -> ChatMessage.Content.CoinagePayment.Status.Transferred(transferred)
     is CoinagePaymentStatusLocal.FailedDetection -> ChatMessage.Content.CoinagePayment.Status.FailedDetection
     is CoinagePaymentStatusLocal.FailedTransfer -> ChatMessage.Content.CoinagePayment.Status.FailedTransfer
@@ -230,6 +231,7 @@ private fun DeviceInfoLocal.toDomain(): DeviceInfo {
 private fun ChatMessage.Content.CoinagePayment.Status.toLocal(): CoinagePaymentStatusLocal = when (this) {
     is ChatMessage.Content.CoinagePayment.Status.Detecting -> CoinagePaymentStatusLocal.Detecting
     is ChatMessage.Content.CoinagePayment.Status.Detected -> CoinagePaymentStatusLocal.Detected(amount)
+    is ChatMessage.Content.CoinagePayment.Status.PartiallyClaimed -> CoinagePaymentStatusLocal.PartiallyClaimed(claimed)
     is ChatMessage.Content.CoinagePayment.Status.Transferred -> CoinagePaymentStatusLocal.Transferred(amount)
     is ChatMessage.Content.CoinagePayment.Status.FailedDetection -> CoinagePaymentStatusLocal.FailedDetection
     is ChatMessage.Content.CoinagePayment.Status.FailedTransfer -> CoinagePaymentStatusLocal.FailedTransfer

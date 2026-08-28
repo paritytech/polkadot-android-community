@@ -118,7 +118,6 @@ class VoucherBatchDistributionTest {
         location = Location.InRecycler(RingIndex(ring.toBigInteger())),
         allocatedAt = 0L,
         delayUnloadUntil = 0L,
-        usageState = RecyclerVoucher.UsageState.NOT_USED,
         ringHasEnoughRingMembersToWithdraw = true
     )
 }

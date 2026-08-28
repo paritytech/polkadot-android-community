@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data
 
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.api.AuthTokenApi
-import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.manager.TimeProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.model.JWTTokenResponse
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.model.JwtRequest
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.model.RefreshTokenRequest

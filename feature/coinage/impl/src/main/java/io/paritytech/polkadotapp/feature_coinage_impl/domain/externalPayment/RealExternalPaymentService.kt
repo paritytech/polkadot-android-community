@@ -43,6 +43,8 @@ class RealExternalPaymentService @Inject constructor(
 
     private fun ExternalPayment.toStatus(): PaymentStatus = when (val s = stage) {
         ExternalPayment.Stage.Completed -> PaymentStatus.Completed
+        // Money moved, so this is a completion. How much of it is the reason string's job.
+        is ExternalPayment.Stage.PartiallyCompleted -> PaymentStatus.Completed
         is ExternalPayment.Stage.Failed -> PaymentStatus.Failed(s.reason)
         else -> PaymentStatus.Processing
     }

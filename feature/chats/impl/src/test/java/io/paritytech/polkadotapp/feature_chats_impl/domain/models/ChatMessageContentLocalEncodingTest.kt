@@ -56,6 +56,22 @@ class ChatMessageContentLocalEncodingTest {
     }
 
     @Test
+    fun `decode part-claimed Payment content from encoded bytes`() {
+        // Identical to the Detected case above but for the sealed type's index: 05 = PartiallyClaimed. That
+        // it only differs by that byte is the point — the variant was appended, so older rows still decode.
+        val encoded = "10070010a5d4e80480000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f05070088526a74"
+        val decoded = BinaryScale.decodeFromByteArray<ChatMessageContentLocal>(encoded.fromHex())
+
+        assertTrue(decoded is ChatMessageContentLocal.CoinagePayment)
+        val status = (decoded as ChatMessageContentLocal.CoinagePayment).status
+        assertTrue(status is CoinagePaymentStatusLocal.PartiallyClaimed)
+        assertEquals(
+            500000000000.toBigInteger().intoBalance(),
+            (status as CoinagePaymentStatusLocal.PartiallyClaimed).claimed
+        )
+    }
+
+    @Test
     fun `decode ContactAdded content from encoded bytes`() {
         val encoded = "03"
         val decoded = BinaryScale.decodeFromByteArray<ChatMessageContentLocal>(encoded.fromHex())
@@ -174,6 +190,16 @@ class ChatMessageContentLocalEncodingTest {
                 totalValue = 1000000000000.toBigInteger().intoBalance(),
                 coinKeys = listOf(ByteArray(32) { it.toByte() }),
                 status = CoinagePaymentStatusLocal.Detected(500000000000.toBigInteger().intoBalance())
+            ),
+            "Payment (partially claimed)" to ChatMessageContentLocal.CoinagePayment(
+                totalValue = 1000000000000.toBigInteger().intoBalance(),
+                coinKeys = listOf(ByteArray(32) { it.toByte() }),
+                status = CoinagePaymentStatusLocal.PartiallyClaimed(500000000000.toBigInteger().intoBalance())
+            ),
+            "Payment (partially claimed)" to ChatMessageContentLocal.CoinagePayment(
+                totalValue = 1000000000000.toBigInteger().intoBalance(),
+                coinKeys = listOf(ByteArray(32) { it.toByte() }),
+                status = CoinagePaymentStatusLocal.PartiallyClaimed(500000000000.toBigInteger().intoBalance())
             ),
             "ContactAdded" to ChatMessageContentLocal.ContactAdded,
             "Reacted" to ChatMessageContentLocal.Reacted(

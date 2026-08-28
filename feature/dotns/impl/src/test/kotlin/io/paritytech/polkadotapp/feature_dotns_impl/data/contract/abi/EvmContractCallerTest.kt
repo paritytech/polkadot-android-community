@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_dotns_impl.data.contract.abi
 
 import io.novasama.substrate_sdk_android.extensions.fromHex
+import io.paritytech.polkadotapp.feature_revive_api.NameHash
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

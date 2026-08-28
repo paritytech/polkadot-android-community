@@ -478,7 +478,9 @@ class HostApiInteractor @Inject constructor(
 
         totalBalanceUseCase.subscribeTotalBalance()
             .mapNotNull { it.getOrNull() }
-            .map { PaymentBalance(available = it.totalBalance) }
+            // Only what can actually be spent: a product that tops up against this number must not be
+            // told about balance still waiting on a transaction of ours.
+            .map { PaymentBalance(available = it.spendableBalance.total) }
     }
 
     suspend fun registerRingVrfKey(

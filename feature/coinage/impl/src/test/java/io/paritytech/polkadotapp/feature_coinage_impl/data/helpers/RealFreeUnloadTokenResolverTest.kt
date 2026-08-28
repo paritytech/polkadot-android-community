@@ -1,17 +1,15 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.data.helpers
 
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.CoinageSigningContextProvider
-import io.paritytech.polkadotapp.test_shared.any
-import io.paritytech.polkadotapp.test_shared.anyInt
-import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mockito.mock
-import org.mockito.invocation.InvocationOnMock
 import kotlin.time.Duration.Companion.seconds
 
 class RealFreeUnloadTokenResolverTest {
@@ -21,10 +19,10 @@ class RealFreeUnloadTokenResolverTest {
     // Records the counters queried per `getNotUsedCounterIndices` call, so tests can assert batching.
     private val queriedBatches = mutableListOf<List<Long>>()
 
-    private val periodCalculator: UnloadTokenPeriodCalculator = mock(UnloadTokenPeriodCalculator::class.java)
-    private val contextProvider: CoinageSigningContextProvider = mock(CoinageSigningContextProvider::class.java)
-    private val resolverSource: UnloadTokenResolverSource = mock(UnloadTokenResolverSource::class.java)
-    private val consumedTokenChecker: ConsumedTokenChecker = mock(ConsumedTokenChecker::class.java)
+    private val periodCalculator: UnloadTokenPeriodCalculator = mockk()
+    private val contextProvider: CoinageSigningContextProvider = mockk()
+    private val resolverSource: UnloadTokenResolverSource = mockk()
+    private val consumedTokenChecker: ConsumedTokenChecker = mockk()
 
     private val resolver = RealFreeUnloadTokenResolver(
         consumedTokenChecker = consumedTokenChecker,
@@ -34,27 +32,21 @@ class RealFreeUnloadTokenResolverTest {
     )
 
     @Before
-    fun setUp() = runBlocking<Unit> {
-        whenever(periodCalculator.currentPeriod(PERIOD_DURATION_SECONDS.seconds)).thenReturn(PERIOD)
+    fun setUp() {
+        every { periodCalculator.currentPeriod(PERIOD_DURATION_SECONDS.seconds) } returns PERIOD
+        coEvery { resolverSource.getPeriodDuration(any()) } returns PERIOD_DURATION_SECONDS
+        coEvery { resolverSource.getFreeUnloadTokenLimit(any()) } answers { Result.success(maxCounter) }
 
-        whenever(resolverSource.getPeriodDuration(any())).thenAnswer { PERIOD_DURATION_SECONDS }
-
-        // `Result` is a value class, so the answer must return the successful value itself to match
-        // the unboxed JVM return slot.
-        whenever(resolverSource.getFreeUnloadTokenLimit(any())).thenAnswer { maxCounter }
-
-        // The context (and thus the identity alias) encodes the counter, so the consumed-token
-        // stub can map a query back to the concrete counter it was built from.
-        // `freeUnloadTokenContext` returns the `BandersnatchContext` value class, so the answer must
-        // return its underlying ByteArray to match the unboxed JVM return slot.
-        whenever(contextProvider.freeUnloadTokenContext(anyInt(), anyInt())).thenAnswer { invocation ->
-            val counter = invocation.getArgument<Int>(1)
-            BandersnatchContext(counter.toString().encodeToByteArray()).value
+        // The context (and thus the identity alias) encodes the counter, so the consumed-token stub can map
+        // a query back to the concrete counter it was built from.
+        every { contextProvider.freeUnloadTokenContext(any(), any()) } answers {
+            BandersnatchContext(secondArg<Int>().toString().encodeToByteArray())
         }
-        whenever(resolverSource.generateAlias(any())).thenAnswer { it.getArgument<ByteArray>(0) }
+        coEvery { resolverSource.generateAlias(any()) } answers { firstArg() }
 
-        whenever(consumedTokenChecker.getNotUsedCounterIndices(any(), any()))
-            .thenAnswer(::answerNotUsedCounterIndices)
+        coEvery { consumedTokenChecker.getNotUsedCounterIndices(any(), any()) } answers {
+            notUsedCounterIndices(secondArg())
+        }
     }
 
     @Test
@@ -133,8 +125,7 @@ class RealFreeUnloadTokenResolverTest {
     }
 
     // Mirrors the real checker: returns positional indices of counters that are not yet taken.
-    private fun answerNotUsedCounterIndices(invocation: InvocationOnMock): Result<List<Long>> {
-        val queries = invocation.getArgument<List<ConsumedTokenChecker.Query>>(1)
+    private fun notUsedCounterIndices(queries: List<ConsumedTokenChecker.Query>): Result<List<Long>> {
         val counters = queries.map { it.counter() }
         queriedBatches += counters
 

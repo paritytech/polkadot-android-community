@@ -31,7 +31,7 @@ class VoucherRingMembersService @Inject constructor(
     suspend fun start() {
         val chainId = chainAssetProvider.chainId()
 
-        voucherRepository.subscribeActiveVouchers()
+        voucherRepository.subscribeVouchersInRecycler()
             .map {
                 it.groupBy { voucher ->
                     val location = voucher.recyclerLocationOrThrow()

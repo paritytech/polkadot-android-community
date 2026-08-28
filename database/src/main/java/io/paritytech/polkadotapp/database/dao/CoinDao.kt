@@ -9,7 +9,8 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.database.model.CoinLocal
 import kotlinx.coroutines.flow.Flow
 
-private const val ACTIVE_COINS_QUERY = "SELECT * FROM coins WHERE spentState = :spentState AND ageValue IS NOT NULL"
+/** Coins the chain holds right now — presence, not the age it was last seen with. */
+private const val ON_CHAIN_COINS_QUERY = "SELECT * FROM coins WHERE onChain = 1"
 
 @Dao
 interface CoinDao {
@@ -22,14 +23,14 @@ interface CoinDao {
     @Query("SELECT * FROM coins")
     fun subscribeAll(): Flow<List<CoinLocal>>
 
-    @Query("SELECT * FROM coins WHERE spentState = :state")
-    fun subscribeCoinsWithSpentState(state: CoinLocal.SpentState): Flow<List<CoinLocal>>
+    @Query("SELECT * FROM coins")
+    suspend fun getAll(): List<CoinLocal>
 
-    @Query("SELECT * FROM coins WHERE spentState = :state")
-    suspend fun getCoinsWithSpentState(state: CoinLocal.SpentState): List<CoinLocal>
+    @Query("SELECT * FROM coins WHERE accountId IN (:accountIds)")
+    fun subscribeBy(accountIds: List<ByteArray>): Flow<List<CoinLocal>>
 
-    @Query("SELECT * FROM coins WHERE spentState != :state")
-    fun subscribeCoinsExcludingSpentOnChain(state: CoinLocal.SpentState): Flow<List<CoinLocal>>
+    @Query("SELECT * FROM coins WHERE derivationIndex IN (:derivationIndices)")
+    suspend fun getByDerivationIndices(derivationIndices: List<Int>): List<CoinLocal>
 
     @Query("SELECT * FROM coins WHERE ageValue IS NULL")
     fun subscribeAllCoinsWithUnknownAge(): Flow<List<CoinLocal>>
@@ -37,44 +38,33 @@ interface CoinDao {
     @Query("SELECT MAX(derivationIndex) FROM coins")
     suspend fun getMaxDerivationIndex(): Int?
 
-    @Query(
-        """
-        UPDATE coins
-        SET ageValue = :age, spentState = :spentState
-        WHERE accountId = :accountId
-        """
-    )
-    suspend fun updateCoin(accountId: ByteArray, age: Int, spentState: CoinLocal.SpentState)
+    /**
+     * Presence always; the age only when the chain gave one.
+     *
+     * COALESCE is what keeps the age monotonic: a coin that has left the chain keeps the last age it was
+     * seen with, so "never observed" stays distinguishable from "observed, now gone".
+     */
+    @Query("UPDATE coins SET onChain = :onChain, ageValue = COALESCE(:age, ageValue) WHERE accountId = :accountId")
+    suspend fun updateCoinPresence(accountId: ByteArray, onChain: Boolean, age: Int?)
 
     @Transaction
     suspend fun updateCoins(updates: List<CoinUpdateLocal>) {
-        updates.forEach {
-            updateCoin(
-                accountId = it.accountId.value,
-                age = it.age,
-                spentState = it.spentState
-            )
-        }
+        updates.forEach { updateCoinPresence(accountId = it.accountId.value, onChain = it.onChain, age = it.age) }
     }
 
-    @Query(ACTIVE_COINS_QUERY)
-    suspend fun getAllAgedCoinsWithState(spentState: CoinLocal.SpentState): List<CoinLocal>
+    @Query(ON_CHAIN_COINS_QUERY)
+    suspend fun getOnChainCoins(): List<CoinLocal>
 
-    @Query(ACTIVE_COINS_QUERY)
-    fun subscribeAllAgedCoinsWithState(spentState: CoinLocal.SpentState): Flow<List<CoinLocal>>
+    @Query(ON_CHAIN_COINS_QUERY)
+    fun subscribeOnChainCoins(): Flow<List<CoinLocal>>
 
-    @Query("SELECT * FROM coins WHERE spentState = :spentState AND ageValue IS NOT NULL AND ageValue >= :minAge")
-    suspend fun getCoinsWithKnownAgeAtLeast(spentState: CoinLocal.SpentState, minAge: Int): List<CoinLocal>
-
-    @Query("UPDATE coins SET spentState = :spentState WHERE derivationIndex = :derivationIndex")
-    suspend fun setSpentStateByDerivationIndex(derivationIndex: Int, spentState: CoinLocal.SpentState)
-
-    @Query("UPDATE coins SET spentState = :spentState WHERE derivationIndex IN (:indices)")
-    suspend fun setSpentStateByDerivationIndices(indices: List<Int>, spentState: CoinLocal.SpentState)
+    @Query("SELECT * FROM coins WHERE onChain = 1 AND ageValue >= :minAge")
+    suspend fun getCoinsWithKnownAgeAtLeast(minAge: Int): List<CoinLocal>
 }
 
 class CoinUpdateLocal(
     val accountId: AccountId,
-    val age: Int,
-    val spentState: CoinLocal.SpentState
+    val onChain: Boolean,
+    /** Null when the chain gave no age, which leaves the last one known standing. */
+    val age: Int?,
 )

@@ -18,7 +18,7 @@ import javax.inject.Singleton
 
 private const val FALLBACK_MAX_HASH_COUNT = 250
 private const val FINALITY_BUFFER = 5
-private const val MORTAL_PERIOD = 5 * 60 * 1000
+private const val MORTAL_PERIOD = 2 * 60 * 1000
 
 @Singleton
 class MortalityConstructor @Inject constructor(
@@ -63,6 +63,6 @@ class MortalityConstructor @Inject constructor(
         val eraBlockHash = rpcCalls.getBlockHash(chainId, eraBlockNumber.toBlockNumber())
             .fromHex().toDataByteArray()
 
-        Mortality(era, eraBlockHash)
+        Mortality(era, eraBlockHash, eraBlockNumber.toLong())
     }
 }

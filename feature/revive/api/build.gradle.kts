@@ -11,4 +11,6 @@ dependencies {
     api(project(":chains"))
 
     implementation(libs.bouncycastle.jdk18)
+
+    testImplementation(libs.junit)
 }

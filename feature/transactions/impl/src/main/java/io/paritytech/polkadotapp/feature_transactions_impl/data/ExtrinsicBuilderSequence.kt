@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_transactions_impl.data
 
-import io.novasama.substrate_sdk_android.runtime.extrinsic.builder.ExtrinsicBuilder
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.domain.model.AccountId
@@ -18,13 +17,13 @@ class ExtrinsicBuilderSequence(
     private val extrinsicBuilderFactory: ExtrinsicBuilderFactory,
     private val signerProvider: SignerProvider
 ) {
-    private val iteratorCache = mutableMapOf<Pair<ChainId, AccountId?>, Iterator<ExtrinsicBuilder>>()
+    private val iteratorCache = mutableMapOf<Pair<ChainId, AccountId?>, Iterator<ExtrinsicBuilderFactory.Submittable>>()
 
     suspend fun next(
         chain: Chain,
         origin: TransactionOrigin,
         options: ExtrinsicBuilderFactory.Options
-    ): ExtrinsicBuilder {
+    ): ExtrinsicBuilderFactory.Submittable {
         val requestedSignerAccountId = origin.signerSource.accountId(chain)
         val signer = signerProvider.submissionSigner(origin.signerSource)
 

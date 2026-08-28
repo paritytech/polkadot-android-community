@@ -17,6 +17,7 @@ class SyncContactUsernameUseCase @Inject constructor(
     private val resourcesRepository: ResourcesRepository,
     private val contactsRepository: ContactsRepository
 ) {
+    // TODO: People Chain is used until dotNS resolve-by-address lands (paritytech/dotns#216, #217)
     private val chainId = knownChains.people
 
     fun sync(accountId: AccountId): Flow<Result<Unit>> = flowOfAll {

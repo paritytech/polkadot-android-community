@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.worker
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
@@ -20,6 +21,8 @@ import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -56,8 +59,12 @@ class CoinageRecyclingWorker @AssistedInject constructor(
     }
 
     override suspend fun doWork(): Result {
+        coinageLogD("Recycling worker run started")
+
         return coinageRecyclingUseCase()
             .logFailure("Failed to recycle coins")
+            .onSuccess { coinageLogD("Recycling worker run finished") }
+            .onFailure { coinageLogW("Recycling worker run failed: $it") }
             .toWorkerResult()
     }
 
@@ -75,7 +82,7 @@ class CoinageRecyclingWorker @AssistedInject constructor(
             .setOngoing(true)
             .build()
 
-        return ForegroundInfo(NOTIFICATION_ID, notification)
+        return ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
 
     private fun createChannel(): String {

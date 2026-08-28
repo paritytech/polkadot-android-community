@@ -1,13 +1,10 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor
 
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
-import io.paritytech.polkadotapp.chains.util.planksFromAmount
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.data.network.TestnetEnvironment
 import io.paritytech.polkadotapp.common.utils.filterResultSuccess
 import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
-import io.paritytech.polkadotapp.feature_account_api.data.repository.getDepositAccount
 import io.paritytech.polkadotapp.feature_coinage_api.domain.CoinsInteractor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.RecyclerVouchersInteractor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
@@ -16,36 +13,30 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBackupService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestHelperUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
-import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
-import io.paritytech.polkadotapp.feature_fund_api.domain.model.AutoConvertDeposit
 import io.paritytech.polkadotapp.feature_products_api.model.KnownProductIds
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
-import io.paritytech.polkadotapp.feature_transfers_api.domain.usecase.TestnetFundUseCase
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.AssetInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import javax.inject.Inject
 
 class DigitalDollarCardDetailsInteractor @Inject constructor(
-    private val accountRepository: AccountRepository,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val totalBalanceUseCase: TotalBalanceUseCase,
-    private val testnetFundUseCase: TestnetFundUseCase,
     private val environment: TestnetEnvironment,
     private val coinsInteractor: CoinsInteractor,
     private val recyclerVouchersInteractor: RecyclerVouchersInteractor,
     private val coinageTestHelperUseCase: CoinageTestHelperUseCase,
-    private val autoConvertDepositService: AutoConvertDepositService,
+    private val coinageTestnetFundUseCase: CoinageTestnetFundUseCase,
     private val shareCoinageLogsUseCase: ShareCoinageLogsUseCase,
     private val coinageRecyclingUseCase: CoinageRecyclingUseCase,
     private val coinageBackupService: CoinageBackupService,
@@ -81,24 +72,12 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     suspend fun autoFundAvailable() = environment != TestnetEnvironment.PRODUCTION
 
     suspend fun testnetFund(): Result<Unit> {
-        val chainAsset = chainAssetProvider()
         val amount = when (environment) {
             TestnetEnvironment.TESTNET -> TOP_UP_AMOUNT
             TestnetEnvironment.NIGHTLY, TestnetEnvironment.PRODUCTION -> NIGHTLY_TOP_UP_AMOUNT
         }
-        val topUpAmount = amount.planksFromAmount(chainAsset.asset.precision)
-        val recipientAccountId = accountRepository.getDepositAccount().accountIdIn(chainAsset.chain)
 
-        return testnetFundUseCase(chainAsset, topUpAmount, recipientAccountId)
-            .mapCatching {
-                val terminalStatus = autoConvertDepositService.currentDeposit
-                    .mapNotNull { it?.status }
-                    .first { it is AutoConvertDeposit.Status.Done || it is AutoConvertDeposit.Status.Failure }
-
-                if (terminalStatus is AutoConvertDeposit.Status.Failure) {
-                    throw terminalStatus.reason
-                }
-            }
+        return coinageTestnetFundUseCase(amount)
     }
 
     suspend fun makeAllVouchersReady() = coinageTestHelperUseCase.makeAllVouchersReady()

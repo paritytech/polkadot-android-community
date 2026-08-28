@@ -36,7 +36,7 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUse
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUseSecured
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.tokenAmount
 import kotlinx.collections.immutable.ImmutableList
@@ -324,12 +324,12 @@ private fun CoinItemCard(
                 )
                 FillerSpacer()
 
-                val (spentText, spentColor) = when (coin.spentState) {
-                    Coin.SpentState.NOT_SPENT -> "Not spent" to PolkadotTheme.colors.fg.success
-                    Coin.SpentState.SPENT_LOCALLY -> "Spent locally" to PolkadotTheme.colors.fg.tertiary
-                    Coin.SpentState.SPENT_ON_CHAIN -> "Spent on chain" to PolkadotTheme.colors.fg.tertiary
+                val (presenceText, presenceColor) = if (coin.isOnChain) {
+                    "On chain" to PolkadotTheme.colors.fg.success
+                } else {
+                    "Not on chain" to PolkadotTheme.colors.fg.tertiary
                 }
-                NovaText(text = spentText, color = spentColor)
+                NovaText(text = presenceText, color = presenceColor)
             }
 
             VerticalSpacer { 4.dp }
@@ -391,7 +391,7 @@ private fun CoinItemCard(
                 )
             }
 
-            if (coin.spentState == Coin.SpentState.NOT_SPENT) {
+            if (coin.isOnChain) {
                 VerticalSpacer { 8.dp }
 
                 PolkadotTextButton(
@@ -408,7 +408,7 @@ private fun CoinItemCard(
 private fun VoucherItemCard(voucher: RecyclerVoucher) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val isReady = voucher.isReadyToUse()
+    val isReady = voucher.isInRecycler()
     val isReadySecured = voucher.isReadyToUseSecured(System.currentTimeMillis())
     val fullKey = voucher.ringVrfPublicKey.toString()
 

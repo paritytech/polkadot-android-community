@@ -7,9 +7,6 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import timber.log.Timber
 import javax.inject.Inject
 
-/** Raised when an extrinsic is blocked from submission by [PreSubmissionValidator]. */
-class PreSubmissionValidationFailed : Exception("Extrinsic was rejected as invalid before submission")
-
 /**
  * Pre-submission gate shared by the live submit path and the tracked-extrinsic submit path.
  *

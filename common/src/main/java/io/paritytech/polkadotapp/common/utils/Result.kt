@@ -161,6 +161,24 @@ fun <T1, T2, T3, R> combineResults(
     }
 }
 
+fun <T1, T2, T3, T4, R> combineResults(
+    result1: Result<T1>,
+    result2: Result<T2>,
+    result3: Result<T3>,
+    result4: Result<T4>,
+    transform: (T1, T2, T3, T4) -> R,
+): Result<R> {
+    return result1.flatMap { one ->
+        result2.flatMap { two ->
+            result3.flatMap { three ->
+                result4.map { four ->
+                    transform(one, two, three, four)
+                }
+            }
+        }
+    }
+}
+
 inline fun <T, R> List<T>.foldResult(
     initial: R,
     fold: (acc: R, element: T) -> Result<R>,

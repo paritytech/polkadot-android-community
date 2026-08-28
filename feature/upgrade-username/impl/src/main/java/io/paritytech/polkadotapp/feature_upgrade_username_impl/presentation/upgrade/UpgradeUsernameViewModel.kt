@@ -50,8 +50,6 @@ class UpgradeUsernameViewModel @Inject constructor(
         prefillInputWithLiteUsername()
     }
 
-    private val usernameState = MutableStateFlow<UpgradeUsernameAvailabilityState>(UpgradeUsernameAvailabilityState.NotAvailable)
-
     override fun onUsernameChanged(value: String) {
         val previousValue = uiState.value.username
         val newValue = value.filterUsernameInput()
@@ -66,10 +64,7 @@ class UpgradeUsernameViewModel @Inject constructor(
         isClaimingInProgress.value = true
 
         launch {
-            interactor.upgrade(
-                username = uiState.value.username,
-                usernameState = usernameState.value,
-            )
+            interactor.upgrade(username = uiState.value.username)
                 .onSuccess {
                     onBackClick()
                 }
@@ -98,7 +93,6 @@ class UpgradeUsernameViewModel @Inject constructor(
                             else -> UsernameFieldState.AVAILABLE
                         }
 
-                        usernameState.value = availabilityState
                         fieldState.value = newFieldState
                     }
                     .onFailure {

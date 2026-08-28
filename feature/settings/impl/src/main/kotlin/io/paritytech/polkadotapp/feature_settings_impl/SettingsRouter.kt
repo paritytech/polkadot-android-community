@@ -15,7 +15,6 @@ interface SettingsRouter : ReturnableRouter {
     fun openBlockedUsers()
     fun openLinkedDevices()
     fun openDeviceDetails(deviceId: String)
-    fun openForceReclaim()
     fun openScanQr()
     fun openContactChat(accountId: AccountId)
     fun openNotificationSettings()

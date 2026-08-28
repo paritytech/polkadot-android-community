@@ -53,13 +53,20 @@ sealed interface ChatMessageUiModel {
         val amount: TokenAmountModel,
         val reactions: ImmutableList<Reaction>
     ) : ChatMessageUiModel {
+        /**
+         * Only a finished claim can be short. While claiming is still going the amount seen so far says
+         * nothing about the final one, and showing a shortfall then tells the user they were short-changed
+         * by a payment that may yet arrive in full.
+         */
         val differingAmount: TokenAmountModel?
-            get() = paymentStatus.settledAmountOrNull()?.takeIf { it.amount.compareTo(amount.amount) != 0 }
+            get() = (paymentStatus as? Status.Transferred)?.transferred
+                ?.takeIf { it.amount.compareTo(amount.amount) != 0 }
 
         @Immutable
         sealed interface Status {
             data object Detecting : Status
             data class Detected(val detected: TokenAmountModel) : Status
+            data class PartiallyClaimed(val claimed: TokenAmountModel) : Status
             data class Transferred(val transferred: TokenAmountModel) : Status
             data object FailedDetection : Status
             data object FailedTransfer : Status
@@ -222,12 +229,6 @@ sealed class MessagePopUpUiState {
         val canLeaveReactions: Boolean,
         val allowedMenuActions: ImmutableList<AllowedMessageMenuAction>
     ) : MessagePopUpUiState()
-}
-
-private fun ChatMessageUiModel.CoinagePayment.Status.settledAmountOrNull(): TokenAmountModel? = when (this) {
-    is ChatMessageUiModel.CoinagePayment.Status.Detected -> detected
-    is ChatMessageUiModel.CoinagePayment.Status.Transferred -> transferred
-    else -> null
 }
 
 fun ChatMessageUiModel.isUnread(): Boolean {

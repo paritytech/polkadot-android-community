@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.manager
 
 import com.google.gson.Gson
+import io.paritytech.polkadotapp.tools_integrity_api.exception.IntegrityException
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.DelayableAuthTokenApi
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.FakeTimeProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.api.AuthTokenApi
@@ -20,6 +21,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
@@ -44,7 +46,7 @@ class JWTTokenProviderTest {
         authTokenApi = mock(AuthTokenApi::class.java)
         timeProvider = FakeTimeProvider()
         jwtParser = JWTParser(Gson())
-        manager = JWTTokenProvider(tokenStore, authTokenApi, timeProvider, jwtParser)
+        manager = JWTTokenProvider(tokenStore, authTokenApi, timeProvider, jwtParser, Gson())
     }
 
     // MARK: - Cached token
@@ -119,7 +121,7 @@ class JWTTokenProviderTest {
     @Test
     fun `invalidateAccessToken waits for in-flight obtainToken then evicts only if it matches`() = runTest {
         val api = DelayableAuthTokenApi()
-        val m = JWTTokenProvider(tokenStore, api, timeProvider, jwtParser)
+        val m = JWTTokenProvider(tokenStore, api, timeProvider, jwtParser, Gson())
         timeProvider.nowSeconds = 1_000_000_000L
 
         // Kick off obtainToken — it suspends inside DelayableAuthTokenApi.fetchToken.
@@ -145,7 +147,7 @@ class JWTTokenProviderTest {
     @Test
     fun `concurrent validToken calls share a single network fetch`() = runTest {
         val api = DelayableAuthTokenApi()
-        val m = JWTTokenProvider(tokenStore, api, timeProvider, jwtParser)
+        val m = JWTTokenProvider(tokenStore, api, timeProvider, jwtParser, Gson())
         timeProvider.nowSeconds = 1_000_000_000L
 
         // Valid JWT so the cache-recheck inside the Mutex treats it as live
@@ -290,6 +292,61 @@ class JWTTokenProviderTest {
         runCatching { manager.validToken() }
 
         assertEquals("rt-other", tokenStore.fetchRefreshToken())
+    }
+
+    // MARK: - Attestation error classification
+
+    @Test
+    fun `attestation 403 with INTEGRITY_FAILED code throws IntegrityException`() = runTest {
+        timeProvider.nowSeconds = 1_000_000_000L
+        `when`(authTokenApi.fetchToken(JwtRequest))
+            .thenThrow(httpException(403, """{"error":"INTEGRITY_FAILED","message":"attestation rejected"}"""))
+
+        val error = runCatching { manager.validToken() }.exceptionOrNull()
+
+        assertTrue("expected IntegrityException but was $error", error is IntegrityException)
+    }
+
+    @Test
+    fun `attestation 403 without INTEGRITY_FAILED code propagates HttpException`() = runTest {
+        timeProvider.nowSeconds = 1_000_000_000L
+        `when`(authTokenApi.fetchToken(JwtRequest))
+            .thenThrow(httpException(403, """{"error":"FORBIDDEN","message":"forbidden"}"""))
+
+        val error = runCatching { manager.validToken() }.exceptionOrNull()
+
+        assertTrue("expected HttpException but was $error", error is HttpException)
+    }
+
+    @Test
+    fun `attestation 503 CRL unavailable retries once and succeeds`() = runTest {
+        timeProvider.nowSeconds = 1_000_000_000L
+        `when`(authTokenApi.fetchToken(JwtRequest))
+            .thenThrow(httpException(503, """{"error":"ATTESTATION_CRL_UNAVAILABLE","message":"retry"}"""))
+            .thenReturn(JWTTokenResponse("retried-token", "retried-refresh"))
+
+        val token = manager.validToken()
+
+        assertEquals("retried-token", token)
+        assertEquals("retried-refresh", tokenStore.fetchRefreshToken())
+    }
+
+    @Test
+    fun `attestation 503 CRL unavailable on retry propagates HttpException`() = runTest {
+        timeProvider.nowSeconds = 1_000_000_000L
+        `when`(authTokenApi.fetchToken(JwtRequest))
+            .thenThrow(
+                httpException(503, """{"error":"ATTESTATION_CRL_UNAVAILABLE","message":"retry"}"""),
+                httpException(503, """{"error":"ATTESTATION_CRL_UNAVAILABLE","message":"retry"}""")
+            )
+
+        val error = runCatching { manager.validToken() }.exceptionOrNull()
+
+        assertTrue("expected HttpException but was $error", error is HttpException)
+    }
+
+    private fun httpException(code: Int, body: String): HttpException {
+        return HttpException(Response.error<Any>(code, body.toResponseBody()))
     }
 
     // MARK: - Expiry

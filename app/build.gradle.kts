@@ -166,6 +166,7 @@ dependencies {
     implementation(project(":feature:calls:impl"))
     implementation(project(":feature:coinage:impl"))
     implementation(project(":feature:dotns:impl"))
+    implementation(project(":feature:dotns-gateway:impl"))
     implementation(project(":feature:connection-status:api"))
     implementation(project(":feature:connection-status:impl"))
     implementation(project(":feature:revive:impl"))

@@ -16,13 +16,16 @@ import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.getExtri
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.isSuccess
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.chains.network.rpc.RpcCalls
+import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
 import io.paritytech.polkadotapp.chains.util.tip
 import io.paritytech.polkadotapp.chains.util.utilityAsset
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.orZero
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.takeWhileInclusive
 import io.paritytech.polkadotapp.feature_transactions.api.data.DispatchError
+import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicDispatch
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicExecutionResult
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
@@ -35,19 +38,24 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.extensions.Defaul
 import io.paritytech.polkadotapp.feature_transactions.api.data.fee.SimpleAccountFee
 import io.paritytech.polkadotapp.feature_transactions.api.data.fee.SimpleFee
 import io.paritytech.polkadotapp.feature_transactions.api.data.feeSignerOrThrow
+import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicRecoveryContext
+import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicRecoveryVerdict
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicSubmissionFailure
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicSubmissionFailureRecovery
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ExtrinsicSubmissionFailureRecoveryStrategy
+import io.paritytech.polkadotapp.feature_transactions.api.data.retry.PreSubmissionValidationFailed
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ResubmitWhenValidFactory
 import io.paritytech.polkadotapp.feature_transactions.api.data.submissionSigner
+import io.paritytech.polkadotapp.feature_transactions.api.data.withMortality
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.AccountFee
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.ExtrinsicSubmission
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.Fee
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.accountId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.accountIdOrThrow
-import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.PreSubmissionValidationFailed
+import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.ExtrinsicValidator
 import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.PreSubmissionValidator
+import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.TransactionValidity
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -67,6 +75,8 @@ class RealExtrinsicService @Inject constructor(
     private val chainRegistry: ChainRegistry,
     private val extrinsicBuilderFactory: ExtrinsicBuilderFactory,
     private val preSubmissionValidator: PreSubmissionValidator,
+    private val extrinsicValidator: ExtrinsicValidator,
+    private val chainStateRepository: ChainStateRepository,
     private val signerProvider: SignerProvider,
     private val chainEventsRepositoryFactory: ChainEventsRepositoryFactory,
     private val coroutineDispatchers: CoroutineDispatchers,
@@ -217,19 +227,41 @@ class RealExtrinsicService @Inject constructor(
 
             Timber.w("Submission attempt on ${chain.id} failed: ${failedAttempt.cause}")
 
-            when (val recovery = submissionFailureRecovery.recoverSubmissionFailure(extrinsic, failedAttempt.cause)) {
+            val recoveryContext = recoveryContextFor(chain, extrinsic)
+
+            when (submissionFailureRecovery.recoverSubmissionFailure(recoveryContext, failedAttempt.cause)) {
                 ExtrinsicSubmissionFailureRecovery.Abort -> {
                     Timber.w("Recovery aborted extrinsic submission on ${chain.id}")
                     flowCollector.emit(failedAttempt.terminalStatus)
                     break
                 }
 
-                is ExtrinsicSubmissionFailureRecovery.Resubmit -> {
+                // The same bytes, held here rather than handed to the strategy: recovery decides whether to
+                // resubmit, never what to submit.
+                ExtrinsicSubmissionFailureRecovery.Resubmit ->
                     Timber.i("Recovery is resubmitting the extrinsic on ${chain.id}")
-                    extrinsic = recovery.extrinsic
-                }
             }
         }
+    }
+
+    /**
+     * The only capability a recovery strategy gets: re-ask the runtime. It cannot submit, which is what keeps
+     * [PreSubmissionValidationFailed] meaning "these bytes were never sent" no matter what strategy is used.
+     */
+    private fun recoveryContextFor(chain: Chain, extrinsic: SendableExtrinsic) = object : ExtrinsicRecoveryContext {
+        override suspend fun revalidate(): Result<ExtrinsicRecoveryVerdict> {
+            val blockHash = chainStateRepository.currentBlockHash(chain.id)
+            val body = extrinsic.bytesWithoutLength.toDataByteArray()
+
+            return extrinsicValidator.validate(chain.id, body, blockHash).map { it.toRecoveryVerdict() }
+        }
+    }
+
+    private fun TransactionValidity.toRecoveryVerdict(): ExtrinsicRecoveryVerdict = when (this) {
+        is TransactionValidity.Valid -> ExtrinsicRecoveryVerdict.ACCEPTED
+        is TransactionValidity.Invalid ->
+            if (isMortalityExpired) ExtrinsicRecoveryVerdict.EXPIRED else ExtrinsicRecoveryVerdict.REJECTED_FOR_NOW
+        is TransactionValidity.Unknown -> ExtrinsicRecoveryVerdict.UNKNOWN
     }
 
     private suspend fun preSubmissionFailure(
@@ -266,6 +298,8 @@ class RealExtrinsicService @Inject constructor(
         return when (this) {
             is ExtrinsicStatus.FailedToSubmit -> ExtrinsicSubmissionFailure.Submission(exception)
             is ExtrinsicStatus.Invalid -> ExtrinsicSubmissionFailure.TxInvalidation
+            is ExtrinsicStatus.Dropped -> ExtrinsicSubmissionFailure.PoolEviction
+            is ExtrinsicStatus.Usurped -> ExtrinsicSubmissionFailure.Usurped(by)
         }
     }
 
@@ -323,8 +357,16 @@ class RealExtrinsicService @Inject constructor(
         origin: TransactionOrigin,
         options: ExtrinsicService.SubmissionOptions,
         formExtrinsic: FormExtrinsic,
-    ): Result<SendableExtrinsic> = runCatching {
+    ): Result<EnrichedSendableExtrinsic> = runCatching {
         buildSubmittableExtrinsic(chain, origin, options, formExtrinsic).extrinsic
+    }
+
+    override suspend fun buildExtrinsics(
+        chain: Chain,
+        options: ExtrinsicService.SubmissionOptions,
+        formExtrinsic: FormMultiExtrinsic,
+    ): Result<List<EnrichedSendableExtrinsic>> = runCatching {
+        buildSubmittableExtrinsicMulti(chain, options, formExtrinsic).map(Submission::extrinsic)
     }
 
     private fun ExtrinsicService.SubmissionOptions.createExtrinsicFactoryOptions(): ExtrinsicBuilderFactory.Options {
@@ -366,14 +408,15 @@ class RealExtrinsicService @Inject constructor(
         val requestedSignerAccountId = originOrDefault.signerSource.accountId(chain)
         val signer = signerProvider.submissionSigner(originOrDefault.signerSource)
 
-        val extrinsicBuilder = extrinsicBuilderFactory.createForSubmission(chain, signer, requestedSignerAccountId, factoryOptions)
+        val submittable = extrinsicBuilderFactory.createForSubmission(chain, signer, requestedSignerAccountId, factoryOptions)
+        val extrinsicBuilder = submittable.builder
         formExtrinsic(InlineWithRuntime(extrinsicBuilder.runtime), extrinsicBuilder)
         if (originOrDefault.paysFees) options.feePayment.modifyExtrinsic(extrinsicBuilder)
         originOrDefault.applyTo(extrinsicBuilder)
         applyDefaultTransactionExtensions(chain, extrinsicBuilder)
         val extrinsic = extrinsicBuilder.buildExtrinsic()
 
-        return Submission(extrinsic)
+        return Submission(extrinsic.withMortality(submittable.mortality))
     }
 
     private suspend fun buildSubmittableExtrinsicMulti(
@@ -387,7 +430,8 @@ class RealExtrinsicService @Inject constructor(
 
         return perExtrinsicBuilders.map {
             val origin = it.origin
-            val extrinsicBuilder = builderSequence.next(chain, origin, factoryOptions)
+            val submittable = builderSequence.next(chain, origin, factoryOptions)
+            val extrinsicBuilder = submittable.builder
 
             it.formExtrinsic(InlineWithRuntime(extrinsicBuilder.runtime), extrinsicBuilder)
             if (origin.paysFees) options.feePayment.modifyExtrinsic(extrinsicBuilder)
@@ -395,7 +439,7 @@ class RealExtrinsicService @Inject constructor(
             applyDefaultTransactionExtensions(chain, extrinsicBuilder)
             val extrinsic = extrinsicBuilder.buildExtrinsic()
 
-            Submission(extrinsic)
+            Submission(extrinsic.withMortality(submittable.mortality))
         }
     }
 
@@ -405,7 +449,7 @@ class RealExtrinsicService @Inject constructor(
         }
     }
 
-    private data class Submission(val extrinsic: SendableExtrinsic)
+    private data class Submission(val extrinsic: EnrichedSendableExtrinsic)
 
     private suspend fun Flow<ExtrinsicStatus>.awaitInBlock(): Result<ExtrinsicStatus.InBlock> {
         return runCancellableCatching {

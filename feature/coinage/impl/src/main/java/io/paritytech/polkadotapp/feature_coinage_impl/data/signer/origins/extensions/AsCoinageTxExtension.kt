@@ -22,13 +22,11 @@ import io.paritytech.polkadotapp.feature_members_api.domain.MembershipProver
 import io.paritytech.polkadotapp.feature_members_api.domain.model.MemberSource
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProof
-import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
 import javax.inject.Inject
 
 class AsCoinageTxExtensionFactory @Inject constructor(
     private val coinageSigningContextProvider: CoinageSigningContextProvider,
     private val membershipProver: MembershipProver,
-    private val peopleMembershipProver: PeopleMembershipProver,
     private val voucherRingDerivation: VoucherRingDerivation,
     private val chainRegistry: ChainRegistry,
 ) {
@@ -37,7 +35,6 @@ class AsCoinageTxExtensionFactory @Inject constructor(
             info = info,
             coinageSigningContextProvider = coinageSigningContextProvider,
             membershipProver = membershipProver,
-            peopleMembershipProver = peopleMembershipProver,
             voucherRingDerivation = voucherRingDerivation,
             chainRegistry = chainRegistry,
         )
@@ -48,7 +45,6 @@ class AsCoinageTxExtension(
     private val info: AsCoinageInfo,
     private val coinageSigningContextProvider: CoinageSigningContextProvider,
     private val membershipProver: MembershipProver,
-    private val peopleMembershipProver: PeopleMembershipProver,
     private val voucherRingDerivation: VoucherRingDerivation,
     private val chainRegistry: ChainRegistry,
 ) : TransactionExtension {
@@ -96,9 +92,7 @@ class AsCoinageTxExtension(
         )
 
         val personProofMessage = createPersonProofMessage(encodedImplication, aliasProofs)
-        val personProof = peopleMembershipProver
-            .proofPersonMembership(personProofMessage, proofContext, chainId, info.peopleCollection)
-            .getOrThrow()
+        val personProof = info.personProver.proofPersonMembership(personProofMessage, proofContext).getOrThrow()
 
         val body = AsCoinageInfoScale.Body(
             proof = personProof.toPeopleRingProof(),
@@ -130,7 +124,7 @@ class AsCoinageTxExtension(
         val voucherEntropies = voucherRingDerivation.deriveBandersnatchForVouchers(vouchers)
 
         return membershipProver.proofMembershipBatched(
-            members = voucherEntropies.map { MemberSource.Entropy(it) },
+            members = voucherEntropies.map(MemberSource::Entropy),
             message = message,
             context = coinageSigningContextProvider.recyclerVouchersContext(),
             chainId = chainId,

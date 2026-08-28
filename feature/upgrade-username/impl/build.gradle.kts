@@ -14,7 +14,7 @@ dependencies {
     implementation(libs.androidx.fragment.ktx)
 
     implementation(project(":feature:people:api"))
-    implementation(project(":feature:chain-resources:api"))
+    implementation(project(":feature:dotns-gateway:api"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.PlannedMemoEntry
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
 
 sealed interface TransferStrategy {
     /**
@@ -8,5 +9,14 @@ sealed interface TransferStrategy {
      * [io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction]. Returns the memo entries
      * describing the coins handed to the recipient, built from the coins actually allocated here.
      */
-    suspend fun run(): Result<List<PlannedMemoEntry>>
+    suspend fun run(): Result<PreparedTransfer>
 }
+
+/**
+ * [handoffCommit] must be committed once the keys in [entries] are durably on their way — until then the
+ * coins are reserved but recoverable, and a relaunch returns them.
+ */
+data class PreparedTransfer(
+    val entries: List<PlannedMemoEntry>,
+    val handoffCommit: CoinageHandoffCommit,
+)

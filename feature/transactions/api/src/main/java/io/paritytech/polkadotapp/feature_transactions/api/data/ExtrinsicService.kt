@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_transactions.api.data
 
 import io.novasama.substrate_sdk_android.runtime.definitions.types.generics.Era
 import io.novasama.substrate_sdk_android.runtime.extrinsic.BatchMode
+import io.novasama.substrate_sdk_android.runtime.extrinsic.ExtrinsicVersion
 import io.novasama.substrate_sdk_android.runtime.extrinsic.Nonce
 import io.novasama.substrate_sdk_android.runtime.extrinsic.builder.ExtrinsicBuilder
 import io.novasama.substrate_sdk_android.runtime.extrinsic.signer.SendableExtrinsic
@@ -10,7 +11,6 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
-import io.paritytech.polkadotapp.common.utils.toResult
 import io.paritytech.polkadotapp.feature_transactions.api.data.fee.FeePayment
 import io.paritytech.polkadotapp.feature_transactions.api.data.fee.NativeFeePayment
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.Abort
@@ -28,29 +28,22 @@ class FormExtrinsicWithOrigin(
     val origin: TransactionOrigin
 )
 
-class Mortality(val era: Era, val blockHash: DataByteArray) {
+/**
+ * [eraBlockNumber] is the number of the block [blockHash] identifies. It is null when the mortality was
+ * recovered from an already-signed payload, which carries the anchor's hash but not its number.
+ */
+class Mortality(val era: Era, val blockHash: DataByteArray, val eraBlockNumber: Long?) {
     companion object {
         fun immortal(chain: Chain): Mortality {
             return Mortality(
                 era = Era.Immortal,
-                blockHash = chain.genesisHash
+                blockHash = chain.genesisHash,
+                eraBlockNumber = 0
             )
         }
-    }
-}
 
-enum class ExtrinsicVersion {
-    V4, V5;
-
-    companion object {
-        fun fromInt(version: Int): Result<ExtrinsicVersion> {
-            val version = when (version) {
-                4 -> V4
-                5 -> V5
-                else -> null
-            }
-
-            return version.toResult { "Extrinsic version $version is not supported" }
+        fun externallyPassed(era: Era, blockHash: DataByteArray): Mortality {
+            return Mortality(era, blockHash, eraBlockNumber = null)
         }
     }
 }
@@ -104,7 +97,18 @@ interface ExtrinsicService {
         origin: TransactionOrigin,
         options: SubmissionOptions,
         formExtrinsic: FormExtrinsic,
-    ): Result<SendableExtrinsic>
+    ): Result<EnrichedSendableExtrinsic>
+
+    /**
+     * Builds and signs every extrinsic of [formExtrinsic] up front, with nonces sequenced across the batch,
+     * and submits none of them. For callers that must durably record each extrinsic before its bytes reach
+     * the wire: build here, record, then submit each via [submitAndWatchBuiltExtrinsic].
+     */
+    suspend fun buildExtrinsics(
+        chain: Chain,
+        options: SubmissionOptions = SubmissionOptions(),
+        formExtrinsic: FormMultiExtrinsic,
+    ): Result<List<EnrichedSendableExtrinsic>>
 
     /**
      * Submits and watches an already-built [extrinsic] through to [ExtrinsicStatus.Finalized], applying

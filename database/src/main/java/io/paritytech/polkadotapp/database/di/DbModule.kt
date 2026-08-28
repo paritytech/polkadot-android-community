@@ -103,11 +103,7 @@ class DbModule {
 
     @Provides
     @Singleton
-    fun provideCoinageTransferDetectionDao(appDatabase: AppDatabase) = appDatabase.coinageTransferDetectionDao()
-
-    @Provides
-    @Singleton
-    fun provideCoinageTransferWalDao(appDatabase: AppDatabase) = appDatabase.coinageTransferWalDao()
+    fun provideCoinageEntryDao(appDatabase: AppDatabase) = appDatabase.coinageEntryDao()
 
     @Provides
     @Singleton

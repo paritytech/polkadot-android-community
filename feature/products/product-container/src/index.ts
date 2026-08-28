@@ -89,13 +89,14 @@ if (navigator.serviceWorker) {
 }
 
 // --- DOM: block iframe creation ---
-const _createElement = document.createElement.bind(document);
-freezeValue(document, 'createElement', (tagName: string, options?: ElementCreationOptions) => {
-  if (tagName.toLowerCase() === 'iframe') {
-    throw new Error('iframe creation is not allowed');
-  }
-  return _createElement(tagName, options);
-});
+// TODO: disabled for now since we need iframes to work. We need to figure out reasonable iframe restrictions by the time trustees products appear
+// const _createElement = document.createElement.bind(document);
+// freezeValue(document, 'createElement', (tagName: string, options?: ElementCreationOptions) => {
+//   if (tagName.toLowerCase() === 'iframe') {
+//     throw new Error('iframe creation is not allowed');
+//   }
+//   return _createElement(tagName, options);
+// });
 
 (window as any).__HOST_WEBVIEW_MARK__ = true;
 

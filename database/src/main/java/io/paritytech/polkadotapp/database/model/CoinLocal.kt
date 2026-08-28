@@ -8,12 +8,8 @@ class CoinLocal(
     @PrimaryKey val derivationIndex: Int,
     val accountId: ByteArray,
     val valueExponent: Int,
+    /** The last age the chain was seen to hold, never cleared once known — see Coin.Age. */
     val ageValue: Int?,
-    val spentState: SpentState
-) {
-    enum class SpentState {
-        SPENT_LOCALLY,
-        SPENT_ON_CHAIN,
-        NOT_SPENT
-    }
-}
+    /** Whether the chain holds the coin right now. Kept apart from [ageValue] on purpose. */
+    val onChain: Boolean,
+)

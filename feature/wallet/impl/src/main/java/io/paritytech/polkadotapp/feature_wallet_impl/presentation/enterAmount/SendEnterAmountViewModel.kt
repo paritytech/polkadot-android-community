@@ -16,7 +16,6 @@ import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddressParcel
 import io.paritytech.polkadotapp.feature_balances_api.presentation.provider.BalanceFlowAvailableBalanceProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlan
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferPlan
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.amountinput.AmountInput
@@ -32,6 +31,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.SendPlan
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.TransferMethod
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.spendablePlanks
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress.Settling.Stage
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendEnterAmountInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
@@ -162,7 +162,8 @@ class SendEnterAmountViewModel @Inject constructor(
         interactor.send(payload.value, payload.transferMethod)
             .collect { state ->
                 when (state) {
-                    is SendState.Settling -> sendProgress.value = SendProgress.Settling(state.detection.toStageUi())
+                    is SendState.Detecting -> sendProgress.value = SendProgress.Settling(Stage.DETECTING)
+                    is SendState.Detected -> sendProgress.value = SendProgress.Settling(Stage.DETECTED)
                     is SendState.Complete -> handleTransactionResult(error = null)
                     is SendState.Failed -> handleTransactionResult(error = state.error)
                 }
@@ -214,11 +215,6 @@ private fun TransferMethodPayload.toRecipientInfo(): RecipientInfo = when (this)
 
 private fun ExtractedAddressParcel.toRecipientInfo(): RecipientInfo =
     RecipientInfo(display, type, AvatarColorScheme.from(accountId))
-
-private fun CoinageTransferDetection.toStageUi(): SendProgress.Settling.Stage = when (this) {
-    is CoinageTransferDetection.Detected -> SendProgress.Settling.Stage.DETECTED
-    else -> SendProgress.Settling.Stage.DETECTING
-}
 
 private fun TransferMethodPayload.toDomain(): TransferMethod = when (this) {
     is TransferMethodPayload.CoinsViaChat -> TransferMethod.CoinsViaChat(recipient.accountId.intoAccountId())

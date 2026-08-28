@@ -8,8 +8,6 @@ import dagger.hilt.android.scopes.ViewModelScoped
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.interactor.RealUsernamesClaimInteractor
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.interactor.UsernamesClaimInteractor
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.CreateClaimParamsUseCase
-import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.AdoptWalletBackendAuthUseCase
-import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.RealAdoptWalletBackendAuthUseCase
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.RealCreateClaimParamsUseCase
 
 @Module
@@ -22,7 +20,4 @@ interface UsernamesClaimModule {
     @Binds
     @ViewModelScoped
     fun bindCreateClaimParamsUseCase(impl: RealCreateClaimParamsUseCase): CreateClaimParamsUseCase
-
-    @Binds
-    fun bindAdoptWalletBackendAuthUseCase(impl: RealAdoptWalletBackendAuthUseCase): AdoptWalletBackendAuthUseCase
 }

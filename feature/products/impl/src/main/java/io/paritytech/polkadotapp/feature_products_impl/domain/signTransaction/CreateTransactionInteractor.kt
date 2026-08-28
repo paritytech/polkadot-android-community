@@ -26,6 +26,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.extensions.DecodedTransactionExtensionValue
 import io.paritytech.polkadotapp.feature_transactions.api.data.extensions.TxPayloadExtensionsResolver
 import io.paritytech.polkadotapp.feature_transactions.api.di.ExtrinsicSerializer
+import io.paritytech.polkadotapp.feature_transactions.api.domain.model.SignedTransactionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import kotlinx.coroutines.withContext
 
@@ -54,7 +55,8 @@ class CreateTransactionInteractor @AssistedInject constructor(
 
     override suspend fun humanReadableRepresentation(): Result<String> = runCatching {
         val runtime = runtime()
-        val resolved = extensionsResolver.resolve(payload.extensions, runtime).getOrThrow()
+        val origin = resolveTransactionOrigin().getOrThrow()
+        val resolved = resolveExtensions(origin).getOrThrow()
         val call = GenericCall.fromByteArray(runtime, payload.callData.value)
         val view = createTransactionHumanReadable(call, resolved.allRequestedExtensions)
         extrinsicSerializerGson.toJson(view)
@@ -95,7 +97,7 @@ class CreateTransactionInteractor @AssistedInject constructor(
         val runtime = chainRegistry.getRuntime(chainId)
 
         return resolveTransactionOrigin().flatMap { origin ->
-            extensionsResolver.resolve(payload.extensions, runtime).map { resolved ->
+            resolveExtensions(origin).map { resolved ->
                 val call = GenericCall.fromByteArray(runtime, payload.callData.value)
                 ExtrinsicBuildingContext(
                     chain = chain,
@@ -106,6 +108,15 @@ class CreateTransactionInteractor @AssistedInject constructor(
                 )
             }
         }
+    }
+
+    private suspend fun resolveExtensions(origin: TransactionOrigin): Result<TxPayloadExtensionsResolver.Resolved> {
+        return extensionsResolver.resolve(
+            extensions = payload.extensions,
+            txExtVersion = payload.txExtVersion,
+            chainId = chainId(),
+            isSigned = origin is SignedTransactionOrigin,
+        )
     }
 
     private suspend fun buildExtrinsic(context: ExtrinsicBuildingContext): Result<SendableExtrinsic> {

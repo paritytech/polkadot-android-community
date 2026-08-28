@@ -44,6 +44,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = authTokenApi,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -70,6 +71,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = mock(AuthTokenApi::class.java),
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -97,6 +99,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = authTokenApi,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -126,6 +129,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = authTokenApi,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -148,6 +152,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = mock(AuthTokenApi::class.java),
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -171,6 +176,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = api,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 

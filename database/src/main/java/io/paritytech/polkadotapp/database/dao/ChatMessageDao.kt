@@ -20,9 +20,14 @@ abstract class ChatMessageDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     protected abstract suspend fun insertIfNotExists(local: List<ChatMessageLocal>): List<Long>
 
+    /**
+     * [onSaved] runs inside the same transaction as the insert, so a caller can make a fact durable exactly
+     * when the message is — neither can be rolled back without the other.
+     */
     @Transaction
-    open suspend fun saveMessage(local: ChatMessageLocal) {
+    open suspend fun saveMessage(local: ChatMessageLocal, onSaved: suspend () -> Unit) {
         saveMessages(listOf(local))
+        onSaved()
     }
 
     @Transaction

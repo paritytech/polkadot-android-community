@@ -8,7 +8,7 @@ class RealCoinageTestHelperUseCase @Inject constructor(
     private val voucherRepository: VoucherRepository
 ) : CoinageTestHelperUseCase {
     override suspend fun makeAllVouchersReady() {
-        voucherRepository.getActiveVouchers()
+        voucherRepository.getVouchersInRecycler()
             .forEach {
                 voucherRepository.save(
                     it.copy(

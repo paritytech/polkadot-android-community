@@ -71,5 +71,8 @@ sentry.properties
 
 .serena/
 
+# Lavish Editor generated review artifacts
+.lavish/
+
 # Temp
 tmp/

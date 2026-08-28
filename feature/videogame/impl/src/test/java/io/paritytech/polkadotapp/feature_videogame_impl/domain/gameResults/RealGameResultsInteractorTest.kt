@@ -522,14 +522,11 @@ class RealGameResultsInteractorTest {
     }
 
     @Test
-    fun `availability maps ReservedByUs and ReclaimExpiredReservation to AVAILABLE`() = runBlocking<Unit> {
+    fun `availability maps ReservedByUs to AVAILABLE`() = runBlocking<Unit> {
         whenever(checkUsernameAvailabilityUseCase("a"))
             .thenReturn(Result.success(UpgradeUsernameAvailabilityState.ReservedByUs))
-        whenever(checkUsernameAvailabilityUseCase("b"))
-            .thenReturn(Result.success(UpgradeUsernameAvailabilityState.ReclaimExpiredReservation(emptyList())))
 
         assertEquals(UsernameAvailability.AVAILABLE, resolveAvailability("a"))
-        assertEquals(UsernameAvailability.AVAILABLE, resolveAvailability("b"))
     }
 
     @Test

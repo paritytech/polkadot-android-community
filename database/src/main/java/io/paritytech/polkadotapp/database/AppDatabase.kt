@@ -24,8 +24,7 @@ import io.paritytech.polkadotapp.database.dao.ChatRequestSyncStateDao
 import io.paritytech.polkadotapp.database.dao.ChatRoomDao
 import io.paritytech.polkadotapp.database.dao.ChatSearchRecentDao
 import io.paritytech.polkadotapp.database.dao.CoinDao
-import io.paritytech.polkadotapp.database.dao.CoinageTransferDetectionDao
-import io.paritytech.polkadotapp.database.dao.CoinageTransferWalDao
+import io.paritytech.polkadotapp.database.dao.CoinageEntryDao
 import io.paritytech.polkadotapp.database.dao.ContactDao
 import io.paritytech.polkadotapp.database.dao.ContactDeviceDao
 import io.paritytech.polkadotapp.database.dao.ExternalPaymentDao
@@ -82,6 +81,7 @@ import io.paritytech.polkadotapp.database.migrations.Migration3To4
 import io.paritytech.polkadotapp.database.migrations.Migration42To43Spec
 import io.paritytech.polkadotapp.database.migrations.Migration48To49
 import io.paritytech.polkadotapp.database.migrations.Migration54To55Spec
+import io.paritytech.polkadotapp.database.migrations.Migration55To56
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
@@ -95,8 +95,10 @@ import io.paritytech.polkadotapp.database.model.ChatRequestSyncStateLocal
 import io.paritytech.polkadotapp.database.model.ChatRoomLocal
 import io.paritytech.polkadotapp.database.model.ChatSearchRecentLocal
 import io.paritytech.polkadotapp.database.model.CoinLocal
-import io.paritytech.polkadotapp.database.model.CoinageTransferDetectionLocal
-import io.paritytech.polkadotapp.database.model.CoinageTransferWalLocal
+import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
+import io.paritytech.polkadotapp.database.model.CoinageEntryLocal
+import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
+import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
 import io.paritytech.polkadotapp.database.model.ContactDeviceLocal
 import io.paritytech.polkadotapp.database.model.ContactLocal
 import io.paritytech.polkadotapp.database.model.ExternalPaymentLocal
@@ -135,7 +137,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 55,
+    version = 57,
     entities = [
         ChainLocal::class,
         ChainNodeLocal::class,
@@ -154,8 +156,6 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         ChatMessageCompactionLinkLocal::class,
         ChatMessagePendingExpansionLocal::class,
         ChatMessageProcessingLocal::class,
-        CoinageTransferDetectionLocal::class,
-        CoinageTransferWalLocal::class,
         ChatMessageReactionLocal::class,
         ChatBotStateLocal::class,
         VideoGameVoteLocal::class,
@@ -188,6 +188,10 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         BrowserTabLocal::class,
         ChatSearchRecentLocal::class,
         RingVrfKeyRegistrationLocal::class,
+        CoinageEntryLocal::class,
+        CoinageEntryInputLocal::class,
+        CoinageEntryOutputLocal::class,
+        CoinageHandoffLocal::class,
     ],
     autoMigrations = [
         // Add ChatMessageReactionLocal
@@ -256,6 +260,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 53, to = 54),
         // Add icon columns + userWorkerUrl to products; drop scriptUrl, contentHash and iconUrl
         AutoMigration(from = 54, to = 55, spec = Migration54To55Spec::class),
+        // Add syncedTransactionVersion column to chain_runtimes
+        AutoMigration(from = 56, to = 57),
     ]
 )
 @TypeConverters(
@@ -303,6 +309,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration35To36(),
                 Migration38To39(),
                 Migration48To49(),
+                Migration55To56(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }
@@ -332,9 +339,7 @@ abstract class AppDatabase : RoomDatabase() {
 
     abstract fun processedChatMessageDao(): ProcessedChatMessageDao
 
-    abstract fun coinageTransferDetectionDao(): CoinageTransferDetectionDao
-
-    abstract fun coinageTransferWalDao(): CoinageTransferWalDao
+    abstract fun coinageEntryDao(): CoinageEntryDao
 
     abstract fun messageReactionsDao(): ChatMessageReactionDao
 

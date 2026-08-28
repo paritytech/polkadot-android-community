@@ -65,6 +65,7 @@ class ClaimUsernameViewModel @Inject constructor(
     private suspend fun handleOnboardingStatus(status: AccountOnboardingStatus) {
         when {
             status.isOnboarded -> postOnboardingFlow.openPostOnboarding()
+            status.isWaitingInQueue -> router.openRegistrationQueue()
             status.accountCreated -> {
                 state.update { it.copy(showRecoverOption = false) }
                 tryRecoverUsername()
@@ -219,6 +220,12 @@ class ClaimUsernameViewModel @Inject constructor(
     private suspend fun handleClaimOutcome(outcome: ClaimUsernameOutcome) {
         when (outcome) {
             ClaimUsernameOutcome.Claimed -> Unit
+            ClaimUsernameOutcome.Queued -> Unit
+            ClaimUsernameOutcome.PaymentRequired -> {
+                state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
+                router.openClaimUnavailable()
+            }
+
             is ClaimUsernameOutcome.SuffixTaken -> {
                 val firstDigits = outcome.freshDigits.firstOrNull().orEmpty()
                 state.update {
@@ -252,11 +259,7 @@ class ClaimUsernameViewModel @Inject constructor(
 
     private fun handleClaimError(error: Throwable) {
         when (error) {
-            is IntegrityException -> {
-                state.update {
-                    it.copy(fieldState = UsernameFieldState.ALREADY_CREATED)
-                }
-            }
+            is IntegrityException -> router.openIntegrityFailed()
 
             else -> showError(error)
         }

@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.tools_backup_impl.data.processing
 
-import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.tools_backup_api.domain.error.CorruptedBackupException
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.Backup
 import io.paritytech.polkadotapp.tools_backup_impl.data.model.EncryptedBackup
@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScryptBackupEncryptionTest {
-    private val encryption = ScryptBackupEncryption(CoroutineDispatchers())
+    private val encryption = ScryptBackupEncryption(RealCoroutineDispatchers())
 
     @Test
     fun `decrypting empty backup fails with CorruptedBackupException`() = runTest {

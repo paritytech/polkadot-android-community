@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.FreeUnloadTok
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.extensions.AsCoinageInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.extensions.AsCoinageTxExtensionFactory
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
+import io.paritytech.polkadotapp.feature_people_api.domain.PrecomputedPersonMembershipProver
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.SetTransactionExtensionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
@@ -39,12 +40,14 @@ class CoinageTransactionOrigins @Inject constructor(
         recyclerRevisionBlockHash: BlockHash,
         vouchers: List<RecyclerVoucher>,
         resolvedUnloadToken: FreeUnloadTokenResolver.ResolvedUnloadToken,
+        personProver: PrecomputedPersonMembershipProver,
         peopleCollection: PeopleCollection,
     ): TransactionOrigin {
         val info = AsCoinageInfo.AsFreeUnloadToken(
             vouchers = vouchers,
             resolvedToken = resolvedUnloadToken,
             recyclerRevisionBlockHash = recyclerRevisionBlockHash,
+            personProver = personProver,
             peopleCollection = peopleCollection,
         )
         return SetTransactionExtensionOrigin(

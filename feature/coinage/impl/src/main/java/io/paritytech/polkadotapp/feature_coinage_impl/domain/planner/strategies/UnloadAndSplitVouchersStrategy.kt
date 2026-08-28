@@ -9,11 +9,15 @@ import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
 import io.paritytech.polkadotapp.chains.util.EncodedArguments.Companion.autoEncodedArgs
 import io.paritytech.polkadotapp.chains.util.call
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.mapIndexedAsync
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.PlannedMemoEntry
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionRequest
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
@@ -21,18 +25,19 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.FreeUnloadTok
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenResolverFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.createForCollection
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinageTransferWalRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RecyclerProofDataProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.CoinageSigningContextProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.SplitDestination
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.TransferWalEntry
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransactionAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.mintAndHandOffCoins
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.service.TransferExecutionService
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.transfer.execution.ExtrinsicSubmissionTask
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.toSplitDestinations
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
+import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
+import io.paritytech.polkadotapp.feature_people_api.domain.PrecomputedPersonMembershipProver
+import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
+import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import javax.inject.Inject
 
@@ -44,12 +49,12 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
     private val recyclerProofDataProvider: RecyclerProofDataProvider,
     private val unloadTokenResolverFactory: UnloadTokenResolverFactory,
     private val coinRepository: CoinRepository,
-    private val transferWalRepository: CoinageTransferWalRepository,
-    private val walEntryBuilder: WalEntryBuilder,
-    private val transferExecutionService: TransferExecutionService,
+    private val extrinsicService: ExtrinsicService,
+    private val transactionService: CoinageTransactionService,
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
-    private val balanceConverterUseCase: CoinageBalanceConverterUseCase
+    private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
+    private val peopleMembershipProver: PeopleMembershipProver
 ) {
     fun create(
         payload: StrategyType.UnloadAndSplit,
@@ -66,12 +71,12 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
         chain = chain,
         chainStateRepository = chainStateRepository,
         coinRepository = coinRepository,
-        transferWalRepository = transferWalRepository,
-        walEntryBuilder = walEntryBuilder,
-        transferExecutionService = transferExecutionService,
+        extrinsicService = extrinsicService,
+        transactionService = transactionService,
         coinageTransactionFactory = coinageTransactionFactory,
         breakdownUseCase = breakdownUseCase,
-        balanceConverterUseCase = balanceConverterUseCase
+        balanceConverterUseCase = balanceConverterUseCase,
+        peopleMembershipProver = peopleMembershipProver
     )
 }
 
@@ -86,88 +91,88 @@ class UnloadAndSplitVouchersStrategy(
     private val freeUnloadTokenResolver: FreeUnloadTokenResolver,
     private val chain: Chain,
     private val coinRepository: CoinRepository,
-    private val transferWalRepository: CoinageTransferWalRepository,
-    private val walEntryBuilder: WalEntryBuilder,
-    private val transferExecutionService: TransferExecutionService,
+    private val extrinsicService: ExtrinsicService,
+    private val transactionService: CoinageTransactionService,
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
-    private val balanceConverterUseCase: CoinageBalanceConverterUseCase
+    private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
+    private val peopleMembershipProver: PeopleMembershipProver
 ) : TransferStrategy {
     private val vouchers = payload.vouchersToUnload
     private val recipientAmount = payload.recipientAmount
     private val exactCoins = payload.exactCoins
 
-    override suspend fun run(): Result<List<PlannedMemoEntry>> {
-        return prepare().map { prepared ->
-            transferWalRepository.saveAll(prepared.walEntries)
-            prepared.tasks.forEach { transferExecutionService.submit(it) }
+    /**
+     * One group of transactions, one per voucher batch.
+     *
+     * Every extrinsic is built before any is registered, each is then
+     * registered and submitted on its own. A crash part-way leaves the registered ones to reach FAILURE at
+     * mortality and return their vouchers, and the unregistered ones never reserved anything.
+     */
+    override suspend fun run(): Result<PreparedTransfer> = runCatching {
+        require(vouchers.isNotEmpty()) { "TransferStrategyError.emptyVouchers" }
+        require(vouchers.all { it.isInRecycler() }) { "TransferStrategyError.missingRecyclerInfo" }
 
-            prepared.memoEntries
-        }
-    }
+        val batches = resolveBatches()
+        val freeUnloadTokens = freeUnloadTokenResolver.resolve(chain.id, batches.size)
 
-    private suspend fun prepare(): Result<Prepared> {
-        // Existing coins are handed off in a prep-scoped transaction: rolled back only if preparation fails,
-        // never on a per-group submission failure (the per-group transactions own that).
-        val prepTransaction = coinageTransactionFactory.newTransaction()
-        val groupTransactions = mutableListOf<CoinageTransaction>()
+        val pinnedBlockHash = chainStateRepository.currentBlockHash(chain.id)
+        val groupRevisions = recyclerProofDataProvider
+            .getRecyclerRevisions(chain.id, batches.map { it.recyclerKey }, pinnedBlockHash)
+            .logFailure("Failed to get recycler revisions")
+            .getOrThrow()
 
-        return runCatching {
-            require(vouchers.isNotEmpty()) { "TransferStrategyError.emptyVouchers" }
-            require(vouchers.all { it.isInRecycler() }) { "TransferStrategyError.missingRecyclerInfo" }
+        // One prover for the whole transfer: every batch proves the same person against the same pinned
+        // block, so the ring lookups behind it are paid once instead of once per extrinsic.
+        val personProver = peopleMembershipProver.precomputeForMember(
+            chainId = chain.id,
+            peopleCollection = peopleCollection,
+            at = pinnedBlockHash,
+        ).getOrThrow()
 
-            val batches = resolveBatches()
-            val freeUnloadTokens = freeUnloadTokenResolver.resolve(chain.id, batches.size)
+        val prepared = batches.mapIndexedAsync { index, batch ->
+            val transaction = coinageTransactionFactory.newTransaction()
+            val outputs = transaction.mintGroupOutputs(batch)
 
-            prepTransaction.handOffCoins(exactCoins)
-
-            val recyclerRevisionBlockHash = chainStateRepository.currentBlockHash(chain.id)
-            val groupRevisions = recyclerProofDataProvider
-                .getRecyclerRevisions(chain.id, batches.map { it.recyclerKey }, recyclerRevisionBlockHash)
-                .logFailure("Failed to get recycler revisions")
-                .getOrThrow()
-
-            val recipientMemoCoins = mutableListOf<Coin>()
-            val tasks = mutableListOf<ExtrinsicSubmissionTask>()
-            val walEntries = mutableListOf<TransferWalEntry>()
-
-            batches.forEachIndexed { index, batch ->
-                val transaction = coinageTransactionFactory.newTransaction()
-                val outputs = transaction.mintGroupOutputs(batch)
-                groupTransactions.add(transaction)
-
-                val walEntry = walEntryBuilder.createNewWalEntry(
-                    chainId = chain.id,
-                    inputCoins = emptyList(),
-                    inputVouchers = batch.vouchers,
-                    outputCoins = outputs.all
-                ).getOrThrow()
-
-                tasks.add(
-                    buildTask(
-                        walId = walEntry.id,
-                        batch = batch,
-                        transaction = transaction,
-                        outputCoins = outputs.all,
-                        unloadToken = freeUnloadTokens[index],
-                        recyclerRevisionBlockHash = recyclerRevisionBlockHash,
-                        revision = groupRevisions.getValue(batch.recyclerKey)
-                    )
-                )
-                walEntries.add(walEntry)
-                recipientMemoCoins.addAll(outputs.recipient)
-            }
-
-            Prepared(
-                tasks = tasks,
-                walEntries = walEntries,
-                memoEntries = (exactCoins + recipientMemoCoins).toMemoEntries()
+            PreparedBatch(
+                assets = transaction.build(),
+                recipientCoins = outputs.recipient,
+                extrinsic = buildExtrinsic(
+                    batch = batch,
+                    outputCoins = outputs.all,
+                    unloadToken = freeUnloadTokens[index],
+                    personProver = personProver,
+                    recyclerRevisionBlockHash = pinnedBlockHash,
+                    revision = groupRevisions.getValue(batch.recyclerKey),
+                ).getOrThrow(),
             )
-        }.onFailure { cause ->
-            groupTransactions.forEach { it.rollback(CoinageTransaction.Stage.PREPARATION, cause) }
-            prepTransaction.rollback(CoinageTransaction.Stage.PREPARATION, cause)
         }
+
+        val groupId = CoinageOperationGroupId.generateNew()
+        val handedOffExactCoins = exactCoins.map { OwnAsset.Coin(it.derivationIndex) }
+
+        val handoffCommit = transactionService
+            .preCommitHandoff(handedOffExactCoins + prepared.flatMap { it.assets.handedOff })
+            .getOrThrow()
+
+        val requests = prepared.map { batch ->
+            CoinageTransactionRequest(
+                extrinsic = batch.extrinsic,
+                inputs = batch.assets.inputs,
+                outputs = batch.assets.outputs,
+            )
+        }
+
+        transactionService.submitTransactions(requests, groupId).getOrThrow()
+
+        PreparedTransfer((exactCoins + prepared.flatMap { it.recipientCoins }).toMemoEntries(), handoffCommit)
     }
+
+    private class PreparedBatch(
+        val assets: CoinageTransactionAssets,
+        val recipientCoins: List<Coin>,
+        val extrinsic: EnrichedSendableExtrinsic,
+    )
 
     private suspend fun resolveBatches(): List<VoucherBatch> {
         val breakdown = breakdownUseCase.createCoinAmountBreakdown().getOrThrow()
@@ -190,22 +195,22 @@ class UnloadAndSplitVouchersStrategy(
         return TransferOutputs(recipientCoins, changeCoins)
     }
 
-    private suspend fun buildTask(
-        walId: String,
+    private suspend fun buildExtrinsic(
         batch: VoucherBatch,
-        transaction: CoinageTransaction,
         outputCoins: List<Coin>,
         unloadToken: FreeUnloadTokenResolver.ResolvedUnloadToken,
+        personProver: PrecomputedPersonMembershipProver,
         recyclerRevisionBlockHash: BlockHash,
         revision: RingRevision
-    ): ExtrinsicSubmissionTask {
-        val destinations = buildSplitDestinations(outputCoins)
-        val origin = makeOriginDefinition(batch.vouchers, unloadToken, recyclerRevisionBlockHash)
+    ) = run {
+        val destinations = outputCoins.toSplitDestinations()
+        val origin = makeOriginDefinition(batch.vouchers, unloadToken, recyclerRevisionBlockHash, personProver)
         val aliases = buildAliases(batch.vouchers)
 
-        return ExtrinsicSubmissionTask(
-            walId = walId,
+        extrinsicService.buildExtrinsic(
+            chain = chain,
             origin = origin,
+            options = ExtrinsicService.SubmissionOptions(),
             formExtrinsic = {
                 call(
                     moduleName = "Coinage",
@@ -220,20 +225,7 @@ class UnloadAndSplitVouchersStrategy(
                     ),
                 )
             },
-            transaction = transaction
         )
-    }
-
-    private fun buildSplitDestinations(coins: List<Coin>): List<SplitDestination> {
-        return coins.groupBy { it.valueExponent }
-            .entries
-            .sortedBy { it.key }
-            .map { (exponent, groupCoins) ->
-                SplitDestination(
-                    exponent = exponent,
-                    accountIds = groupCoins.map { it.accountId },
-                )
-            }
     }
 
     private suspend fun buildAliases(vouchers: List<RecyclerVoucher>): List<BandersnatchAlias> {
@@ -249,18 +241,14 @@ class UnloadAndSplitVouchersStrategy(
         vouchers: List<RecyclerVoucher>,
         resolvedUnloadToken: FreeUnloadTokenResolver.ResolvedUnloadToken,
         recyclerRevisionBlockHash: BlockHash,
+        personProver: PrecomputedPersonMembershipProver,
     ): TransactionOrigin {
         return originFactory.createAsUnloadTokenPeopleOrigin(
             vouchers = vouchers,
             resolvedUnloadToken = resolvedUnloadToken,
             recyclerRevisionBlockHash = recyclerRevisionBlockHash,
+            personProver = personProver,
             peopleCollection = peopleCollection,
         )
     }
-
-    private class Prepared(
-        val tasks: List<ExtrinsicSubmissionTask>,
-        val walEntries: List<TransferWalEntry>,
-        val memoEntries: List<PlannedMemoEntry>
-    )
 }

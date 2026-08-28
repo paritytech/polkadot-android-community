@@ -135,7 +135,12 @@ class RuntimeSyncService @Inject constructor(
 
             runtimeFilesCache.saveChainMetadata(chainId, runtimeMetadata)
 
-            chainDao.updateSyncedRuntimeVersion(chainId, runtimeInfo.remoteVersion, cacheMigrator.latestVersion())
+            chainDao.updateSyncedRuntimeVersion(
+                chainId = chainId,
+                syncedVersion = runtimeInfo.remoteVersion,
+                syncedTransactionVersion = runtimeInfo.transactionVersion,
+                localMigratorVersion = cacheMigrator.latestVersion()
+            )
 
             runtimeMetadata.md5()
         } else {
@@ -169,5 +174,7 @@ class RuntimeSyncService @Inject constructor(
     }
 
     private fun ChainRuntimeInfoLocal.shouldSyncMetadata() =
-        syncedVersion != remoteVersion || cacheMigrator.needsMetadataFetch(localMigratorVersion)
+        syncedVersion != remoteVersion ||
+            syncedTransactionVersion != transactionVersion ||
+            cacheMigrator.needsMetadataFetch(localMigratorVersion)
 }

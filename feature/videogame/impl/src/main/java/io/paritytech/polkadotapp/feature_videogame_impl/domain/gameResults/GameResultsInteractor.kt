@@ -233,8 +233,7 @@ class RealGameResultsInteractor @Inject constructor(
     private fun UpgradeUsernameAvailabilityState.toAvailability(): UsernameAvailability = when (this) {
         UpgradeUsernameAvailabilityState.NotAvailable -> UsernameAvailability.TAKEN
         UpgradeUsernameAvailabilityState.Free,
-        UpgradeUsernameAvailabilityState.ReservedByUs,
-        is UpgradeUsernameAvailabilityState.ReclaimExpiredReservation -> UsernameAvailability.AVAILABLE
+        UpgradeUsernameAvailabilityState.ReservedByUs -> UsernameAvailability.AVAILABLE
     }
 
     private suspend fun isMember(chainId: ChainId, player: OnChainAccountOrPerson): Boolean {

@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.SignerProvider
+import io.paritytech.polkadotapp.feature_transactions.api.data.extensions.TxPayloadExtensionsResolver
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.FreeTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.LitePeopleOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.SignedOrigins
@@ -20,6 +21,7 @@ import io.paritytech.polkadotapp.feature_transactions_impl.data.ExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_transactions_impl.data.RealDefaultExtrinsicVersionProvider
 import io.paritytech.polkadotapp.feature_transactions_impl.data.RealExtrinsicBuilderFactory
 import io.paritytech.polkadotapp.feature_transactions_impl.data.RealExtrinsicService
+import io.paritytech.polkadotapp.feature_transactions_impl.data.extensions.RealTxPayloadExtensionsResolver
 import io.paritytech.polkadotapp.feature_transactions_impl.data.extrinsicSerializer.ExtrinsicSerializers
 import io.paritytech.polkadotapp.feature_transactions_impl.data.origins.RealFreeTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions_impl.data.origins.RealLitePeopleOrigins
@@ -56,6 +58,9 @@ internal interface TransactionsFeatureApiModule {
 
     @Binds
     fun bindDefaultExtrinsicVersionProvider(impl: RealDefaultExtrinsicVersionProvider): DefaultExtrinsicVersionProvider
+
+    @Binds
+    fun bindTxPayloadExtensionsResolver(impl: RealTxPayloadExtensionsResolver): TxPayloadExtensionsResolver
 
     @Binds
     @Singleton

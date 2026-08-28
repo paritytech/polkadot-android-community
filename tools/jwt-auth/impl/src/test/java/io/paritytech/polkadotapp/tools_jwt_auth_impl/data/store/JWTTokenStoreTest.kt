@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.store
 
-import io.paritytech.polkadotapp.test_shared.FakeEncryptedPreferences
+import io.paritytech.polkadotapp.common.data.storage.preferences.encrypted.EncryptedPreferences
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -113,4 +115,22 @@ class JWTTokenStoreTest {
         assertNull(store.fetchToken())
         assertNull(store.fetchRefreshToken())
     }
+}
+
+private class FakeEncryptedPreferences : EncryptedPreferences {
+    private val storage = mutableMapOf<String, String>()
+
+    override fun putEncryptedString(field: String, value: String) {
+        storage[field] = value
+    }
+
+    override fun getDecryptedString(field: String): String? = storage[field]
+
+    override fun hasKey(field: String): Boolean = storage.containsKey(field)
+
+    override fun removeKey(field: String) {
+        storage.remove(field)
+    }
+
+    override fun decryptedStringFlow(field: String): Flow<String?> = flowOf(storage[field])
 }

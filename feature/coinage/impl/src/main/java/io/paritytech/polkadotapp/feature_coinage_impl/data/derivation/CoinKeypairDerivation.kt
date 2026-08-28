@@ -15,17 +15,23 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
 import javax.inject.Inject
 
-class CoinKeypairDerivation @Inject constructor(
+interface CoinKeypairDerivation {
+    suspend fun deriveKeypair(derivationIndex: DerivationIndex): Keypair
+
+    suspend fun deriveKeypairs(derivationIndices: List<DerivationIndex>): List<Keypair>
+}
+
+class RealCoinKeypairDerivation @Inject constructor(
     private val accountRepository: AccountRepository,
     private val accountSecretsStorage: AccountSecretsStorage,
-) {
+) : CoinKeypairDerivation {
     companion object {
         private const val COIN_DERIVATION_PATH_BASE = "//pps//coin"
 
         private fun getCoinDerivationPath(derivationIndex: DerivationIndex) = "$COIN_DERIVATION_PATH_BASE//$derivationIndex"
     }
 
-    suspend fun deriveKeypair(derivationIndex: DerivationIndex): Keypair {
+    override suspend fun deriveKeypair(derivationIndex: DerivationIndex): Keypair {
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
 
@@ -37,7 +43,7 @@ class CoinKeypairDerivation @Inject constructor(
         return keypair
     }
 
-    suspend fun deriveKeypairs(derivationIndices: List<DerivationIndex>): List<Keypair> {
+    override suspend fun deriveKeypairs(derivationIndices: List<DerivationIndex>): List<Keypair> {
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
         val seedResult = SubstrateSeedFactory.deriveSeed32(mnemonic.words, password = null)
