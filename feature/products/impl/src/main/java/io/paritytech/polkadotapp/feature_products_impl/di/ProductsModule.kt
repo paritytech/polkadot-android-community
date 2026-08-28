@@ -2,9 +2,12 @@ package io.paritytech.polkadotapp.feature_products_impl.di
 
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
@@ -17,6 +20,7 @@ import io.paritytech.polkadotapp.feature_products_api.domain.deriveEntropy.Deriv
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.PreimageSubmitSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.StatementStoreSubmissionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.TransactionSponsoring
+import io.paritytech.polkadotapp.feature_products_api.model.KnownProductIds
 import io.paritytech.polkadotapp.feature_products_api.presentation.spaHost.SpaHost
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.BrowserTabRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductIntegrationRepository
@@ -56,6 +60,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.Prod
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.RealProductNotificationScheduler
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.ProductAccountOrigins
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.RealProductAccountOrigins
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.AutoAllowProductPermissionRequester
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRepository
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRequester
@@ -193,10 +198,6 @@ internal interface ProductsModule {
 
     @Binds
     @Singleton
-    fun bindPermissionRequester(impl: RealProductPermissionRequester): ProductPermissionRequester
-
-    @Binds
-    @Singleton
     fun bindProductScriptResolver(impl: RealProductScriptResolver): ProductScriptResolver
 
     @Binds
@@ -251,4 +252,20 @@ internal interface ProductsModule {
 
     @Binds
     fun bindExecuteTopUpUseCase(impl: RealExecuteTopUpUseCase): ExecuteTopUpUseCase
+
+    companion object {
+        @Provides
+        @Singleton
+        fun providePermissionRequester(real: RealProductPermissionRequester): ProductPermissionRequester {
+            return AutoAllowProductPermissionRequester(autoAllowedLabels(), real)
+        }
+
+        private fun autoAllowedLabels(): Set<String> {
+            return if (FeatureOption.PRODUCT_SETTINGS.isDisabled) {
+                setOf(KnownProductIds.GET_CASH_LABEL)
+            } else {
+                emptySet()
+            }
+        }
+    }
 }
