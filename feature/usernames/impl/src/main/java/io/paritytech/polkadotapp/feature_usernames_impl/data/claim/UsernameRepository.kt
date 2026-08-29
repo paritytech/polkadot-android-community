@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.data.claim
 
+import com.google.gson.Gson
 import io.novasama.substrate_sdk_android.extensions.toHexString
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
 import io.paritytech.polkadotapp.common.utils.flatten
 import io.paritytech.polkadotapp.common.utils.mapError
@@ -19,6 +21,8 @@ import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUserna
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.RegistrationQueueStatus
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameClaimResult
+import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidence
+import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidenceProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.toBackendRequestError
 import retrofit2.HttpException
 import javax.inject.Inject
@@ -37,7 +41,9 @@ interface UsernameRepository {
 
 class RealUsernameRepository @Inject constructor(
     private val api: UsernameApi,
-    private val usernamesChainProvider: UsernamesChainProvider
+    private val usernamesChainProvider: UsernamesChainProvider,
+    private val claimDeviceEvidenceProvider: ClaimDeviceEvidenceProvider,
+    private val gson: Gson
 ) : UsernameRepository {
     override suspend fun getVerifier(): Result<String> = runCancellableCatching {
         api.getAttester().attester
@@ -65,7 +71,35 @@ class RealUsernameRepository @Inject constructor(
             .mapNotNull { it.toDomain(chain) }
     }
 
-    override suspend fun claimUsername(params: ClaimUsernameParams): Result<UsernameClaimResult> = runCancellableCatching {
+    override suspend fun claimUsername(params: ClaimUsernameParams): Result<UsernameClaimResult> {
+        // Evidence is fresh per attempt (single-use challenge); after two
+        // DEVICE_EVIDENCE_INVALID the backend decides via an evidence-less claim.
+        return submitClaimWithEvidence(params)
+            .flatRecover { error ->
+                if (error.isDeviceEvidenceInvalid(gson)) retryClaim(params) else Result.failure(error)
+            }
+            .mapError(::mapClaimUsernameError)
+    }
+
+    private suspend fun retryClaim(params: ClaimUsernameParams): Result<UsernameClaimResult> {
+        return submitClaimWithEvidence(params).flatRecover { error ->
+            if (error.isDeviceEvidenceInvalid(gson)) {
+                submitClaim(params, evidence = null)
+            } else {
+                Result.failure(error)
+            }
+        }
+    }
+
+    private suspend fun submitClaimWithEvidence(params: ClaimUsernameParams): Result<UsernameClaimResult> {
+        return claimDeviceEvidenceProvider.collectEvidence()
+            .flatMap { evidence -> submitClaim(params, evidence) }
+    }
+
+    private suspend fun submitClaim(
+        params: ClaimUsernameParams,
+        evidence: ClaimDeviceEvidence?
+    ): Result<UsernameClaimResult> = runCancellableCatching {
         val request = UsernameClaimRequest(
             candidateAccountId = params.candidateAddress,
             username = params.username,
@@ -80,10 +114,13 @@ class RealUsernameRepository @Inject constructor(
                 signedAt = params.dotNsSignedAt,
                 reservedUsername = params.dotNsReservedUsername
             ),
+            attestationChain = evidence?.attestationChain,
+            deviceEnvelope = evidence?.deviceEnvelope,
+            envelopeSignature = evidence?.envelopeSignature,
         )
 
         api.claimUsername(request).toClaimResult()
-    }.mapError(::mapClaimUsernameError)
+    }
 
     override suspend fun getRegistrationQueueStatus(): Result<RegistrationQueueStatus> = runCatching {
         val response = api.getRegistrationQueueStatus()

@@ -13,6 +13,9 @@ class UsernameClaimRequest(
     val identifierKey: String,
     val preferredDigits: String?,
     val dotns: UsernameClaimDotNsRequest?,
+    val attestationChain: List<String>?,
+    val deviceEnvelope: String?,
+    val envelopeSignature: String?,
 )
 
 @Keep
