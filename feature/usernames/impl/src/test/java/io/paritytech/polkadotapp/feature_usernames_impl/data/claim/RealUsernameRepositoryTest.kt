@@ -166,7 +166,7 @@ class RealUsernameRepositoryTest {
 
     private fun deviceEvidenceInvalid() = httpException(
         code = 403,
-        body = """{"error":"DEVICE_EVIDENCE_INVALID","message":"envelope expired"}"""
+        body = """{"error":"DEVICE_EVIDENCE_INVALID"}"""
     )
 
     private fun httpException(code: Int, body: String): HttpException {
