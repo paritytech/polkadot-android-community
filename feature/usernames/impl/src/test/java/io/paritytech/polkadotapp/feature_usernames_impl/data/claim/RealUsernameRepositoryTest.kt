@@ -51,8 +51,8 @@ class RealUsernameRepositoryTest {
 
     private val evidence = ClaimDeviceEvidence(
         attestationChain = listOf("leaf", "root"),
-        deviceEnvelope = "envelope",
-        envelopeSignature = "signature"
+        deviceChallenge = "challenge",
+        deviceId = "device-id"
     )
 
     private val requests = mutableListOf<UsernameClaimRequest>()
@@ -71,8 +71,8 @@ class RealUsernameRepositoryTest {
         assertEquals(UsernameClaimResult.Registered::class, result.getOrNull()!!::class)
         val request = requests.single()
         assertEquals(listOf("leaf", "root"), request.attestationChain)
-        assertEquals("envelope", request.deviceEnvelope)
-        assertEquals("signature", request.envelopeSignature)
+        assertEquals("challenge", request.deviceChallenge)
+        assertEquals("device-id", request.deviceId)
     }
 
     @Test
@@ -85,8 +85,8 @@ class RealUsernameRepositoryTest {
         assertTrue(result.isSuccess)
         val request = requests.single()
         assertNull(request.attestationChain)
-        assertNull(request.deviceEnvelope)
-        assertNull(request.envelopeSignature)
+        assertNull(request.deviceChallenge)
+        assertNull(request.deviceId)
     }
 
     @Test
@@ -110,7 +110,7 @@ class RealUsernameRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals(2, requests.size)
-        assertEquals("envelope", requests[1].deviceEnvelope)
+        assertEquals("device-id", requests[1].deviceId)
         verify(evidenceProvider, times(2)).collectEvidence()
     }
 
@@ -127,8 +127,8 @@ class RealUsernameRepositoryTest {
         assertEquals(UsernameClaimResult.PaymentRequired, result.getOrNull())
         assertEquals(3, requests.size)
         assertNull(requests[2].attestationChain)
-        assertNull(requests[2].deviceEnvelope)
-        assertNull(requests[2].envelopeSignature)
+        assertNull(requests[2].deviceChallenge)
+        assertNull(requests[2].deviceId)
         verify(evidenceProvider, times(2)).collectEvidence()
     }
 

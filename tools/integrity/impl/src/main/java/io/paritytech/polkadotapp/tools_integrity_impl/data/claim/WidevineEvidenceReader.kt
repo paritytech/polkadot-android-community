@@ -9,14 +9,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 
-internal const val WIDEVINE_LEVEL_L1 = 1
-internal const val WIDEVINE_LEVEL_L3 = 3
-
-internal class WidevineEvidence(
-    val deviceId: ByteArray,
-    val level: Int
-)
-
 internal class WidevineUnavailableException(
     message: String,
     cause: Throwable?
@@ -29,7 +21,12 @@ internal object WidevineEvidenceReader {
     private const val MAX_DEVICE_ID_BYTES = 64
     private const val PROVISION_TIMEOUT_MS = 30_000
 
-    fun read(): WidevineEvidence {
+    /**
+     * The raw Widevine device id when the device measures L1, or `null` when
+     * it honestly does not (measured L1 is a protocol invariant of the wire
+     * spec, so a non-L1 device sends no evidence).
+     */
+    fun readL1DeviceId(): ByteArray? {
         val drm = try {
             MediaDrm(WIDEVINE_UUID)
         } catch (error: UnsupportedSchemeException) {
@@ -47,22 +44,20 @@ internal object WidevineEvidenceReader {
                     null
                 )
             }
-            WidevineEvidence(
-                deviceId = deviceId,
-                level = measureSecurityLevel(
-                    openSession = { drm.openSession(MediaDrm.SECURITY_LEVEL_HW_SECURE_ALL) },
-                    closeSession = drm::closeSession,
-                    provision = { provision(drm) }
-                )
+            val measuredL1 = measureHardwareSecure(
+                openSession = { drm.openSession(MediaDrm.SECURITY_LEVEL_HW_SECURE_ALL) },
+                closeSession = drm::closeSession,
+                provision = { provision(drm) }
             )
+            if (measuredL1) deviceId else null
         }
     }
 
-    internal fun measureSecurityLevel(
+    internal fun measureHardwareSecure(
         openSession: () -> ByteArray,
         closeSession: (ByteArray) -> Unit,
         provision: () -> Unit
-    ): Int {
+    ): Boolean {
         for (attempt in 0..1) {
             val session = try {
                 openSession()
@@ -79,12 +74,12 @@ internal object WidevineEvidenceReader {
             } catch (error: ResourceBusyException) {
                 throw WidevineUnavailableException("Widevine sessions are busy", error)
             } catch (error: IllegalArgumentException) {
-                // HW_SECURE_ALL above the device's maximum level is a real measurement
-                // (GrapheneOS ships L3), not a failure.
-                return WIDEVINE_LEVEL_L3
+                // HW_SECURE_ALL above the device's maximum level is a real
+                // measurement, not a failure.
+                return false
             }
             closeSession(session)
-            return WIDEVINE_LEVEL_L1
+            return true
         }
         error("Widevine measurement exhausted its retry")
     }

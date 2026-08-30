@@ -16,8 +16,6 @@ import io.paritytech.polkadotapp.tools_integrity_impl.data.api.IntegrityApi
 import kotlinx.coroutines.withContext
 import java.security.KeyPairGenerator
 import java.security.KeyStore
-import java.security.PrivateKey
-import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.util.UUID
 import javax.inject.Inject
@@ -38,7 +36,7 @@ class RealClaimDeviceEvidenceProvider @Inject constructor(
         }
     }
 
-    // The token handshake spent its own challenge; the envelope needs a fresh one.
+    // The token handshake spent its own challenge; the evidence needs a fresh one.
     private suspend fun fetchClaimChallenge(): Result<ByteArray> {
         return runCancellableCatching { integrityApi.fetchChallenge().challenge }
             .flatMap { it.decodeBase64toByteArray() }
@@ -50,35 +48,26 @@ class RealClaimDeviceEvidenceProvider @Inject constructor(
             }
     }
 
-    private fun buildEvidence(challenge: ByteArray): ClaimDeviceEvidence {
+    private fun buildEvidence(challenge: ByteArray): ClaimDeviceEvidence? {
         val candidate = clientKeypairStore.getOrGenerate().publicKey
         require(candidate.size == CANDIDATE_BYTES) {
             "client public key must be $CANDIDATE_BYTES bytes, got ${candidate.size}"
         }
-        val widevine = WidevineEvidenceReader.read()
+        val rawWidevineId = WidevineEvidenceReader.readL1DeviceId() ?: return null
+        val deviceId = ClaimEvidenceDigests.deviceId(rawWidevineId)
+        val attestationChallenge = ClaimEvidenceDigests.attestationChallenge(
+            challenge = challenge,
+            candidate = candidate,
+            deviceId = deviceId
+        )
         val alias = "$KEY_ALIAS_PREFIX${UUID.randomUUID()}"
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         try {
-            generateAttestedKey(alias, challenge, keyStore)
-            val chain = attestationChain(keyStore, alias)
-            val envelope = DeviceEnvelopeEncoder.encode(
-                challenge = challenge,
-                candidate = candidate,
-                widevineId = widevine.deviceId,
-                level = widevine.level
-            )
-            val key = requireNotNull(keyStore.getKey(alias, null) as? PrivateKey) {
-                "Android Keystore returned no signing key for the claim envelope"
-            }
-            val signature = Signature.getInstance(SIGNATURE_ALGORITHM).run {
-                initSign(key)
-                update(envelope)
-                sign()
-            }
+            generateAttestedKey(alias, attestationChallenge, keyStore)
             return ClaimDeviceEvidence(
-                attestationChain = chain,
-                deviceEnvelope = envelope.base64NoWrap(),
-                envelopeSignature = signature.base64NoWrap()
+                attestationChain = attestationChain(keyStore, alias),
+                deviceChallenge = challenge.base64NoWrap(),
+                deviceId = deviceId.base64NoWrap()
             )
         } finally {
             runCatching { keyStore.deleteEntry(alias) }
@@ -136,7 +125,6 @@ class RealClaimDeviceEvidenceProvider @Inject constructor(
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val EC_CURVE = "secp256r1"
         const val KEY_ALIAS_PREFIX = "polkadotapp-claim-attestation-"
-        const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
         const val CHALLENGE_BYTES = 32
         const val CANDIDATE_BYTES = 32
         const val MIN_CHAIN_ENTRIES = 2

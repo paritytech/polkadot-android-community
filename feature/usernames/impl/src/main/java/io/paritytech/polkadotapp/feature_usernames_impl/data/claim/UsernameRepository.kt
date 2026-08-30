@@ -115,8 +115,8 @@ class RealUsernameRepository @Inject constructor(
                 reservedUsername = params.dotNsReservedUsername
             ),
             attestationChain = evidence?.attestationChain,
-            deviceEnvelope = evidence?.deviceEnvelope,
-            envelopeSignature = evidence?.envelopeSignature,
+            deviceChallenge = evidence?.deviceChallenge,
+            deviceId = evidence?.deviceId,
         )
 
         api.claimUsername(request).toClaimResult()
