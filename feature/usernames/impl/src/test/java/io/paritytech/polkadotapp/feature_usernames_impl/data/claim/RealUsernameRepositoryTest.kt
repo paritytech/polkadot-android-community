@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.data.claim
 
-import com.google.gson.Gson
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.UsernameApi
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.model.RegistrationOutcome
@@ -9,15 +8,16 @@ import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.m
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.UsernamesChainProvider
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameParams
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameClaimResult
+import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidence
+import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidenceProvider
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.whenever
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -25,15 +25,13 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import retrofit2.HttpException
 import retrofit2.Response
-import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidence
-import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidenceProvider
 
 class RealUsernameRepositoryTest {
     private val api: UsernameApi = mock(UsernameApi::class.java)
     private val chainProvider: UsernamesChainProvider = mock(UsernamesChainProvider::class.java)
     private val evidenceProvider: ClaimDeviceEvidenceProvider = mock(ClaimDeviceEvidenceProvider::class.java)
 
-    private val repository = RealUsernameRepository(api, chainProvider, evidenceProvider, Gson())
+    private val repository = RealUsernameRepository(api, chainProvider, evidenceProvider)
 
     private val params = ClaimUsernameParams(
         username = "alice.07",
@@ -49,21 +47,23 @@ class RealUsernameRepositoryTest {
         dotNsReservedUsername = "alice"
     )
 
-    private val evidence = ClaimDeviceEvidence(
+    private val initialEvidence = ClaimDeviceEvidence(
         attestationChain = listOf("leaf", "root"),
         deviceChallenge = "challenge",
         deviceId = "device-id"
     )
 
+    private val freshEvidence = ClaimDeviceEvidence(
+        attestationChain = listOf("fresh-leaf", "fresh-root"),
+        deviceChallenge = "fresh-challenge",
+        deviceId = "fresh-device-id"
+    )
+
     private val requests = mutableListOf<UsernameClaimRequest>()
 
-    @Before
-    fun setUp() = runTest {
-        whenever(evidenceProvider.collectEvidence()).thenReturn(Result.success(evidence))
-    }
-
     @Test
-    fun `claim attaches all three evidence fields`() = runTest {
+    fun `claim attaches all three evidence fields`() = runBlocking<Unit> {
+        withEvidence(initialEvidence)
         stubClaimResponses({ registeredResponse() })
 
         val result = repository.claimUsername(params)
@@ -76,13 +76,13 @@ class RealUsernameRepositoryTest {
     }
 
     @Test
-    fun `claim without applicable evidence omits all three fields`() = runTest {
-        whenever(evidenceProvider.collectEvidence()).thenReturn(Result.success(null))
+    fun `claim without applicable evidence omits all three fields`() = runBlocking<Unit> {
+        withEvidence(null)
         stubClaimResponses({ registeredResponse() })
 
         val result = repository.claimUsername(params)
 
-        assertTrue(result.isSuccess)
+        assertSuccess(result)
         val request = requests.single()
         assertNull(request.attestationChain)
         assertNull(request.deviceChallenge)
@@ -90,9 +90,9 @@ class RealUsernameRepositoryTest {
     }
 
     @Test
-    fun `non-Widevine evidence failure propagates without a request`() = runTest {
+    fun `non-Widevine evidence failure propagates without a request`() = runBlocking<Unit> {
         val error = IllegalStateException("challenge unavailable")
-        whenever(evidenceProvider.collectEvidence()).thenReturn(Result.failure(error))
+        withEvidenceFailure(error)
 
         val result = repository.claimUsername(params)
 
@@ -101,7 +101,8 @@ class RealUsernameRepositoryTest {
     }
 
     @Test
-    fun `invalid device evidence is retried once with fresh evidence`() = runTest {
+    fun `invalid device evidence is retried once with fresh evidence`() = runBlocking<Unit> {
+        withEvidence(initialEvidence, freshEvidence)
         stubClaimResponses(
             { throw deviceEvidenceInvalid() },
             { registeredResponse() }
@@ -109,14 +110,17 @@ class RealUsernameRepositoryTest {
 
         val result = repository.claimUsername(params)
 
-        assertTrue(result.isSuccess)
+        assertSuccess(result)
         assertEquals(2, requests.size)
-        assertEquals("device-id", requests[1].deviceId)
+        assertEquals(freshEvidence.attestationChain, requests[1].attestationChain)
+        assertEquals(freshEvidence.deviceChallenge, requests[1].deviceChallenge)
+        assertEquals(freshEvidence.deviceId, requests[1].deviceId)
         verify(evidenceProvider, times(2)).collectEvidence()
     }
 
     @Test
-    fun `second invalid evidence rejection falls back to an evidence-less claim`() = runTest {
+    fun `second invalid evidence rejection falls back to an evidence-less claim`() = runBlocking<Unit> {
+        withEvidence(initialEvidence, freshEvidence)
         stubClaimResponses(
             { throw deviceEvidenceInvalid() },
             { throw deviceEvidenceInvalid() },
@@ -134,13 +138,57 @@ class RealUsernameRepositoryTest {
     }
 
     @Test
-    fun `unrelated errors are not retried`() = runTest {
-        stubClaimResponses({ throw httpException(code = 403, body = """{"error":"SOMETHING_ELSE"}""") })
+    fun `unrelated errors are not retried`() = runBlocking<Unit> {
+        val error = httpException(code = 403, body = """{"error":"SOMETHING_ELSE"}""")
+        withEvidence(initialEvidence)
+        stubClaimResponses({ throw error })
 
         val result = repository.claimUsername(params)
 
-        assertTrue(result.isFailure)
+        assertEquals(error, result.exceptionOrNull())
         assertEquals(1, requests.size)
+    }
+
+    @Test
+    fun `malformed error body is not retried`() = runBlocking<Unit> {
+        val error = httpException(code = 403, body = "{")
+        withEvidence(initialEvidence)
+        stubClaimResponses({ throw error })
+
+        val result = repository.claimUsername(params)
+
+        assertEquals(error, result.exceptionOrNull())
+        assertEquals(1, requests.size)
+    }
+
+    @Test
+    fun `missing error field is not retried`() = runBlocking<Unit> {
+        val error = httpException(code = 403, body = "{}")
+        withEvidence(initialEvidence)
+        stubClaimResponses({ throw error })
+
+        val result = repository.claimUsername(params)
+
+        assertEquals(error, result.exceptionOrNull())
+        assertEquals(1, requests.size)
+    }
+
+    private suspend fun withEvidence(evidence: ClaimDeviceEvidence?) {
+        whenever(evidenceProvider.collectEvidence()).thenReturn(Result.success(evidence))
+    }
+
+    private suspend fun withEvidence(
+        initialEvidence: ClaimDeviceEvidence,
+        freshEvidence: ClaimDeviceEvidence
+    ) {
+        whenever(evidenceProvider.collectEvidence()).thenReturn(
+            Result.success(initialEvidence),
+            Result.success(freshEvidence)
+        )
+    }
+
+    private suspend fun withEvidenceFailure(error: Throwable) {
+        whenever(evidenceProvider.collectEvidence()).thenReturn(Result.failure(error))
     }
 
     private suspend fun stubClaimResponses(vararg responses: () -> UsernameClaimResponse) {
@@ -167,11 +215,15 @@ class RealUsernameRepositoryTest {
 
     private fun deviceEvidenceInvalid() = httpException(
         code = 403,
-        body = """{"error":"DEVICE_EVIDENCE_INVALID"}"""
+        body = """{"error":"DEVICE_EVIDENCE_INVALID","message":"stale evidence"}"""
     )
 
     private fun httpException(code: Int, body: String): HttpException {
         val errorBody = body.toResponseBody("application/json".toMediaType())
         return HttpException(Response.error<UsernameClaimResponse>(code, errorBody))
+    }
+
+    private fun assertSuccess(result: Result<*>) {
+        assertTrue("expected Result.success but was ${result.exceptionOrNull()}", result.isSuccess)
     }
 }

@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.data.claim
 
-import com.google.gson.Gson
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
@@ -42,8 +41,7 @@ interface UsernameRepository {
 class RealUsernameRepository @Inject constructor(
     private val api: UsernameApi,
     private val usernamesChainProvider: UsernamesChainProvider,
-    private val claimDeviceEvidenceProvider: ClaimDeviceEvidenceProvider,
-    private val gson: Gson
+    private val claimDeviceEvidenceProvider: ClaimDeviceEvidenceProvider
 ) : UsernameRepository {
     override suspend fun getVerifier(): Result<String> = runCancellableCatching {
         api.getAttester().attester
@@ -75,14 +73,14 @@ class RealUsernameRepository @Inject constructor(
         // Retry once with fresh evidence, then let the backend decide without it.
         return submitClaimWithEvidence(params)
             .flatRecover { error ->
-                if (error.isDeviceEvidenceInvalid(gson)) retryClaim(params) else Result.failure(error)
+                if (error.isDeviceEvidenceInvalid()) retryClaim(params) else Result.failure(error)
             }
             .mapError(::mapClaimUsernameError)
     }
 
     private suspend fun retryClaim(params: ClaimUsernameParams): Result<UsernameClaimResult> {
         return submitClaimWithEvidence(params).flatRecover { error ->
-            if (error.isDeviceEvidenceInvalid(gson)) {
+            if (error.isDeviceEvidenceInvalid()) {
                 submitClaim(params, evidence = null)
             } else {
                 Result.failure(error)

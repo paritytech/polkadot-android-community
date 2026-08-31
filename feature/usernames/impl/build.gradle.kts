@@ -12,6 +12,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.fragment.ktx)
+    implementation(libs.kotlinx.serialization.json)
 
     implementation(project(":chains"))
 
