@@ -3,7 +3,8 @@ package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.manager
 import com.google.gson.Gson
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
-import io.paritytech.polkadotapp.tools_integrity_api.exception.IntegrityException
+import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
+import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.AuthError
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.api.AuthTokenApi
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.model.AuthErrorResponse
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.model.JWTTokenResponse
@@ -75,17 +76,24 @@ internal class JWTTokenProvider @Inject constructor(
         return try {
             authTokenApi.fetchToken(JwtRequest)
         } catch (e: HttpException) {
-            when {
-                e.hasAuthError(HTTP_FORBIDDEN, ERROR_INTEGRITY_FAILED) -> throw IntegrityException()
-
-                shouldRetryOnCrlFailure && e.hasAuthError(HTTP_SERVICE_UNAVAILABLE, ERROR_CRL_UNAVAILABLE) -> {
-                    Timber.w(e, "Attestation CRL unavailable, retrying with a fresh challenge")
-                    fetchTokenClassifyingErrors(shouldRetryOnCrlFailure = false)
-                }
-
-                else -> throw e
+            if (shouldRetryOnCrlFailure && e.hasAuthError(HTTP_SERVICE_UNAVAILABLE, ERROR_CRL_UNAVAILABLE)) {
+                Timber.w(e, "Attestation CRL unavailable, retrying with a fresh challenge")
+                return fetchTokenClassifyingErrors(shouldRetryOnCrlFailure = false)
             }
+
+            throw e.toAttestationError() ?: e
         }
+    }
+
+    private fun HttpException.toAttestationError(): AuthError? = when {
+        hasAuthError(HTTP_FORBIDDEN, ERROR_INTEGRITY_FAILED) ->
+            AuthError.Integrity(IntegrityError.AttestationRejected)
+
+        // Only reached once the single CRL retry is spent, but it stays the retryable kind.
+        hasAuthError(HTTP_SERVICE_UNAVAILABLE, ERROR_CRL_UNAVAILABLE) ->
+            AuthError.Integrity(IntegrityError.AttestationTransient)
+
+        else -> null
     }
 
     private fun HttpException.hasAuthError(httpCode: Int, errorCode: String): Boolean {

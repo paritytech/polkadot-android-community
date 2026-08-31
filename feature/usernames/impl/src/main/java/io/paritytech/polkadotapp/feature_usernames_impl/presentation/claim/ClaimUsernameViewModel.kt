@@ -2,19 +2,20 @@ package io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim
 
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.feature_backup_api.domain.error.ImportFromBackupError
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupFoundPayload
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.AccountOnboardingStatus
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.Username
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.MIN_USERNAME_LENGTH
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.DigitsFieldState
-import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.UsernameFlowError
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.asUsernameFlowError
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.interactor.UsernamesClaimInteractor
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameOutcome
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.UsernamesRouter
 import io.paritytech.polkadotapp.feature_web3summit_api.presentation.PostOnboardingFlow
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.BackupOutcome
-import io.paritytech.polkadotapp.tools_integrity_api.exception.IntegrityException
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -84,10 +85,7 @@ class ClaimUsernameViewModel @Inject constructor(
                     interactor.saveIsNewAccount()
                 }
             }
-            .onFailure {
-                showError(it)
-                state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
-            }
+            .onFailure { error -> applyFieldError(error) }
     }
 
     private fun meetsMinimumLength(name: String) = name.length >= MIN_USERNAME_LENGTH
@@ -100,7 +98,7 @@ class ClaimUsernameViewModel @Inject constructor(
             .mapLatest { username ->
                 state.update {
                     it.copy(
-                        fieldState = UsernameFieldState.NEUTRAL,
+                        fieldState = ClaimUsernameFieldState.Neutral,
                         availableDigits = persistentListOf(),
                         digitsFieldState = DigitsFieldState.Hidden
                     )
@@ -112,7 +110,7 @@ class ClaimUsernameViewModel @Inject constructor(
                                 val firstDigits = availabilityState.availableDigits.firstOrNull().orEmpty()
                                 state.update {
                                     it.copy(
-                                        fieldState = UsernameFieldState.AVAILABLE,
+                                        fieldState = ClaimUsernameFieldState.Available,
                                         availableDigits = availabilityState.availableDigits.toImmutableList(),
                                         digitsFieldState = if (firstDigits.isNotEmpty()) {
                                             DigitsFieldState.Visible(digits = firstDigits, isValid = true)
@@ -124,15 +122,15 @@ class ClaimUsernameViewModel @Inject constructor(
                             }
 
                             is UsernameAvailabilityState.Taken -> {
-                                state.update { it.copy(fieldState = UsernameFieldState.TAKEN) }
+                                state.update { it.copy(fieldState = ClaimUsernameFieldState.Taken) }
                             }
 
                             is UsernameAvailabilityState.Invalid -> {
-                                state.update { it.copy(fieldState = UsernameFieldState.INVALID) }
+                                state.update { it.copy(fieldState = ClaimUsernameFieldState.Invalid) }
                             }
                         }
                     }
-                    .onFailure { Timber.d(it) }
+                    .onFailure { error -> applyFieldError(error) }
             }
             .launchIn(this)
     }
@@ -149,7 +147,7 @@ class ClaimUsernameViewModel @Inject constructor(
             state.update {
                 it.copy(
                     username = newValue,
-                    fieldState = UsernameFieldState.NEUTRAL,
+                    fieldState = ClaimUsernameFieldState.Neutral,
                     availableDigits = persistentListOf(),
                     digitsFieldState = DigitsFieldState.Hidden
                 )
@@ -176,10 +174,7 @@ class ClaimUsernameViewModel @Inject constructor(
 
                 interactor.tryRecoverBackupOrCreateAccount()
                     .onSuccess { handleOutcome(it) }
-                    .onFailure { error ->
-                        state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
-                        showError(error)
-                    }
+                    .onFailure { error -> applyFieldError(error) }
             }
         }
     }
@@ -205,15 +200,19 @@ class ClaimUsernameViewModel @Inject constructor(
         launch {
             val baseUsername = Username.fromParts(state.value.username, null)
             val preferredDigits = (state.value.digitsFieldState as? DigitsFieldState.Visible)?.digits.orEmpty()
-            val isAvailable = interactor.checkUsernameAvailable(baseUsername)
-                .map { it is UsernameAvailabilityState.Available }
-                .getOrDefault(false)
 
-            if (isAvailable) {
-                handleClaimOutcome(interactor.claimUsername(baseUsername, preferredDigits))
-            } else {
-                state.update { it.copy(progress = ClaimUsernameProgress.NONE, fieldState = UsernameFieldState.TAKEN) }
-            }
+            interactor.checkUsernameAvailable(baseUsername)
+                .onSuccess { availability ->
+                    if (availability is UsernameAvailabilityState.Available) {
+                        handleClaimOutcome(interactor.claimUsername(baseUsername, preferredDigits))
+                    } else {
+                        state.update {
+                            it.copy(progress = ClaimUsernameProgress.NONE, fieldState = ClaimUsernameFieldState.Taken)
+                        }
+                    }
+                }
+                // A failed re-check used to render as "taken", blaming the user for a network blip.
+                .onFailure { error -> applyFieldError(error) }
         }
     }
 
@@ -231,7 +230,7 @@ class ClaimUsernameViewModel @Inject constructor(
                 state.update {
                     it.copy(
                         progress = ClaimUsernameProgress.NONE,
-                        fieldState = UsernameFieldState.AVAILABLE,
+                        fieldState = ClaimUsernameFieldState.Available,
                         availableDigits = outcome.freshDigits.toImmutableList(),
                         digitsFieldState = if (firstDigits.isNotEmpty()) {
                             DigitsFieldState.Visible(digits = firstDigits, isValid = true)
@@ -245,7 +244,7 @@ class ClaimUsernameViewModel @Inject constructor(
 
             ClaimUsernameOutcome.Unavailable -> {
                 state.update {
-                    it.copy(progress = ClaimUsernameProgress.NONE, fieldState = UsernameFieldState.TAKEN)
+                    it.copy(progress = ClaimUsernameProgress.NONE, fieldState = ClaimUsernameFieldState.Taken)
                 }
                 _messageEvents.emit(RCommon.string.pick_username_just_claimed_taken)
             }
@@ -257,11 +256,29 @@ class ClaimUsernameViewModel @Inject constructor(
         }
     }
 
-    private fun handleClaimError(error: Throwable) {
+    private fun handleClaimError(error: UsernameFlowError) {
         when (error) {
-            is IntegrityException -> router.openIntegrityFailed()
+            UsernameFlowError.VerificationUnavailable -> router.openClaimUnavailable()
+            UsernameFlowError.VerificationRejected -> router.openIntegrityFailed()
 
-            else -> showError(error)
+            else -> state.update { it.copy(fieldState = ClaimUsernameFieldState.Error(error)) }
+        }
+    }
+
+    private fun applyFieldError(error: Throwable) {
+        // A user-cancelled sign-in is not a failure to display, mirroring
+        // BaseViewModel.shouldIgnore(SigningCancelledException).
+        if (error == ImportFromBackupError.Cancelled) {
+            state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
+            return
+        }
+
+        Timber.w(error, "Claim username flow failed")
+        state.update {
+            it.copy(
+                progress = ClaimUsernameProgress.NONE,
+                fieldState = ClaimUsernameFieldState.Error(error.asUsernameFlowError()),
+            )
         }
     }
 
@@ -269,7 +286,7 @@ class ClaimUsernameViewModel @Inject constructor(
         state.update {
             it.copy(
                 username = "",
-                fieldState = UsernameFieldState.NEUTRAL,
+                fieldState = ClaimUsernameFieldState.Neutral,
                 availableDigits = persistentListOf(),
                 digitsFieldState = DigitsFieldState.Hidden
             )

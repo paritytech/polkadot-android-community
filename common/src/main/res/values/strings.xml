@@ -375,6 +375,13 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pick_username_action_clear">Clear</string>
     <string name="pick_username_action_claim">Get username</string>
 
+    <string name="username_error_no_connection">No connection. Check your network and try again.</string>
+    <string name="username_error_verification_unavailable">Google Play services aren\'t available on this device. Try installing the vanilla build.</string>
+    <string name="username_error_verification_rejected">We couldn\'t verify this device. Rooted devices and custom ROMs aren\'t supported.</string>
+    <string name="username_error_verification_busy">Device verification is temporarily unavailable. Try again in a moment.</string>
+    <string name="username_error_server">Something went wrong on our side. Try again.</string>
+    <string name="username_error_unknown">Couldn\'t check this username. Try again.</string>
+
     <string name="backup_found_title">We found an existing backup</string>
     <string name="backup_found_description">Restore from the existing backup or remove it and create a new one</string>
     <string name="backup_found_date_created">Created</string>

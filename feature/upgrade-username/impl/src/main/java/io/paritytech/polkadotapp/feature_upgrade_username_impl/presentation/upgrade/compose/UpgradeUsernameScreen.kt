@@ -47,8 +47,8 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.colors.BerlinNightPalette
 import io.paritytech.polkadotapp.designsystem.colors.LocalPolkadotColors
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.presentation.upgrade.UpgradeUsernameContract
+import io.paritytech.polkadotapp.feature_upgrade_username_impl.presentation.upgrade.UpgradeUsernameFieldState
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.presentation.upgrade.UpgradeUsernameUiState
-import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private val FieldRadius = 12.dp
@@ -164,7 +164,7 @@ private fun UpgradeUsernameScreenInternal(
                 text = stringResource(RCommon.string.upgrade_username_action_confirm),
                 style = whiteCtaStyle(),
                 shape = RoundedCornerShape(FieldRadius),
-                enabled = state.fieldState == UsernameFieldState.AVAILABLE,
+                enabled = state.fieldState == UpgradeUsernameFieldState.Available,
                 loading = state.isClaimingInProgress,
                 onClick = onClaimAction,
             )
@@ -176,25 +176,23 @@ private fun UpgradeUsernameScreenInternal(
 private fun PickUsernameField(
     modifier: Modifier = Modifier,
     username: String,
-    fieldState: UsernameFieldState,
+    fieldState: UpgradeUsernameFieldState,
     isEnabled: Boolean,
     onUsernameChanged: (String) -> Unit,
 ) {
     val borderColor = when (fieldState) {
-        UsernameFieldState.AVAILABLE -> UpgradeUsernameScreenColors.available
-        UsernameFieldState.TAKEN,
-        UsernameFieldState.INVALID,
-        UsernameFieldState.ALREADY_CREATED -> UpgradeUsernameScreenColors.error
-        UsernameFieldState.NEUTRAL -> UpgradeUsernameScreenColors.fieldNeutralBorder
+        UpgradeUsernameFieldState.Available -> UpgradeUsernameScreenColors.available
+        UpgradeUsernameFieldState.Taken,
+        UpgradeUsernameFieldState.Invalid -> UpgradeUsernameScreenColors.error
+        UpgradeUsernameFieldState.Neutral -> UpgradeUsernameScreenColors.fieldNeutralBorder
     }
     val backgroundColor = when (fieldState) {
-        UsernameFieldState.AVAILABLE -> UpgradeUsernameScreenColors.availableBg
-        UsernameFieldState.TAKEN,
-        UsernameFieldState.INVALID,
-        UsernameFieldState.ALREADY_CREATED -> UpgradeUsernameScreenColors.errorBg
-        UsernameFieldState.NEUTRAL -> UpgradeUsernameScreenColors.fieldNeutralBg
+        UpgradeUsernameFieldState.Available -> UpgradeUsernameScreenColors.availableBg
+        UpgradeUsernameFieldState.Taken,
+        UpgradeUsernameFieldState.Invalid -> UpgradeUsernameScreenColors.errorBg
+        UpgradeUsernameFieldState.Neutral -> UpgradeUsernameScreenColors.fieldNeutralBg
     }
-    val showErrorPill = fieldState == UsernameFieldState.TAKEN
+    val showErrorPill = fieldState == UpgradeUsernameFieldState.Taken
 
     Column(
         modifier = modifier
