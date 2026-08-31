@@ -100,6 +100,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         coinAmountBreakdownUseCase = mockk(relaxed = true),
         coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
         peopleMembershipProver = peopleMembershipProver,
+        quotaTracker = mockk(relaxed = true),
         chainAssetProvider = chainAssetProvider,
     )
 
@@ -359,8 +360,6 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
         recyclerValue = ValueExponent(1),
         location = location,
-        allocatedAt = 0L,
-        delayUnloadUntil = 0L,
     )
 
     private companion object {

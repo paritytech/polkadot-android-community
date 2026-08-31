@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_api.domain.recycling
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
@@ -51,14 +50,12 @@ data class RecyclingSnapshot(
 )
 
 /**
- * The two external facts a voucher predicate needs: a clock to age the unload delay against, and ring
- * capacity to turn a required fill fraction into a member count.
+ * Ring capacity per denomination, so a required fill fraction can become a member count.
  *
- * Capacities are resolved up front rather than fetched on demand so the predicate stays cheap and
- * non-suspending — it runs once per voucher every time the balance recomputes.
+ * Resolved up front rather than fetched on demand: the predicate runs once per voucher every time the
+ * balance recomputes, so it has to stay cheap and non-suspending.
  */
 data class VoucherUsabilityContext(
-    val now: Timestamp,
     val ringCapacities: Map<ValueExponent, Int>,
 ) {
     /** A ring we could not resolve reads as never full, so only the unload delay can make it usable. */

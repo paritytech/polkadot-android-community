@@ -1,13 +1,13 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
+import io.paritytech.polkadotapp.common.data.memory.AccumulatingMapCache
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.toRingCollectionId
 import io.paritytech.polkadotapp.feature_members_api.data.repository.MembersRepository
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,7 +22,19 @@ class RingCapacityProvider @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val membersRepository: MembersRepository,
 ) {
-    private val capacities = ConcurrentHashMap<ValueExponent, Int>()
+    private val capacities = AccumulatingMapCache<ValueExponent, Int> { denominations ->
+        membersRepository.getCollections(
+            chainId = chainAssetProvider.chainId(),
+            collectionIds = denominations.map { it.toRingCollectionId() },
+            consistency = CacheableDataConsistency.CAN_BE_STALE,
+        ).map { collections ->
+            denominations.mapNotNull { denomination ->
+                val collection = collections[denomination.toRingCollectionId()] ?: return@mapNotNull null
+
+                denomination to collection.ringSize.ringCapacity
+            }.toMap()
+        }
+    }
 
     /**
      * Denominations that could not be read are left out rather than failing the caller, which reads them as
@@ -30,18 +42,9 @@ class RingCapacityProvider @Inject constructor(
      * voucher on a capacity we do not have.
      */
     suspend fun capacitiesFor(denominations: Set<ValueExponent>): Map<ValueExponent, Int> {
-        val chainId = chainAssetProvider.chainId()
-
-        denominations.filterNot(capacities::containsKey).forEach { denomination ->
-            membersRepository.getCollection(
-                chainId = chainId,
-                collectionId = denomination.toRingCollectionId(),
-                consistency = CacheableDataConsistency.CAN_BE_STALE,
-            )
-                .logFailure("Can't fetch ring collection for recycler denomination")
-                .onSuccess { capacities[denomination] = it.ringSize.ringCapacity }
-        }
-
-        return capacities.filterKeys(denominations::contains)
+        return capacities.get(denominations)
+            .logFailure("Can't fetch ring capacities for recycler denominations")
+            .getOrDefault(emptyMap())
+            .filterKeys(denominations::contains)
     }
 }

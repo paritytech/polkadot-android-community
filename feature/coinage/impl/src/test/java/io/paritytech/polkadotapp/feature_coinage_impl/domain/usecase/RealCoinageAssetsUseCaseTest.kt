@@ -160,8 +160,6 @@ class RealCoinageAssetsUseCaseTest {
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = location,
-        allocatedAt = 0L,
-        delayUnloadUntil = 0L,
     )
 
     private companion object {

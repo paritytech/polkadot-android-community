@@ -44,14 +44,7 @@ class CoinageAssetSelector @Inject constructor(
     private val settings: CoinageRecyclingStrategySettings,
     private val evaluator: CoinRecyclingEvaluator,
 ) {
-    /**
-     * Both answers from one reading of the wallet, because a caller that tries the narrow set and falls back
-     * to the wider one would otherwise re-read the ledger, the verdicts and the ring capacities to learn
-     * something the first pass already knew.
-     *
-     * Suspends until the first verdict exists. Spending a coin before the strategy has judged it would let
-     * one out that is about to be recycled, which is the leak the strategy is there to prevent.
-     */
+    /** Suspends until the first verdict exists, so nothing is spent before the strategy has judged it. */
     suspend fun getSelectableCoinsByScope(): Map<SpendScope, List<Coin>> {
         val verdicts = evaluator.verdicts.first()
         val minted = coinageAssetsUseCase.getCoins().preClassifyCoins().minted
@@ -95,7 +88,6 @@ class CoinageAssetSelector @Inject constructor(
         val tracked = coinageAssetsUseCase.getVouchers()
 
         val usability = VoucherUsabilityContext(
-            now = System.currentTimeMillis(),
             ringCapacities = ringCapacityProvider.capacitiesFor(tracked.mapToSet { it.voucher.recyclerValue }),
         )
 

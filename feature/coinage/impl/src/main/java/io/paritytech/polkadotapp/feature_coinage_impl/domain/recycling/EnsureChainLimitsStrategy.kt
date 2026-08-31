@@ -4,12 +4,10 @@ import io.paritytech.polkadotapp.common.data.memory.SingleValueCache
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrDefault
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecyclingStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 
 /**
@@ -22,7 +20,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinReposi
 class EnsureChainLimitsStrategy(
     private val inner: CoinRecyclingStrategy,
     coinRepository: CoinRepository,
-) : CoinRecyclingStrategy {
+) : CoinRecyclingStrategy by inner {
     private val forcedRecyclingAge = SingleValueCache { coinRepository.getCoinRecyclingAge() }
 
     context(conversion: CoinageBalanceConversionContext)
@@ -31,17 +29,14 @@ class EnsureChainLimitsStrategy(
         val forcedAge = forcedRecyclingAge()
 
         return coins.associate { coin ->
+            val age = coin.ageOrNull()
+
             val verdict = when {
-                coin.ageOrDefault() >= forcedAge -> CoinRecyclingState.MUST_RECYCLE
+                age != null && age >= forcedAge -> CoinRecyclingState.MUST_RECYCLE
                 else -> verdicts[coin.derivationIndex] ?: CoinRecyclingState.ALLOW_USE
             }
 
             coin.derivationIndex to verdict
         }
     }
-
-    override fun isVoucherUsable(voucher: RecyclerVoucher, context: VoucherUsabilityContext) =
-        inner.isVoucherUsable(voucher, context)
-
-    override fun allowsConfirmedSpend(): Boolean = inner.allowsConfirmedSpend()
 }

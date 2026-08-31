@@ -3,11 +3,9 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecyclingStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
 
 /**
  * Stops discretionary recycling once the free unload allowance runs low.
@@ -20,20 +18,15 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsa
 class EnsureQuotaLimitsStrategy(
     private val inner: CoinRecyclingStrategy,
     private val quotaTracker: UnloadQuotaTracker,
-) : CoinRecyclingStrategy {
+) : CoinRecyclingStrategy by inner {
     context(conversion: CoinageBalanceConversionContext)
     override suspend fun evaluate(coins: List<Coin>, snapshot: RecyclingSnapshot): RecyclingVerdicts {
         // An allowance we could not read is not evidence of an exhausted one. Keeping the user's choice on a
         // failed read costs at worst a rejected unload; overriding it would stop recycling on a hiccup.
-        val quotaExhausted = quotaTracker.isQuotaExhausted()
+        val quotaRunningLow = quotaTracker.isQuotaRunningLow()
             .logFailure("Can't read remaining unload quota")
             .getOrDefault(false)
 
-        return if (quotaExhausted) emptyMap() else inner.evaluate(coins, snapshot)
+        return if (quotaRunningLow) emptyMap() else inner.evaluate(coins, snapshot)
     }
-
-    override fun isVoucherUsable(voucher: RecyclerVoucher, context: VoucherUsabilityContext) =
-        inner.isVoucherUsable(voucher, context)
-
-    override fun allowsConfirmedSpend(): Boolean = inner.allowsConfirmedSpend()
 }

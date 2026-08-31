@@ -64,7 +64,7 @@ class RecyclingStrategyLimitsTest {
 
     @Test
     fun `an exhausted allowance leaves only the coins the chain forces`() = runBlocking {
-        whenever(quotaTracker.isQuotaExhausted()).thenReturn(Result.success(true))
+        whenever(quotaTracker.isQuotaRunningLow()).thenReturn(Result.success(true))
 
         val due = coinOf(age = FORCED_AGE, derivationIndex = 1)
         val discretionary = coinOf(age = 5, derivationIndex = 2)
@@ -78,13 +78,28 @@ class RecyclingStrategyLimitsTest {
     /** A quota we could not read is not evidence of an exhausted one, so the user's choice stands. */
     @Test
     fun `an unreadable allowance does not stop recycling`() = runBlocking {
-        whenever(quotaTracker.isQuotaExhausted()).thenReturn(Result.failure(RuntimeException("chain down")))
+        whenever(quotaTracker.isQuotaRunningLow()).thenReturn(Result.failure(RuntimeException("chain down")))
 
         val discretionary = coinOf(age = 5)
 
         val verdicts = evaluate(fullChain(RecyclingStrategyType.MAX_PRIVACY), listOf(discretionary))
 
         assertEquals(CoinRecyclingState.TO_RECYCLE, verdicts.getValue(discretionary.derivationIndex))
+    }
+
+    /**
+     * The two recycling verdicts are not interchangeable: one is a privacy trade the user may take, the
+     * other is a coin the chain will not accept. Only the first may ever be offered for spending.
+     */
+    @Test
+    fun `the chain limit and the policy produce different verdicts`() {
+        val forced = coinOf(age = FORCED_AGE, derivationIndex = 1)
+        val chosen = coinOf(age = 5, derivationIndex = 2)
+
+        val verdicts = evaluate(chainLimited(RecyclingStrategyType.MAX_PRIVACY), listOf(forced, chosen))
+
+        assertEquals(CoinRecyclingState.MUST_RECYCLE, verdicts.getValue(forced.derivationIndex))
+        assertEquals(CoinRecyclingState.TO_RECYCLE, verdicts.getValue(chosen.derivationIndex))
     }
 
     private fun chainLimited(type: RecyclingStrategyType) = EnsureChainLimitsStrategy(
@@ -117,19 +132,4 @@ class RecyclingStrategyLimitsTest {
         isOnChain = true,
         accountId = mock(),
     )
-
-    /**
-     * The two recycling verdicts are not interchangeable: one is a privacy trade the user may take, the
-     * other is a coin the chain will not accept. Only the first may ever be offered for spending.
-     */
-    @Test
-    fun `the chain limit and the policy produce different verdicts`() {
-        val forced = coinOf(age = FORCED_AGE, derivationIndex = 1)
-        val chosen = coinOf(age = 5, derivationIndex = 2)
-
-        val verdicts = evaluate(chainLimited(RecyclingStrategyType.MAX_PRIVACY), listOf(forced, chosen))
-
-        assertEquals(CoinRecyclingState.MUST_RECYCLE, verdicts.getValue(forced.derivationIndex))
-        assertEquals(CoinRecyclingState.TO_RECYCLE, verdicts.getValue(chosen.derivationIndex))
-    }
 }

@@ -60,13 +60,7 @@ fun List<TrackedVoucher>.preClassifyVouchers(
     )
 }
 
-/**
- * Settled: on chain, with an age the chain has told us.
- *
- * The age half is what keeps an untriaged coin out of the recycler. [Coin.Age.Unknown] reads as -1 through
- * [io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrDefault], which no threshold accepts,
- * but relying on that alone would leave the guard resting on a sentinel — so the set is narrowed here too.
- */
+/** Settled: on chain, with an age the chain has told us — the only coins a strategy may gate. */
 fun TrackedCoin.isMinted(): Boolean = state.isFree && coin.isOnChain && coin.hasEverBeenOnChain
 
 fun List<TrackedCoin>.coins(): List<Coin> = map(TrackedCoin::coin)

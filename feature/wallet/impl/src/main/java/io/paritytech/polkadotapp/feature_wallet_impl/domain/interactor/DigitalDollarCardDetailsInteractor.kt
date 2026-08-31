@@ -12,7 +12,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBackupService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestHelperUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
@@ -35,7 +34,6 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     private val environment: TestnetEnvironment,
     private val coinsInteractor: CoinsInteractor,
     private val recyclerVouchersInteractor: RecyclerVouchersInteractor,
-    private val coinageTestHelperUseCase: CoinageTestHelperUseCase,
     private val coinageTestnetFundUseCase: CoinageTestnetFundUseCase,
     private val shareCoinageLogsUseCase: ShareCoinageLogsUseCase,
     private val coinageRecyclingUseCase: CoinageRecyclingUseCase,
@@ -79,8 +77,6 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
 
         return coinageTestnetFundUseCase(amount)
     }
-
-    suspend fun makeAllVouchersReady() = coinageTestHelperUseCase.makeAllVouchersReady()
 
     suspend fun shareCoinageLogs(): Result<Unit> = shareCoinageLogsUseCase().map { }
 

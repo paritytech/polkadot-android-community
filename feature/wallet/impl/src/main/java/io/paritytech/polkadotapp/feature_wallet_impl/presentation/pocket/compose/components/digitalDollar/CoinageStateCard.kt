@@ -37,7 +37,6 @@ internal fun CoinageStateCard(
     state: CoinageUiState.TokensState,
     onCoinsClick: () -> Unit,
     onVouchersClick: () -> Unit,
-    makeAllVouchersReady: () -> Unit,
     onShareLogsClick: () -> Unit
 ) {
     val formatter = LocalTokenAmountFormatter.current
@@ -154,14 +153,6 @@ internal fun CoinageStateCard(
             }
 
             PolkadotTextButton(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                text = "Make all vouchers ready",
-                onClick = { makeAllVouchersReady() }
-            )
-
-            PolkadotTextButton(
                 text = "Share Coinage Logs",
                 onClick = { onShareLogsClick() },
                 modifier = Modifier
@@ -191,7 +182,6 @@ private fun CoinageStateCardPreview() {
                 ),
                 onCoinsClick = {},
                 onVouchersClick = {},
-                makeAllVouchersReady = {},
                 onShareLogsClick = {}
             )
         }

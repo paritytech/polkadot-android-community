@@ -1,7 +1,5 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
-import io.paritytech.polkadotapp.common.utils.currentTimestampFlow
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.totalBalance
@@ -28,17 +26,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import org.jetbrains.annotations.VisibleForTesting
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.seconds
-
-private val TOTAL_BALANCE_UPDATE_INTERVAL = 6.seconds
 
 /**
- * Balance keeps its own subscriptions and its own clock rather than reading the evaluator's output, because
- * it must stay live: a spend has to leave the displayed balance at once, not on the next evaluation. Only
- * the gating verdicts — which by nature move slowly — are taken from the evaluator.
- *
- * The two share [preClassifyCoins] and [preClassifyVouchers] so they cannot disagree about what the user
- * holds while running at different rates.
+ * Keeps its own subscriptions rather than reading the evaluator's output: a spend has to leave the displayed
+ * balance at once, not on the next evaluation. Only the gating verdicts are taken from the evaluator.
  */
 class RealTotalBalanceUseCase @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
@@ -49,20 +40,18 @@ class RealTotalBalanceUseCase @Inject constructor(
     private val evaluator: CoinRecyclingEvaluator,
 ) : TotalBalanceUseCase {
     override fun subscribeTotalBalance(): Flow<Result<CoinageBalance>> = combine(
-        currentTimestampFlow(interval = TOTAL_BALANCE_UPDATE_INTERVAL),
         coinageAssetsUseCase.subscribeCoins(),
         coinageAssetsUseCase.subscribeVouchers(),
         settings.strategyFlow(),
         evaluator.verdicts,
-    ) { now, coins, vouchers, strategyType, verdicts ->
-        calculateCoinageBalance(coins, vouchers, now, strategyType, verdicts)
+    ) { coins, vouchers, strategyType, verdicts ->
+        calculateCoinageBalance(coins, vouchers, strategyType, verdicts)
     }.distinctUntilChanged()
 
     override suspend fun getBalance(): Result<CoinageBalance> {
         return calculateCoinageBalance(
             coins = coinageAssetsUseCase.getCoins(),
             vouchers = coinageAssetsUseCase.getVouchers(),
-            currentTimeMillis = System.currentTimeMillis(),
             strategyType = settings.getStrategy(),
             verdicts = evaluator.verdicts.first(),
         )
@@ -76,16 +65,12 @@ class RealTotalBalanceUseCase @Inject constructor(
     internal suspend fun calculateCoinageBalance(
         coins: List<TrackedCoin>,
         vouchers: List<TrackedVoucher>,
-        currentTimeMillis: Timestamp,
         strategyType: RecyclingStrategyType,
         verdicts: RecyclingVerdicts,
     ): Result<CoinageBalance> = coinageBalanceConverterUseCase.create().map { conversionContext ->
         val strategy = strategyProvider.voucherStrategyFor(strategyType)
         val denominations = vouchers.mapToSet { it.voucher.recyclerValue }
-        val usability = VoucherUsabilityContext(
-            now = currentTimeMillis,
-            ringCapacities = ringCapacityProvider.capacitiesFor(denominations),
-        )
+        val usability = VoucherUsabilityContext(ringCapacities = ringCapacityProvider.capacitiesFor(denominations))
 
         val coinBuckets = coins.preClassifyCoins()
         val voucherBuckets = vouchers.preClassifyVouchers(strategy, usability)

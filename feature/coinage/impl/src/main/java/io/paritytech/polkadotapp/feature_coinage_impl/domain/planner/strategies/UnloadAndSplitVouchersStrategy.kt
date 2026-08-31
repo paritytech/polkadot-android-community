@@ -32,6 +32,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransa
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransactionAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.mintAndHandOffCoins
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.toSplitDestinations
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
@@ -54,7 +55,8 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
-    private val peopleMembershipProver: PeopleMembershipProver
+    private val peopleMembershipProver: PeopleMembershipProver,
+    private val quotaTracker: UnloadQuotaTracker,
 ) {
     fun create(
         payload: StrategyType.UnloadAndSplit,
@@ -76,7 +78,8 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
         coinageTransactionFactory = coinageTransactionFactory,
         breakdownUseCase = breakdownUseCase,
         balanceConverterUseCase = balanceConverterUseCase,
-        peopleMembershipProver = peopleMembershipProver
+        peopleMembershipProver = peopleMembershipProver,
+        quotaTracker = quotaTracker,
     )
 }
 
@@ -96,7 +99,8 @@ class UnloadAndSplitVouchersStrategy(
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
-    private val peopleMembershipProver: PeopleMembershipProver
+    private val peopleMembershipProver: PeopleMembershipProver,
+    private val quotaTracker: UnloadQuotaTracker,
 ) : TransferStrategy {
     private val vouchers = payload.vouchersToUnload
     private val recipientAmount = payload.recipientAmount
@@ -115,6 +119,7 @@ class UnloadAndSplitVouchersStrategy(
 
         val batches = resolveBatches()
         val freeUnloadTokens = freeUnloadTokenResolver.resolve(chain.id, batches.size)
+        quotaTracker.noteUnloadsHappened(freeUnloadTokens.size)
 
         val pinnedBlockHash = chainStateRepository.currentBlockHash(chain.id)
         val groupRevisions = recyclerProofDataProvider

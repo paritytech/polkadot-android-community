@@ -86,7 +86,7 @@ class CoinagePreClassificationTest {
     fun `min privacy makes an in-recycler voucher usable at once`() {
         val voucher = voucherOf(Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = 0))
 
-        val buckets = listOf(trackedVoucher(voucher)).preClassifyVouchers(minPrivacy, contextAt(now = 0L))
+        val buckets = listOf(trackedVoucher(voucher)).preClassifyVouchers(minPrivacy, context())
 
         assertEquals(listOf(voucher), buckets.usable)
     }
@@ -95,7 +95,7 @@ class CoinagePreClassificationTest {
     fun `max privacy holds an in-recycler voucher back until the ring is full`() {
         val partial = voucherOf(Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = FULL_RING - 1))
 
-        val buckets = listOf(trackedVoucher(partial)).preClassifyVouchers(maxPrivacy, contextAt(now = 0L))
+        val buckets = listOf(trackedVoucher(partial)).preClassifyVouchers(maxPrivacy, context())
 
         assertEquals(listOf(partial), buckets.gainingPrivacy)
         assertTrue(buckets.usable.isEmpty())
@@ -105,7 +105,7 @@ class CoinagePreClassificationTest {
     fun `an onboarding voucher is minting, whatever the ledger says about its minter`() {
         val onboarding = voucherOf(Location.Onboarding)
 
-        val buckets = listOf(trackedVoucher(onboarding)).preClassifyVouchers(minPrivacy, contextAt(now = 0L))
+        val buckets = listOf(trackedVoucher(onboarding)).preClassifyVouchers(minPrivacy, context())
 
         assertEquals(listOf(onboarding), buckets.minting)
     }
@@ -116,16 +116,13 @@ class CoinagePreClassificationTest {
         val onboarding = voucherOf(Location.Onboarding, ringVrfKeyIndex = 2)
 
         val buckets = listOf(trackedVoucher(usable), trackedVoucher(onboarding))
-            .preClassifyVouchers(maxPrivacy, contextAt(now = 0L))
+            .preClassifyVouchers(maxPrivacy, context())
 
         assertEquals(buckets.total.size, buckets.total.distinct().size)
         assertEquals(2, buckets.total.size)
     }
 
-    private fun contextAt(now: Long) = VoucherUsabilityContext(
-        now = now,
-        ringCapacities = mapOf(ValueExponent(1) to FULL_RING),
-    )
+    private fun context() = VoucherUsabilityContext(ringCapacities = mapOf(ValueExponent(1) to FULL_RING))
 
     private fun tracked(
         coin: Coin,
@@ -151,8 +148,6 @@ class CoinagePreClassificationTest {
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = location,
-        allocatedAt = 0L,
-        delayUnloadUntil = 0L,
     )
 
     private companion object {

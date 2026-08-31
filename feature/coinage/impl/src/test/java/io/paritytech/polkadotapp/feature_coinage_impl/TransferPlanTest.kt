@@ -252,8 +252,6 @@ class TransferPlannerTest {
             ringVrfPublicKey = mock(),
             recyclerValue = ValueExponent(exponent),
             location = Location.InRecycler(index, recyclerMembers = FULL_RING),
-            allocatedAt = 0L,
-            delayUnloadUntil = delayUnloadUntil,
         )
     }
 

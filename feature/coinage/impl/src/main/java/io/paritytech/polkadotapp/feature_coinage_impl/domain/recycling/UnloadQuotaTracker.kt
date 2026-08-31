@@ -32,12 +32,12 @@ class UnloadQuotaTracker @Inject constructor(
     private var cached: FreeUnloadTokenResolver.UnloadQuota? = null
     private var unloadsSinceRefresh = 0
 
-    suspend fun isQuotaExhausted(): Result<Boolean> = quota().map { it.remaining <= it.limit * QUOTA_RESERVE }
+    suspend fun isQuotaRunningLow(): Result<Boolean> = quota().map { it.remaining <= it.limit * QUOTA_RESERVE }
 
-    /** Called after an unload lands, so the cached count follows it without another walk of the range. */
-    suspend fun noteUnloadHappened() = mutex.withLock {
-        unloadsSinceRefresh++
-        cached = cached?.let { it.copy(remaining = (it.remaining - 1).coerceAtLeast(0)) }
+    /** Called when unload tokens are claimed, so the cached count follows without another walk of the range. */
+    suspend fun noteUnloadsHappened(count: Int) = mutex.withLock {
+        unloadsSinceRefresh += count
+        cached = cached?.let { it.copy(remaining = (it.remaining - count).coerceAtLeast(0)) }
     }
 
     private suspend fun quota(): Result<FreeUnloadTokenResolver.UnloadQuota> = mutex.withLock {
@@ -63,5 +63,4 @@ class UnloadQuotaTracker @Inject constructor(
     }
 }
 
-private operator fun Long.times(fraction: Fraction): Long =
-    toBigDecimal().multiply(fraction.fraction).toLong()
+private operator fun Long.times(fraction: Fraction): Long = (this * fraction.fraction.toDouble()).toLong()

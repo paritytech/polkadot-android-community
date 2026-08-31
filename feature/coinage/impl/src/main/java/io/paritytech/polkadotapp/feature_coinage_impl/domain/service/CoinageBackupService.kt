@@ -329,8 +329,6 @@ class RealCoinageBackupService @Inject constructor(
             ringVrfPublicKey = publicKey,
             recyclerValue = values[publicKey] ?: return@mapNotNull null,
             location = onChainInfo.getVoucherLocation(),
-            allocatedAt = System.currentTimeMillis(),
-            delayUnloadUntil = System.currentTimeMillis(),
         )
     }
 

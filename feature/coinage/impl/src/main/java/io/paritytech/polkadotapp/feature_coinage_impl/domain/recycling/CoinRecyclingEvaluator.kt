@@ -1,9 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
-import io.paritytech.polkadotapp.common.utils.currentTimestampFlow
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.throttleLatest
@@ -21,6 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -51,13 +50,15 @@ class CoinRecyclingEvaluator @Inject constructor(
     private val ringCapacityProvider: RingCapacityProvider,
     private val balanceConverter: CoinageBalanceConverterUseCase,
     private val recyclingUseCase: CoinageRecyclingUseCase,
-    private val quotaTracker: UnloadQuotaTracker,
     private val dispatchers: CoroutineDispatchers,
 ) {
-    private class Input(
-        val now: Timestamp,
+    private class Assets(
         val coins: List<TrackedCoin>,
         val vouchers: List<TrackedVoucher>,
+    )
+
+    private class Input(
+        val assets: Assets,
         val strategyType: RecyclingStrategyType,
     )
 
@@ -72,16 +73,11 @@ class CoinRecyclingEvaluator @Inject constructor(
     context(scope: ComputationalScope)
     fun start() {
         scope.launch(dispatchers.computation) {
-            combine(
-                currentTimestampFlow(interval = EVALUATION_INTERVAL),
-                coinageAssetsUseCase.subscribeCoins(),
-                coinageAssetsUseCase.subscribeVouchers(),
-                settings.strategyFlow(),
-                ::Input,
-            )
-                // Before the work, not after it: everything downstream reads the chain and walks the whole
-                // live set, so throttling the result would rate-limit nothing that costs anything.
+            combine(coinageAssetsUseCase.subscribeCoins(), coinageAssetsUseCase.subscribeVouchers(), ::Assets)
                 .throttleLatest(EVALUATION_INTERVAL)
+                // Outside the throttle: switching strategy should re-judge the wallet at once rather than up
+                // to an interval later. Only the asset churn needs damping.
+                .combine(settings.strategyFlow(), ::Input)
                 .collect { input ->
                     evaluate(input)
                         .onSuccess { verdicts ->
@@ -100,11 +96,11 @@ class CoinRecyclingEvaluator @Inject constructor(
         val strategy = strategyProvider.strategyFor(input.strategyType)
         val conversion = balanceConverter.create().getOrElse { return Result.failure(it) }
 
-        val denominations = input.vouchers.mapToSet { it.voucher.recyclerValue }
-        val usability = VoucherUsabilityContext(input.now, ringCapacityProvider.capacitiesFor(denominations))
+        val denominations = input.assets.vouchers.mapToSet { it.voucher.recyclerValue }
+        val usability = VoucherUsabilityContext(ringCapacityProvider.capacitiesFor(denominations))
 
-        val coinBuckets = input.coins.preClassifyCoins()
-        val voucherBuckets = input.vouchers.preClassifyVouchers(strategy, usability)
+        val coinBuckets = input.assets.coins.preClassifyCoins()
+        val voucherBuckets = input.assets.vouchers.preClassifyVouchers(strategy, usability)
 
         return with(conversion) {
             // Measured before this pass gates anything; evaluate accumulates into it, so the pending
@@ -116,14 +112,23 @@ class CoinRecyclingEvaluator @Inject constructor(
                     voucherBuckets.gainingPrivacy.totalBalance(),
             )
 
-            Result.success(strategy.evaluate(coinBuckets.minted, snapshot))
+            val verdicts = strategy.evaluate(coinBuckets.minted, snapshot)
+
+            coinageLogD(
+                "Recycling evaluation strategy=${input.strategyType}" +
+                    " minted=${coinBuckets.minted.size} arriving=${coinBuckets.minting.size}" +
+                    " vouchers(usable=${voucherBuckets.usable.size} gaining=${voucherBuckets.gainingPrivacy.size})" +
+                    " verdicts=${verdicts.values.groupingBy { it }.eachCount()}"
+            )
+
+            Result.success(verdicts)
         }
     }
 
     /**
      * Gating a coin takes it out of the spendable balance immediately, so recycling has to follow at once —
-     * otherwise the user watches money move to "establishing privacy" and sit there. A failed attempt needs
-     * no retry of its own: the next tick re-evaluates and tries again.
+     * otherwise the user watches money move to "gaining privacy" and sit there. A failed attempt needs no
+     * retry of its own: the next evaluation tries again.
      */
     private suspend fun recycleGated(input: Input, verdicts: RecyclingVerdicts) {
         // Both recycling verdicts, not just the discretionary one: a coin past the chain's age limit is the
@@ -131,10 +136,11 @@ class CoinRecyclingEvaluator @Inject constructor(
         val gated = verdicts.filterValues { it in RECYCLING_VERDICTS }.keys
         if (gated.isEmpty()) return
 
-        val coins = input.coins.map { it.coin }.filter { it.derivationIndex in gated }
+        val coins = input.assets.coins.map { it.coin }.filter { it.derivationIndex in gated }
 
-        recyclingUseCase.recycle(coins)
-            .onSuccess { quotaTracker.noteUnloadHappened() }
-            .logFailure(LOG_TAG)
+        coinageLogD("Recycling ${coins.size} gated coin(s)")
+
+        // No quota is spent here: recycling loads a coin into a recycler, it does not unload anything.
+        recyclingUseCase.recycle(coins).logFailure(LOG_TAG)
     }
 }

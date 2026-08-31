@@ -45,6 +45,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
@@ -118,6 +119,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
     private val coinAmountBreakdownUseCase: CoinAmountBreakdownUseCase,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase,
     private val peopleMembershipProver: PeopleMembershipProver,
+    private val quotaTracker: UnloadQuotaTracker,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
 ) : UnloadRecyclerIntoExternalAssetUseCase {
     override suspend fun initiateUnload(
@@ -177,6 +179,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         val resolvedTokens = unloadTokenResolverFactory
             .createForCollection(peopleCollection)
             .resolve(chain.id, grouped.size)
+            .also { quotaTracker.noteUnloadsHappened(it.size) }
         val pinnedBlockHash = rpcCalls.getBlockHash(chain.id)
 
         return recyclerProofDataProvider

@@ -1,13 +1,12 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
-import io.paritytech.polkadotapp.common.utils.Fraction
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.balance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrDefault
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerMembersOrZero
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecyclingStrategy
@@ -28,11 +27,13 @@ class ParametricRecyclingStrategy(private val params: RecyclingParams) : CoinRec
 
         // Oldest first: a coin nearer the age the chain stops accepting has the most to lose by waiting,
         // so it gets first claim on the budget.
-        return coins.sortedByDescending(Coin::ageOrDefault).associate { coin ->
+        return coins.sortedByDescending { it.ageOrNull() }.associate { coin ->
+            val age = coin.ageOrNull()
+
             // Headroom, not fit. While any budget is left the next coin is admitted even if it overshoots,
             // so a coin worth more than the whole budget still recycles instead of sitting untouched until
             // the age limit forces it. The coin after an overshoot then finds no headroom and waits.
-            val gated = coin.ageOrDefault() >= params.minRecyclingAge && unavailable < budget
+            val gated = age != null && age >= params.minRecyclingAge && unavailable < budget
 
             if (gated) unavailable += coin.balance()
 
@@ -49,11 +50,7 @@ class ParametricRecyclingStrategy(private val params: RecyclingParams) : CoinRec
             .setScale(0, RoundingMode.CEILING)
             .toInt()
 
-        // Short of a full ring the random unload delay stands in for anonymity-set size — it buys the same
-        // unlinkability by time instead of by crowd. At a full ring nothing but the ring will do.
-        val delayElapsed = params.requiredRingFill < Fraction.FULL && voucher.delayUnloadUntil < context.now
-
-        return voucher.recyclerMembersOrZero() >= requiredMembers || delayElapsed
+        return voucher.recyclerMembersOrZero() >= requiredMembers
     }
 
     override fun allowsConfirmedSpend(): Boolean = params.allowsConfirmedSpend

@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
@@ -51,10 +50,6 @@ class RealTotalBalanceUseCaseTest {
     private val quotaTracker: UnloadQuotaTracker = mock()
 
     private val strategyProvider = RecyclingStrategyProvider(coinRepository, quotaTracker)
-
-    private val timestamp = 1000L
-    private val delayElapsed = timestamp - 1L
-    private val delayPending = timestamp + 1L
 
     private val useCase: RealTotalBalanceUseCase
 
@@ -147,7 +142,7 @@ class RealTotalBalanceUseCaseTest {
 
     @Test
     fun `under min privacy an in-recycler voucher is available whatever its ring or delay`() {
-        val voucher = voucherOf(exponent = 1, location = inRecycler(members = 0), delayUnloadUntil = delayPending)
+        val voucher = voucherOf(exponent = 1, location = inRecycler(members = 0))
 
         assertBalance(
             coins = emptyList(),
@@ -162,7 +157,6 @@ class RealTotalBalanceUseCaseTest {
         val voucher = voucherOf(
             exponent = 1,
             location = inRecycler(members = FULL_RING - 1),
-            delayUnloadUntil = delayElapsed,
         )
 
         assertBalance(
@@ -174,8 +168,9 @@ class RealTotalBalanceUseCaseTest {
     }
 
     @Test
-    fun `under balanced an elapsed unload delay releases a voucher a half-empty ring would not`() {
-        val voucher = voucherOf(exponent = 1, location = inRecycler(members = 0), delayUnloadUntil = delayElapsed)
+    fun `under balanced a half-full ring releases a voucher`() {
+        // 767 keys, so half rounds up to 384 — a ring of 383 is one short.
+        val voucher = voucherOf(exponent = 1, location = inRecycler(members = FULL_RING / 2 + 1))
 
         assertBalance(
             coins = emptyList(),
@@ -186,8 +181,20 @@ class RealTotalBalanceUseCaseTest {
     }
 
     @Test
+    fun `under balanced a ring short of half holds the voucher back`() {
+        val voucher = voucherOf(exponent = 1, location = inRecycler(members = 0))
+
+        assertBalance(
+            coins = emptyList(),
+            vouchers = listOf(voucher),
+            strategyType = RecyclingStrategyType.BALANCED,
+            expected = balanceOf(gainingPrivacy = 1.exponentToBalance()),
+        )
+    }
+
+    @Test
     fun `an onboarding voucher is pending`() {
-        val voucher = voucherOf(exponent = 1, location = Location.Onboarding, delayUnloadUntil = delayElapsed)
+        val voucher = voucherOf(exponent = 1, location = Location.Onboarding)
 
         assertBalance(
             coins = emptyList(),
@@ -287,7 +294,6 @@ class RealTotalBalanceUseCaseTest {
         useCase.calculateCoinageBalance(
             coins = coins.zip(coinStates, ::TrackedCoin),
             vouchers = vouchers.zip(voucherStates, ::TrackedVoucher),
-            currentTimeMillis = timestamp,
             strategyType = strategyType,
             verdicts = verdicts,
         ).getOrThrow()
@@ -317,13 +323,11 @@ class RealTotalBalanceUseCaseTest {
         accountId = mock(),
     )
 
-    private fun voucherOf(exponent: Int, location: Location, delayUnloadUntil: Timestamp) = RecyclerVoucher(
+    private fun voucherOf(exponent: Int, location: Location) = RecyclerVoucher(
         ringVrfKeyIndex = 0,
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(exponent),
         location = location,
-        allocatedAt = 0L,
-        delayUnloadUntil = delayUnloadUntil,
     )
 
     private fun Int.exponentToBalance() = testConversionContext.formatExponentToBalance(ValueExponent(this))

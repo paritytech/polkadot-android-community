@@ -8,7 +8,6 @@ import dagger.hilt.components.SingletonComponent
 import io.paritytech.polkadotapp.common.data.storage.SingleValueStorageFactory
 import io.paritytech.polkadotapp.feature_coinage_api.domain.CoinsInteractor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.RecyclerVouchersInteractor
-import io.paritytech.polkadotapp.feature_coinage_api.domain.UnloadDelayStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.VoucherAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.debug.CoinageDebugSettings
@@ -26,7 +25,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestHelperUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.OnboardingUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
@@ -69,7 +67,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageCh
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageEntryRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RealCoinageChainViewFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RealCoinageEntryRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.RandomUnloadDelayStrategy
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.RealCoinsInteractor
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.RealVouchersInteractor
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.RealCoinAllocator
@@ -98,7 +95,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinage
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageRecyclingUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageTestHelperUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageTransferSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealOnboardingUseCase
@@ -161,9 +157,6 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindVoucherRepository(impl: RealVoucherRepository): VoucherRepository
-
-    @Binds
-    fun bindUnloadDelayStrategy(impl: RandomUnloadDelayStrategy): UnloadDelayStrategy
 
     @Binds
     fun bindCoinageTestnetFundUseCase(impl: RealCoinageTestnetFundUseCase): CoinageTestnetFundUseCase
@@ -229,9 +222,6 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindUnloadTokenPeriodCalculator(impl: RealUnloadTokenPeriodCalculator): UnloadTokenPeriodCalculator
-
-    @Binds
-    fun bindCoinageTestHelperUseCase(impl: RealCoinageTestHelperUseCase): CoinageTestHelperUseCase
 
     @Binds
     fun bindRecyclerRevisionProvider(impl: RealRecyclerProofDataProvider): RecyclerProofDataProvider

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 58,
-    "identityHash": "74623c8fb8ad2896ab4c7689561c85c4",
+    "identityHash": "4d398f5dc2dc2c43d4241baeed9a1c5c",
     "entities": [
       {
         "tableName": "chains",
@@ -1674,7 +1674,7 @@
       },
       {
         "tableName": "recycler_vouchers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `allocatedAt` INTEGER NOT NULL, `delayUnloadUntil` INTEGER NOT NULL, `recyclerMembers` INTEGER, PRIMARY KEY(`ringVrfKeyIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, PRIMARY KEY(`ringVrfKeyIndex`))",
         "fields": [
           {
             "fieldPath": "ringVrfKeyIndex",
@@ -1698,18 +1698,6 @@
             "fieldPath": "locationRecyclerIndex",
             "columnName": "locationRecyclerIndex",
             "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "allocatedAt",
-            "columnName": "allocatedAt",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "delayUnloadUntil",
-            "columnName": "delayUnloadUntil",
-            "affinity": "INTEGER",
-            "notNull": true
           },
           {
             "fieldPath": "recyclerMembers",
@@ -2937,7 +2925,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '74623c8fb8ad2896ab4c7689561c85c4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4d398f5dc2dc2c43d4241baeed9a1c5c')"
     ]
   }
 }

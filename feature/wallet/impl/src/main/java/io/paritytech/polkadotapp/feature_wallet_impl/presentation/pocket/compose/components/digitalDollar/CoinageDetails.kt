@@ -178,8 +178,8 @@ internal fun VouchersListSheetContent(
             VoucherSortMode.INDEX_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex }
             VoucherSortMode.VALUE_DESC -> vouchers.sortedByDescending { it.recyclerValue.value }
             VoucherSortMode.VALUE_ASC -> vouchers.sortedBy { it.recyclerValue.value }
-            VoucherSortMode.DATE_DESC -> vouchers.sortedByDescending { it.delayUnloadUntil }
-            VoucherSortMode.DATE_ASC -> vouchers.sortedBy { it.delayUnloadUntil }
+            VoucherSortMode.DATE_DESC -> vouchers.sortedByDescending { it.ringVrfKeyIndex }
+            VoucherSortMode.DATE_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex }
         }
     }
 
@@ -481,7 +481,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
-                NovaText(text = voucher.delayUnloadUntil.toDateString())
+                NovaText(text = "$ringMembers")
             }
 
             VerticalSpacer { 4.dp }

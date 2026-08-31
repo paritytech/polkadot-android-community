@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_api.domain.model
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
 
 typealias RingVrfIndex = Int
@@ -12,8 +11,6 @@ data class RecyclerVoucher(
     val ringVrfPublicKey: BandersnatchPublicKey,
     val recyclerValue: ValueExponent,
     val location: Location,
-    val allocatedAt: Timestamp,
-    val delayUnloadUntil: Timestamp,
 ) {
     sealed interface Location {
         data object Unknown : Location

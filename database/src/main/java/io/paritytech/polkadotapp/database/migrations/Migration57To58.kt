@@ -14,6 +14,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 class Migration57To58 : Migration(57, 58) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE recycler_vouchers ADD COLUMN recyclerMembers INTEGER")
+
+        // A voucher already in a recycler must not come back with a location and no count - the two are
+        // written together from here on. Zero until the chain subscription rewrites it, which reads as an
+        // empty ring, so nothing is released on anonymity we have not actually seen.
+        db.execSQL("UPDATE recycler_vouchers SET recyclerMembers = 0 WHERE locationRecyclerIndex IS NOT NULL")
         db.execSQL("ALTER TABLE recycler_vouchers DROP COLUMN ringHasEnoughRingMembersToWithdraw")
+        db.execSQL("ALTER TABLE recycler_vouchers DROP COLUMN delayUnloadUntil")
+        db.execSQL("ALTER TABLE recycler_vouchers DROP COLUMN allocatedAt")
     }
 }

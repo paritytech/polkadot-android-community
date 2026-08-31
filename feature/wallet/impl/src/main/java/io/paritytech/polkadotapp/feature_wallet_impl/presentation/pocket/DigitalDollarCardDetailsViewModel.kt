@@ -100,10 +100,6 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         fundInProgress.disable()
     }
 
-    fun makeAllVouchersReady() = launchUnit {
-        interactor.makeAllVouchersReady()
-    }
-
     fun onShareLogsClick() = launchUnit {
         interactor.shareCoinageLogs()
             .onFailure { showMessage("Failed to share coinage logs") }

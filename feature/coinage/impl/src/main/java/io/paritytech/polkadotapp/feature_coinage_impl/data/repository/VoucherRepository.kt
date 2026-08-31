@@ -130,19 +130,19 @@ class RealVoucherRepository @Inject constructor(
             ringVrfPublicKey = ringVrfPublicKey.toDataByteArray(),
             recyclerValue = ValueExponent(recyclerValue),
             location = toDomainLocation(),
-            allocatedAt = allocatedAt,
-            delayUnloadUntil = delayUnloadUntil,
         )
     }
 
     private fun RecyclerVoucherLocal.toDomainLocation(): RecyclerVoucher.Location {
         val index = locationRecyclerIndex ?: return RecyclerVoucher.Location.Unknown
 
-        // A location written before the ring was read reads as an empty ring rather than a full one, so a
-        // strategy waiting on anonymity keeps waiting instead of releasing on a count we do not have.
+        // Written together by the location service, so one without the other is a corrupt row rather than a
+        // state worth guessing at.
+        val members = requireNotNull(recyclerMembers) { "Voucher in recycler $index has no member count" }
+
         return RecyclerVoucher.Location.InRecycler(
             recyclerIndex = RecyclerIndex(index.toBigInteger()),
-            recyclerMembers = recyclerMembers ?: 0
+            recyclerMembers = members
         )
     }
 
@@ -153,8 +153,6 @@ class RealVoucherRepository @Inject constructor(
             ringVrfPublicKey = ringVrfPublicKey.value,
             recyclerValue = recyclerValue.value,
             locationRecyclerIndex = inRecycler?.recyclerIndex?.value?.toInt(),
-            allocatedAt = allocatedAt,
-            delayUnloadUntil = delayUnloadUntil,
             recyclerMembers = inRecycler?.recyclerMembers,
         )
     }

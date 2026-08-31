@@ -118,12 +118,23 @@ class CoinageAssetSelectorTest {
         val usable = voucherOf(ringVrfKeyIndex = 1, members = FULL_RING)
         val gaining = voucherOf(ringVrfKeyIndex = 2, members = 0)
         withVouchers(usable, gaining)
-        withStrategy(RecyclingStrategyType.MAX_PRIVACY)
+        withStrategy(RecyclingStrategyType.BALANCED)
 
         assertEquals(listOf(usable), selector.getSelectableVouchersByScope().getValue(SpendScope.SPENDABLE))
+        assertEquals(
+            listOf(usable, gaining),
+            selector.getSelectableVouchersByScope().getValue(SpendScope.WITH_CONFIRMATION),
+        )
+    }
 
-        withStrategy(RecyclingStrategyType.BALANCED)
-        assertEquals(listOf(usable, gaining), selector.getSelectableVouchersByScope().getValue(SpendScope.WITH_CONFIRMATION))
+    @Test
+    fun `a strategy that refuses the offer keeps its vouchers even for a confirmed spend`() = runBlocking<Unit> {
+        val usable = voucherOf(ringVrfKeyIndex = 1, members = FULL_RING)
+        val gaining = voucherOf(ringVrfKeyIndex = 2, members = 0)
+        withVouchers(usable, gaining)
+        withStrategy(RecyclingStrategyType.MAX_PRIVACY)
+
+        assertEquals(listOf(usable), selector.getSelectableVouchersByScope().getValue(SpendScope.WITH_CONFIRMATION))
     }
 
     @Test
@@ -160,8 +171,5 @@ class CoinageAssetSelectorTest {
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = members),
-        allocatedAt = 0L,
-        // Past, so only the ring fill decides — otherwise balanced would release it by delay alone.
-        delayUnloadUntil = 0L,
     )
 }

@@ -316,8 +316,6 @@ class RealCoinageRecyclingUseCaseTest {
             ringVrfPublicKey = byteArrayOf(ringVrfKeyIndex.toByte()).toDataByteArray(),
             recyclerValue = ValueExponent(exponent),
             location = RecyclerVoucher.Location.Unknown,
-            allocatedAt = 0L,
-            delayUnloadUntil = 0L,
         )
     }
 
