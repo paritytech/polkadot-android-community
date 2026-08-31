@@ -461,7 +461,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="rewards_withdraw_to_address_action">Withdraw Rewards</string>
     <string name="rewards_until_next_withdrawal">Not available</string>
     <string name="rewards_expiration_warning">Reward is expiring in %s. Withdraw it now.</string>
-    <string name="rewards_start_earning_description">Earn CASH by providing judgements, playing weekly games, or inviting friends</string>
+    <string name="rewards_start_earning_description">Earn %1$s by providing judgements, playing weekly games, or inviting friends</string>
     <string name="rewards_start_earning_action">Start earning</string>
     <string name="rewards_remove_address_action">Remove</string>
     <string name="rewards_add_address_action">Add Withdrawal Address</string>
@@ -751,7 +751,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_enter_amount_placeholder">Enter Amount</string>
     <string name="send_enter_amount_your_balance_label">Available now</string>
     <string name="send_enter_amount_not_enough_funds_error">You don’t have enough funds</string>
-    <string name="send_enter_amount_cash_title">CASH</string>
+    <string name="send_enter_amount_cash_title">%1$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>
     <string name="send_enter_amount_settling">Waiting for seller confirmation…</string>
 
@@ -1135,7 +1135,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_bot_weekly_game_start_playing_action">Start Playing</string>
     <string name="chat_bot_weekly_game_deposit_required_title">Deposit is required</string>
     <string name="chat_bot_weekly_game_deposit_required_subtitle">Deposit %1$s and join the weekly game</string>
-    <string name="chat_bot_weekly_game_deposit_required_description">Deposited funds will be held from you CASH account and sent back after you become a Member.</string>
+    <string name="chat_bot_weekly_game_deposit_required_description">Deposited funds will be held from you %1$s account and sent back after you become a Member.</string>
     <string name="chat_bot_weekly_game_deposit_required_action">Deposit %1$s</string>
     <string name="chat_bot_weekly_game_deposit_required_funding">Funding account, please wait…</string>
 
@@ -1211,7 +1211,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="card_balance_will_be_available_soon">Available soon</string>
 
     <string name="asset_details_fund_button">Fund %1$s</string>
-    <string name="asset_details_fund_digital_dollar">Get CASH</string>
+    <string name="asset_details_fund_digital_dollar">Get %1$s</string>
     <string name="asset_details_transfer_button">Transfer</string>
     <string name="asset_details_actions_disabled">Actions will be available after you finish updating your balance</string>
     <string name="asset_details_backup_in_progress">Updating balance</string>
@@ -1457,8 +1457,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="connection_status_connecting">Connecting... %1$d/%2$d</string>
 
     <string name="pocket_digital_dollar_title">Balance Card</string>
-    <string name="pocket_digital_dollar_card_title">CASH</string>
-    <string name="pocket_digital_dollar_send_button">Send CASH</string>
+    <string name="pocket_digital_dollar_card_title">%1$s</string>
+    <string name="pocket_digital_dollar_send_button">Send %1$s</string>
+    <string name="pocket_digital_dollar_faucet_top_up">Faucet Top Up</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
 

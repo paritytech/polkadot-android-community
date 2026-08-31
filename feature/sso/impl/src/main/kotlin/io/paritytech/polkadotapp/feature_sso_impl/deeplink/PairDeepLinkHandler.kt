@@ -4,6 +4,8 @@ import android.net.Uri
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.awaitAccountsInitialized
 import io.paritytech.polkadotapp.feature_sso_impl.SsoRouter
@@ -17,7 +19,7 @@ internal class PairDeepLinkHandler @Inject constructor(
     private val ssoRouter: SsoRouter,
 ) : DeepLinkHandler {
     override fun canHandle(data: Uri): Boolean {
-        return ssoHandshakeProtocol.isPairingDeeplink(data)
+        return FeatureOption.LINKED_DEVICES.isEnabled && ssoHandshakeProtocol.isPairingDeeplink(data)
     }
 
     context(scope: ComputationalScope)

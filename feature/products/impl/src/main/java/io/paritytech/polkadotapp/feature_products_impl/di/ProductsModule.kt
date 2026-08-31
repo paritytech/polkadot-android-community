@@ -9,6 +9,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.common.BuildConfig
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isDisabled
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
@@ -22,6 +25,7 @@ import io.paritytech.polkadotapp.feature_products_api.domain.runtime.ProductRunt
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.PreimageSubmitSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.StatementStoreSubmissionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.TransactionSponsoring
+import io.paritytech.polkadotapp.feature_products_api.model.KnownProductIds
 import io.paritytech.polkadotapp.feature_products_api.presentation.spaHost.SpaHost
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.BrowserTabRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductIntegrationRepository
@@ -61,6 +65,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.Prod
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.RealProductNotificationScheduler
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.ProductAccountOrigins
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.RealProductAccountOrigins
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.AutoAllowProductPermissionRequester
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRepository
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRequester
@@ -91,6 +96,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.RealE
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.RealResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.ProductServingHostResolver
+import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaHost.RuntimeSelectingSpaHost
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -99,30 +105,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal interface ProductsModule {
-    companion object {
-        @Provides
-        @Singleton
-        @TrUAPIChainHttpClient
-        fun provideTrUAPIChainHttpClient(shared: OkHttpClient): OkHttpClient =
-            shared.newBuilder()
-                // Chain sockets are long-lived subscriptions: the shared client's
-                // read timeout would kill them when idle, so detect dead peers
-                // with pings instead. newBuilder keeps the shared pool/dispatcher.
-                .readTimeout(0, TimeUnit.SECONDS)
-                .pingInterval(CHAIN_SOCKET_PING_SECONDS, TimeUnit.SECONDS)
-                .build()
-
-        private const val CHAIN_SOCKET_PING_SECONDS = 30L
-
-        @Provides
-        @Singleton
-        fun provideProductRuntimeSettings(@ApplicationContext context: Context): ProductRuntimeSettings =
-            PrefsProductRuntimeSettings(
-                prefs = context.getSharedPreferences("product_runtime_settings", Context.MODE_PRIVATE),
-                isDebugBuild = BuildConfig.DEBUG,
-            )
-    }
-
     @Binds
     @Singleton
     fun bindWidgetSerializer(impl: ScaleWidgetSerializer): JsWidgetSerializer
@@ -166,10 +148,6 @@ internal interface ProductsModule {
     @Binds
     @IntoSet
     fun bindProductExternalExtensionProvider(impl: ProductExternalExtensionProvider): ExternalExtensionProvider
-
-    @Binds
-    @IntoSet
-    fun bindProductChatSearchResultProvider(impl: ProductChatSearchResultProvider): ChatSearchResultProvider
 
     @Binds
     fun bindProductLocalStorage(impl: RealProductLocalStorage): ProductLocalStorage
@@ -222,10 +200,6 @@ internal interface ProductsModule {
     fun bindUserIdentityAccessPermissionHandler(
         impl: UserIdentityAccessPermissionHandler,
     ): ProductPermissionHandler<ProductPermission.UserIdentityAccess>
-
-    @Binds
-    @Singleton
-    fun bindPermissionRequester(impl: RealProductPermissionRequester): ProductPermissionRequester
 
     @Binds
     @Singleton
@@ -283,4 +257,55 @@ internal interface ProductsModule {
 
     @Binds
     fun bindExecuteTopUpUseCase(impl: RealExecuteTopUpUseCase): ExecuteTopUpUseCase
+
+    companion object {
+        @Provides
+        @Singleton
+        @TrUAPIChainHttpClient
+        fun provideTrUAPIChainHttpClient(shared: OkHttpClient): OkHttpClient =
+            shared.newBuilder()
+                // Chain sockets are long-lived subscriptions: the shared client's
+                // read timeout would kill them when idle, so detect dead peers
+                // with pings instead. newBuilder keeps the shared pool/dispatcher.
+                .readTimeout(0, TimeUnit.SECONDS)
+                .pingInterval(CHAIN_SOCKET_PING_SECONDS, TimeUnit.SECONDS)
+                .build()
+
+        private const val CHAIN_SOCKET_PING_SECONDS = 30L
+
+        @Provides
+        @Singleton
+        fun provideProductRuntimeSettings(@ApplicationContext context: Context): ProductRuntimeSettings =
+            PrefsProductRuntimeSettings(
+                prefs = context.getSharedPreferences("product_runtime_settings", Context.MODE_PRIVATE),
+                isDebugBuild = BuildConfig.DEBUG,
+            )
+
+        @Provides
+        @Singleton
+        fun providePermissionRequester(real: RealProductPermissionRequester): ProductPermissionRequester {
+            return AutoAllowProductPermissionRequester(autoAllowedLabels(), real)
+        }
+
+        @Provides
+        @IntoSet
+        fun provideProductChatSearchResultProvider(
+            productRepository: ProductRepository,
+            productsRouter: ProductsRouter,
+        ): ChatSearchResultProvider {
+            return ProductChatSearchResultProvider(
+                arbitraryProductsEnabled = FeatureOption.ARBITRARY_PRODUCTS.isEnabled,
+                productRepository = productRepository,
+                productsRouter = productsRouter,
+            )
+        }
+
+        private fun autoAllowedLabels(): Set<String> {
+            return if (FeatureOption.PRODUCT_SETTINGS.isDisabled) {
+                setOf(KnownProductIds.GET_CASH_LABEL)
+            } else {
+                emptySet()
+            }
+        }
+    }
 }

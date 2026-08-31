@@ -16,6 +16,9 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestH
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
+import io.paritytech.polkadotapp.feature_products_api.model.KnownProductIds
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.AssetInfo
@@ -36,12 +39,15 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     private val coinageTestnetFundUseCase: CoinageTestnetFundUseCase,
     private val shareCoinageLogsUseCase: ShareCoinageLogsUseCase,
     private val coinageRecyclingUseCase: CoinageRecyclingUseCase,
-    private val coinageBackupService: CoinageBackupService
+    private val coinageBackupService: CoinageBackupService,
+    private val dotNsTldProvider: DotNsTldProvider
 ) {
     companion object {
         private val TOP_UP_AMOUNT = 150.toBigDecimal()
         private val NIGHTLY_TOP_UP_AMOUNT = 10.toBigDecimal()
     }
+
+    suspend fun getCashProductId(): Result<ProductId> = dotNsTldProvider.getTld().map(KnownProductIds::getCash)
 
     fun observeAssetInfo(): Flow<AssetInfo> = flow {
         val asset = chainAssetProvider.asset()

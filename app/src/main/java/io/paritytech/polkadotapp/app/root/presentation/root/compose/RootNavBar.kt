@@ -52,6 +52,8 @@ import io.paritytech.polkadotapp.app.root.presentation.main.compose.components.S
 import io.paritytech.polkadotapp.app.root.presentation.main.compose.icon
 import io.paritytech.polkadotapp.app.root.presentation.main.compose.title
 import io.paritytech.polkadotapp.common.presentation.tabs.BottomTab
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.TabsBox
@@ -88,9 +90,10 @@ private val AppMenuIconSize = 20.dp
 private val AppMenuShadowElevation = 8.dp
 
 /**
- * The global navigation bar: the four tab buttons (Chats/Pocket/Explore/Settings) around a center pill that
- * holds the scanner and, beside it, the open-tabs button (a stacked-cards icon with the tab count — white
- * while the apps grid is expanded, otherwise the same muted colour as the scanner).
+ * The global navigation bar: the available tab buttons around a center pill that holds the scanner and,
+ * beside it, the open-tabs button (a stacked-cards icon with the tab count — white while the apps grid is
+ * expanded, otherwise the same muted colour as the scanner). Without the Browse tab there are no product
+ * tabs to manage, so the pill keeps the scanner alone.
  */
 @Composable
 fun RootNavBar(
@@ -107,6 +110,8 @@ fun RootNavBar(
     onScanClicked: () -> Unit,
     onScannerTooltipDismiss: () -> Unit,
 ) {
+    val availableTabs = BottomTab.availableEntries
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -133,21 +138,22 @@ fun RootNavBar(
         }
 
         PolkadotNavigationBar(
-            selectedIndex = currentTab.ordinal,
-            itemCount = BottomTab.entries.size,
+            selectedIndex = availableTabs.indexOf(currentTab).coerceAtLeast(0),
+            itemCount = availableTabs.size,
             shape = RoundedCornerShape(NavBarCornerRadius),
             centerContent = {
                 CenterPill(
                     scannerTooltipVisible = scannerTooltipVisible,
                     onScanClicked = onScanClicked,
                     onScannerTooltipDismiss = onScannerTooltipDismiss,
+                    tabsVisible = FeatureOption.BROWSE_TAB.isEnabled,
                     tabsCount = apps.size,
                     appsExpanded = appsExpanded,
                     onTabsClicked = onCountClicked,
                 )
             },
         ) {
-            BottomTab.entries.fastForEach { tab ->
+            availableTabs.fastForEach { tab ->
                 PolkadotNavigationBarItem(
                     selected = tab == currentTab,
                     onClick = { onTabSelected(tab) },
@@ -166,6 +172,7 @@ private fun CenterPill(
     scannerTooltipVisible: Boolean,
     onScanClicked: () -> Unit,
     onScannerTooltipDismiss: () -> Unit,
+    tabsVisible: Boolean,
     tabsCount: Int,
     appsExpanded: Boolean,
     onTabsClicked: () -> Unit,
@@ -193,22 +200,24 @@ private fun CenterPill(
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .width(PolkadotTheme.borders.default)
-                    .padding(vertical = PolkadotTheme.spacings.smallIncreased)
-                    .fillMaxHeight()
-                    .background(PolkadotTheme.colors.stroke.secondary),
-            )
+            if (tabsVisible) {
+                Box(
+                    modifier = Modifier
+                        .width(PolkadotTheme.borders.default)
+                        .padding(vertical = PolkadotTheme.spacings.smallIncreased)
+                        .fillMaxHeight()
+                        .background(PolkadotTheme.colors.stroke.secondary),
+                )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(onClick = onTabsClicked)
-                    .padding(horizontal = PolkadotTheme.spacings.medium),
-                contentAlignment = Alignment.Center,
-            ) {
-                OpenTabsIcon(count = tabsCount, active = appsExpanded)
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .clickable(onClick = onTabsClicked)
+                        .padding(horizontal = PolkadotTheme.spacings.medium),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    OpenTabsIcon(count = tabsCount, active = appsExpanded)
+                }
             }
         }
     }
