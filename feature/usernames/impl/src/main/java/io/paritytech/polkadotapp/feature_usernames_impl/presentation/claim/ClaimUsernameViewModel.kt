@@ -274,7 +274,9 @@ class ClaimUsernameViewModel @Inject constructor(
             return
         }
 
-        Timber.w(error, "Claim username flow failed")
+        // The variant goes in the message: payload-free errors override fillInStackTrace, so
+        // passing one as the throwable alone prints no identity at all.
+        Timber.w(error, "Claim username flow failed: %s", flowError)
         state.update {
             it.copy(
                 progress = ClaimUsernameProgress.NONE,

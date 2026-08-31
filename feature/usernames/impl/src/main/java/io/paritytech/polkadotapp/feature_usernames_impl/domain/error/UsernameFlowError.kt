@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
 import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.AuthError
 import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.BackendRequestError
 import kotlinx.coroutines.CancellationException
+import timber.log.Timber
 
 /**
  * Claim-flow failures, flattened so the screen resolves one to a string with a single-level
@@ -46,7 +47,11 @@ fun Throwable.toUsernameFlowError(): Throwable = when (this) {
         BackendRequestError.Unknown -> UsernameFlowError.Unknown
     }
 
-    else -> UsernameFlowError.Unknown
+    else -> {
+        // Payload-free variants cannot carry the cause, and this is the last place with it.
+        Timber.e(this, "Unclassified username flow failure")
+        UsernameFlowError.Unknown
+    }
 }
 
 /** Total variant of [toUsernameFlowError], for the terminal sites that must render something. */

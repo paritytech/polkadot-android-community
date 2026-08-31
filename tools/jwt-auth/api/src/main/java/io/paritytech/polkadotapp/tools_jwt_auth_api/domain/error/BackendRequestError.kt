@@ -4,6 +4,7 @@ import com.google.gson.JsonParseException
 import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
+import timber.log.Timber
 import java.io.IOException
 
 private const val HTTP_UNAUTHORIZED = 401
@@ -47,7 +48,11 @@ fun Throwable.toBackendRequestError(): Throwable {
 
         this is IOException -> BackendRequestError.NoConnection
 
-        else -> BackendRequestError.Unknown
+        else -> {
+            // Payload-free variants cannot carry the cause, and this is the last place with it.
+            Timber.e(this, "Unclassified backend failure")
+            BackendRequestError.Unknown
+        }
     }
 }
 
