@@ -5,7 +5,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 
 @Immutable
 data class BalanceDetailsUiState(
-    val totalBalance: TokenAmountModel,
     val availablePrivate: TokenAmountModel,
     val exposed: TokenAmountModel,
     val canSpendExposed: Boolean,

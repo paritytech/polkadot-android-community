@@ -5,7 +5,6 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
 
 data class BalanceBreakdown(
     val asset: Chain.Asset,
-    val total: Balance,
     val availablePrivate: Balance,
     val exposed: Balance,
     /** False when the chosen strategy will not part with [exposed], which changes how it is labelled. */

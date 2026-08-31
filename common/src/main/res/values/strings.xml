@@ -2,8 +2,6 @@
 <resources>
     <string name="balance_details_title">Balance details</string>
     <string name="balance_details_subtitle">See what makes up your balance</string>
-    <string name="balance_details_total">Total Balance</string>
-    <string name="balance_details_total_description">Everything in your balance</string>
     <string name="balance_details_available_private">Available private</string>
     <string name="balance_details_available_private_description">Funds you can spend without privacy concerns</string>
     <string name="balance_details_available_exposed">Available exposed</string>

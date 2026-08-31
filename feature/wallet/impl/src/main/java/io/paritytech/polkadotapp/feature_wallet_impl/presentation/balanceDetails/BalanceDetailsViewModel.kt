@@ -22,7 +22,6 @@ class BalanceDetailsViewModel @Inject constructor(
             with(breakdown) {
                 LoadingState.Loaded(
                     BalanceDetailsUiState(
-                        totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(total)),
                         availablePrivate = tokenAmountMapper.mapFrom(asset.withAmount(availablePrivate)),
                         exposed = tokenAmountMapper.mapFrom(asset.withAmount(exposed)),
                         canSpendExposed = canSpendExposed,

@@ -81,14 +81,6 @@ private fun BalanceDetailsContent(state: BalanceDetailsUiState?) {
                 modifier = Modifier.padding(all = PolkadotTheme.spacings.large),
             ) {
                 BalanceRow(
-                    label = stringResource(RCommon.string.balance_details_total),
-                    subLabel = stringResource(RCommon.string.balance_details_total_description),
-                    amount = state?.totalBalance.formattedOrPlaceholder(),
-                )
-
-                VerticalSpacer { extraLarge }
-
-                BalanceRow(
                     label = stringResource(RCommon.string.balance_details_available_private),
                     subLabel = stringResource(RCommon.string.balance_details_available_private_description),
                     amount = state?.availablePrivate.formattedOrPlaceholder(),
@@ -182,7 +174,6 @@ private fun BalanceDetailsPreview() {
             NovaBottomSheetSurface {
                 BalanceDetailsContent(
                     BalanceDetailsUiState(
-                        totalBalance = TokenAmountModel.mock(450),
                         availablePrivate = TokenAmountModel.mock(300),
                         exposed = TokenAmountModel.mock(150),
                         canSpendExposed = true,
@@ -204,7 +195,6 @@ private fun BalanceDetailsExposedUnavailablePreview() {
             NovaBottomSheetSurface {
                 BalanceDetailsContent(
                     BalanceDetailsUiState(
-                        totalBalance = TokenAmountModel.mock(450),
                         availablePrivate = TokenAmountModel.mock(300),
                         exposed = TokenAmountModel.mock(150),
                         canSpendExposed = false,
