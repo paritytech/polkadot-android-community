@@ -11,6 +11,9 @@ import kotlinx.coroutines.CancellationException
  * `when`. Variants are payload-free because this reaches Compose state.
  */
 sealed class UsernameFlowError(message: String) : Throwable(message) {
+    /** The user backed out — for example by dismissing the Google sign-in sheet. Shows nothing. */
+    data object Cancelled : UsernameFlowError("cancelled by user")
+
     data object NoConnection : UsernameFlowError("no connection")
 
     data object VerificationUnavailable : UsernameFlowError("device cannot verify")
@@ -27,13 +30,13 @@ sealed class UsernameFlowError(message: String) : Throwable(message) {
 }
 
 /**
- * Boundary mapper for `mapError`. Cancellations pass through untouched — including a
- * user-cancelled Google sign-in, which the claim screen deliberately shows no error for.
+ * Boundary mapper for `mapError`. Coroutine cancellation passes through untouched; every other
+ * failure becomes a [UsernameFlowError], so the interactor never hands a caller a foreign type.
  */
 fun Throwable.toUsernameFlowError(): Throwable = when (this) {
     is CancellationException -> this
     is UsernameFlowError -> this
-    ImportFromBackupError.Cancelled -> this
+    ImportFromBackupError.Cancelled -> UsernameFlowError.Cancelled
 
     is BackendRequestError -> when (this) {
         is BackendRequestError.Auth -> error.toUsernameFlowError()

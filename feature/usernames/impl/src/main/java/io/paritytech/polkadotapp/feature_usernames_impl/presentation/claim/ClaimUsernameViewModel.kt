@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim
 
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
-import io.paritytech.polkadotapp.feature_backup_api.domain.error.ImportFromBackupError
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupFoundPayload
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.AccountOnboardingStatus
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.Username
@@ -266,9 +265,11 @@ class ClaimUsernameViewModel @Inject constructor(
     }
 
     private fun applyFieldError(error: Throwable) {
-        // A user-cancelled sign-in is not a failure to display, mirroring
+        val flowError = error.asUsernameFlowError()
+
+        // Backing out is not a failure to display, mirroring
         // BaseViewModel.shouldIgnore(SigningCancelledException).
-        if (error == ImportFromBackupError.Cancelled) {
+        if (flowError == UsernameFlowError.Cancelled) {
             state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
             return
         }
@@ -277,7 +278,7 @@ class ClaimUsernameViewModel @Inject constructor(
         state.update {
             it.copy(
                 progress = ClaimUsernameProgress.NONE,
-                fieldState = ClaimUsernameFieldState.Error(error.asUsernameFlowError()),
+                fieldState = ClaimUsernameFieldState.Error(flowError),
             )
         }
     }

@@ -107,6 +107,19 @@ class ClaimUsernameViewModelTest {
     }
 
     @Test
+    fun `backing out shows no error at all`() = runTest(mainDispatcher) {
+        whenever(interactor.checkUsernameAvailable(any()))
+            .thenReturn(Result.failure(UsernameFlowError.Cancelled))
+
+        val viewModel = createViewModel()
+        viewModel.onUsernameChanged(USERNAME)
+        advanceUntilIdle()
+
+        assertEquals(ClaimUsernameFieldState.Neutral, viewModel.state.value.fieldState)
+        assertEquals(ClaimUsernameProgress.NONE, viewModel.state.value.progress)
+    }
+
+    @Test
     fun `a transport failure at claim time stays on the field`() = runTest(mainDispatcher) {
         givenClaimFails(UsernameFlowError.NoConnection)
 

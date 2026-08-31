@@ -407,11 +407,16 @@ private fun claimFieldStatus(
             text = stringResource(RCommon.string.pick_username_state_available),
         )
 
-        is ClaimUsernameFieldState.Error -> UsernameFieldStatus(
-            style = UsernameFieldStyle.Error,
-            text = stringResource(fieldState.error.userMessage()),
-        )
+        is ClaimUsernameFieldState.Error -> fieldState.error.toStatus()
     }
+}
+
+@Composable
+private fun UsernameFlowError.toStatus(): UsernameFieldStatus = when (this) {
+    // The ViewModel never stores this; rendering nothing is the right fallback if it ever does.
+    UsernameFlowError.Cancelled -> UsernameFieldStatus(UsernameFieldStyle.Neutral, null)
+
+    else -> UsernameFieldStatus(UsernameFieldStyle.Error, stringResource(userMessage()))
 }
 
 @StringRes
@@ -421,5 +426,6 @@ private fun UsernameFlowError.userMessage(): Int = when (this) {
     UsernameFlowError.VerificationRejected -> RCommon.string.username_error_verification_rejected
     UsernameFlowError.VerificationBusy -> RCommon.string.username_error_verification_busy
     UsernameFlowError.Server -> RCommon.string.username_error_server
+    UsernameFlowError.Cancelled,
     UsernameFlowError.Unknown -> RCommon.string.username_error_unknown
 }

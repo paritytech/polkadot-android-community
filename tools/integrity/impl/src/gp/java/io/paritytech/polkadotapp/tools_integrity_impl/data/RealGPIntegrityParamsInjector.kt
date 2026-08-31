@@ -3,11 +3,10 @@ package io.paritytech.polkadotapp.tools_integrity_impl.data
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.common.data.keypair.ClientKeypairStore
-import io.paritytech.polkadotapp.common.utils.decodeBase64toByteArray
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
+import io.paritytech.polkadotapp.common.utils.decodeBase64toByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.mapError
-import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.sha256
 import io.paritytech.polkadotapp.common.utils.sha256UrlSafe
 import io.paritytech.polkadotapp.common.utils.toByteArray
@@ -36,12 +35,10 @@ class RealGPIntegrityParamsInjector @Inject constructor(
         requestBuilder.addHeader(HEADER_ATTESTATION_TYPE, ATTESTATION_TYPE)
 
         return challenge.decodeBase64toByteArray()
-            .flatMap { challengeBytes ->
-                runCancellableCatching {
-                    val publicKey = keypairStore.getOrGenerate().publicKey
-                    val bodyEncodedBytes = (requestBuilder.build().body?.toByteArray() ?: ByteArray(0)).sha256()
-                    (challengeBytes + publicKey + bodyEncodedBytes).sha256UrlSafe()
-                }
+            .mapCatching { challengeBytes ->
+                val publicKey = keypairStore.getOrGenerate().publicKey
+                val bodyEncodedBytes = (requestBuilder.build().body?.toByteArray() ?: ByteArray(0)).sha256()
+                (challengeBytes + publicKey + bodyEncodedBytes).sha256UrlSafe()
             }
             .flatMap { nonce -> playIntegrityManager.generateIntegrityToken(nonce) }
             .map { integrityPayload ->

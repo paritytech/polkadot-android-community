@@ -60,13 +60,18 @@ class UsernameFlowErrorMapperTest {
     }
 
     @Test
-    fun `cancellations are never reclassified`() {
+    fun `coroutine cancellation is never reclassified`() {
         val cancellation = CancellationException("scope died")
-        assertSame(cancellation, cancellation.toUsernameFlowError())
 
-        // A user-cancelled Google sign-in during backup recovery is not an error to display.
-        assertSame(
-            ImportFromBackupError.Cancelled,
+        assertSame(cancellation, cancellation.toUsernameFlowError())
+    }
+
+    @Test
+    fun `a foreign cancellation becomes the flow-level variant`() {
+        // The interactor must only ever fail with UsernameFlowError - callers should not have to
+        // recall that a backup type can surface here.
+        assertEquals(
+            UsernameFlowError.Cancelled,
             ImportFromBackupError.Cancelled.toUsernameFlowError()
         )
     }
@@ -79,6 +84,7 @@ class UsernameFlowErrorMapperTest {
     @Test
     fun `asUsernameFlowError is total`() {
         assertEquals(UsernameFlowError.Unknown, CancellationException("x").asUsernameFlowError())
+        assertEquals(UsernameFlowError.Cancelled, ImportFromBackupError.Cancelled.asUsernameFlowError())
         assertEquals(
             UsernameFlowError.NoConnection,
             BackendRequestError.NoConnection.asUsernameFlowError()
