@@ -50,7 +50,7 @@ class PocketViewModel @Inject constructor(
         persistentListOf(
             PocketCardUiModel.DigitalDollar(
                 balance = tokenAmountMapper.mapFrom(balance.total),
-                availableNow = tokenAmountMapper.mapFrom(balance.availableNow),
+                availablePrivate = tokenAmountMapper.mapFrom(balance.availablePrivate),
                 syncInProgress = backupProgress.isInProgress()
             ),
             PocketCardUiModel.IdCard(username = username, address = address, rank = rank)
@@ -91,7 +91,7 @@ class PocketViewModel @Inject constructor(
     private fun cardDisplayKey(card: PocketCardUiModel): String = when (card) {
         is PocketCardUiModel.DigitalDollar -> listOf(
             tokenAmountFormatter.formatTokenAmount(card.balance, RoundPrecision.FIAT, withSymbol = false),
-            tokenAmountFormatter.formatFiat(card.availableNow),
+            tokenAmountFormatter.formatFiat(card.availablePrivate),
             card.syncInProgress,
             card.notFullyAvailable
         ).joinToString("|")

@@ -32,8 +32,10 @@ class RealBalanceDetailsInteractor @Inject constructor(
                     BalanceBreakdown(
                         asset = asset,
                         total = balance.total,
-                        availableNow = balance.spendable,
-                        availableSoon = balance.gainingPrivacy.amount + balance.pending,
+                        availablePrivate = balance.spendable,
+                        exposed = balance.gainingPrivacy.amount,
+                        canSpendExposed = balance.gainingPrivacy.canSpendWithConfirmation,
+                        notAvailable = balance.pending,
                     )
                 }
         )

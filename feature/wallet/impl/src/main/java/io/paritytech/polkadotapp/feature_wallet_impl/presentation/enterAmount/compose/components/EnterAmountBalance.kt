@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Info
-import io.paritytech.polkadotapp.design.components.icon.vectors.LockUnlocked
+import io.paritytech.polkadotapp.design.components.icon.vectors.VisibilityOffOutlined
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
@@ -20,7 +20,8 @@ import io.paritytech.polkadotapp.common.R as RCommon
 
 /**
  * [gainingPrivacy] is shown apart from the balance rather than added to it: it is spendable, but only at the
- * cost of the privacy it has earned, so it should not read as money simply sitting there.
+ * cost of the privacy it has earned, so it should not read as money simply sitting there. The crossed-out eye
+ * says what spending it costs — exposure — rather than that it is locked away.
  */
 @Composable
 internal fun EnterAmountBalance(
@@ -66,8 +67,8 @@ internal fun EnterAmountBalance(
 
             NovaIcon(
                 modifier = Modifier.size(16.dp),
-                imageVector = NovaIcons.LockUnlocked,
-                tint = PolkadotTheme.colors.fg.warning,
+                imageVector = NovaIcons.VisibilityOffOutlined,
+                tint = PolkadotTheme.colors.fg.secondary,
             )
         }
     }

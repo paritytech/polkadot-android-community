@@ -23,8 +23,10 @@ class BalanceDetailsViewModel @Inject constructor(
                 LoadingState.Loaded(
                     BalanceDetailsUiState(
                         totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(total)),
-                        availableNow = tokenAmountMapper.mapFrom(asset.withAmount(availableNow)),
-                        availableSoon = tokenAmountMapper.mapFrom(asset.withAmount(availableSoon)),
+                        availablePrivate = tokenAmountMapper.mapFrom(asset.withAmount(availablePrivate)),
+                        exposed = tokenAmountMapper.mapFrom(asset.withAmount(exposed)),
+                        canSpendExposed = canSpendExposed,
+                        notAvailable = tokenAmountMapper.mapFrom(asset.withAmount(notAvailable)),
                     )
                 )
             }
