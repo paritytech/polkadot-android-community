@@ -114,8 +114,11 @@ private fun SendEnterAmountScreenInternal(
     val symbol = remember(state.available) {
         formatter.formatToSymbol(state.available)
     }
-    val amount = remember(state.available) {
-        formatter.formatTokenAmount(state.available, RoundPrecision.FIAT, withSymbol = false)
+    val amount = remember(state.spendable) {
+        formatter.formatTokenAmount(state.spendable, RoundPrecision.FIAT, withSymbol = false)
+    }
+    val gainingPrivacy = remember(state.gainingPrivacy) {
+        state.gainingPrivacy?.let { formatter.formatTokenAmount(it, RoundPrecision.FIAT, withSymbol = false) }
     }
 
     Column(
@@ -143,7 +146,7 @@ private fun SendEnterAmountScreenInternal(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            EnterAmountBalance(amount, onInfoClick)
+            EnterAmountBalance(amount, gainingPrivacy, onInfoClick)
 
             VerticalSpacer { small }
 
@@ -220,6 +223,8 @@ private fun SendEnterAmountScreenPreview() {
                     recipient = "2o4ytihgkgrjbsk4kjb45lnqlkn35lk3ny73l54jnu45lkjulk5u4lu4lubhv",
                     recipientType = ExtractedAddress.DisplayType.ADDRESS,
                     available = TokenAmountModel.mock,
+                    spendable = TokenAmountModel.mock(300),
+                    gainingPrivacy = TokenAmountModel.mock(150),
                     sendProgress = SendProgress.Idle,
                     showBalanceError = true,
                     isSendEnabled = false,

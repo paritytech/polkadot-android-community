@@ -119,7 +119,6 @@ class UnloadAndSplitVouchersStrategy(
 
         val batches = resolveBatches()
         val freeUnloadTokens = freeUnloadTokenResolver.resolve(chain.id, batches.size)
-        quotaTracker.noteUnloadsHappened(freeUnloadTokens.size)
 
         val pinnedBlockHash = chainStateRepository.currentBlockHash(chain.id)
         val groupRevisions = recyclerProofDataProvider
@@ -169,6 +168,10 @@ class UnloadAndSplitVouchersStrategy(
         }
 
         transactionService.submitTransactions(requests, groupId).getOrThrow()
+
+        // After submission, not after resolving: a token picked for a transaction that never left is still
+        // there to be picked again.
+        quotaTracker.noteUnloadsHappened(freeUnloadTokens.size)
 
         PreparedTransfer((exactCoins + prepared.flatMap { it.recipientCoins }).toMemoEntries(), handoffCommit)
     }

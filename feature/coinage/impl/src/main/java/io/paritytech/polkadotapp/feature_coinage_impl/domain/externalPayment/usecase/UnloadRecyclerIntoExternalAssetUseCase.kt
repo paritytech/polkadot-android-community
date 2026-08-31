@@ -179,7 +179,6 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         val resolvedTokens = unloadTokenResolverFactory
             .createForCollection(peopleCollection)
             .resolve(chain.id, grouped.size)
-            .also { quotaTracker.noteUnloadsHappened(it.size) }
         val pinnedBlockHash = rpcCalls.getBlockHash(chain.id)
 
         return recyclerProofDataProvider
@@ -279,6 +278,10 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         coinageLogI("Unload registering group=${groupId.value} transactions=${transactions.size}")
 
         transactionService.submitTransactions(transactions, groupId).getOrThrow()
+
+        // After submission, not after resolving: a token picked for a transaction that never left is still
+        // there to be picked again.
+        quotaTracker.noteUnloadsHappened(prepared.groups.size)
     }
 
     override fun subscribeUnloadStatus(groupId: CoinageOperationGroupId): Flow<ExternalUnloadStatus> =

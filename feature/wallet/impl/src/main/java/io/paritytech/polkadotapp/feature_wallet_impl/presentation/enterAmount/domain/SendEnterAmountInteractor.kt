@@ -93,7 +93,14 @@ class RealSendEnterAmountInteractor @Inject constructor(
 
     override fun tokenBalance(): Flow<AvailableToSendAmount> {
         return totalBalanceUseCase.subscribeTotalBalance()
-            .mapResult { AvailableToSendAmount(it.spendable, asset()) }
+            .mapResult {
+                AvailableToSendAmount(
+                    spendable = it.spendable,
+                    gainingPrivacy = it.gainingPrivacy.amount,
+                    canSpendGainingPrivacy = it.gainingPrivacy.canSpendWithConfirmation,
+                    chainAsset = asset(),
+                )
+            }
             .filterResultSuccessNotNull()
     }
 
