@@ -270,8 +270,8 @@ private fun DigitalDollarCardDetailsPreview() {
                     CoinageUiState(
                         tokensState = CoinageUiState.TokensState(
                             totalBalance = TokenAmountModel.mock,
-                            spendableSecuredBalance = TokenAmountModel.mock,
-                            spendableDegradedBalance = TokenAmountModel.mock,
+                            spendableBalance = TokenAmountModel.mock,
+                            gainingPrivacyBalance = TokenAmountModel.mock,
                             pendingBalance = TokenAmountModel.mock,
                             coinList = persistentListOf(),
                             voucherList = persistentListOf()

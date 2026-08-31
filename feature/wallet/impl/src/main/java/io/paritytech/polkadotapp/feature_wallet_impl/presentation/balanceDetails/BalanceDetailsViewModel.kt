@@ -24,8 +24,6 @@ class BalanceDetailsViewModel @Inject constructor(
                     BalanceDetailsUiState(
                         totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(total)),
                         availableNow = tokenAmountMapper.mapFrom(asset.withAmount(availableNow)),
-                        availableNowSecured = tokenAmountMapper.mapFrom(asset.withAmount(availableNowSecured)),
-                        availableNowLowPrivacy = tokenAmountMapper.mapFrom(asset.withAmount(availableNowLowPrivacy)),
                         availableSoon = tokenAmountMapper.mapFrom(asset.withAmount(availableSoon)),
                     )
                 )

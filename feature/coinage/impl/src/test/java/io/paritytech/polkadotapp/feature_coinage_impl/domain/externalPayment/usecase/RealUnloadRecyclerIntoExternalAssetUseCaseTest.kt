@@ -352,7 +352,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
     )
 
     private fun voucherInRecycler(index: Int, recycler: Int = index) =
-        voucherOf(index, Location.InRecycler(RecyclerIndex(BigInteger.valueOf(recycler.toLong()))))
+        voucherOf(index, Location.InRecycler(RecyclerIndex(BigInteger.valueOf(recycler.toLong())), recyclerMembers = 767))
 
     private fun voucherOf(index: Int, location: Location) = RecyclerVoucher(
         ringVrfKeyIndex = index,
@@ -361,7 +361,6 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         location = location,
         allocatedAt = 0L,
         delayUnloadUntil = 0L,
-        ringHasEnoughRingMembersToWithdraw = true,
     )
 
     private companion object {

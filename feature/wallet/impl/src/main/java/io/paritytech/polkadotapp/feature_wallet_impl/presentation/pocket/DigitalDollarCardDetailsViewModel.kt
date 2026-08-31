@@ -47,8 +47,10 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
             CoinageUiState(
                 tokensState = CoinageUiState.TokensState(
                     totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.totalBalance)),
-                    spendableSecuredBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableSecuredBalance)),
-                    spendableDegradedBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableDegradedBalance)),
+                    spendableBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableBalance)),
+                    gainingPrivacyBalance = tokenAmountMapper.mapFrom(
+                        asset.withAmount(assetInfo.gainingPrivacyBalance)
+                    ),
                     pendingBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.pendingBalance)),
                     coinList = coins.toImmutableList(),
                     voucherList = vouchers.toImmutableList()

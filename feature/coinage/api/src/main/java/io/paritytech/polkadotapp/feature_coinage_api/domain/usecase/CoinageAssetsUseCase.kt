@@ -3,8 +3,6 @@ package io.paritytech.polkadotapp.feature_coinage_api.domain.usecase
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isAgeValidToSpend
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import kotlinx.coroutines.flow.Flow
 
@@ -27,12 +25,6 @@ interface CoinageAssetsUseCase {
     fun subscribeVouchers(): Flow<List<TrackedVoucher>>
 
     suspend fun getVouchers(): List<TrackedVoucher>
-
-    /** Coins an operation may spend right now — see [TrackedCoin.isSelectable]. */
-    suspend fun getSelectableCoins(): List<Coin>
-
-    /** Vouchers an operation may spend right now — see [TrackedVoucher.isSelectable]. */
-    suspend fun getSelectableVouchers(): List<RecyclerVoucher>
 }
 
 data class TrackedCoin(
@@ -46,13 +38,6 @@ data class TrackedVoucher(
 )
 
 /**
- * Free of any claim of ours and present on chain. Necessary but not sufficient: locked coins and recycler
- * onboarding are outer-layer concerns, and [recyclingAge] is what keeps a coin about to be recycled out.
- */
-fun TrackedCoin.isSelectable(recyclingAge: Int): Boolean =
-    state.isFree && coin.isOnChain && coin.isAgeValidToSpend(recyclableAge = recyclingAge)
-
-/**
  * Not on chain yet, but expected to arrive: the transaction minting it has not resolved.
  *
  * This is what keeps a freshly-split change coin visible instead of vanishing for a whole mortality window,
@@ -60,12 +45,6 @@ fun TrackedCoin.isSelectable(recyclingAge: Int): Boolean =
  */
 fun TrackedCoin.isMinting(): Boolean =
     state.isFree && !coin.isOnChain && state.minterStatus?.isLive == true
-
-/** On chain, unclaimed, and old enough that it may no longer be spent — it is due for recycling. */
-fun TrackedCoin.isAwaitingRecycling(recyclingAge: Int): Boolean =
-    state.isFree && coin.isOnChain && !coin.isAgeValidToSpend(recyclableAge = recyclingAge)
-
-fun TrackedVoucher.isSelectable(): Boolean = state.isFree && voucher.isInRecycler()
 
 /** Registered on chain and working its way into a ring: not usable yet, but it exists. */
 fun TrackedVoucher.isOnboarding(): Boolean =

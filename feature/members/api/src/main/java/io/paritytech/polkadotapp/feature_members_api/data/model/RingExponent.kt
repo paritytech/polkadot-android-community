@@ -4,10 +4,22 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchDomainSize
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class RingExponent {
-    R2e9,
-    R2e10,
-    R2e14
+enum class RingExponent(val exponent: Int) {
+    R2e9(9),
+    R2e10(10),
+    R2e14(14);
+
+    /**
+     * How many keys the ring can hold. Smaller than `2^exponent`: ring-VRF reserves the tail of the domain
+     * for PIOP padding, `4 + MODULUS_BIT_SIZE` of the Bandersnatch scalar field. So [R2e10], which recycler
+     * collections use, holds 767 members rather than 1024.
+     */
+    val ringCapacity: Int
+        get() = (1 shl exponent) - RING_PIOP_OVERHEAD
+
+    private companion object {
+        const val RING_PIOP_OVERHEAD = 257
+    }
 }
 
 fun RingExponent.toDomainSize(): BandersnatchDomainSize {

@@ -60,7 +60,6 @@ class RealVoucherAllocator @Inject constructor(
             recyclerValue = valueExponent,
             allocatedAt = System.currentTimeMillis(),
             delayUnloadUntil = unloadDelayStrategy.calculateDelayUnloadUntil(),
-            ringHasEnoughRingMembersToWithdraw = false
         )
     }
 }

@@ -18,8 +18,8 @@ data class CoinageUiState(
     @Immutable
     data class TokensState(
         val totalBalance: TokenAmountModel,
-        val spendableSecuredBalance: TokenAmountModel,
-        val spendableDegradedBalance: TokenAmountModel,
+        val spendableBalance: TokenAmountModel,
+        val gainingPrivacyBalance: TokenAmountModel,
         val pendingBalance: TokenAmountModel,
         val coinList: ImmutableList<Coin>,
         val voucherList: ImmutableList<RecyclerVoucher>

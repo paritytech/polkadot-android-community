@@ -13,7 +13,6 @@ class RealCoinageTestHelperUseCase @Inject constructor(
                 voucherRepository.save(
                     it.copy(
                         delayUnloadUntil = System.currentTimeMillis(),
-                        ringHasEnoughRingMembersToWithdraw = true
                     )
                 )
             }

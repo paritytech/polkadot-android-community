@@ -2,16 +2,26 @@ package io.paritytech.polkadotapp.feature_coinage_api.domain.model
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 
+/**
+ * What the user holds, split by whether they can spend it right now.
+ *
+ * The middle bucket is the interesting one: it is money the strategy is deliberately holding back, which
+ * some strategies will still let go of if the user says so. [pending] never will.
+ */
 data class CoinageBalance(
-    val spendableBalance: SpendableBalance,
-    val pendingBalance: Balance,
+    val spendable: Balance,
+    val gainingPrivacy: GainingPrivacyBalance,
+    /** On its way, or past the age the chain still accepts. Not spendable on any terms. */
+    val pending: Balance,
 ) {
-    data class SpendableBalance(
-        val degraded: Balance,
-        val secured: Balance
-    ) {
-        val total: Balance = degraded + secured
-    }
+    data class GainingPrivacyBalance(
+        val amount: Balance,
+        /**
+         * Whether the user may spend [amount] anyway once they have confirmed. The privacy it has earned so
+         * far is lost if they do, which is why it takes a confirmation instead of being part of [spendable].
+         */
+        val canSpendWithConfirmation: Boolean,
+    )
 
-    val totalBalance: Balance = spendableBalance.total + pendingBalance
+    val total: Balance = spendable + gainingPrivacy.amount + pending
 }

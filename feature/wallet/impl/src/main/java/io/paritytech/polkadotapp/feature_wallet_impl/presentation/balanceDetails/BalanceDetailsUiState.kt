@@ -7,7 +7,5 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 data class BalanceDetailsUiState(
     val totalBalance: TokenAmountModel,
     val availableNow: TokenAmountModel,
-    val availableNowSecured: TokenAmountModel,
-    val availableNowLowPrivacy: TokenAmountModel,
     val availableSoon: TokenAmountModel,
 )

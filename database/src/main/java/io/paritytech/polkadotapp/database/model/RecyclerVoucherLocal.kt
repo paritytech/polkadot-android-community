@@ -11,5 +11,5 @@ class RecyclerVoucherLocal(
     val locationRecyclerIndex: Int?,
     val allocatedAt: Long,
     val delayUnloadUntil: Long,
-    val ringHasEnoughRingMembersToWithdraw: Boolean,
+    val recyclerMembers: Int?,
 )

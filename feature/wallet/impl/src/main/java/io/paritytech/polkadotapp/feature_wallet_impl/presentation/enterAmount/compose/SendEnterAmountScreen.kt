@@ -23,7 +23,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
-import io.paritytech.polkadotapp.common.presentation.validation.compose.rememberValidationActionHandle
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.progress.LoadingScreenState
@@ -46,8 +45,6 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.co
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountInput
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountRecipient
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountToolbar
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmDegradedVouchersDecision
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmDegradedVouchersUserAction
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -69,30 +66,10 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
         }
     }
 
-    DegradedConfirmationHost(contract)
-
     BalanceDetailsBottomSheet(
         isVisible = isBalanceDetailsVisible,
         onDismissRequest = { isBalanceDetailsVisible = false },
     )
-}
-
-@Composable
-private fun DegradedConfirmationHost(contract: SendEnterAmountContract) {
-    val handle = contract.sendValidationMixin
-        .rememberValidationActionHandle<ConfirmDegradedVouchersUserAction, ConfirmDegradedVouchersDecision>()
-
-    val action = handle.payload
-
-    if (action != null) {
-        SendConfirmDegradedStateBottomSheet(
-            isVisible = handle.isVisible,
-            action = action,
-            onSendPrivatelyOnly = { handle.respond(ConfirmDegradedVouchersDecision.SendPrivatelyOnly) },
-            onSendWithDegraded = { handle.respond(ConfirmDegradedVouchersDecision.SendWithDegraded) },
-            onDismiss = { handle.respond(ConfirmDegradedVouchersDecision.Cancel) },
-        )
-    }
 }
 
 @Composable

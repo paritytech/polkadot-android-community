@@ -10,9 +10,10 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.Paym
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.usecase.ExternalUnloadStatus
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.usecase.UnloadRecyclerIntoExternalAssetUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinageAssetSelector
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.SpendScope
 import kotlinx.coroutines.flow.first
 import java.math.BigInteger
 
@@ -27,7 +28,7 @@ class OffboardVouchersPaymentState @AssistedInject constructor(
     @Assisted override val context: PaymentContext,
     @Assisted val selected: List<RingVrfIndex>,
     @Assisted val surplusPlanks: BigInteger,
-    private val coinageAssetsUseCase: CoinageAssetsUseCase,
+    private val assetSelector: CoinageAssetSelector,
     private val unloadIntoExternalAsset: UnloadRecyclerIntoExternalAssetUseCase,
     private val ensureVouchersFactory: EnsureVouchersPaymentState.Factory,
 ) : ExternalPaymentState {
@@ -48,7 +49,7 @@ class OffboardVouchersPaymentState @AssistedInject constructor(
     override suspend fun performTransition(): TransitionResult<ExternalPaymentState> = runTransition {
         // Selectable, not merely on chain: a voucher another operation of ours already holds would be
         // rejected at registration and take the whole unload down with it.
-        val selectableByIndex = coinageAssetsUseCase.getSelectableVouchers().associateBy { it.ringVrfKeyIndex }
+        val selectableByIndex = assetSelector.getSelectableVouchers(SpendScope.SPENDABLE).associateBy { it.ringVrfKeyIndex }
         val vouchers = selected.mapNotNull { selectableByIndex[it] }
 
         if (vouchers.size != selected.size) {

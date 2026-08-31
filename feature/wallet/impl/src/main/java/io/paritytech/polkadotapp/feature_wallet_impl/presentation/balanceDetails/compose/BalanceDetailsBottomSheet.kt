@@ -152,20 +152,6 @@ private fun RootPage(
                     onInfoClick = onAvailableNowInfo,
                 )
 
-                VerticalSpacer { small }
-
-                SubBalanceRow(
-                    label = stringResource(RCommon.string.balance_details_available_now_secured),
-                    amount = state?.availableNowSecured.formattedOrPlaceholder(),
-                )
-
-                VerticalSpacer { small }
-
-                SubBalanceRow(
-                    label = stringResource(RCommon.string.balance_details_available_now_low_privacy),
-                    amount = state?.availableNowLowPrivacy.formattedOrPlaceholder(),
-                )
-
                 VerticalSpacer { extraLarge }
 
                 BalanceRow(
@@ -351,8 +337,6 @@ private fun RootPagePreview() {
                     state = BalanceDetailsUiState(
                         totalBalance = TokenAmountModel.mock,
                         availableNow = TokenAmountModel.mock,
-                        availableNowSecured = TokenAmountModel.mock,
-                        availableNowLowPrivacy = TokenAmountModel.mock,
                         availableSoon = TokenAmountModel.mock,
                     ),
                     onAvailableNowInfo = {},

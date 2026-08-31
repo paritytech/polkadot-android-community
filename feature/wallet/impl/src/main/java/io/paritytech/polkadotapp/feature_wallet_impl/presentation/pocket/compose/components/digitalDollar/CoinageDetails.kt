@@ -37,7 +37,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUseSecured
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerMembersOrZero
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.tokenAmount
 import kotlinx.collections.immutable.ImmutableList
 import java.text.SimpleDateFormat
@@ -409,7 +409,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val isReady = voucher.isInRecycler()
-    val isReadySecured = voucher.isReadyToUseSecured(System.currentTimeMillis())
+    val ringMembers = voucher.recyclerMembersOrZero()
     val fullKey = voucher.ringVrfPublicKey.toString()
 
     PolkadotSurface(
@@ -431,16 +431,8 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                 )
                 FillerSpacer()
                 Column(horizontalAlignment = Alignment.End) {
-                    val statusText = if (isReady) {
-                        if (isReadySecured) {
-                            "Ready"
-                        } else {
-                            "Ready (Degraded)"
-                        }
-                    } else {
-                        "Not ready"
-                    }
-                    val statusColor = if (isReadySecured) PolkadotTheme.colors.fg.success else PolkadotTheme.colors.fg.tertiary
+                    val statusText = if (isReady) "In recycler ($ringMembers)" else "Not in recycler"
+                    val statusColor = if (isReady) PolkadotTheme.colors.fg.success else PolkadotTheme.colors.fg.tertiary
                     NovaText(
                         text = statusText,
                         color = statusColor
