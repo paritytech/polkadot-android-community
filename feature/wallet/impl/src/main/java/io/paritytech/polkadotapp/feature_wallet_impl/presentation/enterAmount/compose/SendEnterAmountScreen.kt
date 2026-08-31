@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
+import io.paritytech.polkadotapp.common.presentation.validation.compose.rememberValidationActionHandle
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.progress.LoadingScreenState
@@ -45,6 +46,8 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.co
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountInput
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountRecipient
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountToolbar
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmGainingPrivacySpendDecision
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmGainingPrivacySpendUserAction
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -70,6 +73,25 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
         isVisible = isBalanceDetailsVisible,
         onDismissRequest = { isBalanceDetailsVisible = false },
     )
+
+    GainingPrivacyConfirmationHost(contract)
+}
+
+@Composable
+private fun GainingPrivacyConfirmationHost(contract: SendEnterAmountContract) {
+    val handle = contract.sendValidationMixin
+        .rememberValidationActionHandle<ConfirmGainingPrivacySpendUserAction, ConfirmGainingPrivacySpendDecision>()
+
+    val action = handle.payload
+
+    if (action != null) {
+        SendConfirmGainingPrivacyBottomSheet(
+            isVisible = handle.isVisible,
+            action = action,
+            onSendAnyway = { handle.respond(ConfirmGainingPrivacySpendDecision.SendAnyway) },
+            onDismiss = { handle.respond(ConfirmGainingPrivacySpendDecision.Cancel) },
+        )
+    }
 }
 
 @Composable

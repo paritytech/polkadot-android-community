@@ -17,14 +17,13 @@
     <string name="balance_details_available_soon_info_title">What does \"Available soon\" mean?</string>
     <string name="balance_details_available_soon_info_body">These funds are still being prepared by the private payment system and cannot be sent yet.\n\nThey may include funds from recent payments that are still settling, or change that is being made ready for future private sends.\n\nThey will become available automatically once processing is complete.</string>
 
-    <string name="send_degraded_title">Some funds are less private</string>
-    <string name="send_degraded_can_send_privately">You can send %1$s privately.</string>
-    <string name="send_degraded_full_amount">To send %1$s, the remaining %2$s will use lower-privacy funds.</string>
-    <string name="send_degraded_why_link">Why is %1$s less private?</string>
-    <string name="send_degraded_send_privately_button">Send %1$s privately</string>
-    <string name="send_degraded_send_with_degraded_button">Send %1$s with less privacy</string>
-    <string name="send_degraded_why_title">About lower-privacy funds</string>
-    <string name="send_degraded_why_body">When your ring has insufficient members, part of the amount is sent using vouchers that reveal more information about the sender. Wait for your ring to grow to keep every transfer fully private.</string>
+    <string name="send_gaining_privacy_title">Some funds are still gaining privacy</string>
+    <string name="send_gaining_privacy_spendable">You can send %1$s right now.</string>
+    <string name="send_gaining_privacy_full_amount">To send %1$s, the remaining %2$s has to come from funds that are still gaining privacy.</string>
+    <string name="send_gaining_privacy_why_link">Why is %1$s still gaining privacy?</string>
+    <string name="send_gaining_privacy_send_anyway_button">Send %1$s anyway</string>
+    <string name="send_gaining_privacy_why_title">About funds gaining privacy</string>
+    <string name="send_gaining_privacy_why_body">Recycled funds hide among everyone else in their recycler, and the more of it fills up, the harder they are to trace back to you. Spending them before it fills gives up the privacy they have earned so far. Wait, and they become spendable on their own.</string>
 
     <string name="send_payment_failed">Failed to submit transaction</string>
     <string name="common_intent_failed">Failed to find application to perform specified action</string>

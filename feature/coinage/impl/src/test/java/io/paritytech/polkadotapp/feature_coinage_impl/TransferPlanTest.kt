@@ -172,16 +172,16 @@ class TransferPlannerTest {
     }
 
     @Test
-    fun `Secured vs degraded - prefers secured voucher when it alone can cover remainder`() = runBlocking {
+    fun `takes a single voucher when either one alone can cover the remainder`() = runBlocking {
         // 5.5 = 4 (coin exp=2) + 1.5 from vouchers. Either voucher alone (exp=1, =2) can cover.
         val coins = listOf(createCoin(exponent = 2))
-        val securedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE))
-        val degradedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO))
+        val first = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE))
+        val second = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO))
 
-        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(securedVoucher, degradedVoucher)).getOrThrow()
+        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(first, second)).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
-        assertEquals(listOf(securedVoucher), strategy.vouchersToUnload)
+        assertEquals(listOf(first), strategy.vouchersToUnload)
     }
 
     @Test(expected = InsufficientBalanceException::class)
