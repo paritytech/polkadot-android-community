@@ -22,6 +22,7 @@ env:
   TERMS_OF_USE_URL: ${{ vars.TERMS_OF_USE_URL }}
   CI_FIREBASE_GROUP: android-daily-tests
   CI_FIREBASE_GROUP_VANILLA: android-daily-tests-vanilla
+  CI_FIREBASE_GROUP_SAFETYNET: android-safetynet-testers
   # use it fot tests
   #CI_FIREBASE_GROUP: nightly-ci-test
   # comma-separated chat/room IDs for notifications
@@ -186,6 +187,16 @@ jobs:
           releaseNotes: ${{ steps.meta.outputs.release_notes_plain }}
           test-groups: ${{ env.CI_FIREBASE_GROUP_VANILLA }}
           upload-file: app/build/outputs/apk/vanilla/nightly/app-vanilla-nightly.apk
+
+      - name: Upload safetynet build to Firebase
+        if: steps.collect_prs.outputs.should_build == 'true'
+        uses: ./.github/actions/upload-to-firebase
+        with:
+          appId: ${{ secrets.ANDROID_FIREBASE_SAFETYNET_APP_ID }}
+          firebase-token: ${{ secrets.FIREBASE_GOOGLE_SERVICE_ACCOUNT }}
+          releaseNotes: ${{ steps.meta.outputs.release_notes_plain }}
+          test-groups: ${{ env.CI_FIREBASE_GROUP_SAFETYNET }}
+          upload-file: app/build/outputs/apk/gp/safetynet/app-gp-safetynet.apk
 
       - name: Upload to S3
         if: steps.collect_prs.outputs.should_build == 'true'

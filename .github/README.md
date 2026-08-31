@@ -33,7 +33,7 @@ not contain credentials.
 
 | Variable | Purpose |
 |----------|---------|
-| `APPLICATION_ID` | Base Android application ID. The build adds `.debug` or `.nightly` for those build types. It must match a client in `google-services.json`. |
+| `APPLICATION_ID` | Base Android application ID. The build adds `.debug`, `.nightly` or `.safetynet` for those build types. Every resulting id must match a client in `google-services.json`. |
 | `PRIVACY_POLICY_URL` | Privacy-policy destination shown by the application. |
 | `CURRENCY_SYMBOL` | Symbol of the in-app digital currency shown in the UI (card title, send/get actions). |
 | `TERMS_OF_USE_URL` | Terms-of-use destination shown by the application. |
@@ -171,6 +171,16 @@ for signing, Google/Firebase, Sentry, publishing, and local-build configuration.
 - **App ID:** `ANDROID_FIREBASE_RELEASE_APP_ID` (from secrets)
 - **Groups:** `dev-team`
 - **APK:** Release variant with release keystore
+
+### Nightly Builds
+Each build type carries its own `applicationIdSuffix`, so App Distribution treats it
+as a separate Firebase app and needs its own App ID secret.
+
+| Variant | App ID | Groups |
+|---------|--------|--------|
+| `gpNightly` | `ANDROID_FIREBASE_NIGHTLY_APP_ID` | `CI_FIREBASE_GROUP` |
+| `vanillaNightly` | `ANDROID_FIREBASE_NIGHTLY_APP_ID` (product flavors add no suffix) | `CI_FIREBASE_GROUP_VANILLA` |
+| `gpSafetynet` | `ANDROID_FIREBASE_SAFETYNET_APP_ID` | `CI_FIREBASE_GROUP_SAFETYNET` |
 
 ---
 
