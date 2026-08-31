@@ -1,11 +1,14 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.webView
 
 import android.net.Uri
+import android.os.Message
 import android.webkit.ConsoleMessage
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -13,6 +16,7 @@ import io.paritytech.polkadotapp.common.data.storage.file.FileProvider
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.openUri
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.getProductIdOrNull
@@ -31,6 +35,7 @@ class ProductWebChromeClient @AssistedInject constructor(
     @Assisted private val callingProductIdProvider: CallingProductIdProvider,
     @Assisted private val scope: CoroutineScope,
     @Assisted private val onTitleReceived: ((String) -> Unit)?,
+    @Assisted private val allowIframes: Boolean,
 ) : WebChromeClient() {
     @AssistedFactory
     interface Factory {
@@ -39,7 +44,29 @@ class ProductWebChromeClient @AssistedInject constructor(
             callingProductIdProvider: CallingProductIdProvider,
             scope: CoroutineScope,
             onTitleReceived: ((String) -> Unit)?,
+            allowIframes: Boolean,
         ): ProductWebChromeClient
+    }
+
+    // Funding providers (e.g. Meld) open as web2 window.open popups. The product WebView only serves
+    // .dot content, so those URLs would be refused here — hand them off to the system browser instead.
+    // The transport still needs a WebView, so a throwaway one captures the target URL, opens it
+    // externally, and is destroyed once it has handed off.
+    override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+        if (!allowIframes) return false
+
+        val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+        val popupView = WebView(view.context)
+        popupView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(popup: WebView, request: WebResourceRequest): Boolean {
+                contextManager.getActivity()?.openUri(request.url)
+                popup.post { popup.destroy() } // deferred so we don't destroy inside its own callback
+                return true
+            }
+        }
+        transport.webView = popupView
+        resultMsg.sendToTarget()
+        return true
     }
 
     override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {

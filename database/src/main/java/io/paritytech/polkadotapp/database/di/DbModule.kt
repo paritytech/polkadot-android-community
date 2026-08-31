@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.database.dao.FileUploadDao
 import io.paritytech.polkadotapp.database.dao.GamePlayersDao
 import io.paritytech.polkadotapp.database.dao.ProductDao
 import io.paritytech.polkadotapp.database.dao.ProductIntegrationDao
+import io.paritytech.polkadotapp.database.dao.ProductFundingOperationDao
 import io.paritytech.polkadotapp.database.dao.ProductPermissionGrantDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RemovedChatDao
@@ -149,6 +150,11 @@ class DbModule {
     @Provides
     @Singleton
     fun provideBrowserTabDao(appDatabase: AppDatabase): BrowserTabDao = appDatabase.browserTabDao()
+
+    @Provides
+    @Singleton
+    fun provideProductFundingOperationDao(appDatabase: AppDatabase): ProductFundingOperationDao =
+        appDatabase.productFundingOperationDao()
 
     @Provides
     @Singleton

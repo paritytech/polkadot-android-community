@@ -1,6 +1,6 @@
 import { createContainer } from '@novasamatech/host-container';
 import type { Provider, Subscription } from '@novasamatech/host-api';
-import { RequestCredentialsErr, CreateProofErr, GetAliasErr, SignVrfErr, RegisterRingVrfKeyErr, ListRingVrfKeysErr, RingVrfSignErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, toHex, fromHex } from '@novasamatech/host-api';
+import { RequestCredentialsErr, CreateProofErr, GetAliasErr, SignVrfErr, RegisterRingVrfKeyErr, ListRingVrfKeysErr, RingVrfSignErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, WorkerErr, toHex, fromHex } from '@novasamatech/host-api';
 import { createWsJsonRpcProvider } from '@novasamatech/host-substrate-chain-connection';
 
 type PausableJsonRpcProvider = ReturnType<typeof createWsJsonRpcProvider>;
@@ -1023,6 +1023,40 @@ container.handleLocalStorageClear((key, { ok, err }) => {
   return callNative('localStorageClear', { key }).then(
     () => ok(undefined),
     (e) => err(new StorageErr.Unknown({ reason: String(e) })),
+  );
+});
+
+container.handleLocalStorageSubscribe((key, send, _interrupt) => {
+  return subscribeNative(
+    'localStorageSubscribe',
+    { key },
+    (payload: { value: string | null }) => send(payload.value != null ? fromHex(payload.value) : undefined),
+  );
+});
+
+// --- Worker keep-alive operations (native-bridged) ---
+
+container.handleWorkerBeginOperation((params, { ok, err }) => {
+  return callNative('workerBeginOperation', { label: params.label }).then(
+    (result) => ok({ id: result.operationId }),
+    (e) => err(new WorkerErr.Unknown({ reason: String(e) })),
+  );
+});
+
+container.handleWorkerEndOperation((params, { ok, err }) => {
+  return callNative('workerEndOperation', { id: params.id }).then(
+    () => ok(undefined),
+    (e) => err(new WorkerErr.Unknown({ reason: String(e) })),
+  );
+});
+
+// --- Locale (native-bridged) ---
+
+container.handleLocaleSubscribe((_params, send, _interrupt) => {
+  return subscribeNative(
+    'localeSubscribe',
+    {},
+    (payload: { languageTag: string }) => send({ languageTag: payload.languageTag }),
   );
 });
 

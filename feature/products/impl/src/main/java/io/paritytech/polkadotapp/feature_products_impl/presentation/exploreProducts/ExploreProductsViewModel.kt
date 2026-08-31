@@ -81,7 +81,7 @@ class ExploreProductsViewModel @Inject constructor(
 
         val navigationPolicy = NavigationPolicy.CatalogNavigation(::onProductSelected, dotNsTldProvider)
 
-        val webViewProvider = browserWebViewProviderFactory.create(exploreUrl, navigationPolicy, viewModelScope)
+        val webViewProvider = browserWebViewProviderFactory.create(exploreUrl, navigationPolicy, allowIframes = false, viewModelScope)
         webViewProvider.addOnPageStartedListener { url ->
             dotNsTldProvider.currentTldOrNull()
                 ?.let { tld -> ProductId.fromUrl(url.toUri(), tld).getOrNull() }

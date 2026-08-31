@@ -45,6 +45,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
     dispatchers: CoroutineDispatchers,
     @Assisted private val initialUrl: String,
     @Assisted private val navigationPolicy: NavigationPolicy,
+    @Assisted private val allowIframes: Boolean,
     @Assisted private val scope: CoroutineScope,
 ) : WebViewProvider(dispatchers), PageLifecycleSource {
     @AssistedFactory
@@ -52,6 +53,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
         fun create(
             initialUrl: String,
             navigationPolicy: NavigationPolicy,
+            allowIframes: Boolean,
             scope: CoroutineScope
         ): BrowserWebViewProvider
     }
@@ -73,6 +75,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
         callingProductIdProvider = callingProductIdProvider,
         scope = scope,
         onTitleReceived = null,
+        allowIframes = allowIframes,
     )
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -89,6 +92,8 @@ class BrowserWebViewProvider @AssistedInject constructor(
                 domStorageEnabled = true
                 allowFileAccess = false
                 allowContentAccess = false
+                setSupportMultipleWindows(allowIframes)
+                javaScriptCanOpenWindowsAutomatically = allowIframes
             }
 
             val innerClient =

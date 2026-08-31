@@ -76,6 +76,7 @@ dependencies {
     implementation(project(":chains"))
     implementation(project(":feature:chats:api"))
     implementation(project(":feature:account:api"))
+    implementation(project(":feature:settings:api"))
     implementation(project(":feature:transaction-storage:api"))
     implementation(project(":feature:transactions:api"))
     implementation(project(":feature:statement-store:api"))

@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGro
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.ChatHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.EntropyHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.HostCallHandlerGroup
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.LocaleHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.NavigationHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.NotificationHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.PaymentHostCalls
@@ -20,7 +21,10 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGro
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.StorageHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.ThemeHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.UserIdHostCalls
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.handlerGroups.WorkerHostCalls
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.navigation.NavigationPolicy
+import io.paritytech.polkadotapp.feature_products_impl.domain.operation.ProductOperationService
+import io.paritytech.polkadotapp.feature_settings_api.domain.language.AppLanguageProvider
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +38,8 @@ import javax.inject.Singleton
 class HostCallGroupFactory @Inject constructor(
     private val productLocalStorage: ProductLocalStorage,
     private val dotNsTldProvider: DotNsTldProvider,
+    private val operationService: ProductOperationService,
+    private val appLanguageProvider: AppLanguageProvider,
 ) {
     /**
      * Shared handler groups used by ALL environments.
@@ -58,6 +64,8 @@ class HostCallGroupFactory @Inject constructor(
         UserIdHostCalls(botApi, productIdProvider),
         AllowanceHostCalls(botApi, productIdProvider),
         ThemeHostCalls(botApi),
+        WorkerHostCalls(operationService, productIdProvider),
+        LocaleHostCalls(appLanguageProvider),
     )
 
     /**

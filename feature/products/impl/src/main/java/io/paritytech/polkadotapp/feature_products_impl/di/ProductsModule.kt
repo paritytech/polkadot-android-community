@@ -6,6 +6,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
+import io.paritytech.polkadotapp.common.presentation.AppInitializer
 import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.common.utils.isEnabled
@@ -35,8 +36,17 @@ import io.paritytech.polkadotapp.feature_products_impl.data.scheduledNotificatio
 import io.paritytech.polkadotapp.feature_products_impl.data.scheduledNotification.ScheduledProductNotificationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.AssetContainerScriptProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ContainerScriptProvider
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductFundingOperationRepository
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealProductFundingOperationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ProductLocalStorage
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.RealProductLocalStorage
+import io.paritytech.polkadotapp.feature_products_impl.domain.operation.ProductOperationService
+import io.paritytech.polkadotapp.feature_products_impl.domain.operation.RealProductOperationService
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorkerRefCounter
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.RealProductWorkerRefCounter
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.RealWorkerBootFactory
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.WorkerBootFactory
+import io.paritytech.polkadotapp.feature_products_impl.presentation.initialization.ProductWorkerInitializer
 import io.paritytech.polkadotapp.feature_products_impl.domain.ProductAccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.RealProductRequestAccountResolver
 import io.paritytech.polkadotapp.feature_products_impl.domain.accountsProtocol.RealAccountsProtocol
@@ -144,6 +154,24 @@ internal interface ProductsModule {
 
     @Binds
     fun bindProductLocalStorage(impl: RealProductLocalStorage): ProductLocalStorage
+
+    @Binds
+    @Singleton
+    fun bindProductWorkerRefCounter(impl: RealProductWorkerRefCounter): ProductWorkerRefCounter
+
+    @Binds
+    fun bindWorkerBootFactory(impl: RealWorkerBootFactory): WorkerBootFactory
+
+    @Binds
+    @Singleton
+    fun bindProductOperationService(impl: RealProductOperationService): ProductOperationService
+
+    @Binds
+    fun bindProductFundingOperationRepository(impl: RealProductFundingOperationRepository): ProductFundingOperationRepository
+
+    @Binds
+    @IntoSet
+    fun bindProductWorkerInitializer(impl: ProductWorkerInitializer): AppInitializer
 
     @Binds
     fun bindProductAccountOrigins(impl: RealProductAccountOrigins): ProductAccountOrigins

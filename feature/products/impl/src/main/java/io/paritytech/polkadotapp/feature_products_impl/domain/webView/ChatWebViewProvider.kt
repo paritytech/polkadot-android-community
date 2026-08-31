@@ -52,6 +52,7 @@ class ChatWebViewProvider @AssistedInject constructor(
         callingProductIdProvider = callingProductIdProvider,
         scope = scope,
         onTitleReceived = null,
+        allowIframes = false,
     )
 
     @SuppressLint("SetJavaScriptEnabled")

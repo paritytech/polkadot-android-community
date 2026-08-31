@@ -14,7 +14,7 @@ import io.paritytech.polkadotapp.feature_products_api.model.JsWidget
 import io.paritytech.polkadotapp.feature_products_api.model.Product
 import io.paritytech.polkadotapp.feature_products_api.model.toChatExtensionId
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.message.ProductsMessageContent
-import io.paritytech.polkadotapp.feature_products_impl.domain.scriptExecutor.ProductsScriptExecutor
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.onEach
 class ProductsMessageViewModel @AssistedInject constructor(
     @Assisted private val content: ProductsMessageContent,
     @Assisted private val messageId: ChatMessageId,
-    @Assisted private val scriptExecutor: ProductsScriptExecutor,
+    @Assisted private val worker: ProductWorker,
     @Assisted private val product: Product,
 ) : BaseViewModel() {
     private val chatId = ChatId.fromChatBotId(product.id.toChatExtensionId())
@@ -45,11 +45,11 @@ class ProductsMessageViewModel @AssistedInject constructor(
 
     fun handleUiEvent(actionId: String, eventType: JsUiEvent.Type) {
         val event = JsUiEvent(messageId, chatId, actionId, eventType)
-        scriptExecutor.dispatchEvent(event)
+        worker.dispatchEvent(event)
     }
 
     private fun loadWidget() {
-        scriptExecutor.renderMessage(messageId, content.messageType, content.data)
+        worker.renderMessage(messageId, content.messageType, content.data)
             .onEach { result -> handleRenderUpdate(result) }
             .launchIn(this)
     }
@@ -71,7 +71,7 @@ class ProductsMessageViewModel @AssistedInject constructor(
             content: ProductsMessageContent,
             messageId: ChatMessageId,
             product: Product,
-            scriptExecutor: ProductsScriptExecutor,
+            worker: ProductWorker,
         ): ProductsMessageViewModel
     }
 }

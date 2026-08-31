@@ -58,6 +58,7 @@ class RealSpaHost @Inject constructor(
         webViewProvider = browserWebViewProviderFactory.create(
             initialUrl = initialUrl,
             navigationPolicy = webViewNavigation,
+            allowIframes = true,
             scope = scope
         )
 

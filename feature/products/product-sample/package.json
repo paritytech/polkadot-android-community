@@ -13,10 +13,10 @@
     "postinstall": "npx papi"
   },
   "dependencies": {
-    "@novasamatech/host-api": "0.9.4",
-    "@novasamatech/host-api-wrapper": "0.9.4",
-    "@novasamatech/product-react-renderer": "0.9.4",
-    "@novasamatech/scale": "0.9.4",
+    "@novasamatech/host-api": "0.10.1",
+    "@novasamatech/host-api-wrapper": "0.10.1",
+    "@novasamatech/product-react-renderer": "0.10.1",
+    "@novasamatech/scale": "0.10.1",
     "@polkadot-api/descriptors": "file:.papi/descriptors",
     "@polkadot-api/json-rpc-provider": "^0.2.0",
     "@polkadot-api/pjs-signer": "^0.6.19",
