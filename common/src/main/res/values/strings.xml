@@ -367,7 +367,6 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pick_username_state_invalid">Try another.</string>
     <string name="pick_username_state_available">It\'s yours!</string>
     <string name="pick_username_digits_taken">Digits taken. Try again.</string>
-    <string name="pick_username_account_already_created">An account has already been created on this device. You can’t create another one on the same device.</string>
     <string name="pick_username_just_claimed_new_digit">This username was just claimed. We picked a new number for you.</string>
     <string name="pick_username_just_claimed_taken">This username was just claimed. Try another.</string>
 

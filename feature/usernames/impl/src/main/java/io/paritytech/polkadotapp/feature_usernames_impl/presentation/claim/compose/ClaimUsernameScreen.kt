@@ -248,7 +248,7 @@ private fun PickUsernameScreenInternal(
                 onDigitsChanged = onDigitsChanged,
                 status = claimFieldStatus(fieldState, digitsFieldState),
                 digitsFieldState = digitsFieldState,
-                isEnabled = isClaimingInProgress.not() && fieldState !is ClaimUsernameFieldState.AlreadyCreated
+                isEnabled = isClaimingInProgress.not()
             )
 
             FillerSpacer()
@@ -395,11 +395,6 @@ private fun claimFieldStatus(
         ClaimUsernameFieldState.Invalid -> UsernameFieldStatus(
             style = UsernameFieldStyle.Error,
             text = stringResource(RCommon.string.pick_username_state_invalid),
-        )
-
-        ClaimUsernameFieldState.AlreadyCreated -> UsernameFieldStatus(
-            style = UsernameFieldStyle.Error,
-            text = stringResource(RCommon.string.pick_username_account_already_created),
         )
 
         ClaimUsernameFieldState.Available -> UsernameFieldStatus(
