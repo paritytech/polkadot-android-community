@@ -2,6 +2,7 @@
 
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.balanceDetails.compose
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,69 +73,99 @@ private fun BalanceDetailsContent(state: BalanceDetailsUiState?) {
 
         VerticalSpacer { mediumIncreased }
 
-        PolkadotSurface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = PolkadotTheme.shapes.large,
-            color = PolkadotTheme.colors.bg.surface.nested,
-        ) {
-            Column(
-                modifier = Modifier.padding(all = PolkadotTheme.spacings.large),
+        val rows = balanceRows(state)
+
+        if (rows.isNotEmpty()) {
+            PolkadotSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = PolkadotTheme.shapes.large,
+                color = PolkadotTheme.colors.bg.surface.nested,
             ) {
-                BalanceRow(
-                    label = stringResource(RCommon.string.balance_details_available_private),
-                    subLabel = stringResource(RCommon.string.balance_details_available_private_description),
-                    amount = state?.availablePrivate.formattedOrPlaceholder(),
-                )
+                Column(
+                    modifier = Modifier.padding(all = PolkadotTheme.spacings.large),
+                ) {
+                    rows.forEachIndexed { index, row ->
+                        if (index > 0) VerticalSpacer { extraLarge }
 
-                VerticalSpacer { extraLarge }
-
-                // Exposed funds are spendable in principle; whether they are spendable *here* is the chosen
-                // strategy's call, and the label has to say which of the two the user is looking at.
-                val exposedSpendable = state?.canSpendExposed != false
-
-                BalanceRow(
-                    label = stringResource(
-                        if (exposedSpendable) {
-                            RCommon.string.balance_details_available_exposed
-                        } else {
-                            RCommon.string.balance_details_exposed_unavailable
-                        }
-                    ),
-                    subLabel = stringResource(
-                        if (exposedSpendable) {
-                            RCommon.string.balance_details_available_exposed_description
-                        } else {
-                            RCommon.string.balance_details_exposed_unavailable_description
-                        }
-                    ),
-                    amount = state?.exposed.formattedOrPlaceholder(),
-                )
-
-                VerticalSpacer { extraLarge }
-
-                BalanceRow(
-                    label = stringResource(RCommon.string.balance_details_not_available),
-                    subLabel = stringResource(RCommon.string.balance_details_not_available_description),
-                    amount = state?.notAvailable.formattedOrPlaceholder(),
-                )
+                        BalanceRow(row)
+                    }
+                }
             }
         }
     }
 }
 
+private class BalanceRowModel(
+    val label: String,
+    val subLabel: String,
+    val amount: String,
+)
+
 @Composable
-private fun BalanceRow(
-    label: String,
-    subLabel: String,
-    amount: String,
-) {
+private fun balanceRows(state: BalanceDetailsUiState?): List<BalanceRowModel> {
+    // Nothing is known to be empty until the balance arrives, so every row shows as a placeholder rather
+    // than appearing one by one as the numbers land.
+    val loading = state == null
+
+    // Exposed funds are spendable in principle; whether they are spendable *here* is the chosen strategy's
+    // call, and the label has to say which of the two the user is looking at.
+    val exposedSpendable = state?.canSpendExposed != false
+
+    return listOfNotNull(
+        balanceRowOrNull(
+            amount = state?.availablePrivate,
+            loading = loading,
+            label = RCommon.string.balance_details_available_private,
+            subLabel = RCommon.string.balance_details_available_private_description,
+        ),
+        balanceRowOrNull(
+            amount = state?.exposed,
+            loading = loading,
+            label = if (exposedSpendable) {
+                RCommon.string.balance_details_available_exposed
+            } else {
+                RCommon.string.balance_details_exposed_unavailable
+            },
+            subLabel = if (exposedSpendable) {
+                RCommon.string.balance_details_available_exposed_description
+            } else {
+                RCommon.string.balance_details_exposed_unavailable_description
+            },
+        ),
+        balanceRowOrNull(
+            amount = state?.notAvailable,
+            loading = loading,
+            label = RCommon.string.balance_details_not_available,
+            subLabel = RCommon.string.balance_details_not_available_description,
+        ),
+    )
+}
+
+@Composable
+private fun balanceRowOrNull(
+    amount: TokenAmountModel?,
+    loading: Boolean,
+    @StringRes label: Int,
+    @StringRes subLabel: Int,
+): BalanceRowModel? = when {
+    amount == null && !loading -> null
+
+    else -> BalanceRowModel(
+        label = stringResource(label),
+        subLabel = stringResource(subLabel),
+        amount = amount.formattedOrPlaceholder(),
+    )
+}
+
+@Composable
+private fun BalanceRow(row: BalanceRowModel) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             NovaText(
-                text = label,
+                text = row.label,
                 style = PolkadotTheme.typography.title.small,
                 color = PolkadotTheme.colors.fg.primary,
             )
@@ -142,7 +173,7 @@ private fun BalanceRow(
             VerticalSpacer { tiny }
 
             NovaText(
-                text = subLabel,
+                text = row.subLabel,
                 style = PolkadotTheme.typography.body.medium,
                 color = PolkadotTheme.colors.fg.secondary,
             )
@@ -150,7 +181,7 @@ private fun BalanceRow(
 
         NovaText(
             modifier = Modifier.padding(start = PolkadotTheme.spacings.medium),
-            text = amount,
+            text = row.amount,
             style = PolkadotTheme.typography.title.small,
             color = PolkadotTheme.colors.fg.primary,
         )
@@ -166,41 +197,59 @@ private fun TokenAmountModel?.formattedOrPlaceholder(): String {
 
 @Preview
 @Composable
-private fun BalanceDetailsPreview() {
-    PolkadotTheme {
-        CompositionLocalProvider(
-            LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
-        ) {
-            NovaBottomSheetSurface {
-                BalanceDetailsContent(
-                    BalanceDetailsUiState(
-                        availablePrivate = TokenAmountModel.mock(300),
-                        exposed = TokenAmountModel.mock(150),
-                        canSpendExposed = true,
-                        notAvailable = TokenAmountModel.mock(0),
-                    )
-                )
-            }
-        }
-    }
+private fun BalanceDetailsEveryBucketPreview() {
+    BalanceDetailsPreview(
+        BalanceDetailsUiState(
+            availablePrivate = TokenAmountModel.mock(300),
+            exposed = TokenAmountModel.mock(150),
+            canSpendExposed = true,
+            notAvailable = TokenAmountModel.mock(40),
+        )
+    )
+}
+
+/** Nothing is settling, so that row is absent rather than showing a zero. */
+@Preview
+@Composable
+private fun BalanceDetailsNothingUnavailablePreview() {
+    BalanceDetailsPreview(
+        BalanceDetailsUiState(
+            availablePrivate = TokenAmountModel.mock(300),
+            exposed = TokenAmountModel.mock(150),
+            canSpendExposed = true,
+            notAvailable = null,
+        )
+    )
+}
+
+/** Maximum privacy will not part with what it is holding, so the exposed row says so and stands alone. */
+@Preview
+@Composable
+private fun BalanceDetailsExposedUnavailablePreview() {
+    BalanceDetailsPreview(
+        BalanceDetailsUiState(
+            availablePrivate = null,
+            exposed = TokenAmountModel.mock(150),
+            canSpendExposed = false,
+            notAvailable = null,
+        )
+    )
 }
 
 @Preview
 @Composable
-private fun BalanceDetailsExposedUnavailablePreview() {
+private fun BalanceDetailsLoadingPreview() {
+    BalanceDetailsPreview(state = null)
+}
+
+@Composable
+private fun BalanceDetailsPreview(state: BalanceDetailsUiState?) {
     PolkadotTheme {
         CompositionLocalProvider(
             LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
         ) {
             NovaBottomSheetSurface {
-                BalanceDetailsContent(
-                    BalanceDetailsUiState(
-                        availablePrivate = TokenAmountModel.mock(300),
-                        exposed = TokenAmountModel.mock(150),
-                        canSpendExposed = false,
-                        notAvailable = TokenAmountModel.mock(0),
-                    )
-                )
+                BalanceDetailsContent(state)
             }
         }
     }

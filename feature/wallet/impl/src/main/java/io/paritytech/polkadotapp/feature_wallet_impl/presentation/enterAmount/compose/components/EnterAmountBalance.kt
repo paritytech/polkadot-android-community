@@ -36,15 +36,25 @@ internal fun EnterAmountBalance(
             color = PolkadotTheme.colors.fg.primary
         )
 
-        HorizontalSpacer { tiny }
+        if (gainingPrivacy != null) {
+            HorizontalSpacer { tiny }
 
-        NovaText(
-            text = stringResource(RCommon.string.send_enter_amount_your_balance_label),
-            style = PolkadotTheme.typography.body.large,
-            color = PolkadotTheme.colors.fg.secondary,
-        )
+            NovaText(
+                text = stringResource(RCommon.string.send_enter_amount_gaining_privacy_extra, gainingPrivacy),
+                style = PolkadotTheme.typography.body.large,
+                color = PolkadotTheme.colors.fg.tertiary,
+            )
 
-        HorizontalSpacer { tiny }
+            HorizontalSpacer { tiny }
+
+            NovaIcon(
+                modifier = Modifier.size(16.dp),
+                imageVector = NovaIcons.VisibilityOffOutlined,
+                tint = PolkadotTheme.colors.fg.tertiary,
+            )
+        }
+
+        HorizontalSpacer { small }
 
         NovaIcon(
             modifier = Modifier
@@ -53,24 +63,6 @@ internal fun EnterAmountBalance(
             imageVector = NovaIcons.Info,
             tint = PolkadotTheme.colors.fg.secondary,
         )
-
-        if (gainingPrivacy != null) {
-            HorizontalSpacer { small }
-
-            NovaText(
-                text = stringResource(RCommon.string.send_enter_amount_gaining_privacy_extra, gainingPrivacy),
-                style = PolkadotTheme.typography.body.large,
-                color = PolkadotTheme.colors.fg.secondary,
-            )
-
-            HorizontalSpacer { tiny }
-
-            NovaIcon(
-                modifier = Modifier.size(16.dp),
-                imageVector = NovaIcons.VisibilityOffOutlined,
-                tint = PolkadotTheme.colors.fg.secondary,
-            )
-        }
     }
 }
 
@@ -88,7 +80,7 @@ private fun EnterAmountBalancePreview() {
 
 @Preview
 @Composable
-private fun EnterAmountBalanceNothingHeldBackPreview() {
+private fun EnterAmountBalanceNothingExposedPreview() {
     PolkadotTheme {
         EnterAmountBalance(
             amount = "$300",
