@@ -222,7 +222,7 @@ private fun ColumnScope.Coinage(
                 ) {
                     CoinageCardContent(
                         state = state,
-                            onAutoFundClick = onAutoFundClick,
+                        onAutoFundClick = onAutoFundClick,
                         makeAllVouchersReady = makeAllVouchersReady,
                         onShareLogsClick = onShareLogsClick,
                         onForceRecycleClick = onForceRecycleClick

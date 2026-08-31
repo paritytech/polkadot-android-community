@@ -30,6 +30,7 @@ android {
     buildTypes {
         getByName("release") {
             initWith(getByName("release"))
+            buildConfigField("boolean", "SAFETY_MODE", "true")
             buildConfigField("String", "TESTNET_ENVIRONMENT", "\"PRODUCTION\"")
             buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
             buildConfigField("boolean", "DIM1_ENABLED", "false")

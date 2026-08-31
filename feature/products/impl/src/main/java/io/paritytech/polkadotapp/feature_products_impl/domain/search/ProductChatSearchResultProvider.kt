@@ -1,5 +1,7 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.search
 
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatExtensionId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.search.ChatListSearchResult
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
@@ -15,8 +17,10 @@ class ProductChatSearchResultProvider @Inject constructor(
 ) : ChatSearchResultProvider {
     override val id: ChatExtensionId = PRODUCT_SEARCH_PROVIDER_ID
 
-    override suspend fun search(query: String): Result<List<ChatListSearchResult.App>> =
-        runCatching {
+    override suspend fun search(query: String): Result<List<ChatListSearchResult.App>> {
+        if (FeatureOption.ARBITRARY_PRODUCTS.isDisabled) return Result.success(emptyList())
+
+        return runCatching {
             productRepository.observeProducts()
                 .first()
                 .filter { it.name.contains(query, ignoreCase = true) }
@@ -28,6 +32,7 @@ class ProductChatSearchResultProvider @Inject constructor(
                     )
                 }
         }
+    }
 
     override suspend fun onAppResultSelected(result: ChatListSearchResult.App) {
         productsRouter.openSpaBrowser(SpaBrowserPayload.ByProductId(result.id))

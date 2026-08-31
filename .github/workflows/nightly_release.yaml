@@ -11,6 +11,7 @@ on:
 
 env:
   APPLICATION_ID: ${{ vars.APPLICATION_ID }}
+  CURRENCY_SYMBOL: ${{ vars.CURRENCY_SYMBOL }}
   GAME_RESULTS_FALLBACK_URL: ${{ vars.GAME_RESULTS_FALLBACK_URL }}
   LOG_COLLECTION_EMAIL: ${{ vars.LOG_COLLECTION_EMAIL }}
   PRIVACY_POLICY_URL: ${{ vars.PRIVACY_POLICY_URL }}
@@ -121,6 +122,20 @@ jobs:
           W3S_AUTH_KEY: ${{ secrets.W3S_AUTH_KEY }}
         run: ./gradlew assembleVanillaNightly --no-daemon --stacktrace
 
+      - name: Build safetynet APK
+        if: steps.collect_prs.outputs.should_build == 'true'
+        env:
+          CI_KEYSTORE_KEY_ALIAS: ${{ secrets.CI_KEYSTORE_KEY_ALIAS }}
+          CI_KEYSTORE_KEY_PASS: ${{ secrets.CI_KEYSTORE_KEY_PASS }}
+          CI_KEYSTORE_PASS: ${{ secrets.CI_KEYSTORE_PASS }}
+          FIRESTORE_DATABASE_ID: ${{ secrets.FIRESTORE_DATABASE_ID }}
+          GOOGLE_OAUTH_ID: ${{ secrets.GOOGLE_OAUTH_ID }}
+          GOOGLE_PROJECT_ID: ${{ secrets.GOOGLE_PROJECT_ID }}
+          NIGHTLY_FUNDING_MNEMONIC: ${{ secrets.NIGHTLY_FUNDING_MNEMONIC }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          W3S_AUTH_KEY: ${{ secrets.W3S_AUTH_KEY }}
+        run: ./gradlew assembleGpSafetynet --no-daemon --stacktrace
+
       - name: Build debug APK
         if: steps.collect_prs.outputs.should_build == 'true'
         env:
@@ -213,6 +228,7 @@ jobs:
           APK_PATH="app/build/outputs/apk/gp/nightly/app-gp-nightly.apk"
           PREVIEW_APK_PATH="app/build/outputs/apk/gp/debug/app-preview.apk"
           VANILLA_APK_PATH="app/build/outputs/apk/vanilla/nightly/app-vanilla-nightly.apk"
+          SAFETYNET_APK_PATH="app/build/outputs/apk/gp/safetynet/app-gp-safetynet.apk"
           mv app/build/outputs/apk/gp/debug/app-gp-debug.apk "$PREVIEW_APK_PATH"
           RELEASE_NOTES="Nightly ${RELEASE_DATE} (version ${APP_VERSION_NAME} code ${APP_VERSION_CODE})
 
@@ -233,7 +249,8 @@ jobs:
             --target "${{ github.sha }}" \
             "$APK_PATH" \
             "$PREVIEW_APK_PATH" \
-            "$VANILLA_APK_PATH"
+            "$VANILLA_APK_PATH" \
+            "$SAFETYNET_APK_PATH"
 
       - name: Send release notification
         if: steps.collect_prs.outputs.should_build == 'true'

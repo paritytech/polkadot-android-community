@@ -10,10 +10,10 @@ object FeatureFlags {
             FeatureOption.SHOW_MOB_RULE_CASE_FOR_DEVELOPMENT,
             FeatureOption.SHORT_WORKER_BACKOFF,
             FeatureOption.LOW_BATTERY_EVIDENCE_PROVISION,
-            FeatureOption.SKIP_MOBRULE_CASE -> BuildConfig.DEBUG
+            FeatureOption.SKIP_MOBRULE_CASE,
+            FeatureOption.DEBUG_MENU -> BuildConfig.DEBUG
 
-            FeatureOption.DEBUG_MENU -> BuildConfig.DEBUG && fullFeatured
-
+            FeatureOption.ARBITRARY_PRODUCTS,
             FeatureOption.BROWSE_TAB,
             FeatureOption.CHAT_EXTENSIONS,
             FeatureOption.LINKED_DEVICES,
@@ -46,7 +46,8 @@ enum class FeatureOption {
     LINKED_DEVICES,
     PRODUCT_SETTINGS,
     PERSONHOOD,
-    COLLECTIBLES
+    COLLECTIBLES,
+    ARBITRARY_PRODUCTS
 }
 
 val FeatureOption.isEnabled
