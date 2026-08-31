@@ -36,7 +36,7 @@ class RealClaimDeviceEvidenceProvider @Inject constructor(
         }
     }
 
-    // The token handshake spent its own challenge; the evidence needs a fresh one.
+    // Claim evidence needs its own challenge.
     private suspend fun fetchClaimChallenge(): Result<ByteArray> {
         return runCancellableCatching { integrityApi.fetchChallenge().challenge }
             .flatMap { it.decodeBase64toByteArray() }

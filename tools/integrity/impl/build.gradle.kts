@@ -9,9 +9,6 @@ android {
     namespace = "io.paritytech.polkadotapp.tools_integrity_impl"
     val localProperties = gradleLocalProperties(rootDir, providers)
 
-    // Unit tests throw android.media DRM exceptions, which are android.jar stubs.
-    testOptions.unitTests.isReturnDefaultValues = true
-
     flavorDimensions += "distribution"
 
     productFlavors {

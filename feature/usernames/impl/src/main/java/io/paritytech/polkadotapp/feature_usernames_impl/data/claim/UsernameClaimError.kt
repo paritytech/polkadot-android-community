@@ -21,7 +21,7 @@ fun mapClaimUsernameError(throwable: Throwable): Throwable = when {
 private const val HTTP_FORBIDDEN = 403
 private const val DEVICE_EVIDENCE_INVALID = "DEVICE_EVIDENCE_INVALID"
 
-// Consumes the error body, so call at most once per HttpException instance.
+// Reading consumes the error body.
 fun Throwable.isDeviceEvidenceInvalid(gson: Gson): Boolean {
     if (this !is HttpException || code() != HTTP_FORBIDDEN) return false
     val body = runCatching { response()?.errorBody()?.string() }.getOrNull() ?: return false

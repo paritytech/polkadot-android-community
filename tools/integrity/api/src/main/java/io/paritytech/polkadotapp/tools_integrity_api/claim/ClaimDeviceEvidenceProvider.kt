@@ -2,13 +2,7 @@ package io.paritytech.polkadotapp.tools_integrity_api.claim
 
 interface ClaimDeviceEvidenceProvider {
 
-    /**
-     * Collects fresh Widevine device evidence for one username claim
-     * (evidence wire spec `dub/poud/android/v1`). Success with `null` means
-     * this device does not attest (emulator, or Widevine L1 not measured);
-     * failure means the claim must be aborted so it stays retryable —
-     * evidence is never fabricated.
-     */
+    /** Collects fresh evidence. `null` means not applicable; failure aborts the claim. */
     suspend fun collectEvidence(): Result<ClaimDeviceEvidence?>
 }
 

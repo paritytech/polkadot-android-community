@@ -10,7 +10,7 @@ class ClaimEvidenceDigestsTest {
     private val candidate = ByteArray(32) { 0x22 }
     private val rawWidevineId = ByteArray(16) { 0x33 }
 
-    // Frozen derivations: moving these bytes is a wire break, not a refactor.
+    // Wire-contract golden values.
     @Test
     fun `device id matches the golden bytes`() {
         assertEquals(

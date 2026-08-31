@@ -72,8 +72,7 @@ class RealUsernameRepository @Inject constructor(
     }
 
     override suspend fun claimUsername(params: ClaimUsernameParams): Result<UsernameClaimResult> {
-        // Evidence is fresh per attempt (single-use challenge); after two
-        // DEVICE_EVIDENCE_INVALID the backend decides via an evidence-less claim.
+        // Retry once with fresh evidence, then let the backend decide without it.
         return submitClaimWithEvidence(params)
             .flatRecover { error ->
                 if (error.isDeviceEvidenceInvalid(gson)) retryClaim(params) else Result.failure(error)
@@ -92,8 +91,13 @@ class RealUsernameRepository @Inject constructor(
     }
 
     private suspend fun submitClaimWithEvidence(params: ClaimUsernameParams): Result<UsernameClaimResult> {
-        return claimDeviceEvidenceProvider.collectEvidence()
-            .flatMap { evidence -> submitClaim(params, evidence) }
+        return claimDeviceEvidenceProvider.collectEvidence().fold(
+            onSuccess = { evidence -> submitClaim(params, evidence) },
+            onFailure = {
+                // Never downgrade a local failure to an evidence-less free claim.
+                Result.success(UsernameClaimResult.PaymentRequired)
+            }
+        )
     }
 
     private suspend fun submitClaim(
