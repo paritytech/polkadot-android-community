@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.tools_integrity_impl.data.claim
 
-import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import io.paritytech.polkadotapp.common.data.keypair.ClientKeypairStore
@@ -8,12 +7,14 @@ import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.base64NoWrap
 import io.paritytech.polkadotapp.common.utils.decodeBase64toByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flatRecover
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidence
 import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidenceProvider
 import io.paritytech.polkadotapp.tools_integrity_impl.data.api.IntegrityApi
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.spec.ECGenParameterSpec
@@ -27,13 +28,17 @@ class RealClaimDeviceEvidenceProvider @Inject constructor(
 ) : ClaimDeviceEvidenceProvider {
 
     override suspend fun collectEvidence(): Result<ClaimDeviceEvidence?> = withContext(coroutineDispatchers.io) {
-        if (isEmulator()) {
-            Result.success(null)
-        } else {
-            fetchClaimChallenge()
-                .mapCatching { challenge -> buildEvidence(challenge) }
-                .logFailure("Failed to collect claim device evidence")
-        }
+        fetchClaimChallenge()
+            .mapCatching { challenge -> buildEvidence(challenge) }
+            .flatRecover { error ->
+                if (error is WidevineUnavailableException) {
+                    Timber.w(error, "Widevine evidence unavailable")
+                    Result.success(null)
+                } else {
+                    Result.failure(error)
+                }
+            }
+            .logFailure("Failed to collect claim device evidence")
     }
 
     // Claim evidence needs its own challenge.
@@ -112,14 +117,6 @@ class RealClaimDeviceEvidenceProvider @Inject constructor(
             generateKeyPair()
         }
     }
-
-    private fun isEmulator(): Boolean =
-        Build.FINGERPRINT == "robolectric" ||
-            Build.FINGERPRINT.startsWith("generic") ||
-            Build.FINGERPRINT.contains("emulator", ignoreCase = true) ||
-            Build.HARDWARE.contains("goldfish") ||
-            Build.HARDWARE.contains("ranchu") ||
-            Build.PRODUCT.contains("sdk_gphone")
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"

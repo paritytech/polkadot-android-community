@@ -90,12 +90,13 @@ class RealUsernameRepositoryTest {
     }
 
     @Test
-    fun `evidence collection failure uses unavailable outcome without a request`() = runTest {
-        whenever(evidenceProvider.collectEvidence()).thenReturn(Result.failure(IllegalStateException("drm busy")))
+    fun `non-Widevine evidence failure propagates without a request`() = runTest {
+        val error = IllegalStateException("challenge unavailable")
+        whenever(evidenceProvider.collectEvidence()).thenReturn(Result.failure(error))
 
         val result = repository.claimUsername(params)
 
-        assertEquals(UsernameClaimResult.PaymentRequired, result.getOrNull())
+        assertEquals(error, result.exceptionOrNull())
         verify(api, never()).claimUsername(any())
     }
 

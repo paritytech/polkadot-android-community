@@ -91,13 +91,8 @@ class RealUsernameRepository @Inject constructor(
     }
 
     private suspend fun submitClaimWithEvidence(params: ClaimUsernameParams): Result<UsernameClaimResult> {
-        return claimDeviceEvidenceProvider.collectEvidence().fold(
-            onSuccess = { evidence -> submitClaim(params, evidence) },
-            onFailure = {
-                // Never downgrade a local failure to an evidence-less free claim.
-                Result.success(UsernameClaimResult.PaymentRequired)
-            }
-        )
+        return claimDeviceEvidenceProvider.collectEvidence()
+            .flatMap { evidence -> submitClaim(params, evidence) }
     }
 
     private suspend fun submitClaim(
