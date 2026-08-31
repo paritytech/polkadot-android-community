@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.common.data.keypair.ClientKeypairStore
 import io.paritytech.polkadotapp.common.utils.CertificateChainProvider
 import io.paritytech.polkadotapp.common.utils.decodeBase64toByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.toByteArray
 import io.paritytech.polkadotapp.tools_integrity_impl.data.api.IntegrityApi
 import io.paritytech.polkadotapp.tools_integrity_impl.data.integrity.IntegrityParamsInjector
@@ -43,6 +44,7 @@ class RealVanillaIntegrityParamsInjector @Inject constructor(
             .flatMap { certChain ->
                 injectAttestationField(requestBuilder, certChain)
             }
+            .mapError(Throwable::toIntegrityError)
     }
 
     private fun injectAttestationField(requestBuilder: Request.Builder, certChain: List<String>): Result<Unit> = runCatching {

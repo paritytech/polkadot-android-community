@@ -231,6 +231,7 @@ field. Set them in `local.properties` / CI to point at your own infrastructure.
 | `FIRESTORE_DATABASE_ID`     | `tools/backup/impl`            | no       | `(default)`                    | Firestore database used for backup encryption-key records                    |
 | `NIGHTLY_FUNDING_MNEMONIC`  | `feature/transactions/impl`   | for funding | empty                       | Mnemonic of the funding account used to top up accounts on nightly/production test contours |
 | `LOG_COLLECTION_EMAIL`      | `app`                         | no       | `logs@example.com`             | Recipient address for the in-app "collect logs" debug share action          |
+| `CURRENCY_SYMBOL`           | `common`                      | no       | `CASH`                         | Symbol of the in-app digital currency rendered in the UI                     |
 
 > `NIGHTLY_FUNDING_MNEMONIC` controls a funding account — keep it in a secret store
 > or untracked `local.properties`, never commit it. When it is empty, requesting the

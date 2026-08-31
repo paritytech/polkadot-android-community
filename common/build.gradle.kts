@@ -1,13 +1,19 @@
+import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
+
 plugins {
     id("polkadotapp.android.library")
     id("polkadotapp.android.compose")
     alias(libs.plugins.kotlin.serialization)
 }
 
+val localProperties = gradleLocalProperties(rootDir, providers)
+
 android {
     namespace = "io.paritytech.polkadotapp.common"
 
     defaultConfig {
+        buildConfigString("CURRENCY_SYMBOL", localProperties.readSecretOrDefault("CURRENCY_SYMBOL", "CASH"))
+
         buildConfigField("String", "TESTNET_ENVIRONMENT", "\"TESTNET\"")
         buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "true")
         buildConfigField("boolean", "DIM1_ENABLED", "true")
@@ -16,12 +22,15 @@ android {
         buildConfigField("boolean", "TESTNET_FUND_ENABLED", "true")
         buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "true")
+        buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "true")
         buildConfigField("boolean", "SAMPLE_BOT", "true")
+        buildConfigField("boolean", "SAFETY_MODE", "false")
     }
 
     buildTypes {
         getByName("release") {
             initWith(getByName("release"))
+            buildConfigField("boolean", "SAFETY_MODE", "true")
             buildConfigField("String", "TESTNET_ENVIRONMENT", "\"PRODUCTION\"")
             buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
             buildConfigField("boolean", "DIM1_ENABLED", "false")
@@ -30,6 +39,7 @@ android {
             buildConfigField("boolean", "TESTNET_FUND_ENABLED", "false")
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
         }
         getByName("nightly") {
@@ -37,6 +47,15 @@ android {
             buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "SAMPLE_BOT", "false")
+        }
+        getByName("safetynet") {
+            buildConfigField("boolean", "SAFETY_MODE", "true")
+            buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
+            buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
+            buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
+            buildConfigField("boolean", "DIM2_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
         }
     }

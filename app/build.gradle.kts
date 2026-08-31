@@ -81,7 +81,19 @@ android {
                 localProperties.readSecretOrDefault("APP_NAME", "Polkadot")
             )
         }
+        getByName("safetynet") {
+            matchingFallbacks.addAll(listOf("nightly", "debug"))
+
+            signingConfig = signingConfigs.getByName("dev")
+            applicationIdSuffix = ".safetynet"
+            manifestPlaceholders["appName"] = localProperties.readSecretOrDefault(
+                "SAFETYNET_APP_NAME",
+                "[Safetynet] ${localProperties.readSecretOrDefault("APP_NAME", "Polkadot")}"
+            )
+        }
     }
+
+    sourceSets.getByName("safetynet").manifest.srcFile("src/nightly/AndroidManifest.xml")
 
     flavorDimensions += "distribution"
 

@@ -2,7 +2,9 @@ package io.paritytech.polkadotapp.feature_usernames_impl.data.claim
 
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.utils.flatRecover
+import io.paritytech.polkadotapp.common.utils.flatten
 import io.paritytech.polkadotapp.common.utils.mapError
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.FoundUser
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.Username
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.UsernameApi
@@ -17,6 +19,7 @@ import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUserna
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.RegistrationQueueStatus
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameClaimResult
+import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.toBackendRequestError
 import retrofit2.HttpException
 import javax.inject.Inject
 
@@ -36,11 +39,11 @@ class RealUsernameRepository @Inject constructor(
     private val api: UsernameApi,
     private val usernamesChainProvider: UsernamesChainProvider
 ) : UsernameRepository {
-    override suspend fun getVerifier(): Result<String> = runCatching {
+    override suspend fun getVerifier(): Result<String> = runCancellableCatching {
         api.getAttester().attester
-    }
+    }.mapError(Throwable::toBackendRequestError)
 
-    override suspend fun checkUsernameAvailable(username: Username): Result<UsernameAvailabilityState> = runCatching {
+    override suspend fun checkUsernameAvailable(username: Username): Result<UsernameAvailabilityState> = runCancellableCatching {
         val usernameString = username.getDisplayUsername()
         val response = api.checkUsername(UsernameAvailableRequest(listOf(usernameString)))
         val entry = response.value[usernameString]
@@ -51,6 +54,8 @@ class RealUsernameRepository @Inject constructor(
             .orEmpty()
         UsernameAvailabilityState.fromStatusAndDigits(entry?.status, availableDigits)
     }
+        .flatten()
+        .mapError(Throwable::toBackendRequestError)
 
     override suspend fun searchUsernames(query: String): Result<List<FoundUser>> = runCatching {
         val chain = usernamesChainProvider.chain()
@@ -60,7 +65,7 @@ class RealUsernameRepository @Inject constructor(
             .mapNotNull { it.toDomain(chain) }
     }
 
-    override suspend fun claimUsername(params: ClaimUsernameParams): Result<UsernameClaimResult> = runCatching {
+    override suspend fun claimUsername(params: ClaimUsernameParams): Result<UsernameClaimResult> = runCancellableCatching {
         val request = UsernameClaimRequest(
             candidateAccountId = params.candidateAddress,
             username = params.username,

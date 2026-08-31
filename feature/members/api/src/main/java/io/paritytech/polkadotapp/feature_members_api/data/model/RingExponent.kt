@@ -16,11 +16,13 @@ enum class RingExponent(val exponent: Int) {
      */
     val ringCapacity: Int
         get() = (1 shl exponent) - RING_PIOP_OVERHEAD
-
-    private companion object {
-        const val RING_PIOP_OVERHEAD = 257
-    }
 }
+
+/**
+ * Top-level rather than in a companion: reading a private companion const from an enum member's getter
+ * crashes the Kotlin backend in SyntheticAccessorLowering.
+ */
+private const val RING_PIOP_OVERHEAD = 257
 
 fun RingExponent.toDomainSize(): BandersnatchDomainSize {
     return when (this) {

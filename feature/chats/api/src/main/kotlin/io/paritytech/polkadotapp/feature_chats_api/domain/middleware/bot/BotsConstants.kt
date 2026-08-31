@@ -19,7 +19,9 @@ class ChatBotData private constructor(
         fun mobRule() = ChatBotData(id = "MobRuleBot", name = "Mob Rule")
 
         fun defaultBots() = buildList {
-            add(weeklyGame())
+            if (FeatureOption.DIM2_BOT_BY_DEFAULT.isEnabled) {
+                add(weeklyGame())
+            }
 
             if (FeatureOption.PEER_BOT_BY_DEFAULT.isEnabled) {
                 add(polkadotPeer())

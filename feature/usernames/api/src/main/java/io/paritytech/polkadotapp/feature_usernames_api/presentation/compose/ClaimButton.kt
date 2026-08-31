@@ -11,13 +11,12 @@ import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextBu
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.ClaimUsernameTestTags
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.MIN_USERNAME_LENGTH
-import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 fun ClaimButton(
     username: String,
-    fieldState: UsernameFieldState,
+    showClearAction: Boolean,
     claimButtonEnabled: Boolean,
     isClaimingInProgress: Boolean,
     onClaimAction: () -> Unit,
@@ -37,7 +36,7 @@ fun ClaimButton(
             onClick = {}
         )
 
-        fieldState == UsernameFieldState.TAKEN -> PolkadotTextButton(
+        showClearAction -> PolkadotTextButton(
             modifier = modifier,
             text = stringResource(RCommon.string.pick_username_action_clear),
             style = PolkadotButtonStyle.secondary(),

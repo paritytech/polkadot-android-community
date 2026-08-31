@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.compose
 
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,8 +38,11 @@ import io.paritytech.polkadotapp.feature_usernames_api.presentation.ClaimUsernam
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.compose.ClaimButton
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.compose.UsernameTextField
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.DigitsFieldState
-import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
+import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldStatus
+import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldStyle
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.UsernameFlowError
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.ClaimUsernameContract
+import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.ClaimUsernameFieldState
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.ClaimUsernameProgress
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -189,7 +193,7 @@ private fun PickUsernameScreenInternal(
     username: String,
     onUsernameChanged: (String) -> Unit,
     onDigitsChanged: (String) -> Unit,
-    fieldState: UsernameFieldState,
+    fieldState: ClaimUsernameFieldState,
     digitsFieldState: DigitsFieldState,
     claimButtonEnabled: Boolean,
     isClaimingInProgress: Boolean,
@@ -242,9 +246,9 @@ private fun PickUsernameScreenInternal(
                 postfix = null,
                 onUsernameChanged = onUsernameChanged,
                 onDigitsChanged = onDigitsChanged,
-                fieldState = fieldState,
+                status = claimFieldStatus(fieldState, digitsFieldState),
                 digitsFieldState = digitsFieldState,
-                isEnabled = isClaimingInProgress.not() && fieldState != UsernameFieldState.ALREADY_CREATED
+                isEnabled = isClaimingInProgress.not()
             )
 
             FillerSpacer()
@@ -265,7 +269,7 @@ private fun PickUsernameScreenInternal(
 
             ClaimButton(
                 username = username,
-                fieldState = fieldState,
+                showClearAction = fieldState is ClaimUsernameFieldState.Taken,
                 claimButtonEnabled = claimButtonEnabled,
                 isClaimingInProgress = isClaimingInProgress,
                 onClaimAction = onClaimAction,
@@ -302,7 +306,7 @@ fun PickUsernameScreenPreview() {
             username = "",
             onUsernameChanged = {},
             onDigitsChanged = {},
-            fieldState = UsernameFieldState.NEUTRAL,
+            fieldState = ClaimUsernameFieldState.Neutral,
             digitsFieldState = DigitsFieldState.Hidden,
             claimButtonEnabled = false,
             isClaimingInProgress = false,
@@ -324,7 +328,7 @@ fun PickUsernameAvailableScreenPreview() {
             username = "white_paper",
             onUsernameChanged = {},
             onDigitsChanged = {},
-            fieldState = UsernameFieldState.AVAILABLE,
+            fieldState = ClaimUsernameFieldState.Available,
             digitsFieldState = DigitsFieldState.Visible(digits = "92", isValid = true),
             claimButtonEnabled = true,
             isClaimingInProgress = false,
@@ -346,7 +350,7 @@ private fun PickUsernameRecoveredScreenPreview() {
             username = "",
             onUsernameChanged = {},
             onDigitsChanged = {},
-            fieldState = UsernameFieldState.NEUTRAL,
+            fieldState = ClaimUsernameFieldState.Neutral,
             digitsFieldState = DigitsFieldState.Hidden,
             claimButtonEnabled = false,
             isClaimingInProgress = false,
@@ -366,4 +370,57 @@ private fun FullScreenLoadingPreview() {
     PolkadotTheme {
         FullScreenLoadingContent(ClaimUsernameProgress.CREATING)
     }
+}
+
+@Composable
+private fun claimFieldStatus(
+    fieldState: ClaimUsernameFieldState,
+    digitsFieldState: DigitsFieldState,
+): UsernameFieldStatus {
+    if (digitsFieldState is DigitsFieldState.Visible && !digitsFieldState.isValid) {
+        return UsernameFieldStatus(
+            style = UsernameFieldStyle.Error,
+            text = stringResource(RCommon.string.pick_username_digits_taken),
+        )
+    }
+
+    return when (fieldState) {
+        ClaimUsernameFieldState.Neutral -> UsernameFieldStatus(UsernameFieldStyle.Neutral, null)
+
+        ClaimUsernameFieldState.Taken -> UsernameFieldStatus(
+            style = UsernameFieldStyle.Error,
+            text = stringResource(RCommon.string.pick_username_state_taken),
+        )
+
+        ClaimUsernameFieldState.Invalid -> UsernameFieldStatus(
+            style = UsernameFieldStyle.Error,
+            text = stringResource(RCommon.string.pick_username_state_invalid),
+        )
+
+        ClaimUsernameFieldState.Available -> UsernameFieldStatus(
+            style = UsernameFieldStyle.Success,
+            text = stringResource(RCommon.string.pick_username_state_available),
+        )
+
+        is ClaimUsernameFieldState.Error -> fieldState.error.toStatus()
+    }
+}
+
+@Composable
+private fun UsernameFlowError.toStatus(): UsernameFieldStatus = when (this) {
+    // The ViewModel never stores this; rendering nothing is the right fallback if it ever does.
+    UsernameFlowError.Cancelled -> UsernameFieldStatus(UsernameFieldStyle.Neutral, null)
+
+    else -> UsernameFieldStatus(UsernameFieldStyle.Error, stringResource(userMessage()))
+}
+
+@StringRes
+private fun UsernameFlowError.userMessage(): Int = when (this) {
+    UsernameFlowError.NoConnection -> RCommon.string.username_error_no_connection
+    UsernameFlowError.VerificationUnavailable -> RCommon.string.username_error_verification_unavailable
+    UsernameFlowError.VerificationRejected -> RCommon.string.username_error_verification_rejected
+    UsernameFlowError.VerificationBusy -> RCommon.string.username_error_verification_busy
+    UsernameFlowError.Server -> RCommon.string.username_error_server
+    UsernameFlowError.Cancelled,
+    UsernameFlowError.Unknown -> RCommon.string.username_error_unknown
 }
