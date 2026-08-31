@@ -8,6 +8,7 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.isDisabled
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
@@ -90,6 +91,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.RealE
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.RealResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.ProductServingHostResolver
+import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaHost.RealSpaHost
 import javax.inject.Singleton
 
@@ -139,10 +141,6 @@ internal interface ProductsModule {
     @Binds
     @IntoSet
     fun bindProductExternalExtensionProvider(impl: ProductExternalExtensionProvider): ExternalExtensionProvider
-
-    @Binds
-    @IntoSet
-    fun bindProductChatSearchResultProvider(impl: ProductChatSearchResultProvider): ChatSearchResultProvider
 
     @Binds
     fun bindProductLocalStorage(impl: RealProductLocalStorage): ProductLocalStorage
@@ -258,6 +256,19 @@ internal interface ProductsModule {
         @Singleton
         fun providePermissionRequester(real: RealProductPermissionRequester): ProductPermissionRequester {
             return AutoAllowProductPermissionRequester(autoAllowedLabels(), real)
+        }
+
+        @Provides
+        @IntoSet
+        fun provideProductChatSearchResultProvider(
+            productRepository: ProductRepository,
+            productsRouter: ProductsRouter,
+        ): ChatSearchResultProvider {
+            return ProductChatSearchResultProvider(
+                arbitraryProductsEnabled = FeatureOption.ARBITRARY_PRODUCTS.isEnabled,
+                productRepository = productRepository,
+                productsRouter = productsRouter,
+            )
         }
 
         private fun autoAllowedLabels(): Set<String> {

@@ -1,7 +1,5 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.search
 
-import io.paritytech.polkadotapp.common.utils.FeatureOption
-import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatExtensionId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.search.ChatListSearchResult
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
@@ -9,16 +7,16 @@ import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPay
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductRepository
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import kotlinx.coroutines.flow.first
-import javax.inject.Inject
 
-class ProductChatSearchResultProvider @Inject constructor(
+class ProductChatSearchResultProvider(
+    private val arbitraryProductsEnabled: Boolean,
     private val productRepository: ProductRepository,
     private val productsRouter: ProductsRouter,
 ) : ChatSearchResultProvider {
     override val id: ChatExtensionId = PRODUCT_SEARCH_PROVIDER_ID
 
     override suspend fun search(query: String): Result<List<ChatListSearchResult.App>> {
-        if (FeatureOption.ARBITRARY_PRODUCTS.isDisabled) return Result.success(emptyList())
+        if (!arbitraryProductsEnabled) return Result.success(emptyList())
 
         return runCatching {
             productRepository.observeProducts()
