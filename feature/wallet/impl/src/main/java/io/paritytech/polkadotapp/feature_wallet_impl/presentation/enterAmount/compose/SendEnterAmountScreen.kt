@@ -212,7 +212,7 @@ private fun DebugPlanInfo(info: SendPlanDebugInfo) {
 
 @Preview
 @Composable
-private fun SendEnterAmountScreenPreview() {
+private fun SendEnterAmountScreenAllWidgetPreview() {
     CompositionLocalProvider(
         LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
     ) {

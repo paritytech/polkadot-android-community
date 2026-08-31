@@ -37,15 +37,23 @@ internal fun EnterAmountBalance(
         )
 
         if (gainingPrivacy != null) {
-            HorizontalSpacer { tiny }
+            HorizontalSpacer { extraTiny }
 
             NovaText(
-                text = stringResource(RCommon.string.send_enter_amount_gaining_privacy_extra, gainingPrivacy),
+                text = "+",
                 style = PolkadotTheme.typography.body.large,
                 color = PolkadotTheme.colors.fg.tertiary,
             )
 
-            HorizontalSpacer { tiny }
+            HorizontalSpacer { extraTiny }
+
+            NovaText(
+                text = gainingPrivacy,
+                style = PolkadotTheme.typography.body.large,
+                color = PolkadotTheme.colors.fg.tertiary,
+            )
+
+            HorizontalSpacer { extraTiny }
 
             NovaIcon(
                 modifier = Modifier.size(16.dp),

@@ -11,7 +11,6 @@
     <string name="balance_details_not_available">Not available</string>
     <string name="balance_details_not_available_description">Funds being prepared by the private payment system. Processing usually takes around 1-5 minutes</string>
 
-    <string name="send_enter_amount_gaining_privacy_extra">+ %1$s</string>
     <string name="send_gaining_privacy_title">Some funds are still gaining privacy</string>
     <string name="send_gaining_privacy_spendable">You can send %1$s right now.</string>
     <string name="send_gaining_privacy_full_amount">To send %1$s, the remaining %2$s has to come from funds that are still gaining privacy.</string>
