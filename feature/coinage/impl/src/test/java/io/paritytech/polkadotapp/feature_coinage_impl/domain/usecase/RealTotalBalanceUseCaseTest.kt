@@ -224,7 +224,7 @@ class RealTotalBalanceUseCaseTest {
         )
 
         assertEquals(listOf(1, 2, 3).exponentsToBalance(), balance.total)
-        assertEquals(1.exponentToBalance(), balance.spendable)
+        assertEquals(1.exponentToBalance(), balance.availablePrivate)
         assertEquals(2.exponentToBalance(), balance.gainingPrivacy.amount)
         assertEquals(3.exponentToBalance(), balance.pending)
     }
@@ -305,7 +305,7 @@ class RealTotalBalanceUseCaseTest {
         pending: Balance = ZERO_BALANCE,
         canSpendWithConfirmation: Boolean = true,
     ) = CoinageBalance(
-        spendable = spendable,
+        availablePrivate = spendable,
         gainingPrivacy = CoinageBalance.GainingPrivacyBalance(gainingPrivacy, canSpendWithConfirmation),
         pending = pending,
     )

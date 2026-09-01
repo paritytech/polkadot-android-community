@@ -79,7 +79,7 @@ class RealTotalBalanceUseCase @Inject constructor(
 
         with(conversionContext) {
             CoinageBalance(
-                spendable = byVerdict.balanceOf(CoinRecyclingState.ALLOW_USE) +
+                availablePrivate = byVerdict.balanceOf(CoinRecyclingState.ALLOW_USE) +
                     voucherBuckets.usable.totalBalance(),
                 gainingPrivacy = CoinageBalance.GainingPrivacyBalance(
                     amount = byVerdict.balanceOf(CoinRecyclingState.TO_RECYCLE) +

@@ -31,7 +31,7 @@ class RealBalanceDetailsInteractor @Inject constructor(
                 .map { balance ->
                     BalanceBreakdown(
                         asset = asset,
-                        availablePrivate = balance.spendable,
+                        availablePrivate = balance.availablePrivate,
                         exposed = balance.gainingPrivacy.amount,
                         canSpendExposed = balance.gainingPrivacy.canSpendWithConfirmation,
                         notAvailable = balance.pending,

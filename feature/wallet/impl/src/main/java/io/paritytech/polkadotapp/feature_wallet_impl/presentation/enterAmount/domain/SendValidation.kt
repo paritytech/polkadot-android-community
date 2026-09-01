@@ -26,10 +26,10 @@ class SendValidation @Inject constructor(
         val asset = chainAssetProvider.asset()
         val transferAmountPlanks = payload.value.planksFromAmount(asset.precision)
 
-        if (transferAmountPlanks <= balance.spendable) return ValidationResult.Success(payload)
+        if (transferAmountPlanks <= balance.availablePrivate) return ValidationResult.Success(payload)
 
         val gainingPrivacy = balance.gainingPrivacy
-        val reachable = balance.spendable + gainingPrivacy.amount
+        val reachable = balance.availablePrivate + gainingPrivacy.amount
 
         // Either the strategy will not part with what it is holding, or even that would not cover the
         // amount. Both are the same answer to the user: this cannot be sent.
@@ -39,8 +39,8 @@ class SendValidation @Inject constructor(
 
         val action = ConfirmGainingPrivacySpendUserAction(
             totalTransfer = tokenAmountMapper.mapFrom(transferAmountPlanks.withAsset(asset)),
-            spendable = tokenAmountMapper.mapFrom(balance.spendable.withAsset(asset)),
-            gainingPrivacy = tokenAmountMapper.mapFrom((transferAmountPlanks - balance.spendable).withAsset(asset)),
+            spendable = tokenAmountMapper.mapFrom(balance.availablePrivate.withAsset(asset)),
+            gainingPrivacy = tokenAmountMapper.mapFrom((transferAmountPlanks - balance.availablePrivate).withAsset(asset)),
         )
 
         return when (validationProcess.presentUserInput(action)) {

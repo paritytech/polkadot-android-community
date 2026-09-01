@@ -9,7 +9,7 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
  * some strategies will still let go of if the user says so. [pending] never will.
  */
 data class CoinageBalance(
-    val spendable: Balance,
+    val availablePrivate: Balance,
     val gainingPrivacy: GainingPrivacyBalance,
     /** On its way, or past the age the chain still accepts. Not spendable on any terms. */
     val pending: Balance,
@@ -18,20 +18,20 @@ data class CoinageBalance(
         val amount: Balance,
         /**
          * Whether the user may spend [amount] anyway once they have confirmed. The privacy it has earned so
-         * far is lost if they do, which is why it takes a confirmation instead of being part of [spendable].
+         * far is lost if they do, which is why it takes a confirmation instead of being part of [availablePrivate].
          */
         val canSpendWithConfirmation: Boolean,
     )
 
     /**
      * Everything the chosen strategy will let the user part with, including what it is holding back but
-     * would release on confirmation. [spendable] alone is the subset that costs no privacy to spend.
+     * would release on confirmation. [availablePrivate] alone is the subset that costs no privacy to spend.
      */
     val available: Balance = if (gainingPrivacy.canSpendWithConfirmation) {
-        spendable + gainingPrivacy.amount
+        availablePrivate + gainingPrivacy.amount
     } else {
-        spendable
+        availablePrivate
     }
 
-    val total: Balance = spendable + gainingPrivacy.amount + pending
+    val total: Balance = availablePrivate + gainingPrivacy.amount + pending
 }

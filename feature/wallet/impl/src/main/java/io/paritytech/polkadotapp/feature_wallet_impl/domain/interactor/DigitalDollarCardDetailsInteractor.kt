@@ -98,7 +98,7 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
             AssetInfo(
                 asset = asset,
                 totalBalance = balance.total,
-                spendableBalance = balance.spendable,
+                spendableBalance = balance.availablePrivate,
                 gainingPrivacyBalance = balance.gainingPrivacy.amount,
                 pendingBalance = balance.pending,
             )

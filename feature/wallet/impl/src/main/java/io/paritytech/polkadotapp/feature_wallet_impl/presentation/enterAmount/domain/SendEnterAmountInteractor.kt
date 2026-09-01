@@ -43,7 +43,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -95,7 +94,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
         return totalBalanceUseCase.subscribeTotalBalance()
             .mapResult {
                 AvailableToSendAmount(
-                    spendable = it.spendable,
+                    spendable = it.availablePrivate,
                     gainingPrivacy = it.gainingPrivacy.amount,
                     canSpendGainingPrivacy = it.gainingPrivacy.canSpendWithConfirmation,
                     chainAsset = asset(),
