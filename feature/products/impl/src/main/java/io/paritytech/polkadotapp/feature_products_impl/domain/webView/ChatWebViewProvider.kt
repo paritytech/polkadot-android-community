@@ -43,7 +43,7 @@ class ChatWebViewProvider @AssistedInject constructor(
 
     override val callingProductIdProvider = FixedProductId(productId)
 
-    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider)
+    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider, allowIframes = false)
 
     // Serves the worker's archive by host, so the entry module's relative imports resolve too.
     private val dotNsContentClient = DotNsWebViewClient(dotNsResolver, dotNsTldProvider, servingHostResolver)
@@ -52,7 +52,6 @@ class ChatWebViewProvider @AssistedInject constructor(
         callingProductIdProvider = callingProductIdProvider,
         scope = scope,
         onTitleReceived = null,
-        allowIframes = false,
     )
 
     @SuppressLint("SetJavaScriptEnabled")

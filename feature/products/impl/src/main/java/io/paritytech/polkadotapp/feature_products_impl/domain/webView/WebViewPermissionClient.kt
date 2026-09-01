@@ -23,15 +23,16 @@ class WebViewPermissionClientFactory @Inject constructor(
     private val permissionGuard: ProductPermissionGuard,
     private val dotNsTldProvider: DotNsTldProvider
 ) {
-    fun create(callingProductIdProvider: CallingProductIdProvider): WebViewPermissionClient {
-        return WebViewPermissionClient(callingProductIdProvider, permissionGuard, dotNsTldProvider)
+    fun create(callingProductIdProvider: CallingProductIdProvider, allowIframes: Boolean): WebViewPermissionClient {
+        return WebViewPermissionClient(callingProductIdProvider, permissionGuard, dotNsTldProvider, allowIframes)
     }
 }
 
 class WebViewPermissionClient(
     private val productIdProvider: CallingProductIdProvider,
     private val permissionGuard: ProductPermissionGuard,
-    private val dotNsTldProvider: DotNsTldProvider
+    private val dotNsTldProvider: DotNsTldProvider,
+    private val allowIframes: Boolean,
 ) : WebViewClient() {
     /**
      * Last two entries from back-forward history, captured on [onPageStarted].
@@ -51,6 +52,11 @@ class WebViewPermissionClient(
         )
     }
 
+    private fun WebResourceRequest.isIframeDocument(): Boolean {
+        val dest = requestHeaders.entries.firstOrNull { it.key.equals("Sec-Fetch-Dest", ignoreCase = true) }?.value
+        return dest == "iframe" || dest == "frame"
+    }
+
     private fun WebBackForwardList.productIdAt(index: Int): ProductId? {
         if (index < 0 || index >= size) return null
         val url = getItemAtIndex(index)?.url ?: return null
@@ -62,6 +68,13 @@ class WebViewPermissionClient(
         val url = request?.url ?: return super.shouldInterceptRequest(view, request)
         if (url.scheme == "data") return super.shouldInterceptRequest(view, request)
         if (request.isForMainFrame) return super.shouldInterceptRequest(view, request)
+
+        // Iframes are the only sub-frame document loads; identify them by the Chromium Sec-Fetch-Dest
+        // header and refuse them outright when this WebView does not permit iframes.
+        if (!allowIframes && request.isIframeDocument()) {
+            Timber.w("Blocked iframe load (iframes disabled for this WebView): $url")
+            return notFoundResponse()
+        }
 
         val callingProductId = runBlocking { productIdProvider.getProductIdOrNull() }
 

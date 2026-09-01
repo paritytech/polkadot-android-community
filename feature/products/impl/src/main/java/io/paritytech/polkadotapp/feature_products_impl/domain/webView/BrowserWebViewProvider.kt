@@ -69,13 +69,12 @@ class BrowserWebViewProvider @AssistedInject constructor(
     /** Load progress of the domain the WebView is currently resolving content for. */
     val loadProgress: Flow<DotNsLoadProgress> = contentLoader.loadProgress
 
-    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider)
+    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider, allowIframes)
     private val chromeClient = productWebChromeClientFactory.create(
         logPrefix = "Browser: $initialUrl",
         callingProductIdProvider = callingProductIdProvider,
         scope = scope,
         onTitleReceived = null,
-        allowIframes = allowIframes,
     )
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -92,8 +91,6 @@ class BrowserWebViewProvider @AssistedInject constructor(
                 domStorageEnabled = true
                 allowFileAccess = false
                 allowContentAccess = false
-                setSupportMultipleWindows(allowIframes)
-                javaScriptCanOpenWindowsAutomatically = allowIframes
             }
 
             val innerClient =
