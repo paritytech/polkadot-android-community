@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidence
 import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidenceProvider
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.whenever
+import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.BackendRequestError
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -90,13 +91,13 @@ class RealUsernameRepositoryTest {
     }
 
     @Test
-    fun `non-Widevine evidence failure propagates without a request`() = runBlocking<Unit> {
+    fun `non-Widevine evidence failure is classified without a request`() = runBlocking<Unit> {
         val error = IllegalStateException("challenge unavailable")
         withEvidenceFailure(error)
 
         val result = repository.claimUsername(params)
 
-        assertEquals(error, result.exceptionOrNull())
+        assertEquals(BackendRequestError.Unknown, result.exceptionOrNull())
         verify(api, never()).claimUsername(any())
     }
 
@@ -145,7 +146,7 @@ class RealUsernameRepositoryTest {
 
         val result = repository.claimUsername(params)
 
-        assertEquals(error, result.exceptionOrNull())
+        assertEquals(BackendRequestError.Server(403), result.exceptionOrNull())
         assertEquals(1, requests.size)
     }
 
@@ -157,7 +158,7 @@ class RealUsernameRepositoryTest {
 
         val result = repository.claimUsername(params)
 
-        assertEquals(error, result.exceptionOrNull())
+        assertEquals(BackendRequestError.Server(403), result.exceptionOrNull())
         assertEquals(1, requests.size)
     }
 
@@ -169,7 +170,7 @@ class RealUsernameRepositoryTest {
 
         val result = repository.claimUsername(params)
 
-        assertEquals(error, result.exceptionOrNull())
+        assertEquals(BackendRequestError.Server(403), result.exceptionOrNull())
         assertEquals(1, requests.size)
     }
 
