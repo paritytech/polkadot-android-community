@@ -2,6 +2,7 @@ plugins {
     id("polkadotapp.android.library")
     id("polkadotapp.android.compose")
     id("polkadotapp.android.hilt")
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
 }
 
@@ -11,6 +12,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.fragment.ktx)
+
     implementation(project(":chains"))
 
     implementation(project(":feature:backup:api"))
