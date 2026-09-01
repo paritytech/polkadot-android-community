@@ -26,6 +26,7 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -50,51 +51,28 @@ class TrUAPIConfirmationLauncherTest {
         productsRouter = productsRouter,
     )
 
+    // One table rather than a test per variant: the review-to-permission mapping
+    // is the claim under test, and a wrong entry is the failure that matters.
     @Test
-    fun `account access asks for the target product's account-access permission`() = runBlocking<Unit> {
-        withPermissionAnswer(true)
+    fun `permission-gated reviews ask for the permission their native call would`() = runBlocking<Unit> {
+        val cases = listOf(
+            TrUAPIConfirmation.AccountAccess(caller, target) to ProductPermission.AccountAccess("target.dot"),
+            TrUAPIConfirmation.StatementSign(caller, target) to ProductPermission.AccountAccess("target.dot"),
+            TrUAPIConfirmation.AccountAlias(caller, target) to ProductPermission.AccountAccess("target.dot"),
+            TrUAPIConfirmation.IdentityDisclosure(caller) to ProductPermission.UserIdentityAccess,
+        )
 
-        val approved = launcher.awaitDecision(TrUAPIConfirmation.AccountAccess(caller, target))
+        cases.forEach { (confirmation, permission) ->
+            val case = confirmation::class.simpleName
 
-        assertTrue(approved)
-        verify(permissionGuard).requestPermission(caller, ProductPermission.AccountAccess("target.dot"))
-    }
+            clearInvocations(permissionGuard)
+            withPermissionAnswer(true)
+            assertTrue(case, launcher.awaitDecision(confirmation))
+            verify(permissionGuard).requestPermission(caller, permission)
 
-    @Test
-    fun `a denied permission is a refusal`() = runBlocking<Unit> {
-        withPermissionAnswer(false)
-
-        assertFalse(launcher.awaitDecision(TrUAPIConfirmation.AccountAccess(caller, target)))
-    }
-
-    @Test
-    fun `identity disclosure asks for the user-identity permission`() = runBlocking<Unit> {
-        withPermissionAnswer(true)
-
-        val approved = launcher.awaitDecision(TrUAPIConfirmation.IdentityDisclosure(caller))
-
-        assertTrue(approved)
-        verify(permissionGuard).requestPermission(caller, ProductPermission.UserIdentityAccess)
-    }
-
-    @Test
-    fun `statement sign asks for access to the signing account's product`() = runBlocking<Unit> {
-        withPermissionAnswer(true)
-
-        val approved = launcher.awaitDecision(TrUAPIConfirmation.StatementSign(caller, target))
-
-        assertTrue(approved)
-        verify(permissionGuard).requestPermission(caller, ProductPermission.AccountAccess("target.dot"))
-    }
-
-    @Test
-    fun `account alias asks for access to the context's product`() = runBlocking<Unit> {
-        withPermissionAnswer(true)
-
-        val approved = launcher.awaitDecision(TrUAPIConfirmation.AccountAlias(caller, target))
-
-        assertTrue(approved)
-        verify(permissionGuard).requestPermission(caller, ProductPermission.AccountAccess("target.dot"))
+            withPermissionAnswer(false)
+            assertFalse(case, launcher.awaitDecision(confirmation))
+        }
     }
 
     @Test
@@ -109,22 +87,17 @@ class TrUAPIConfirmationLauncherTest {
 
     @Test
     fun `create proof goes to the cross-product proof prompt`() = runBlocking<Unit> {
+        val confirmation = TrUAPIConfirmation.CreateProof(caller, target, suffix, message)
         crossProductProofRequester.answer = true
 
-        val approved = launcher.awaitDecision(TrUAPIConfirmation.CreateProof(caller, target, suffix, message))
-
-        assertTrue(approved)
+        assertTrue(launcher.awaitDecision(confirmation))
         assertEquals(caller, crossProductProofRequester.callingProduct)
         assertEquals(target, crossProductProofRequester.onBehalfOf)
         assertEquals(suffix, crossProductProofRequester.suffix)
         assertEquals(message, crossProductProofRequester.message)
-    }
 
-    @Test
-    fun `a rejected cross-product proof is a refusal`() = runBlocking<Unit> {
         crossProductProofRequester.answer = false
-
-        assertFalse(launcher.awaitDecision(TrUAPIConfirmation.CreateProof(caller, target, suffix, message)))
+        assertFalse(launcher.awaitDecision(confirmation))
     }
 
     @Test
