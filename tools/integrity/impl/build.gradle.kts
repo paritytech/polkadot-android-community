@@ -3,6 +3,7 @@ import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 plugins {
     id("polkadotapp.android.library")
     id("polkadotapp.android.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -31,6 +32,7 @@ dependencies {
     api(project(":tools:integrity:api"))
 
     implementation(libs.google.integrity)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
