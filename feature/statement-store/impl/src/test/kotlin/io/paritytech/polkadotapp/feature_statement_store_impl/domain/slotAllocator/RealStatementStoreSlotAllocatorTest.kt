@@ -337,7 +337,7 @@ class RealStatementStoreSlotAllocatorTest {
 
     /** Cooldown is zero, so any taken slot is immediately replaceable. */
     private suspend fun withZeroCooldown() {
-        whenever(slotRepository.replacementCooldown(eq(chainId))).thenReturn(0.seconds)
+        whenever(slotRepository.replacementCooldown()).thenReturn(Result.success(0.seconds))
     }
 
     private suspend fun withChainSlots(slots: StatementStoreSlots) {

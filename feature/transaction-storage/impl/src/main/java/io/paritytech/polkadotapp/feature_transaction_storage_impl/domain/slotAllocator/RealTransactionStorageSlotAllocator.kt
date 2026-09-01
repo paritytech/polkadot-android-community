@@ -146,8 +146,7 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
         period: UInt,
         collection: PeopleCollection,
     ): Result<UByte> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_picking_slot) {
-        runCatching {
-            val maxCounters = longTermStorageSlotRepository.maxClaimsPerPeriod(chainId)
+        longTermStorageSlotRepository.maxClaimsPerPeriod().mapCatching { maxCounters ->
             val tld = dotNsTldProvider.getTldRetrying()
             Timber.i("scanning $maxCounters counters for period=$period")
             val aliasesByCounter = (0u until maxCounters.toUInt()).associateWith { c ->

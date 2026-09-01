@@ -3,6 +3,7 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAllocator
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
+import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.common.utils.mapAsync
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
@@ -23,37 +24,36 @@ class StatementStoreSlotLoader @Inject constructor(
     private val dotNsTldProvider: DotNsTldProvider,
 ) {
     suspend fun loadSlots(context: AllocateContext): Result<StatementStoreSlots> {
-        return runCatching {
-            val perCollection = context.availableCollections.mapAsync { collection ->
-                loadSlotsForCollection(context, collection)
-            }
-            StatementStoreSlots(perCollection)
-        }
+        return context.availableCollections
+            .mapAsync { collection -> loadSlotsForCollection(context, collection) }
+            .flattenResult()
+            .map(::StatementStoreSlots)
     }
 
     private suspend fun loadSlotsForCollection(
         context: AllocateContext,
         collection: PeopleCollection,
-    ): StatementSlotsForCollection {
-        val maxSlots = statementStoreSlotRepository.maxSlotsPerPeriod(context.chain.id, collection)
-        val tld = dotNsTldProvider.getTldRetrying()
-        val aliasesByIndex = (0u until maxSlots).associateWith { seq ->
-            val ctx = BandersnatchContext.statementStoreSlot(tld, context.period, seq)
-            bandersnatchKeyResolver.getAliasInContext(collection, ctx)
-        }
-        val taken = statementStoreSlotRepository.allowanceEntries(context.chain.id, context.period, aliasesByIndex.values)
-        val slots = aliasesByIndex.map { (seq, alias) ->
-            val entry = taken[alias]
-            if (entry == null) {
-                StatementStoreSlot.Free(seq)
-            } else {
-                StatementStoreSlot.Taken(
-                    seq = seq,
-                    accountId = entry.accountId,
-                    since = Instant.fromEpochSeconds(entry.since.toLong()),
-                )
+    ): Result<StatementSlotsForCollection> {
+        return statementStoreSlotRepository.maxSlotsPerPeriod(collection).mapCatching { maxSlots ->
+            val tld = dotNsTldProvider.getTldRetrying()
+            val aliasesByIndex = (0u until maxSlots).associateWith { seq ->
+                val ctx = BandersnatchContext.statementStoreSlot(tld, context.period, seq)
+                bandersnatchKeyResolver.getAliasInContext(collection, ctx)
             }
+            val taken = statementStoreSlotRepository.allowanceEntries(context.chain.id, context.period, aliasesByIndex.values)
+            val slots = aliasesByIndex.map { (seq, alias) ->
+                val entry = taken[alias]
+                if (entry == null) {
+                    StatementStoreSlot.Free(seq)
+                } else {
+                    StatementStoreSlot.Taken(
+                        seq = seq,
+                        accountId = entry.accountId,
+                        since = Instant.fromEpochSeconds(entry.since.toLong()),
+                    )
+                }
+            }
+            StatementSlotsForCollection(collection, slots)
         }
-        return StatementSlotsForCollection(collection, slots)
     }
 }

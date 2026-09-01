@@ -173,29 +173,30 @@ class RealStatementStoreSlotAllocator @Inject constructor(
         slots: StatementStoreSlots,
         target: AccountId,
         callerPriority: SlotPriority,
-    ): Result<SlotPick> = runCatching {
+    ): Result<SlotPick> {
         slots.findFreeSlot()?.let { free ->
-            return@runCatching SlotPick(seq = free.slot.seq, collection = free.collection, evictedAccount = null)
+            return Result.success(SlotPick(seq = free.slot.seq, collection = free.collection, evictedAccount = null))
         }
 
-        val cooldown = statementStoreSlotRepository.replacementCooldown(context.chain.id)
-        val candidates = with(currentTimeContext) { slots.filterReplaceableSlots(cooldown) }
-            .filter { it.slot.accountId != target }
+        return statementStoreSlotRepository.replacementCooldown().mapCatching { cooldown ->
+            val candidates = with(currentTimeContext) { slots.filterReplaceableSlots(cooldown) }
+                .filter { it.slot.accountId != target }
 
-        val priorityByAccount = allocationRepository.maxPriorityLevelsFor(
-            context.chain.id,
-            candidates.mapToSet { it.slot.accountId },
-        )
+            val priorityByAccount = allocationRepository.maxPriorityLevelsFor(
+                context.chain.id,
+                candidates.mapToSet { it.slot.accountId },
+            )
 
-        val evictableWithPriority = candidates
-            .map { it to priorityByAccount.getPriorityOrNormal(it.slot.accountId) }
-            .filter { (_, effective) -> effective.level <= callerPriority.level }
+            val evictableWithPriority = candidates
+                .map { it to priorityByAccount.getPriorityOrNormal(it.slot.accountId) }
+                .filter { (_, effective) -> effective.level <= callerPriority.level }
 
-        val victim = evictableWithPriority.minWithOrNull(evictionComparator())?.first
-            ?: error("No free slot and no evictable slot (cooldown=$cooldown, callerPriority=$callerPriority)")
+            val victim = evictableWithPriority.minWithOrNull(evictionComparator())?.first
+                ?: error("No free slot and no evictable slot (cooldown=$cooldown, callerPriority=$callerPriority)")
 
-        Timber.i("allocate: evicting seq=${victim.slot.seq} in ${victim.collection} (since=${victim.slot.since})")
-        SlotPick(seq = victim.slot.seq, collection = victim.collection, evictedAccount = victim.slot.accountId)
+            Timber.i("allocate: evicting seq=${victim.slot.seq} in ${victim.collection} (since=${victim.slot.since})")
+            SlotPick(seq = victim.slot.seq, collection = victim.collection, evictedAccount = victim.slot.accountId)
+        }
     }
 
     private fun Map<AccountId, SlotPriority>.getPriorityOrNormal(accountId: AccountId): SlotPriority {
