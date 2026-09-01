@@ -4,5 +4,5 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainAssetWithA
 
 data class DigitalDollarBalance(
     val total: ChainAssetWithAmount,
-    val availableNow: ChainAssetWithAmount
+    val available: ChainAssetWithAmount
 )

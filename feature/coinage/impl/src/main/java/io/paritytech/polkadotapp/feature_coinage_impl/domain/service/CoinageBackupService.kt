@@ -335,9 +335,6 @@ class RealCoinageBackupService @Inject constructor(
             ringVrfPublicKey = publicKey,
             recyclerValue = values[publicKey] ?: return@mapNotNull null,
             location = onChainInfo.getVoucherLocation(),
-            allocatedAt = System.currentTimeMillis(),
-            delayUnloadUntil = System.currentTimeMillis(),
-            ringHasEnoughRingMembersToWithdraw = false
         )
     }
 
@@ -370,7 +367,9 @@ class RealCoinageBackupService @Inject constructor(
     }
 
     private fun RingPosition.getVoucherLocation() = when (this) {
-        is RingPosition.Included -> Location.InRecycler(ringIndex)
+        // Recovery knows where the voucher sits, not how full the ring is. Zero until the location service
+        // reads it, so nothing releases the voucher on an anonymity set we have not seen.
+        is RingPosition.Included -> Location.InRecycler(ringIndex, recyclerMembers = 0)
         is RingPosition.Onboarding -> Location.Onboarding
         is RingPosition.Suspended -> Location.Unknown
     }

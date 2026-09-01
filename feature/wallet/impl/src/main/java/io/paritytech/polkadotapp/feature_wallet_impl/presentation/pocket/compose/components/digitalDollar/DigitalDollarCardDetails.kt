@@ -46,10 +46,12 @@ import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.DigitalDollarCardDetailsViewModel
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.privacyMode.PaymentPrivacyModeSelector
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketCardSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketContentSlide
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
@@ -78,9 +80,9 @@ fun DigitalDollarCardDetails(
         coinageLoadingState = loadingState,
         state = state,
         onSendClick = viewModel::onSendClick,
+        onPrivacyModeSelected = viewModel::onPrivacyModeSelected,
         onGetCashClick = viewModel::onGetCashClick,
         onAutoFundClick = viewModel::onAutoFundClick,
-        makeAllVouchersReady = viewModel::makeAllVouchersReady,
         onShareLogsClick = viewModel::onShareLogsClick,
         onForceRecycleClick = viewModel::onForceRecycleClick,
         onBackupUpdateClick = viewModel::onBackupUpdateClick,
@@ -96,9 +98,9 @@ private fun DigitalDollarCardDetailsContent(
     coinageLoadingState: LoadingState<CoinageUiState>,
     state: DigitalDollarCardDetailsUiState,
     onSendClick: () -> Unit,
+    onPrivacyModeSelected: (RecyclingStrategyType) -> Unit,
     onGetCashClick: () -> Unit,
     onAutoFundClick: () -> Unit,
-    makeAllVouchersReady: () -> Unit,
     onShareLogsClick: () -> Unit,
     onForceRecycleClick: (Coin) -> Unit,
     onBackupUpdateClick: () -> Unit,
@@ -172,10 +174,14 @@ private fun DigitalDollarCardDetailsContent(
                     }
                 }
 
+                PaymentPrivacyMode(
+                    selectedMode = state.privacyMode,
+                    onModeSelected = onPrivacyModeSelected
+                )
+
                 Coinage(
                     loadingState = coinageLoadingState,
                     onAutoFundClick = onAutoFundClick,
-                    makeAllVouchersReady = makeAllVouchersReady,
                     onShareLogsClick = onShareLogsClick,
                     onForceRecycleClick = onForceRecycleClick
                 )
@@ -185,10 +191,25 @@ private fun DigitalDollarCardDetailsContent(
 }
 
 @Composable
+private fun PaymentPrivacyMode(
+    selectedMode: RecyclingStrategyType?,
+    onModeSelected: (RecyclingStrategyType) -> Unit
+) {
+    if (selectedMode != null) {
+        VerticalSpacer { mediumIncreased }
+
+        PaymentPrivacyModeSelector(
+            modifier = Modifier.fillMaxWidth(),
+            selectedMode = selectedMode,
+            onModeSelected = onModeSelected
+        )
+    }
+}
+
+@Composable
 private fun ColumnScope.Coinage(
     loadingState: LoadingState<CoinageUiState>,
     onAutoFundClick: () -> Unit,
-    makeAllVouchersReady: () -> Unit,
     onShareLogsClick: () -> Unit,
     onForceRecycleClick: (Coin) -> Unit
 ) {
@@ -223,7 +244,6 @@ private fun ColumnScope.Coinage(
                     CoinageCardContent(
                         state = state,
                         onAutoFundClick = onAutoFundClick,
-                        makeAllVouchersReady = makeAllVouchersReady,
                         onShareLogsClick = onShareLogsClick,
                         onForceRecycleClick = onForceRecycleClick
                     )
@@ -300,8 +320,8 @@ private fun DigitalDollarCardDetailsPreview() {
                     CoinageUiState(
                         tokensState = CoinageUiState.TokensState(
                             totalBalance = TokenAmountModel.mock,
-                            spendableSecuredBalance = TokenAmountModel.mock,
-                            spendableDegradedBalance = TokenAmountModel.mock,
+                            spendableBalance = TokenAmountModel.mock,
+                            gainingPrivacyBalance = TokenAmountModel.mock,
                             pendingBalance = TokenAmountModel.mock,
                             coinList = persistentListOf(),
                             voucherList = persistentListOf()
@@ -313,11 +333,14 @@ private fun DigitalDollarCardDetailsPreview() {
                         testnetFundEnabled = true
                     )
                 ),
-                state = DigitalDollarCardDetailsUiState(BalanceRestoreUiState.SendCash),
+                state = DigitalDollarCardDetailsUiState(
+                    balanceRestore = BalanceRestoreUiState.SendCash,
+                    privacyMode = RecyclingStrategyType.BALANCED
+                ),
                 onSendClick = {},
+                onPrivacyModeSelected = {},
                 onGetCashClick = {},
                 onAutoFundClick = {},
-                makeAllVouchersReady = {},
                 onShareLogsClick = {},
                 onForceRecycleClick = {},
                 onBackupUpdateClick = {},

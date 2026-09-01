@@ -105,6 +105,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         coinAmountBreakdownUseCase = mockk(relaxed = true),
         coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
         peopleMembershipProver = peopleMembershipProver,
+        quotaTracker = mockk(relaxed = true),
         chainAssetProvider = chainAssetProvider,
         coinageInstanceIdProvider = coinageInstanceIdProvider,
     )
@@ -358,16 +359,13 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
     )
 
     private fun voucherInRecycler(index: Int, recycler: Int = index) =
-        voucherOf(index, Location.InRecycler(RecyclerIndex(BigInteger.valueOf(recycler.toLong()))))
+        voucherOf(index, Location.InRecycler(RecyclerIndex(BigInteger.valueOf(recycler.toLong())), recyclerMembers = 767))
 
     private fun voucherOf(index: Int, location: Location) = RecyclerVoucher(
         ringVrfKeyIndex = index,
         ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
         recyclerValue = ValueExponent(1),
         location = location,
-        allocatedAt = 0L,
-        delayUnloadUntil = 0L,
-        ringHasEnoughRingMembersToWithdraw = true,
     )
 
     private companion object {

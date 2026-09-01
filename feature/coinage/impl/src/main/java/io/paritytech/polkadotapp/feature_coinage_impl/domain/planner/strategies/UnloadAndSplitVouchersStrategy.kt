@@ -34,6 +34,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransa
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransactionAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.mintAndHandOffCoins
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.toSplitDestinations
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
@@ -57,6 +58,7 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
     private val peopleMembershipProver: PeopleMembershipProver,
+    private val quotaTracker: UnloadQuotaTracker,
     private val coinageInstanceIdProvider: CoinageInstanceIdProvider
 ) {
     fun create(
@@ -80,6 +82,7 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
         breakdownUseCase = breakdownUseCase,
         balanceConverterUseCase = balanceConverterUseCase,
         peopleMembershipProver = peopleMembershipProver,
+        quotaTracker = quotaTracker,
         coinageInstanceIdProvider = coinageInstanceIdProvider
     )
 }
@@ -101,6 +104,7 @@ class UnloadAndSplitVouchersStrategy(
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
     private val peopleMembershipProver: PeopleMembershipProver,
+    private val quotaTracker: UnloadQuotaTracker,
     private val coinageInstanceIdProvider: CoinageInstanceIdProvider
 ) : TransferStrategy {
     private val vouchers = payload.vouchersToUnload
@@ -169,6 +173,10 @@ class UnloadAndSplitVouchersStrategy(
         }
 
         transactionService.submitTransactions(requests, groupId).getOrThrow()
+
+        // After submission, not after resolving: a token picked for a transaction that never left is still
+        // there to be picked again.
+        quotaTracker.noteUnloadsHappened(freeUnloadTokens.size)
 
         PreparedTransfer((exactCoins + prepared.flatMap { it.recipientCoins }).toMemoEntries(), handoffCommit)
     }

@@ -47,6 +47,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
@@ -120,6 +121,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
     private val coinAmountBreakdownUseCase: CoinAmountBreakdownUseCase,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase,
     private val peopleMembershipProver: PeopleMembershipProver,
+    private val quotaTracker: UnloadQuotaTracker,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
 ) : UnloadRecyclerIntoExternalAssetUseCase {
@@ -279,6 +281,10 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         coinageLogI("Unload registering group=${groupId.value} transactions=${transactions.size}")
 
         transactionService.submitTransactions(transactions, groupId).getOrThrow()
+
+        // After submission, not after resolving: a token picked for a transaction that never left is still
+        // there to be picked again.
+        quotaTracker.noteUnloadsHappened(prepared.groups.size)
     }
 
     override fun subscribeUnloadStatus(groupId: CoinageOperationGroupId): Flow<ExternalUnloadStatus> =

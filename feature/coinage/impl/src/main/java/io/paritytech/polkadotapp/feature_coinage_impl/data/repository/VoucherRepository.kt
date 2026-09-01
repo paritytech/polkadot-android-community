@@ -11,7 +11,6 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherLocationUpdate
-import io.paritytech.polkadotapp.database.dao.RingMemberStatusUpdate
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstanceId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
@@ -34,8 +33,6 @@ interface VoucherRepository {
 
     fun subscribeAllVouchers(): Flow<List<RecyclerVoucher>>
 
-    fun subscribeVouchersNotInRecycler(): Flow<List<RecyclerVoucher>>
-
     suspend fun updateLocations(locations: Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler>)
 
     suspend fun getNextDerivationIndex(): DerivationIndex
@@ -46,8 +43,6 @@ interface VoucherRepository {
     suspend fun getVouchersInRecycler(): List<RecyclerVoucher>
 
     suspend fun getAllVouchers(): List<RecyclerVoucher>
-
-    suspend fun updateRingMemberStatuses(updates: Map<Int, Boolean>)
 
     suspend fun fetchValuesForKeys(
         chainId: ChainId,
@@ -85,15 +80,12 @@ class RealVoucherRepository @Inject constructor(
         return recyclerVoucherDao.subscribeAll().mapList { it.toDomain() }
     }
 
-    override fun subscribeVouchersNotInRecycler(): Flow<List<RecyclerVoucher>> {
-        return recyclerVoucherDao.subscribeNotInRecycler().mapList { it.toDomain() }
-    }
-
     override suspend fun updateLocations(locations: Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler>) {
         val updates = locations.map { (publicKey, location) ->
             RecyclerVoucherLocationUpdate(
                 ringVrfPublicKey = publicKey.value,
-                recyclerIndex = location.recyclerIndex.value.toInt()
+                recyclerIndex = location.recyclerIndex.value.toInt(),
+                recyclerMembers = location.recyclerMembers
             )
         }
         recyclerVoucherDao.updateLocations(updates)
@@ -127,13 +119,6 @@ class RealVoucherRepository @Inject constructor(
         return recyclerVoucherDao.getAllVouchers().map { it.toDomain() }
     }
 
-    override suspend fun updateRingMemberStatuses(updates: Map<Int, Boolean>) {
-        val daoUpdates = updates.map { (ringVrfKeyIndex, hasEnough) ->
-            RingMemberStatusUpdate(ringVrfKeyIndex, hasEnough)
-        }
-        recyclerVoucherDao.updateRingMemberStatuses(daoUpdates)
-    }
-
     override fun subscribeVouchersInRecycler(): Flow<List<RecyclerVoucher>> {
         return recyclerVoucherDao.subscribeVouchersInRecycler().mapList { it.toDomain() }
     }
@@ -159,15 +144,20 @@ class RealVoucherRepository @Inject constructor(
             ringVrfPublicKey = ringVrfPublicKey.toDataByteArray(),
             recyclerValue = ValueExponent(recyclerValue),
             location = toDomainLocation(),
-            allocatedAt = allocatedAt,
-            delayUnloadUntil = delayUnloadUntil,
-            ringHasEnoughRingMembersToWithdraw = ringHasEnoughRingMembersToWithdraw,
         )
     }
 
     private fun RecyclerVoucherLocal.toDomainLocation(): RecyclerVoucher.Location {
         val index = locationRecyclerIndex ?: return RecyclerVoucher.Location.Unknown
-        return RecyclerVoucher.Location.InRecycler(recyclerIndex = RecyclerIndex(index.toBigInteger()))
+
+        // Written together by the location service, so one without the other is a corrupt row rather than a
+        // state worth guessing at.
+        val members = requireNotNull(recyclerMembers) { "Voucher in recycler $index has no member count" }
+
+        return RecyclerVoucher.Location.InRecycler(
+            recyclerIndex = RecyclerIndex(index.toBigInteger()),
+            recyclerMembers = members
+        )
     }
 
     private fun RecyclerVoucher.toLocal(): RecyclerVoucherLocal {
@@ -177,9 +167,7 @@ class RealVoucherRepository @Inject constructor(
             ringVrfPublicKey = ringVrfPublicKey.value,
             recyclerValue = recyclerValue.value,
             locationRecyclerIndex = inRecycler?.recyclerIndex?.value?.toInt(),
-            allocatedAt = allocatedAt,
-            delayUnloadUntil = delayUnloadUntil,
-            ringHasEnoughRingMembersToWithdraw = ringHasEnoughRingMembersToWithdraw,
+            recyclerMembers = inRecycler?.recyclerMembers,
         )
     }
 }

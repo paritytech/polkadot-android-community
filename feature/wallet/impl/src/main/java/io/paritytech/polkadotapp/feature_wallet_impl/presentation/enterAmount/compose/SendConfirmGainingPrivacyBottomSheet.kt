@@ -46,27 +46,25 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Token
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.formatFiat
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenSymbolAppearance
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmDegradedVouchersUserAction
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmGainingPrivacySpendUserAction
 import java.math.BigDecimal
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
-fun SendConfirmDegradedStateBottomSheet(
+fun SendConfirmGainingPrivacyBottomSheet(
     isVisible: Boolean,
-    action: ConfirmDegradedVouchersUserAction,
-    onSendPrivatelyOnly: () -> Unit,
-    onSendWithDegraded: () -> Unit,
+    action: ConfirmGainingPrivacySpendUserAction,
+    onSendAnyway: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     NovaModalBottomSheet(
         isVisible = isVisible,
         onDismissRequest = onDismiss,
     ) {
-        SendConfirmDegradedStateContent(
+        SendConfirmGainingPrivacyContent(
             action = action,
             isVisible = isVisible,
-            onSendPrivatelyOnly = onSendPrivatelyOnly,
-            onSendWithDegraded = onSendWithDegraded,
+            onSendAnyway = onSendAnyway,
             onCancel = onDismiss,
         )
     }
@@ -78,11 +76,10 @@ private sealed interface Page {
 }
 
 @Composable
-private fun SendConfirmDegradedStateContent(
-    action: ConfirmDegradedVouchersUserAction,
+private fun SendConfirmGainingPrivacyContent(
+    action: ConfirmGainingPrivacySpendUserAction,
     isVisible: Boolean,
-    onSendPrivatelyOnly: () -> Unit,
-    onSendWithDegraded: () -> Unit,
+    onSendAnyway: () -> Unit,
     onCancel: () -> Unit,
 ) {
     var page: Page by remember { mutableStateOf(Page.Details) }
@@ -96,8 +93,7 @@ private fun SendConfirmDegradedStateContent(
             Page.Details -> DetailsPage(
                 action = action,
                 onWhyClick = { page = Page.WhyExplain },
-                onSendPrivatelyOnly = onSendPrivatelyOnly,
-                onSendWithDegraded = onSendWithDegraded,
+                onSendAnyway = onSendAnyway,
                 onCancel = onCancel,
             )
 
@@ -110,18 +106,17 @@ private fun SendConfirmDegradedStateContent(
 
 @Composable
 private fun DetailsPage(
-    action: ConfirmDegradedVouchersUserAction,
+    action: ConfirmGainingPrivacySpendUserAction,
     onWhyClick: () -> Unit,
-    onSendPrivatelyOnly: () -> Unit,
-    onSendWithDegraded: () -> Unit,
+    onSendAnyway: () -> Unit,
     onCancel: () -> Unit,
 ) {
     val formatter = LocalTokenAmountFormatter.current
 
-    val showSendPrivately = !action.secured.amount.isZero()
+    val hasSpendable = !action.spendable.amount.isZero()
     val totalAmountText = formatter.formatFiat(action.totalTransfer)
-    val securedAmountText = formatter.formatFiat(action.secured)
-    val degradedAmountText = formatter.formatFiat(action.degraded)
+    val spendableAmountText = formatter.formatFiat(action.spendable)
+    val gainingPrivacyAmountText = formatter.formatFiat(action.gainingPrivacy)
 
     Column(
         modifier = Modifier
@@ -140,7 +135,7 @@ private fun DetailsPage(
         VerticalSpacer { mediumIncreased }
 
         NovaText(
-            text = stringResource(RCommon.string.send_degraded_title),
+            text = stringResource(RCommon.string.send_gaining_privacy_title),
             style = PolkadotTheme.typography.headline.small,
             color = PolkadotTheme.colors.fg.primary,
             textAlign = TextAlign.Center,
@@ -148,9 +143,9 @@ private fun DetailsPage(
 
         VerticalSpacer { small }
 
-        if (showSendPrivately) {
+        if (hasSpendable) {
             NovaText(
-                text = stringResource(RCommon.string.send_degraded_can_send_privately, securedAmountText),
+                text = stringResource(RCommon.string.send_gaining_privacy_spendable, spendableAmountText),
                 style = PolkadotTheme.typography.body.large,
                 color = PolkadotTheme.colors.fg.secondary,
                 textAlign = TextAlign.Center,
@@ -161,9 +156,9 @@ private fun DetailsPage(
 
         NovaText(
             text = stringResource(
-                RCommon.string.send_degraded_full_amount,
+                RCommon.string.send_gaining_privacy_full_amount,
                 totalAmountText,
-                degradedAmountText,
+                gainingPrivacyAmountText,
             ),
             style = PolkadotTheme.typography.body.large,
             color = PolkadotTheme.colors.fg.secondary,
@@ -173,28 +168,17 @@ private fun DetailsPage(
         VerticalSpacer { mediumIncreased }
 
         WhyLink(
-            text = stringResource(RCommon.string.send_degraded_why_link, degradedAmountText),
+            text = stringResource(RCommon.string.send_gaining_privacy_why_link, gainingPrivacyAmountText),
             onClick = onWhyClick,
         )
 
         VerticalSpacer { extraLarge }
 
-        if (showSendPrivately) {
-            PolkadotTextButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = stringResource(RCommon.string.send_degraded_send_privately_button, securedAmountText),
-                style = PolkadotButtonStyle.primary(),
-                onClick = onSendPrivatelyOnly,
-            )
-
-            VerticalSpacer { small }
-        }
-
         PolkadotTextButton(
             modifier = Modifier.fillMaxWidth(),
-            text = stringResource(RCommon.string.send_degraded_send_with_degraded_button, totalAmountText),
+            text = stringResource(RCommon.string.send_gaining_privacy_send_anyway_button, totalAmountText),
             style = PolkadotButtonStyle.tertiary(),
-            onClick = onSendWithDegraded,
+            onClick = onSendAnyway,
         )
 
         VerticalSpacer { small }
@@ -255,7 +239,7 @@ private fun WhyExplainPage(
         VerticalSpacer { mediumIncreased }
 
         NovaText(
-            text = stringResource(RCommon.string.send_degraded_why_title),
+            text = stringResource(RCommon.string.send_gaining_privacy_why_title),
             style = PolkadotTheme.typography.headline.small,
             color = PolkadotTheme.colors.fg.primary,
             textAlign = TextAlign.Center,
@@ -264,7 +248,7 @@ private fun WhyExplainPage(
         VerticalSpacer { small }
 
         NovaText(
-            text = stringResource(RCommon.string.send_degraded_why_body),
+            text = stringResource(RCommon.string.send_gaining_privacy_why_body),
             style = PolkadotTheme.typography.body.large,
             color = PolkadotTheme.colors.fg.secondary,
             textAlign = TextAlign.Center,
@@ -283,7 +267,7 @@ private fun WhyExplainPage(
 
 @Preview
 @Composable
-private fun SendConfirmDegradedStateDetailsPreview() {
+private fun SendConfirmGainingPrivacyDetailsPreview() {
     fun createTokenAmountModel(amount: BigDecimal): TokenAmountModel {
         return object : TokenAmountModel {
             override val amount: BigDecimal = amount
@@ -296,14 +280,13 @@ private fun SendConfirmDegradedStateDetailsPreview() {
         ) {
             NovaBottomSheetSurface {
                 DetailsPage(
-                    action = ConfirmDegradedVouchersUserAction(
+                    action = ConfirmGainingPrivacySpendUserAction(
                         totalTransfer = createTokenAmountModel(100.toBigDecimal()),
-                        secured = createTokenAmountModel(60.toBigDecimal()),
-                        degraded = createTokenAmountModel(40.toBigDecimal()),
+                        spendable = createTokenAmountModel(60.toBigDecimal()),
+                        gainingPrivacy = createTokenAmountModel(40.toBigDecimal()),
                     ),
                     onWhyClick = {},
-                    onSendPrivatelyOnly = {},
-                    onSendWithDegraded = {},
+                    onSendAnyway = {},
                     onCancel = {},
                 )
             }
@@ -313,7 +296,7 @@ private fun SendConfirmDegradedStateDetailsPreview() {
 
 @Preview
 @Composable
-private fun SendConfirmDegradedStateWhyExplainPreview() {
+private fun SendConfirmGainingPrivacyWhyExplainPreview() {
     PolkadotTheme {
         NovaBottomSheetSurface {
             WhyExplainPage(onBack = {})

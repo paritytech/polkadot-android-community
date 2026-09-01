@@ -2,14 +2,16 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
-import io.paritytech.polkadotapp.feature_coinage_api.domain.common.formatExponentsToBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
@@ -18,6 +20,11 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
+import io.paritytech.polkadotapp.test_shared.any
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -25,444 +32,311 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import java.math.BigInteger
 
+private const val FULL_RING = 767
+private const val FORCED_AGE = 14
+
+/**
+ * The buckets, not the classification underneath — that lives in `CoinagePreClassificationTest`. What is
+ * asserted here is which bucket each already-classified asset lands in, and that a coin the evaluator has
+ * not judged yet is treated as still arriving rather than as spendable.
+ */
 class RealTotalBalanceUseCaseTest {
-    private val coinRepository: CoinRepository
-    private val coinageAssetsUseCase: CoinageAssetsUseCase
-    private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase
+    private val coinRepository: CoinRepository = mock()
+    private val coinageAssetsUseCase: CoinageAssetsUseCase = mock()
+    private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase = mock()
+    private val ringCapacityProvider: RingCapacityProvider = mock()
+    private val settings: CoinageRecyclingStrategySettings = mock()
+    private val evaluator: CoinRecyclingEvaluator = mock()
+    private val quotaTracker: UnloadQuotaTracker = mock()
+
+    private val strategyProvider = RecyclingStrategyProvider(coinRepository, quotaTracker)
+
     private val useCase: RealTotalBalanceUseCase
 
-    private val maxAge = 10
-    private val timestamp = 1000L
-    private val voucherSpendableTimestamp = timestamp - 1L
-    private val voucherPendingTimestamp = timestamp + 1L
-
     init {
-        coinRepository = mock()
-        coinageAssetsUseCase = mock()
-        coinageBalanceConverterUseCase = mock()
-
         runBlocking {
             `when`(coinageBalanceConverterUseCase.create()).thenReturn(Result.success(testConversionContext))
+            `when`(ringCapacityProvider.capacitiesFor(any()))
+                .thenReturn(mapOf(ValueExponent(1) to FULL_RING, ValueExponent(2) to FULL_RING))
         }
+        `when`(coinRepository.getCoinRecyclingAge()).thenReturn(FORCED_AGE)
 
-        useCase = RealTotalBalanceUseCase(coinRepository, coinageAssetsUseCase, coinageBalanceConverterUseCase)
+        useCase = RealTotalBalanceUseCase(
+            coinageAssetsUseCase = coinageAssetsUseCase,
+            coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
+            strategyProvider = strategyProvider,
+            ringCapacityProvider = ringCapacityProvider,
+            settings = settings,
+            evaluator = evaluator,
+        )
     }
 
     @Test
     fun `empty data returns zero balance`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
+        assertBalance(coins = emptyList(), vouchers = emptyList(), expected = balanceOf())
+    }
+
+    @Test
+    fun `a coin the strategy allows is available`() {
+        val coin = coinOf(exponent = 1, age = 3)
+
+        assertBalance(
+            coins = listOf(coin),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(),
+            verdicts = mapOf(coin.derivationIndex to CoinRecyclingState.ALLOW_USE),
+            expected = balanceOf(spendable = 1.exponentToBalance()),
         )
     }
 
     @Test
-    fun `coin with lower age than recycling age is spendable`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Known(maxAge - 1), onChain = true, exponent = 1)),
-            vouchers = emptyList(),
-            expectedBalance = balanceOf(secured = 1.exponentToBalance()),
-        )
-    }
+    fun `a coin the strategy gated is gaining privacy, not spendable`() {
+        val coin = coinOf(exponent = 1, age = 3)
 
-    /**
-     * A coin the peer has taken keeps the last age it was seen with, so it still looks young enough to
-     * spend. What makes it unspendable is that the chain no longer holds it.
-     *
-     * Only the age used to be checked, because presence was the same value. Now it is not, and counting
-     * this coin would offer money that is already gone.
-     */
-    @Test
-    fun `coin gone from the chain is not spendable however young its last age`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Known(maxAge - 1), onChain = false, exponent = 1)),
+        assertBalance(
+            coins = listOf(coin),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(),
+            verdicts = mapOf(coin.derivationIndex to CoinRecyclingState.TO_RECYCLE),
+            expected = balanceOf(gainingPrivacy = 1.exponentToBalance()),
         )
     }
 
     /**
-     * A coin handed to a peer before its mint finalized: absent, with a live minter, and no longer ours.
-     *
-     * It matches "on its way" on every count except the one that matters — the key has left, so whatever
-     * arrives is not ours to spend.
+     * The correction that follows is upward. The other way round would put money on screen as spendable and
+     * take it away a moment later, which is the one direction a balance must never move on its own.
      */
     @Test
-    fun `coin handed off before its mint finalized is not pending`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Unknown, onChain = false, exponent = 1)),
-            coinStates = listOf(
-                CoinageAssetState(handedOff = true, minterStatus = CoinageTransactionStatus.PENDING, consumerStatus = null)
-            ),
+    fun `a settled coin the evaluator has not judged yet counts as pending`() {
+        val coin = coinOf(exponent = 1, age = 3)
+
+        assertBalance(
+            coins = listOf(coin),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(),
+            verdicts = emptyMap(),
+            expected = balanceOf(pending = 1.exponentToBalance()),
         )
     }
 
     @Test
-    fun `coin absent from chain with no minter of ours counts nowhere`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Unknown, onChain = false, exponent = 1)),
-            vouchers = emptyList(),
-            expectedBalance = balanceOf(),
-        )
-    }
+    fun `a coin still arriving is pending`() {
+        val coin = coinOf(exponent = 1, age = null, onChain = false)
 
-    @Test
-    fun `coin absent from chain is pending while the transaction minting it is live`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Unknown, onChain = false, exponent = 1)),
+        assertBalance(
+            coins = listOf(coin),
             coinStates = listOf(stateWithMinter(CoinageTransactionStatus.PENDING)),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(pending = 1.exponentToBalance()),
+            expected = balanceOf(pending = 1.exponentToBalance()),
         )
     }
 
     @Test
-    fun `coin absent from chain counts nowhere once the transaction minting it failed`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Unknown, onChain = false, exponent = 1)),
+    fun `a coin whose mint failed counts nowhere`() {
+        val coin = coinOf(exponent = 1, age = null, onChain = false)
+
+        assertBalance(
+            coins = listOf(coin),
             coinStates = listOf(stateWithMinter(CoinageTransactionStatus.FAILURE)),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(),
+            expected = balanceOf(),
         )
     }
 
     @Test
-    fun `coin held by a live transaction of ours counts nowhere`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Known(0), onChain = true, exponent = 1)),
-            coinStates = listOf(stateWithConsumer(CoinageTransactionStatus.PENDING)),
+    fun `under min privacy an in-recycler voucher is available whatever its ring or delay`() {
+        val voucher = voucherOf(exponent = 1, location = inRecycler(members = 0))
+
+        assertBalance(
+            coins = emptyList(),
+            vouchers = listOf(voucher),
+            strategyType = RecyclingStrategyType.MIN_PRIVACY,
+            expected = balanceOf(spendable = 1.exponentToBalance()),
+        )
+    }
+
+    @Test
+    fun `under max privacy a voucher in a part-filled ring is gaining privacy`() {
+        val voucher = voucherOf(
+            exponent = 1,
+            location = inRecycler(members = FULL_RING - 1),
+        )
+
+        assertBalance(
+            coins = emptyList(),
+            vouchers = listOf(voucher),
+            strategyType = RecyclingStrategyType.MAX_PRIVACY,
+            expected = balanceOf(gainingPrivacy = 1.exponentToBalance(), canSpendWithConfirmation = false),
+        )
+    }
+
+    @Test
+    fun `under balanced a half-full ring releases a voucher`() {
+        // 767 keys, so half rounds up to 384 — a ring of 383 is one short.
+        val voucher = voucherOf(exponent = 1, location = inRecycler(members = FULL_RING / 2 + 1))
+
+        assertBalance(
+            coins = emptyList(),
+            vouchers = listOf(voucher),
+            strategyType = RecyclingStrategyType.BALANCED,
+            expected = balanceOf(spendable = 1.exponentToBalance()),
+        )
+    }
+
+    @Test
+    fun `under balanced a ring short of half holds the voucher back`() {
+        val voucher = voucherOf(exponent = 1, location = inRecycler(members = 0))
+
+        assertBalance(
+            coins = emptyList(),
+            vouchers = listOf(voucher),
+            strategyType = RecyclingStrategyType.BALANCED,
+            expected = balanceOf(gainingPrivacy = 1.exponentToBalance()),
+        )
+    }
+
+    @Test
+    fun `an onboarding voucher is pending`() {
+        val voucher = voucherOf(exponent = 1, location = Location.Onboarding)
+
+        assertBalance(
+            coins = emptyList(),
+            vouchers = listOf(voucher),
+            expected = balanceOf(pending = 1.exponentToBalance()),
+        )
+    }
+
+    @Test
+    fun `total sums every bucket`() {
+        val available = coinOf(exponent = 1, age = 3, derivationIndex = 1)
+        val gated = coinOf(exponent = 2, age = 9, derivationIndex = 2)
+        val arriving = coinOf(exponent = 3, age = null, onChain = false, derivationIndex = 3)
+
+        val balance = calculate(
+            coins = listOf(available, gated, arriving),
+            coinStates = listOf(
+                CoinageAssetState.UNTRACKED,
+                CoinageAssetState.UNTRACKED,
+                stateWithMinter(CoinageTransactionStatus.PENDING),
+            ),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(),
+            verdicts = mapOf(
+                available.derivationIndex to CoinRecyclingState.ALLOW_USE,
+                gated.derivationIndex to CoinRecyclingState.TO_RECYCLE,
+            ),
         )
+
+        assertEquals(listOf(1, 2, 3).exponentsToBalance(), balance.total)
+        assertEquals(1.exponentToBalance(), balance.availablePrivate)
+        assertEquals(2.exponentToBalance(), balance.gainingPrivacy.amount)
+        assertEquals(3.exponentToBalance(), balance.pending)
     }
 
+    /**
+     * A coin the chain will not take is not a privacy trade the user could accept, so it must not appear
+     * beside the balance they can choose to spend.
+     */
     @Test
-    fun `handed off coin counts nowhere`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Known(0), onChain = true, exponent = 1)),
-            coinStates = listOf(CoinageAssetState(handedOff = true, minterStatus = null, consumerStatus = null)),
+    fun `a coin past the forced age is pending, not gaining privacy`() {
+        val forced = coinOf(exponent = 1, age = 3)
+
+        assertBalance(
+            coins = listOf(forced),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(),
+            verdicts = mapOf(forced.derivationIndex to CoinRecyclingState.MUST_RECYCLE),
+            expected = balanceOf(pending = 1.exponentToBalance()),
         )
     }
 
     @Test
-    fun `coin with recycling age is pending`() {
-        assertCalculatedBalance(
-            coins = listOf(createCoin(age = Coin.Age.Known(maxAge), onChain = true, exponent = 1)),
+    fun `max privacy will not offer what it is holding back`() {
+        val gated = coinOf(exponent = 1, age = 3)
+
+        assertBalance(
+            coins = listOf(gated),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(pending = 1.exponentToBalance()),
+            strategyType = RecyclingStrategyType.MAX_PRIVACY,
+            verdicts = mapOf(gated.derivationIndex to CoinRecyclingState.TO_RECYCLE),
+            expected = balanceOf(gainingPrivacy = 1.exponentToBalance(), canSpendWithConfirmation = false),
         )
     }
 
     @Test
-    fun `coin is added to secured, never to degraded`() {
-        // Two spendable coins with different exponents: both contribute to spendable.secured.
-        assertCalculatedBalance(
-            coins = listOf(
-                createCoin(age = Coin.Age.Known(maxAge - 1), onChain = true, exponent = 1),
-                createCoin(age = Coin.Age.Known(0), onChain = true, exponent = 2),
-            ),
+    fun `balanced offers what it is holding back`() {
+        val gated = coinOf(exponent = 1, age = 5)
+
+        assertBalance(
+            coins = listOf(gated),
             vouchers = emptyList(),
-            expectedBalance = balanceOf(secured = listOf(1, 2).exponentsToBalance()),
+            strategyType = RecyclingStrategyType.BALANCED,
+            verdicts = mapOf(gated.derivationIndex to CoinRecyclingState.TO_RECYCLE),
+            expected = balanceOf(gainingPrivacy = 1.exponentToBalance(), canSpendWithConfirmation = true),
         )
     }
 
-    @Test
-    fun `voucher is secured with passed delay, in recycler and enough members`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(
-                createVoucher(
-                    delayUnloadUntil = voucherSpendableTimestamp,
-                    location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)),
-                    enoughMembers = true,
-                    exponent = 1,
-                )
-            ),
-            expectedBalance = balanceOf(secured = 1.exponentToBalance()),
-        )
+    private fun assertBalance(
+        coins: List<Coin>,
+        vouchers: List<RecyclerVoucher>,
+        expected: CoinageBalance,
+        coinStates: List<CoinageAssetState> = coins.map { CoinageAssetState.UNTRACKED },
+        voucherStates: List<CoinageAssetState> = vouchers.map { CoinageAssetState.UNTRACKED },
+        strategyType: RecyclingStrategyType = RecyclingStrategyType.MIN_PRIVACY,
+        verdicts: RecyclingVerdicts = coins.associate { it.derivationIndex to CoinRecyclingState.ALLOW_USE },
+    ) {
+        assertEquals(expected, calculate(coins, vouchers, coinStates, voucherStates, strategyType, verdicts))
     }
 
-    @Test
-    fun `voucher is degraded when ready to use but not enough ring members`() {
-        // In recycler and past the unload delay, but enoughMembers=false
-        // → goes to degraded bucket, not pending, no latestUnload contribution.
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(
-                createVoucher(
-                    delayUnloadUntil = voucherSpendableTimestamp,
-                    location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)),
-                    enoughMembers = false,
-                    exponent = 1,
-                )
-            ),
-            expectedBalance = balanceOf(degraded = 1.exponentToBalance()),
-        )
+    private fun calculate(
+        coins: List<Coin>,
+        vouchers: List<RecyclerVoucher>,
+        coinStates: List<CoinageAssetState> = coins.map { CoinageAssetState.UNTRACKED },
+        voucherStates: List<CoinageAssetState> = vouchers.map { CoinageAssetState.UNTRACKED },
+        strategyType: RecyclingStrategyType = RecyclingStrategyType.MIN_PRIVACY,
+        verdicts: RecyclingVerdicts = coins.associate { it.derivationIndex to CoinRecyclingState.ALLOW_USE },
+    ): CoinageBalance = runBlocking {
+        useCase.calculateCoinageBalance(
+            coins = coins.zip(coinStates, ::TrackedCoin),
+            vouchers = vouchers.zip(voucherStates, ::TrackedVoucher),
+            strategyType = strategyType,
+            verdicts = verdicts,
+        ).getOrThrow()
     }
 
-    @Test
-    fun `voucher is degraded when ready to use but unload delay not passed`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(
-                createVoucher(
-                    delayUnloadUntil = voucherPendingTimestamp,
-                    location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)),
-                    enoughMembers = true,
-                    exponent = 1,
-                )
-            ),
-            expectedBalance = balanceOf(degraded = 1.exponentToBalance()),
-        )
-    }
-
-    @Test
-    fun `voucher with unknown location is pending while the transaction minting it is live`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(
-                createVoucher(
-                    delayUnloadUntil = voucherSpendableTimestamp,
-                    location = Location.Unknown,
-                    enoughMembers = true,
-                    exponent = 1,
-                )
-            ),
-            voucherStates = listOf(stateWithMinter(CoinageTransactionStatus.PENDING)),
-            expectedBalance = balanceOf(
-                pending = 1.exponentToBalance(),
-            ),
-        )
-    }
-
-    @Test
-    fun `voucher with unknown location counts nowhere once the transaction minting it failed`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(
-                createVoucher(
-                    delayUnloadUntil = voucherSpendableTimestamp,
-                    location = Location.Unknown,
-                    enoughMembers = true,
-                    exponent = 1,
-                )
-            ),
-            voucherStates = listOf(stateWithMinter(CoinageTransactionStatus.FAILURE)),
-            expectedBalance = balanceOf(),
-        )
-    }
-
-    @Test
-    fun `onboarding voucher is pending whatever the ledger says about its minter`() {
-        // It is already registered on chain, so its minter succeeded whether or not we still hold the entry.
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(
-                createVoucher(
-                    delayUnloadUntil = voucherSpendableTimestamp,
-                    location = Location.Onboarding,
-                    enoughMembers = true,
-                    exponent = 1,
-                )
-            ),
-            expectedBalance = balanceOf(pending = 1.exponentToBalance()),
-        )
-    }
-
-    @Test
-    fun `calculates coins and vouchers correctly`() {
-        val coins = listOf(
-            // Spendable → secured.
-            createCoin(age = Coin.Age.Known(maxAge - 1), onChain = true, exponent = 1),
-            // Pending (at recycling age).
-            createCoin(age = Coin.Age.Known(maxAge), onChain = true, exponent = 2),
-        )
-
-        val vouchers = listOf(
-            // Pending (delay not passed).
-            createVoucher(
-                delayUnloadUntil = voucherPendingTimestamp,
-                location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)),
-                enoughMembers = true,
-                exponent = 3,
-            ),
-            // Secured (delay passed, in recycler, enough members).
-            createVoucher(
-                delayUnloadUntil = voucherSpendableTimestamp,
-                location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)),
-                enoughMembers = true,
-                exponent = 4,
-            ),
-            // Degraded (delay passed, in recycler, NOT enough members).
-            createVoucher(
-                delayUnloadUntil = voucherSpendableTimestamp,
-                location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)),
-                enoughMembers = false,
-                exponent = 5,
-            ),
-        )
-
-        assertCalculatedBalance(
-            coins = coins,
-            vouchers = vouchers,
-            expectedBalance = balanceOf(
-                secured = listOf(1, 4).exponentsToBalance(),
-                degraded = listOf(3, 5).exponentsToBalance(),
-                pending = 2.exponentToBalance(),
-            ),
-        )
-    }
-
-    @Test
-    fun `voucher held by a live transaction of ours counts nowhere`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(securedVoucher(exponent = 1)),
-            voucherStates = listOf(stateWithConsumer(CoinageTransactionStatus.PENDING)),
-            expectedBalance = balanceOf(),
-        )
-    }
-
-    @Test
-    fun `voucher a finalized transaction of ours already spent counts nowhere`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(securedVoucher(exponent = 1)),
-            voucherStates = listOf(stateWithConsumer(CoinageTransactionStatus.FINALIZED_SUCCESS)),
-            expectedBalance = balanceOf(),
-        )
-    }
-
-    @Test
-    fun `voucher a failed transaction of ours tried to spend counts again`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(securedVoucher(exponent = 1)),
-            voucherStates = listOf(stateWithConsumer(CoinageTransactionStatus.FAILURE)),
-            expectedBalance = balanceOf(secured = 1.exponentToBalance()),
-        )
-    }
-
-    @Test
-    fun `handed off voucher counts nowhere`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(securedVoucher(exponent = 1)),
-            voucherStates = listOf(CoinageAssetState(handedOff = true, minterStatus = null, consumerStatus = null)),
-            expectedBalance = balanceOf(),
-        )
-    }
-
-    @Test
-    fun `voucher not in the recycler is pending while the transaction minting it is live`() {
-        assertCalculatedBalance(
-            coins = emptyList(),
-            vouchers = listOf(
-                createVoucher(
-                    delayUnloadUntil = voucherSpendableTimestamp,
-                    location = Location.Onboarding,
-                    enoughMembers = true,
-                    exponent = 1,
-                )
-            ),
-            voucherStates = listOf(stateWithMinter(CoinageTransactionStatus.PENDING)),
-            expectedBalance = balanceOf(pending = 1.exponentToBalance()),
-        )
-    }
-
-    private fun securedVoucher(exponent: Int) = createVoucher(
-        delayUnloadUntil = voucherSpendableTimestamp,
-        location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)),
-        enoughMembers = true,
-        exponent = exponent,
+    private fun balanceOf(
+        spendable: Balance = ZERO_BALANCE,
+        gainingPrivacy: Balance = ZERO_BALANCE,
+        pending: Balance = ZERO_BALANCE,
+        canSpendWithConfirmation: Boolean = true,
+    ) = CoinageBalance(
+        availablePrivate = spendable,
+        gainingPrivacy = CoinageBalance.GainingPrivacyBalance(gainingPrivacy, canSpendWithConfirmation),
+        pending = pending,
     )
 
     private fun stateWithMinter(status: CoinageTransactionStatus) =
         CoinageAssetState(handedOff = false, minterStatus = status, consumerStatus = null)
 
-    private fun stateWithConsumer(status: CoinageTransactionStatus) =
-        CoinageAssetState(handedOff = false, minterStatus = null, consumerStatus = status)
+    private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members)
 
-    private fun assertCalculatedBalance(
-        coins: List<Coin>,
-        vouchers: List<RecyclerVoucher>,
-        expectedBalance: CoinageBalance,
-        coinStates: List<CoinageAssetState> = coins.map { CoinageAssetState.UNTRACKED },
-        voucherStates: List<CoinageAssetState> = vouchers.map { CoinageAssetState.UNTRACKED },
-        recyclingAge: Int = maxAge,
-        currentTimeMillis: Timestamp = timestamp,
-    ) = runBlocking {
-        val actualBalance = useCase.calculateCoinageBalance(
-            coins = coins.zip(coinStates, ::TrackedCoin),
-            recyclingAge = recyclingAge,
-            vouchers = vouchers.zip(voucherStates, ::TrackedVoucher),
-            currentTimeMillis = currentTimeMillis,
-        ).getOrThrow()
-
-        assertEquals(expectedBalance, actualBalance)
-    }
-
-    private fun balanceOf(
-        secured: Balance = ZERO_BALANCE,
-        degraded: Balance = ZERO_BALANCE,
-        pending: Balance = ZERO_BALANCE,
-    ): CoinageBalance = CoinageBalance(
-        spendableBalance = CoinageBalance.SpendableBalance(
-            degraded = degraded,
-            secured = secured,
-        ),
-        pendingBalance = pending
+    private fun coinOf(exponent: Int, age: Int?, onChain: Boolean = true, derivationIndex: Int = 0) = Coin(
+        derivationIndex = derivationIndex,
+        valueExponent = ValueExponent(exponent),
+        age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
+        isOnChain = onChain,
+        accountId = mock(),
     )
 
-    /**
-     * Presence is stated, not inferred from the age.
-     *
-     * They used to be one value, and a coin the chain no longer holds keeps the last age it was seen with —
-     * so "known age, gone from chain" is a real state, and deriving one from the other makes it impossible
-     * for a test to say.
-     */
-    private fun createCoin(age: Coin.Age, onChain: Boolean, exponent: Int): Coin {
-        return Coin(
-            derivationIndex = 0,
-            valueExponent = ValueExponent(exponent),
-            age = age,
-            isOnChain = onChain,
-            accountId = mock(),
-        )
-    }
+    private fun voucherOf(exponent: Int, location: Location) = RecyclerVoucher(
+        ringVrfKeyIndex = 0,
+        ringVrfPublicKey = mock(),
+        recyclerValue = ValueExponent(exponent),
+        location = location,
+    )
 
-    private fun createVoucher(
-        delayUnloadUntil: Timestamp,
-        location: Location,
-        enoughMembers: Boolean,
-        exponent: Int,
-    ): RecyclerVoucher {
-        return RecyclerVoucher(
-            ringVrfKeyIndex = 0,
-            ringVrfPublicKey = mock(),
-            recyclerValue = ValueExponent(exponent),
-            location = location,
-            allocatedAt = 0L,
-            delayUnloadUntil = delayUnloadUntil,
-            ringHasEnoughRingMembersToWithdraw = enoughMembers,
-        )
-    }
+    private fun Int.exponentToBalance() = testConversionContext.formatExponentToBalance(ValueExponent(this))
 
-    private fun Int.exponentToBalance(): Balance {
-        return testConversionContext.formatExponentToBalance(ValueExponent(this))
-    }
+    private fun List<Int>.exponentsToBalance() =
+        map { testConversionContext.formatExponentToBalance(ValueExponent(it)) }
+            .fold(ZERO_BALANCE) { acc, balance -> acc + balance }
 
-    private fun List<Int>.exponentsToBalance(): Balance {
-        val exponents = this.map { ValueExponent(it) }
-        return testConversionContext.formatExponentsToBalance(exponents)
-    }
-
-    companion object {
-        private val ZERO_BALANCE: Balance = BigInteger.ZERO.intoBalance()
+    private companion object {
+        val ZERO_BALANCE: Balance = BigInteger.ZERO.intoBalance()
     }
 }

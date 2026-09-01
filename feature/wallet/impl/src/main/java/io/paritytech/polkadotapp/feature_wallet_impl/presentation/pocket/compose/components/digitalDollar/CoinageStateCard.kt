@@ -37,7 +37,6 @@ internal fun CoinageStateCard(
     state: CoinageUiState.TokensState,
     onCoinsClick: () -> Unit,
     onVouchersClick: () -> Unit,
-    makeAllVouchersReady: () -> Unit,
     onShareLogsClick: () -> Unit
 ) {
     val formatter = LocalTokenAmountFormatter.current
@@ -75,31 +74,31 @@ internal fun CoinageStateCard(
 
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 NovaText(
-                    text = "Spendable Secured Balance",
+                    text = "Spendable Balance",
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
                 NovaText(
-                    text = formatter.formatFiat(state.spendableSecuredBalance),
+                    text = formatter.formatFiat(state.spendableBalance),
                     color = PolkadotTheme.colors.fg.primary
                 )
             }
 
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 NovaText(
-                    text = "Spendable Degraded Balance",
+                    text = "Gaining Privacy",
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
                 NovaText(
-                    text = formatter.formatFiat(state.spendableDegradedBalance),
+                    text = formatter.formatFiat(state.gainingPrivacyBalance),
                     color = PolkadotTheme.colors.fg.primary
                 )
             }
 
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 NovaText(
-                    text = "Pending Balance",
+                    text = "Pending",
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
@@ -154,14 +153,6 @@ internal fun CoinageStateCard(
             }
 
             PolkadotTextButton(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                text = "Make all vouchers ready",
-                onClick = { makeAllVouchersReady() }
-            )
-
-            PolkadotTextButton(
                 text = "Share Coinage Logs",
                 onClick = { onShareLogsClick() },
                 modifier = Modifier
@@ -183,15 +174,14 @@ private fun CoinageStateCardPreview() {
             CoinageStateCard(
                 state = CoinageUiState.TokensState(
                     totalBalance = TokenAmountModel.mock,
-                    spendableSecuredBalance = TokenAmountModel.mock,
-                    spendableDegradedBalance = TokenAmountModel.mock,
+                    spendableBalance = TokenAmountModel.mock,
+                    gainingPrivacyBalance = TokenAmountModel.mock,
                     pendingBalance = TokenAmountModel.mock,
                     coinList = persistentListOf(),
                     voucherList = persistentListOf()
                 ),
                 onCoinsClick = {},
                 onVouchersClick = {},
-                makeAllVouchersReady = {},
                 onShareLogsClick = {}
             )
         }

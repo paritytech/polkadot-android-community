@@ -2,29 +2,22 @@
 <resources>
     <string name="balance_details_title">Balance details</string>
     <string name="balance_details_subtitle">See what makes up your balance</string>
-    <string name="balance_details_total">Total Balance</string>
-    <string name="balance_details_total_description">Everything in your balance</string>
-    <string name="balance_details_available_now">Available now</string>
-    <string name="balance_details_available_now_description">Funds you can use for payments right away</string>
-    <string name="balance_details_available_now_secured">— Secured</string>
-    <string name="balance_details_available_now_low_privacy">— Low privacy</string>
-    <string name="balance_details_available_soon">Available soon</string>
-    <string name="balance_details_available_soon_description">Funds being prepared by the private payment system. Processing usually takes around 1-5 minutes</string>
-    <string name="balance_details_available_now_info_title">What does \"Available now\" mean?</string>
-    <string name="balance_details_available_now_info_body">This is the amount you can use for a payment right away.\n\nIt may include funds that are already ready for private sending, funds that can be prepared instantly for a payment, and funds that can be sent now with slightly less privacy.</string>
-    <string name="balance_details_available_now_why_subtitle">Why are some funds less private?</string>
-    <string name="balance_details_available_now_why_body">Some funds are ready to send, but have not completed all privacy preparation steps yet. If you use them now, they may reveal a little more on-chain information than fully private funds.\n\nTo make them private, you don\'t need to do anything. Just wait — they will become private-ready automatically.</string>
-    <string name="balance_details_available_soon_info_title">What does \"Available soon\" mean?</string>
-    <string name="balance_details_available_soon_info_body">These funds are still being prepared by the private payment system and cannot be sent yet.\n\nThey may include funds from recent payments that are still settling, or change that is being made ready for future private sends.\n\nThey will become available automatically once processing is complete.</string>
+    <string name="balance_details_available_private">Available private</string>
+    <string name="balance_details_available_private_description">Funds you can spend without privacy concerns</string>
+    <string name="balance_details_available_exposed">Available exposed</string>
+    <string name="balance_details_available_exposed_description">Spendable funds, but without full privacy guarantees</string>
+    <string name="balance_details_exposed_unavailable">Exposed, not available</string>
+    <string name="balance_details_exposed_unavailable_description">Technically spendable, but your selected privacy mode disallows its usage</string>
+    <string name="balance_details_not_available">Not available</string>
+    <string name="balance_details_not_available_description">Funds being prepared by the private payment system. Processing usually takes around 1-5 minutes</string>
 
-    <string name="send_degraded_title">Some funds are less private</string>
-    <string name="send_degraded_can_send_privately">You can send %1$s privately.</string>
-    <string name="send_degraded_full_amount">To send %1$s, the remaining %2$s will use lower-privacy funds.</string>
-    <string name="send_degraded_why_link">Why is %1$s less private?</string>
-    <string name="send_degraded_send_privately_button">Send %1$s privately</string>
-    <string name="send_degraded_send_with_degraded_button">Send %1$s with less privacy</string>
-    <string name="send_degraded_why_title">About lower-privacy funds</string>
-    <string name="send_degraded_why_body">When your ring has insufficient members, part of the amount is sent using vouchers that reveal more information about the sender. Wait for your ring to grow to keep every transfer fully private.</string>
+    <string name="send_gaining_privacy_title">Some funds are still gaining privacy</string>
+    <string name="send_gaining_privacy_spendable">You can send %1$s right now.</string>
+    <string name="send_gaining_privacy_full_amount">To send %1$s, the remaining %2$s has to come from funds that are still gaining privacy.</string>
+    <string name="send_gaining_privacy_why_link">Why is %1$s still gaining privacy?</string>
+    <string name="send_gaining_privacy_send_anyway_button">Send %1$s anyway</string>
+    <string name="send_gaining_privacy_why_title">About funds gaining privacy</string>
+    <string name="send_gaining_privacy_why_body">Recycled funds hide among everyone else in their bucket, and the more of it fills up, the harder they are to trace back to you. Spending them before it fills gives up the privacy they have earned so far. Wait, and they become spendable on their own.</string>
 
     <string name="send_payment_failed">Failed to submit transaction</string>
     <string name="common_intent_failed">Failed to find application to perform specified action</string>
@@ -751,7 +744,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
 
     <string name="send_enter_amount_title">Enter amount</string>
     <string name="send_enter_amount_placeholder">Enter Amount</string>
-    <string name="send_enter_amount_your_balance_label">Available now</string>
+    <string name="send_enter_amount_max_balance_prefix">Max:</string>
     <string name="send_enter_amount_not_enough_funds_error">You don’t have enough funds</string>
     <string name="send_enter_amount_cash_title">%1$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>
@@ -1462,8 +1455,23 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_digital_dollar_card_title">%1$s</string>
     <string name="pocket_digital_dollar_send_button">Send %1$s</string>
     <string name="pocket_digital_dollar_faucet_top_up">Faucet Top Up</string>
+    <string name="pocket_digital_dollar_available">Available</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
+
+    <string name="payment_privacy_mode_title">Payment Privacy Mode</string>
+    <string name="payment_privacy_mode_subtitle">This setting controls how your payments are processed</string>
+    <string name="payment_privacy_mode_fastest_label">FASTEST</string>
+    <string name="payment_privacy_mode_fastest_description">Fastest payments\nLower privacy</string>
+    <string name="payment_privacy_mode_fastest_accessibility">Fastest. Fastest payments, lower privacy.</string>
+    <string name="payment_privacy_mode_balanced_label">BALANCED</string>
+    <string name="payment_privacy_mode_balanced_description">Stronger privacy\nModerate speed</string>
+    <string name="payment_privacy_mode_balanced_accessibility">Balanced. Stronger privacy, moderate speed.</string>
+    <string name="payment_privacy_mode_most_private_label">MOST PRIVATE</string>
+    <string name="payment_privacy_mode_most_private_description">Maximum privacy\nLowest speed</string>
+    <string name="payment_privacy_mode_most_private_accessibility">Most private. Maximum privacy, lowest speed.</string>
+    <string name="payment_privacy_mode_state_selected">Selected</string>
+    <string name="payment_privacy_mode_state_not_selected">Not selected</string>
 
     <string name="w3s_wait_title">Your username is being registered</string>
     <string name="w3s_wait_subtitle">This usually takes around 10 seconds</string>

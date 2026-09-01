@@ -59,7 +59,9 @@ class VoucherLocationService @Inject constructor(
     }
 
     private fun subscribeVoucherPositions(chainId: ChainId): Flow<VoucherPositions> {
-        return voucherRepository.subscribeVouchersNotInRecycler()
+        // Every voucher, not just the ones outside a recycler: a ring keeps filling after a voucher lands
+        // in it, and the member count is what the strategies read to decide when it may be spent.
+        return voucherRepository.subscribeAllVouchers()
             .filter { it.isNotEmpty() }
             .distinctUntilChangedBy { vouchers -> vouchers.mapToSet { it.ringVrfPublicKey } }
             .flatMapLatest { vouchers ->
@@ -106,7 +108,9 @@ class VoucherLocationService @Inject constructor(
             val ringStatus = ringStatuses[ringStatusKey] ?: return@mapValuesNotNull null
 
             if (ringStatus.includesKey(position)) {
-                RecyclerVoucher.Location.InRecycler(position.ringIndex)
+                // included, not total: a proof only verifies against the keys baked into the ring root, so
+                // that is the set this voucher actually hides in.
+                RecyclerVoucher.Location.InRecycler(position.ringIndex, ringStatus.included)
             } else {
                 null
             }

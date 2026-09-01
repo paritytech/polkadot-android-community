@@ -24,7 +24,6 @@ import io.paritytech.polkadotapp.common.R as RCommon
 fun CoinageCardContent(
     state: CoinageUiState,
     onAutoFundClick: () -> Unit,
-    makeAllVouchersReady: () -> Unit,
     onShareLogsClick: () -> Unit,
     onForceRecycleClick: (Coin) -> Unit
 ) {
@@ -47,7 +46,6 @@ fun CoinageCardContent(
                 state = state.tokensState,
                 onCoinsClick = { details = CoinageDetails.COINS },
                 onVouchersClick = { details = CoinageDetails.VOUCHERS },
-                makeAllVouchersReady = makeAllVouchersReady,
                 onShareLogsClick = onShareLogsClick
             )
 

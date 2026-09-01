@@ -172,55 +172,24 @@ class TransferPlannerTest {
     }
 
     @Test
-    fun `Secured vs degraded - prefers secured voucher when it alone can cover remainder`() = runBlocking {
+    fun `takes a single voucher when either one alone can cover the remainder`() = runBlocking {
         // 5.5 = 4 (coin exp=2) + 1.5 from vouchers. Either voucher alone (exp=1, =2) can cover.
         val coins = listOf(createCoin(exponent = 2))
-        val securedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = true)
-        val degradedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
+        val first = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE))
+        val second = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO))
 
-        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(securedVoucher, degradedVoucher)).getOrThrow()
-
-        val strategy = plan.strategyType as StrategyType.UnloadAndSplit
-        assertEquals(listOf(securedVoucher), strategy.vouchersToUnload)
-    }
-
-    @Test
-    fun `Secured vs degraded - falls back to degraded when secured alone is insufficient`() = runBlocking {
-        // 7.5 = 4 (coin) + 3.5 from vouchers. Secured alone (=2) is not enough → must include degraded.
-        val coins = listOf(createCoin(exponent = 2))
-        val securedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = true)
-        val degradedVoucher1 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
-        val degradedVoucher2 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.valueOf(2)), enoughMembers = false)
-
-        val plan = planner.plan(7.5.centsToDollar(), coins, listOf(securedVoucher, degradedVoucher1, degradedVoucher2)).getOrThrow()
+        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(first, second)).getOrThrow()
 
         val strategy = plan.strategyType as StrategyType.UnloadAndSplit
-        // Secured is exhausted first (2), then one degraded group covers the rest (2 → covers remaining 1.5).
-        assertEquals(2, strategy.vouchersToUnload.size)
-        assertTrue(strategy.vouchersToUnload.any { it === securedVoucher })
-        assertEquals(1, strategy.vouchersToUnload.count { !it.ringHasEnoughRingMembersToWithdraw })
-    }
-
-    @Test
-    fun `Secured vs degraded - uses degraded only when no secured is available`() = runBlocking {
-        val coins = listOf(createCoin(exponent = 2))
-        // No secured vouchers — only degraded, in different rings.
-        val degraded1 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
-        val degraded2 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = false)
-
-        val plan = planner.plan(5.5.centsToDollar(), coins, listOf(degraded1, degraded2)).getOrThrow()
-
-        val strategy = plan.strategyType as StrategyType.UnloadAndSplit
-        assertEquals(1, strategy.vouchersToUnload.size)
-        assertTrue(strategy.vouchersToUnload.none { it.ringHasEnoughRingMembersToWithdraw })
+        assertEquals(listOf(first), strategy.vouchersToUnload)
     }
 
     @Test(expected = InsufficientBalanceException::class)
-    fun `Secured vs degraded - throws when secured plus degraded combined cannot cover`(): Unit = runBlocking {
-        val securedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = true)
-        val degradedVoucher = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO), enoughMembers = false)
+    fun `throws when the vouchers on offer cannot cover the amount`(): Unit = runBlocking {
+        val voucher1 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE))
+        val voucher2 = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ZERO))
 
-        planner.plan(100.0.centsToDollar(), emptyList(), listOf(securedVoucher, degradedVoucher)).getOrThrow()
+        planner.plan(100.0.centsToDollar(), emptyList(), listOf(voucher1, voucher2)).getOrThrow()
     }
 
     @Test
@@ -228,9 +197,9 @@ class TransferPlannerTest {
         // 9.5 from vouchers only. Three secured groups of values $2, $4, $8 in distinct rings.
         // Greedy descending: $8 → remaining 1.5 → $4 → remaining -2.5. Final picks: only the
         // top two (exp=2 + exp=3); $2 group is untouched.
-        val small = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE), enoughMembers = true)
-        val medium = createVoucher(exponent = 2, isReady = true, index = RingIndex(BigInteger.valueOf(2)), enoughMembers = true)
-        val large = createVoucher(exponent = 3, isReady = true, index = RingIndex(BigInteger.valueOf(3)), enoughMembers = true)
+        val small = createVoucher(exponent = 1, isReady = true, index = RingIndex(BigInteger.ONE))
+        val medium = createVoucher(exponent = 2, isReady = true, index = RingIndex(BigInteger.valueOf(2)))
+        val large = createVoucher(exponent = 3, isReady = true, index = RingIndex(BigInteger.valueOf(3)))
 
         val plan = planner.plan(9.5.centsToDollar(), emptyList(), listOf(small, medium, large)).getOrThrow()
 
@@ -274,8 +243,7 @@ class TransferPlannerTest {
     private fun createVoucher(
         exponent: Int,
         isReady: Boolean,
-        index: RecyclerIndex = RecyclerIndex(BigInteger.ONE),
-        enoughMembers: Boolean = true
+        index: RecyclerIndex = RecyclerIndex(BigInteger.ONE)
     ): RecyclerVoucher {
         val delayUnloadUntil = if (isReady) currentTimestamp - 100L else currentTimestamp + 1000L
 
@@ -283,10 +251,11 @@ class TransferPlannerTest {
             ringVrfKeyIndex = voucherIndexCounter++,
             ringVrfPublicKey = mock(),
             recyclerValue = ValueExponent(exponent),
-            location = Location.InRecycler(index),
-            allocatedAt = 0L,
-            delayUnloadUntil = delayUnloadUntil,
-            ringHasEnoughRingMembersToWithdraw = enoughMembers
+            location = Location.InRecycler(index, recyclerMembers = FULL_RING),
         )
+    }
+
+    private companion object {
+        const val FULL_RING = 767
     }
 }
