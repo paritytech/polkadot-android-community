@@ -31,7 +31,7 @@ class RingCapacityProvider @Inject constructor(
             membersRepository.getCollections(
                 chainId = chainAssetProvider.chainId(),
                 collectionIds = denominations.map { it.toRingCollectionId(instanceId) },
-                consistency = CacheableDataConsistency.CAN_BE_STALE,
+                consistency = CacheableDataConsistency.CONSISTENT_WITH_REMOTE,
             ).map { collections ->
                 denominations.mapNotNull { denomination ->
                     val collection = collections[denomination.toRingCollectionId(instanceId)]
