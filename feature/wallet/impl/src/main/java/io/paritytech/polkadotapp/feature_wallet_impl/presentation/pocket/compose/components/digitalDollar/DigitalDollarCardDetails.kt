@@ -46,10 +46,12 @@ import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.DigitalDollarCardDetailsViewModel
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.privacyMode.PaymentPrivacyModeSelector
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketCardSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketContentSlide
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
@@ -78,6 +80,7 @@ fun DigitalDollarCardDetails(
         coinageLoadingState = loadingState,
         state = state,
         onSendClick = viewModel::onSendClick,
+        onPrivacyModeSelected = viewModel::onPrivacyModeSelected,
         onGetCashClick = viewModel::onGetCashClick,
         onAutoFundClick = viewModel::onAutoFundClick,
         onShareLogsClick = viewModel::onShareLogsClick,
@@ -95,6 +98,7 @@ private fun DigitalDollarCardDetailsContent(
     coinageLoadingState: LoadingState<CoinageUiState>,
     state: DigitalDollarCardDetailsUiState,
     onSendClick: () -> Unit,
+    onPrivacyModeSelected: (RecyclingStrategyType) -> Unit,
     onGetCashClick: () -> Unit,
     onAutoFundClick: () -> Unit,
     onShareLogsClick: () -> Unit,
@@ -170,6 +174,11 @@ private fun DigitalDollarCardDetailsContent(
                     }
                 }
 
+                PaymentPrivacyMode(
+                    selectedMode = state.privacyMode,
+                    onModeSelected = onPrivacyModeSelected
+                )
+
                 Coinage(
                     loadingState = coinageLoadingState,
                     onAutoFundClick = onAutoFundClick,
@@ -178,6 +187,22 @@ private fun DigitalDollarCardDetailsContent(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PaymentPrivacyMode(
+    selectedMode: RecyclingStrategyType?,
+    onModeSelected: (RecyclingStrategyType) -> Unit
+) {
+    if (selectedMode != null) {
+        VerticalSpacer { mediumIncreased }
+
+        PaymentPrivacyModeSelector(
+            modifier = Modifier.fillMaxWidth(),
+            selectedMode = selectedMode,
+            onModeSelected = onModeSelected
+        )
     }
 }
 
@@ -308,8 +333,12 @@ private fun DigitalDollarCardDetailsPreview() {
                         testnetFundEnabled = true
                     )
                 ),
-                state = DigitalDollarCardDetailsUiState(BalanceRestoreUiState.SendCash),
+                state = DigitalDollarCardDetailsUiState(
+                    balanceRestore = BalanceRestoreUiState.SendCash,
+                    privacyMode = RecyclingStrategyType.BALANCED
+                ),
                 onSendClick = {},
+                onPrivacyModeSelected = {},
                 onGetCashClick = {},
                 onAutoFundClick = {},
                 onShareLogsClick = {},
