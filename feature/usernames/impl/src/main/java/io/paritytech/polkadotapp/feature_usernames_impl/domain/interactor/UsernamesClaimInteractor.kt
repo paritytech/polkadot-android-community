@@ -2,6 +2,8 @@ package io.paritytech.polkadotapp.feature_usernames_impl.domain.interactor
 
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flatRecover
+import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.storage.newaccount.NewAccountStorage
 import io.paritytech.polkadotapp.feature_backup_api.domain.usecase.TryRecoverFromBackupAndCreateAccountUseCase
@@ -13,6 +15,9 @@ import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.RecoverUse
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameAlreadyClaimedException
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameRepository
 import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.QueuedClaimStorage
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.UsernameFlowError
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.asUsernameFlowError
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.toUsernameFlowError
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameOutcome
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameClaimResult
@@ -51,11 +56,23 @@ class RealUsernamesClaimInteractor @Inject constructor(
     private val recoverUsernameUseCase: RecoverUsernameUseCase,
 ) : UsernamesClaimInteractor {
     override suspend fun tryRecoverBackupOrCreateAccount(): Result<BackupOutcome> {
-        return tryRecoverFromBackupAndCreateAccountUseCase()
+        return tryRecoverFromBackupAndCreateAccountUseCase().mapError(Throwable::toUsernameFlowError)
     }
 
     override suspend fun checkUsernameAvailable(username: Username): Result<UsernameAvailabilityState> {
-        return usernameRepository.checkUsernameAvailable(username)
+        return availabilityOf(username).flatRecover { error ->
+            // Attestation blips clear on the next challenge, so spend exactly one more attempt
+            // before telling the user anything.
+            if (error == UsernameFlowError.VerificationBusy) {
+                availabilityOf(username)
+            } else {
+                Result.failure(error)
+            }
+        }
+    }
+
+    private suspend fun availabilityOf(username: Username): Result<UsernameAvailabilityState> {
+        return usernameRepository.checkUsernameAvailable(username).mapError(Throwable::toUsernameFlowError)
     }
 
     override suspend fun claimUsername(username: Username, preferredDigits: String): ClaimUsernameOutcome {
@@ -90,7 +107,7 @@ class RealUsernamesClaimInteractor @Inject constructor(
         return if (error is UsernameAlreadyClaimedException) {
             recoverFromConflict(username)
         } else {
-            ClaimUsernameOutcome.Failed(error)
+            ClaimUsernameOutcome.Failed(error.asUsernameFlowError())
         }
     }
 
@@ -103,7 +120,7 @@ class RealUsernamesClaimInteractor @Inject constructor(
                     UsernameAvailabilityState.Invalid -> ClaimUsernameOutcome.Unavailable
                 }
             },
-            onFailure = { ClaimUsernameOutcome.Failed(it) }
+            onFailure = { ClaimUsernameOutcome.Failed(it.asUsernameFlowError()) }
         )
     }
 
@@ -113,7 +130,7 @@ class RealUsernamesClaimInteractor @Inject constructor(
 
     override fun observeAccountOnboardingStatus() = observeAccountOnboardingStatusUseCase()
 
-    override suspend fun recoverUsername() = recoverUsernameUseCase()
+    override suspend fun recoverUsername() = recoverUsernameUseCase().mapError(Throwable::toUsernameFlowError)
 
     override suspend fun saveIsNewAccount() {
         newAccountStorage.saveValue(true)

@@ -93,7 +93,7 @@ class RealDotNsGatewayRepositoryTest {
         whenever(configProvider.getConfig()).thenReturn(
             Result.success(DotNsGatewayConfig(popControllerAddress = CONTROLLER, popResolverAddress = RESOLVER))
         )
-        whenever(tldProvider.getTld()).thenReturn(Result.success(DotNsTld.FALLBACK))
+        whenever(tldProvider.getTld()).thenReturn(Result.success(requireNotNull(DotNsTld.parse("dot"))))
     }
 
     private fun stubChatKey(key: ByteArray) = runBlocking {

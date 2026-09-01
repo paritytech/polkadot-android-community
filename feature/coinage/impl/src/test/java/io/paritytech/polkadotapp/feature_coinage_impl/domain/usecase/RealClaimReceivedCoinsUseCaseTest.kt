@@ -664,7 +664,7 @@ class RealClaimReceivedCoinsUseCaseTest {
                     emit(
                         read.map { present ->
                             requested.associateWith { accountId ->
-                                OnChainCoinInfo(value = 3, age = 0).takeIf { accountId in present }
+                                OnChainCoinInfo(instanceId = 0, value = 3, age = 0).takeIf { accountId in present }
                             }
                         }
                     )
@@ -681,7 +681,7 @@ class RealClaimReceivedCoinsUseCaseTest {
             flow {
                 looks.forEach { present ->
                     emit(Result.success(requested.associateWith { accountId ->
-                        OnChainCoinInfo(value = 3, age = 0).takeIf { accountId in present }
+                        OnChainCoinInfo(instanceId = 0, value = 3, age = 0).takeIf { accountId in present }
                     }))
                 }
                 awaitCancellation()
@@ -717,7 +717,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     private fun givenChainSeesAgainAfter(attempted: CompletableDeferred<Unit>) {
         coEvery { coinRepository.subscribeCoinsInfoFor(any(), any()) } answers {
             val requested = secondArg<List<AccountId>>()
-            val present = Result.success(requested.associateWith { OnChainCoinInfo(value = 3, age = 0) })
+            val present = Result.success(requested.associateWith { OnChainCoinInfo(instanceId = 0, value = 3, age = 0) })
 
             flow {
                 emit(present)

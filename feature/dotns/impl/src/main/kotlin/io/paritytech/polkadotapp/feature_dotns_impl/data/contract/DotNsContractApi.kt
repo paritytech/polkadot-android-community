@@ -4,6 +4,4 @@ interface DotNsContractApi {
     suspend fun resolveContentHash(dotNsName: String): Result<ByteArray?>
 
     suspend fun getMetadata(dotNsName: String, key: String): Result<String?>
-
-    suspend fun readTld(): Result<String?>
 }

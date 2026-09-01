@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.domain.collectibles
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
@@ -9,7 +8,7 @@ import io.paritytech.polkadotapp.feature_account_api.data.repository.getCandidat
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.BandersnatchSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.getAliasInContext
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.UsernameOfAccountUseCase
-import io.paritytech.polkadotapp.feature_videogame_impl.data.SCORE
+import io.paritytech.polkadotapp.feature_videogame_impl.data.ScoreContextProvider
 import io.paritytech.polkadotapp.feature_videogame_impl.data.collectibles.CollectiblesRepository
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnChainAccountOrPerson
 import javax.inject.Inject
@@ -26,6 +25,7 @@ class RealCollectiblesInteractor @Inject constructor(
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
+    private val scoreContextProvider: ScoreContextProvider,
 ) : CollectiblesInteractor {
     context(scope: ComputationalScope)
     override suspend fun loadCollection(): Result<CollectionInput> {
@@ -34,7 +34,7 @@ class RealCollectiblesInteractor @Inject constructor(
         val chain = chainRegistry.getChain(knownChains.people)
         val candidateAccount = accountRepository.getCandidateAccount()
         val candidateAccountId = candidateAccount.accountIdIn(chain)
-        val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, BandersnatchContext.SCORE)
+        val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, scoreContextProvider.context())
 
         val owners = listOf(
             OnChainAccountOrPerson.Account(candidateAccountId),

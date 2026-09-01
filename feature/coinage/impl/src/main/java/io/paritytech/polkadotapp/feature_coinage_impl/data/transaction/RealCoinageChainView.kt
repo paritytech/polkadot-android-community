@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.chains.network.binding.BlockNumber
 import io.paritytech.polkadotapp.chains.network.rpc.RpcCalls
 import io.paritytech.polkadotapp.chains.network.rpc.getBlockNumber
 import io.paritytech.polkadotapp.chains.storage.source.StorageDataSource
+import io.paritytech.polkadotapp.chains.storage.source.query.api.StorageKey4
 import io.paritytech.polkadotapp.chains.storage.source.query.metadata
 import io.paritytech.polkadotapp.chains.storage.source.queryCatching
 import io.paritytech.polkadotapp.chains.util.extrinsicHash
@@ -20,6 +21,7 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.ensureKeysWithNullDefault
 import io.paritytech.polkadotapp.common.utils.flowOfAll
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstanceId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.toRingCollectionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CheckpointBlock
@@ -27,6 +29,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinsByOwner
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclerAliasStates
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclersCoinToRecycler
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
@@ -50,8 +53,9 @@ class RealCoinageChainViewFactory @Inject constructor(
     private val chainEventsRepositoryFactory: ChainEventsRepositoryFactory,
     private val rpcCalls: RpcCalls,
     private val membersRepository: MembersRepository,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
 ) : CoinageChainViewFactory {
-    override suspend fun pin(): Result<CoinageChainView> = runCatching {
+    override suspend fun pin(): Result<CoinageChainView> = coinageInstanceIdProvider.instanceId().mapCatching { instanceId ->
         coroutineScope {
             val chainId = chainAssetProvider.chainId()
 
@@ -63,6 +67,7 @@ class RealCoinageChainViewFactory @Inject constructor(
 
             RealCoinageChainView(
                 chainId = chainId,
+                instanceId = instanceId,
                 finalizedHead = CheckpointBlock(finalizedNumber.await(), finalizedHash),
                 bestHead = CheckpointBlock(bestNumber.await(), bestHash),
                 remoteStorageSource = remoteStorageSource,
@@ -87,6 +92,7 @@ class RealCoinageChainViewFactory @Inject constructor(
 
 private class RealCoinageChainView(
     private val chainId: ChainId,
+    private val instanceId: CoinageInstanceId,
     override val finalizedHead: CheckpointBlock,
     override val bestHead: CheckpointBlock,
     private val remoteStorageSource: StorageDataSource,
@@ -110,8 +116,11 @@ private class RealCoinageChainView(
 
         return remoteStorageSource.queryCatching(chainId, at = at) {
             metadata.coinage.recyclersCoinToRecycler.entries(memberKeys)
-        }.map { denominations ->
-            denominations.mapValues { (_, value) -> ValueExponent(value.toInt()) }.ensureKeysWithNullDefault(memberKeys)
+        }.map { locations ->
+            locations
+                .filterValues { location -> location.instanceId.toUInt() == instanceId }
+                .mapValues { (_, location) -> ValueExponent(location.value) }
+                .ensureKeysWithNullDefault(memberKeys)
         }
     }
 
@@ -121,7 +130,7 @@ private class RealCoinageChainView(
     ): Result<Map<BandersnatchPublicKey, RingPosition?>> {
         if (memberships.isEmpty()) return Result.success(emptyMap())
 
-        val keys = memberships.map { (member, denomination) -> denomination.toRingCollectionId() to member }
+        val keys = memberships.map { (member, denomination) -> denomination.toRingCollectionId(instanceId) to member }
 
         return membersRepository.fetchMembers(
             chainId = chainId,
@@ -139,12 +148,13 @@ private class RealCoinageChainView(
     ): Result<Map<RecyclerAliasKey, OnChainAliasState?>> {
         if (keys.isEmpty()) return Result.success(emptyMap())
 
-        val storageKeys = keys.map { Triple(it.valueExponent, it.recyclerIndex, it.alias.value) }
+        val instanceIdKey = instanceId.toLong().toBigInteger()
+        val storageKeys = keys.map { StorageKey4(instanceIdKey, it.valueExponent, it.recyclerIndex, it.alias.value) }
 
         return remoteStorageSource.queryCatching(chainId, at = at) {
             metadata.coinage.recyclerAliasStates.entries(storageKeys)
         }.map { states ->
-            states.mapKeys { (key, _) -> RecyclerAliasKey(key.first, key.second, key.third.toDataByteArray()) }
+            states.mapKeys { (key, _) -> RecyclerAliasKey(key.second, key.third, key.fourth.toDataByteArray()) }
                 .ensureKeysWithNullDefault(keys)
         }
     }

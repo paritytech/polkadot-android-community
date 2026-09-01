@@ -43,6 +43,8 @@ fun Coin.isAgeValidToSpend(recyclableAge: Int) = when (age) {
 
 fun Coin.ageOrDefault() = (this.age as? Coin.Age.Known)?.value ?: -1
 
+fun Coin.ageOrNull(): Int? = (age as? Coin.Age.Known)?.value
+
 fun List<Coin>.filterSpendable(recyclableAge: Int): List<Coin> {
     return filter { it.isAgeValidToSpend(recyclableAge) }
 }

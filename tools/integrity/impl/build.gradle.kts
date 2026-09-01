@@ -32,7 +32,6 @@ dependencies {
 
     implementation(libs.google.integrity)
 
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.integrity)
-    implementation(libs.firebase.integrity.debug)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -27,7 +27,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePayme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PreparedTransferMemo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ValidateTransferPlanUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.prepareMemo
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -44,7 +43,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -78,7 +76,6 @@ class RealSendEnterAmountInteractor @Inject constructor(
     private val prepareCoinageTransferUseCase: PrepareCoinageTransferUseCase,
     private val totalBalanceUseCase: TotalBalanceUseCase,
     private val externalPaymentService: ExternalPaymentService,
-    private val validateTransferPlanUseCase: ValidateTransferPlanUseCase,
     private val externalPaymentPlanner: ExternalPaymentPlanner,
     private val coinsSubmitters: Map<String, @JvmSuppressWildcards CoinsSubmitter>,
     private val coinagePaymentStatusUseCase: CoinagePaymentStatusUseCase,
@@ -95,7 +92,14 @@ class RealSendEnterAmountInteractor @Inject constructor(
 
     override fun tokenBalance(): Flow<AvailableToSendAmount> {
         return totalBalanceUseCase.subscribeTotalBalance()
-            .mapResult { AvailableToSendAmount(it.spendableBalance, asset()) }
+            .mapResult {
+                AvailableToSendAmount(
+                    spendable = it.availablePrivate,
+                    gainingPrivacy = it.gainingPrivacy.amount,
+                    canSpendGainingPrivacy = it.gainingPrivacy.canSpendWithConfirmation,
+                    chainAsset = asset(),
+                )
+            }
             .filterResultSuccessNotNull()
     }
 
@@ -121,7 +125,8 @@ class RealSendEnterAmountInteractor @Inject constructor(
     override suspend fun plan(value: BigDecimal, transferMethod: TransferMethod): SendPlan? = withContext(coroutineDispatchers.computation) {
         when (transferMethod) {
             is TransferMethod.CoinsViaChat,
-            is TransferMethod.CoinsViaSubmitter -> validateTransferPlanUseCase.validate(value)?.let(SendPlan::Coinage)
+            is TransferMethod.CoinsViaSubmitter ->
+                prepareCoinageTransferUseCase.preparePlan(value).map(SendPlan::Coinage).getOrNull()
 
             is TransferMethod.UnloadIntoExternal -> {
                 val amount = asset().planksFromAmount(value)

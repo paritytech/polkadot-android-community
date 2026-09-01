@@ -48,7 +48,9 @@ internal class BearerTokenAuthenticator(
                 is IOException -> throw e
                 else -> {
                     Timber.w(e, "BearerTokenAuthenticator: refresh failed on %s", request.url.encodedPath)
-                    return null
+                    // Returning null here dropped the cause, leaving the caller with a bare 401
+                    // and no way to tell an expired JWT from a rejected attestation.
+                    throw IOException("JWT refresh failed", e)
                 }
             }
         }

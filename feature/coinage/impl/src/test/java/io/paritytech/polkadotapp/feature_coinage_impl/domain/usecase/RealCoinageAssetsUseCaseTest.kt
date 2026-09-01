@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -22,7 +21,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mockito.Mockito.mock
-import java.math.BigInteger
 
 /**
  * The join between a local asset row and the ledger's claim on it.
@@ -112,44 +110,6 @@ class RealCoinageAssetsUseCaseTest {
      * Selectability needs both halves to agree: the chain must hold the coin, the ledger must have no claim
      * on it, and it must not be so old that it is due for recycling.
      */
-    @Test
-    fun `a coin is selectable only when the chain holds it and nothing of ours claims it`() = runBlocking {
-        val free = coinOf(derivationIndex = 1, age = 1)
-        val claimed = coinOf(derivationIndex = 2, age = 1)
-        val notOnChain = coinOf(derivationIndex = 3, age = null)
-        val dueForRecycling = coinOf(derivationIndex = 4, age = RECYCLING_AGE)
-
-        givenCoins(free, claimed, notOnChain, dueForRecycling)
-        givenStates(
-            OwnAsset.Coin(2) to CoinageAssetState(handedOff = false, minterStatus = null, consumerStatus = PENDING),
-        )
-
-        assertEquals(listOf(free), useCase.getSelectableCoins())
-    }
-
-    @Test
-    fun `a voucher is selectable only once it is in the recycler and unclaimed`() = runBlocking {
-        val inRecycler = voucherOf(ringVrfKeyIndex = 1, location = Location.InRecycler(RecyclerIndex(BigInteger.ONE)))
-        val claimed = voucherOf(ringVrfKeyIndex = 2, location = Location.InRecycler(RecyclerIndex(BigInteger.TWO)))
-        val onboarding = voucherOf(ringVrfKeyIndex = 3, location = Location.Onboarding)
-
-        givenVouchers(inRecycler, claimed, onboarding)
-        givenStates(
-            OwnAsset.Voucher(2) to CoinageAssetState(handedOff = false, minterStatus = null, consumerStatus = PENDING),
-        )
-
-        assertEquals(listOf(inRecycler), useCase.getSelectableVouchers())
-    }
-
-    /** The age a coin is retired at is the repository's to decide, not a constant of the join. */
-    @Test
-    fun `the recycling age comes from the repository`() = runBlocking {
-        givenCoins(coinOf(derivationIndex = 1, age = RECYCLING_AGE - 1))
-        givenStates()
-        whenever(coinRepository.getCoinRecyclingAge()).thenReturn(RECYCLING_AGE - 1)
-
-        assertEquals(emptyList<Coin>(), useCase.getSelectableCoins())
-    }
 
     /**
      * Room invalidates a query when its *table* is written, not when the rows it selected change. The
@@ -200,9 +160,6 @@ class RealCoinageAssetsUseCaseTest {
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = location,
-        allocatedAt = 0L,
-        delayUnloadUntil = 0L,
-        ringHasEnoughRingMembersToWithdraw = true,
     )
 
     private companion object {

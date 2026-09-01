@@ -83,6 +83,7 @@ import io.paritytech.polkadotapp.database.migrations.Migration42To43Spec
 import io.paritytech.polkadotapp.database.migrations.Migration48To49
 import io.paritytech.polkadotapp.database.migrations.Migration54To55Spec
 import io.paritytech.polkadotapp.database.migrations.Migration55To56
+import io.paritytech.polkadotapp.database.migrations.Migration57To58
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
@@ -139,7 +140,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 58,
+    version = 59,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -266,7 +267,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         // Add syncedTransactionVersion column to chain_runtimes
         AutoMigration(from = 56, to = 57),
         // Add product_funding_operations table (open funding operations, resumed on app start)
-        AutoMigration(from = 57, to = 58),
+        AutoMigration(from = 58, to = 59),
     ]
 )
 @TypeConverters(
@@ -315,6 +316,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration38To39(),
                 Migration48To49(),
                 Migration55To56(),
+                Migration57To58(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }

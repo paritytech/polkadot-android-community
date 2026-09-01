@@ -7,8 +7,11 @@ import io.paritytech.polkadotapp.common.data.keypair.ClientKeypairStore
 import io.paritytech.polkadotapp.common.utils.base64NoWrap
 import io.paritytech.polkadotapp.common.utils.decodeBase64toByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.mapErrorNotInstance
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.sha256
 import io.paritytech.polkadotapp.common.utils.toByteArray
+import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
 import io.paritytech.polkadotapp.tools_integrity_impl.data.api.IntegrityApi
 import okhttp3.Request
 
@@ -35,21 +38,24 @@ abstract class IntegrityParamsInjector(
     ): Result<Unit> {
         requestBuilder.addHeader(HEADER_CHALLENGE, challenge)
         requestBuilder.addHeader(HEADER_PACKAGE, applicationContext.packageName)
-        val keypair = keypairStore.getOrGenerate()
 
-        return runCatching {
-            requestBuilder.addHeader(HEADER_CLIENT_ID, keypair.publicKey.base64NoWrap())
-        }
-            .flatMap {
+        return runCancellableCatching { keypairStore.getOrGenerate() }
+            .mapCatching { keypair ->
+                requestBuilder.addHeader(HEADER_CLIENT_ID, keypair.publicKey.base64NoWrap())
+                keypair
+            }
+            .flatMap { keypair ->
                 injectAttestationParams(requestBuilder, integrityApi, challenge)
+                    .flatMap {
+                        injectClientProof(
+                            challenge = challenge,
+                            keypair = keypair,
+                            requestBuilder = requestBuilder,
+                        )
+                    }
             }
-            .flatMap {
-                injectClientProof(
-                    challenge = challenge,
-                    keypair = keypair,
-                    requestBuilder = requestBuilder,
-                )
-            }
+            // Attestation failures are already classified by the flavor; everything else is ours.
+            .mapErrorNotInstance<Unit, IntegrityError> { IntegrityError.Unknown }
     }
 
     abstract suspend fun injectAttestationParams(
