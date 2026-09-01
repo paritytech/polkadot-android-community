@@ -358,7 +358,8 @@ class RealStatementStoreSlotAllocatorTest {
     }
 
     private suspend fun withSuccessfulSubmission() {
-        whenever(origins.asResourcesStatementStoreSlot(anyUInt(), anyUInt(), any())).thenReturn(mock(TransactionOrigin::class.java))
+        whenever(origins.asResourcesStatementStoreSlot(anyUInt(), anyUInt(), any()))
+            .thenReturn(Result.success(mock(TransactionOrigin::class.java)))
         whenever(
             extrinsicService.submitExtrinsicAndAwaitExecution(any(), any(), any(), any(), any())
         ).thenReturn(Result.success(successExecution()))

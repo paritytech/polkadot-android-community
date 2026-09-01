@@ -20,6 +20,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.OnboardingUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
@@ -38,6 +39,7 @@ class RealOnboardingUseCase @Inject constructor(
     private val coinAmountBreakdownUseCase: CoinAmountBreakdownUseCase,
     private val coinageOrigins: CoinageTransactionOrigins,
     private val transactionService: CoinageTransactionService,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider
 ) : OnboardingUseCase {
     override suspend fun onboard(
         amount: BigDecimal,
@@ -97,6 +99,7 @@ class RealOnboardingUseCase @Inject constructor(
             moduleName = Modules.COINAGE,
             callName = "load_recycler_with_external_asset_unpaid",
             arguments = autoEncodedArgs(
+                "instance_id" to coinageInstanceIdProvider.instanceId().getOrThrow().toLong(),
                 "preservation" to Preservation.Expendable as Preservation,
                 "value" to voucher.recyclerValue,
                 "member_key" to voucherEntropy.memberKey(),

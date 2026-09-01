@@ -21,6 +21,8 @@ import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessRepor
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.claimLongTermStorage
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.resourcesCalls
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
+import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
 import io.paritytech.polkadotapp.feature_people_api.domain.BandersnatchKeyResolver
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
@@ -55,6 +57,7 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     private val bandersnatchKeyResolver: BandersnatchKeyResolver,
     private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
+    private val dotNsTldProvider: DotNsTldProvider,
 ) : TransactionStorageSlotAllocator {
     /**
      * The claim is submitted on the **people** chain, but the resulting allowance is propagated to
@@ -103,13 +106,14 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     context(diagnostics: StalenessReportCollector)
     private suspend fun submitClaim(ctx: AllocateContext, counter: UByte, target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
         Timber.i("picked free counter=$counter; submitting claim_long_term_storage extrinsic")
-        val origin = transactionStorageOrigins.asResourcesLongTermStorage(ctx.period, counter, ctx.collection)
-
-        extrinsicService.submitExtrinsicAndAwaitExecution(ctx.chain, origin) {
-            resourcesCalls.claimLongTermStorage(ctx.period, counter, target)
-        }
-            .flattenExecutionFailure()
-            .coerceToUnit()
+        transactionStorageOrigins.asResourcesLongTermStorage(ctx.period, counter, ctx.collection)
+            .flatMap { origin ->
+                extrinsicService.submitExtrinsicAndAwaitExecution(ctx.chain, origin) {
+                    resourcesCalls.claimLongTermStorage(ctx.period, counter, target)
+                }
+                    .flattenExecutionFailure()
+                    .coerceToUnit()
+            }
             .onSuccess { Timber.i("extrinsic executed for counter=$counter") }
     }
 
@@ -144,9 +148,10 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     ): Result<UByte> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_picking_slot) {
         runCatching {
             val maxCounters = longTermStorageSlotRepository.maxClaimsPerPeriod(chainId)
+            val tld = dotNsTldProvider.getTldRetrying()
             Timber.i("scanning $maxCounters counters for period=$period")
             val aliasesByCounter = (0u until maxCounters.toUInt()).associateWith { c ->
-                val context = BandersnatchContext.longTermStorageClaim(period, c.toUByte())
+                val context = BandersnatchContext.longTermStorageClaim(tld, period, c.toUByte())
                 bandersnatchKeyResolver.getAliasInContext(collection, context)
             }
             val taken = longTermStorageSlotRepository.spentAliases(chainId, period, aliasesByCounter.values.toList())

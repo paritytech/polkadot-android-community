@@ -2,6 +2,8 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.data.signer.origi
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
+import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.extension.RegisterStatementStoreAllowance
@@ -14,19 +16,21 @@ import javax.inject.Inject
 class RealStatementStoreOrigins @Inject constructor(
     private val peopleMembershipProver: PeopleMembershipProver,
     private val chainRegistry: ChainRegistry,
+    private val dotNsTldProvider: DotNsTldProvider,
 ) : StatementStoreOrigins {
     override suspend fun asResourcesStatementStoreSlot(
         period: UInt,
         seq: UInt,
         collection: PeopleCollection,
-    ): TransactionOrigin {
-        val context = BandersnatchContext.statementStoreSlot(period, seq)
-        val extension = RegisterStatementStoreAllowance(
-            context = context,
-            collection = collection,
-            peopleMembershipProver = peopleMembershipProver,
-            chainRegistry = chainRegistry,
-        )
-        return SetTransactionExtensionOrigin(TransactionSignerSource.None, extension)
+    ): Result<TransactionOrigin> {
+        return runCatching {
+            val extension = RegisterStatementStoreAllowance(
+                context = BandersnatchContext.statementStoreSlot(dotNsTldProvider.getTldRetrying(), period, seq),
+                collection = collection,
+                peopleMembershipProver = peopleMembershipProver,
+                chainRegistry = chainRegistry,
+            )
+            SetTransactionExtensionOrigin(TransactionSignerSource.None, extension)
+        }
     }
 }

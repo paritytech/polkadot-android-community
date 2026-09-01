@@ -5,7 +5,9 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.paritytech.polkadotapp.chains.network.updaters.system.UpdateSystemFactory
 import io.paritytech.polkadotapp.common.data.storage.SingleValueStorageFactory
+import io.paritytech.polkadotapp.feature_coinage_api.data.updaters.CoinageUpdateSystem
 import io.paritytech.polkadotapp.feature_coinage_api.domain.CoinsInteractor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.RecyclerVouchersInteractor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAllocator
@@ -40,8 +42,10 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.RealConsumedT
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.RealUnloadTokenPeriodCalculator
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenPeriodCalculator
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinageInstanceRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.ExponentBoundsRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealCoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealCoinageInstanceRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealExponentBoundsRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealRecyclerProofDataProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RealVoucherRepository
@@ -67,6 +71,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageCh
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageEntryRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RealCoinageChainViewFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RealCoinageEntryRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.data.updaters.CoinageInstanceUpdater
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.RealCoinsInteractor
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.RealVouchersInteractor
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.RealCoinAllocator
@@ -102,6 +107,8 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealPrepare
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealTotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.worker.WorkManagerCoinageRecoveryScheduler
+import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
+import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import javax.inject.Singleton
 
 @Module
@@ -139,6 +146,9 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindVouchersBackupLastIndexStorage(impl: RealVouchersBackupLastIndexStorage): VouchersBackupLastIndexStorage
+
+    @Binds
+    fun bindCoinageInstanceRepository(impl: RealCoinageInstanceRepository): CoinageInstanceRepository
 
     @Binds
     fun bindCoinKeypairDerivation(impl: RealCoinKeypairDerivation): CoinKeypairDerivation
@@ -270,4 +280,20 @@ interface CoinageFeatureModule {
     @Binds
     @Singleton
     fun bindCoinageDebugSettings(impl: RealCoinageDebugSettings): CoinageDebugSettings
+
+    companion object {
+        @Provides
+        fun provideCoinageUpdateSystem(
+            @DigitalDollarChainAssetProvider chainAssetProvider: ChainAssetProvider,
+            updateSystemFactory: UpdateSystemFactory,
+            coinageInstanceUpdater: CoinageInstanceUpdater,
+        ): CoinageUpdateSystem {
+            val updateSystem = updateSystemFactory.createConstantSingleChain(
+                listOf(coinageInstanceUpdater),
+                chainAssetProvider.chainId()
+            )
+
+            return CoinageUpdateSystem(updateSystem)
+        }
+    }
 }

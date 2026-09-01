@@ -4,6 +4,8 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAlloca
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.common.utils.mapAsync
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
+import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
 import io.paritytech.polkadotapp.feature_people_api.domain.BandersnatchKeyResolver
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementSlotsForCollection
@@ -18,6 +20,7 @@ import kotlin.time.Instant
 class StatementStoreSlotLoader @Inject constructor(
     private val statementStoreSlotRepository: StatementStoreSlotRepository,
     private val bandersnatchKeyResolver: BandersnatchKeyResolver,
+    private val dotNsTldProvider: DotNsTldProvider,
 ) {
     suspend fun loadSlots(context: AllocateContext): Result<StatementStoreSlots> {
         return runCatching {
@@ -33,8 +36,9 @@ class StatementStoreSlotLoader @Inject constructor(
         collection: PeopleCollection,
     ): StatementSlotsForCollection {
         val maxSlots = statementStoreSlotRepository.maxSlotsPerPeriod(context.chain.id, collection)
+        val tld = dotNsTldProvider.getTldRetrying()
         val aliasesByIndex = (0u until maxSlots).associateWith { seq ->
-            val ctx = BandersnatchContext.statementStoreSlot(context.period, seq)
+            val ctx = BandersnatchContext.statementStoreSlot(tld, context.period, seq)
             bandersnatchKeyResolver.getAliasInContext(collection, ctx)
         }
         val taken = statementStoreSlotRepository.allowanceEntries(context.chain.id, context.period, aliasesByIndex.values)

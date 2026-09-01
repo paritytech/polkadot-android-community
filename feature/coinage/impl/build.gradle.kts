@@ -18,6 +18,8 @@ dependencies {
     implementation(project(":feature:transfers:api"))
     implementation(project(":feature:usernames:api"))
 
+    implementation(project(":tools:remoteconfig:api"))
+
     implementation(project(":database"))
 
     implementation(libs.hilt.androidx.work)

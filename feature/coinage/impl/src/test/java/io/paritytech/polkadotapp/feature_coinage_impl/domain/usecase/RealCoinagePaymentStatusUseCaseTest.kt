@@ -178,7 +178,7 @@ class RealCoinagePaymentStatusUseCaseTest {
         }
         every { chainView.finalizedHead } returns CheckpointBlock(blockNumber = 100, blockHash = "0xfinal")
         coEvery { chainView.coinsAt(any(), any()) } returns Result.success(
-            mapOf(ACCOUNT to OnChainCoinInfo(value = 3, age = 0).takeIf { atFinalized == PRESENT })
+            mapOf(ACCOUNT to OnChainCoinInfo(instanceId = 0, value = 3, age = 0).takeIf { atFinalized == PRESENT })
         )
     }
 
