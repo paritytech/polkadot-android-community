@@ -9,8 +9,6 @@ import kotlin.time.Duration
 interface StatementStoreSlotRepository {
     suspend fun maxSlotsPerPeriod(chainId: ChainId, collection: PeopleCollection): UInt
 
-    suspend fun networkSuffix(chainId: ChainId): Result<ByteArray>
-
     /** Min delay before an alias's entry can be replaced. */
     suspend fun replacementCooldown(chainId: ChainId): Duration
 

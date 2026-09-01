@@ -1,18 +1,14 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.data
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
-import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
-import io.paritytech.polkadotapp.chains.multiNetwork.withRuntime
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
+import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
 import javax.inject.Inject
 
 class ScoreContextProvider @Inject constructor(
-    private val chainRegistry: ChainRegistry,
+    private val dotNsTldProvider: DotNsTldProvider,
 ) {
     suspend fun context(): BandersnatchContext {
-        val networkSuffix = chainRegistry.withRuntime(chainRegistry.peopleChain().id) {
-            runtime.metadata.score.networkSuffix
-        } ?: error("Score.Suffix constant is missing — runtime does not support product contexts")
-
-        return BandersnatchContext.score(networkSuffix)
+        return BandersnatchContext.score(dotNsTldProvider.getTldRetrying())
     }
 }

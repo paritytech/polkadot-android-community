@@ -8,8 +8,6 @@ interface LongTermStorageSlotRepository {
 
     suspend fun maxClaimsPerPeriod(chainId: ChainId): UByte
 
-    suspend fun networkSuffix(chainId: ChainId): Result<ByteArray>
-
     suspend fun spentAliases(
         chainId: ChainId,
         period: UInt,

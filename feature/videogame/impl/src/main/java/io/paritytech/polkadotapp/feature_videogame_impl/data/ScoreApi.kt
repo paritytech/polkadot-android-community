@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.data
 
-import io.novasama.substrate_sdk_android.koltinx_serialization_scale.serializers.ByteArraySerializable
 import io.novasama.substrate_sdk_android.runtime.metadata.RuntimeMetadata
 import io.novasama.substrate_sdk_android.runtime.metadata.module.Module
 import io.paritytech.polkadotapp.chains.storage.source.query.api.*
@@ -27,7 +26,3 @@ val ScoreApi.personhoodThreshold: QueryableStorageEntry0<Int>
 context(withRuntime: WithRuntime)
 val ScoreApi.voucherType: PrivacyVoucherDenominationType
     get() = constant("VoucherType")
-
-context(withRuntime: WithRuntime)
-val ScoreApi.networkSuffix: ByteArraySerializable?
-    get() = constantOrNull("Suffix")

@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_people_api.domain
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.utils.toLittleEndianBytes
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -12,11 +13,11 @@ private const val LONG_TERM_STORAGE_FAMILY = 3u
 private const val PGAS_CLAIM_FAMILY = 4u
 
 class PersonhoodProductContextTest {
-    private val networkSuffix = "paseo".encodeToByteArray()
+    private val tld = requireNotNull(DotNsTld.parse("paseo"))
 
     @Test
     fun `statement store slot context matches pallet vector`() {
-        val context = personhoodProductContext(networkSuffix, statementStoreSlotSuffix(period = 100u, seq = 3u))
+        val context = personhoodProductContext(tld, statementStoreSlotSuffix(period = 100u, seq = 3u))
 
         assertEquals("b6c21225dcf4c2aeeca32b6db1fc93b6942ca0e8ff5c3cb1b2c5d8f0b4647ee3", context.value.toHexString())
     }
@@ -24,7 +25,7 @@ class PersonhoodProductContextTest {
     @Test
     fun `long term storage context matches pallet vector`() {
         val suffix = personhoodSystemSuffix(LONG_TERM_STORAGE_FAMILY, 100u, byteArrayOf(3))
-        val context = personhoodProductContext(networkSuffix, suffix)
+        val context = personhoodProductContext(tld, suffix)
 
         assertEquals("1b3fbe4dd813ea1e349878c9228c6823db8345207690ca4df656acb7fee81bd1", context.value.toHexString())
     }
@@ -32,14 +33,14 @@ class PersonhoodProductContextTest {
     @Test
     fun `pgas claim context matches pallet vector`() {
         val suffix = personhoodSystemSuffix(PGAS_CLAIM_FAMILY, 100u, 3u.toLittleEndianBytes())
-        val context = personhoodProductContext(networkSuffix, suffix)
+        val context = personhoodProductContext(tld, suffix)
 
         assertEquals("e47ba2c7eae3b97beabaeef8df599afd53e44ba9c2b851cd80850d3ed95a685b", context.value.toHexString())
     }
 
     @Test
     fun `zero values produce distinct context`() {
-        val context = personhoodProductContext(networkSuffix, statementStoreSlotSuffix(period = 0u, seq = 0u))
+        val context = personhoodProductContext(tld, statementStoreSlotSuffix(period = 0u, seq = 0u))
 
         assertEquals("deee1c90cf0d31093d318ac6629b4c4ab08650d4a4164511cc2496205f20f067", context.value.toHexString())
     }
@@ -77,8 +78,8 @@ class PersonhoodProductContextTest {
         val suffix = statementStoreSlotSuffix(period = 100u, seq = 3u)
 
         assertNotEquals(
-            personhoodProductContext("paseo".encodeToByteArray(), suffix).value.toHexString(),
-            personhoodProductContext("dot".encodeToByteArray(), suffix).value.toHexString()
+            personhoodProductContext(requireNotNull(DotNsTld.parse("paseo")), suffix).value.toHexString(),
+            personhoodProductContext(DotNsTld.FALLBACK, suffix).value.toHexString()
         )
     }
 

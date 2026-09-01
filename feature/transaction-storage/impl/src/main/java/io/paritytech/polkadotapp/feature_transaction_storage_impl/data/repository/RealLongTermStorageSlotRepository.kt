@@ -11,7 +11,6 @@ import io.paritytech.polkadotapp.common.utils.scale.BigEndianU32Scale
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.longTermStorageClaimsPerPeriod
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.longTermStoragePeriodDuration
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.ltsResources
-import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.networkSuffix
 import io.paritytech.polkadotapp.feature_transaction_storage_impl.data.blockchain.spentLongTermStorageAliases
 import javax.inject.Inject
 
@@ -29,12 +28,6 @@ class RealLongTermStorageSlotRepository @Inject constructor(
         return chainRegistry.withRuntime(chainId) {
             runtime.metadata.ltsResources.longTermStorageClaimsPerPeriod
         }
-    }
-
-    override suspend fun networkSuffix(chainId: ChainId): Result<ByteArray> = runCatching {
-        chainRegistry.withRuntime(chainId) {
-            runtime.metadata.ltsResources.networkSuffix
-        } ?: error("Resources.Suffix constant is missing — runtime does not support product contexts")
     }
 
     override suspend fun spentAliases(

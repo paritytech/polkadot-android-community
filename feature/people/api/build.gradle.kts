@@ -16,6 +16,7 @@ dependencies {
     api(project(":feature:account:api"))
     api(project(":feature:transactions:api"))
     api(project(":feature:members:api"))
+    api(project(":feature:dotns:api"))
 
     implementation(libs.hilt.android)
 
