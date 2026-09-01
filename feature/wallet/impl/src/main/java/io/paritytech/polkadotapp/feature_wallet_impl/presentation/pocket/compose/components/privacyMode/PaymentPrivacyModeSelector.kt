@@ -4,6 +4,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -145,6 +149,9 @@ private fun RowScope.ModeItem(
     onClick: () -> Unit
 ) {
     val appearance = mode.appearance()
+    // The column is the touch target, but a ripple across label and description would read as a card press.
+    // The indication is handed to the circle instead, which is the thing the user is actually choosing.
+    val interactionSource = remember { MutableInteractionSource() }
 
     val itemDescription = appearance.accessibilityDescription
     val itemState = stringResource(
@@ -160,6 +167,8 @@ private fun RowScope.ModeItem(
             .weight(1f)
             .selectable(
                 selected = isSelected,
+                interactionSource = interactionSource,
+                indication = null,
                 role = Role.RadioButton,
                 onClick = onClick
             )
@@ -184,6 +193,7 @@ private fun RowScope.ModeItem(
         ModeIndicator(
             appearance = appearance,
             isSelected = isSelected,
+            interactionSource = interactionSource,
             hasConnectorBefore = hasConnectorBefore,
             hasConnectorAfter = hasConnectorAfter
         )
@@ -203,6 +213,7 @@ private fun RowScope.ModeItem(
 private fun ModeIndicator(
     appearance: ModeAppearance,
     isSelected: Boolean,
+    interactionSource: MutableInteractionSource,
     hasConnectorBefore: Boolean,
     hasConnectorAfter: Boolean
 ) {
@@ -249,7 +260,9 @@ private fun ModeIndicator(
             // PolkadotSurface propagates its minimum constraints, so a size on the icon itself would be
             // clamped straight back up to the circle. This Box absorbs the minimum and lets the inset stand.
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .indication(interactionSource, LocalIndication.current),
                 contentAlignment = Alignment.Center
             ) {
                 NovaIcon(

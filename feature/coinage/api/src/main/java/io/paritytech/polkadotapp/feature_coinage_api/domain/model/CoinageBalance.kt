@@ -23,5 +23,15 @@ data class CoinageBalance(
         val canSpendWithConfirmation: Boolean,
     )
 
+    /**
+     * Everything the chosen strategy will let the user part with, including what it is holding back but
+     * would release on confirmation. [spendable] alone is the subset that costs no privacy to spend.
+     */
+    val available: Balance = if (gainingPrivacy.canSpendWithConfirmation) {
+        spendable + gainingPrivacy.amount
+    } else {
+        spendable
+    }
+
     val total: Balance = spendable + gainingPrivacy.amount + pending
 }
