@@ -79,4 +79,8 @@ class ProductsNavigator @Inject constructor(
     override suspend fun openCrossProductProofPrompt() = withContext(dispatchers.main) {
         performNavigation(R.id.action_global_to_crossProductProofBottomSheet)
     }
+
+    override suspend fun openTrUAPIConfirmation() = withContext(dispatchers.main) {
+        performNavigation(R.id.action_global_to_truapiConfirmationBottomSheet)
+    }
 }
