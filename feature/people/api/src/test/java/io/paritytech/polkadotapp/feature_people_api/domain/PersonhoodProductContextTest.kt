@@ -79,7 +79,7 @@ class PersonhoodProductContextTest {
 
         assertNotEquals(
             personhoodProductContext(requireNotNull(DotNsTld.parse("paseo")), suffix).value.toHexString(),
-            personhoodProductContext(DotNsTld.FALLBACK, suffix).value.toHexString()
+            personhoodProductContext(requireNotNull(DotNsTld.parse("dot")), suffix).value.toHexString()
         )
     }
 
