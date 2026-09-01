@@ -18,35 +18,44 @@ internal object WidevineEvidenceReader {
     private const val MAX_DEVICE_ID_BYTES = 64
 
     fun readL1DeviceId(): ByteArray? {
-        val drm = try {
-            MediaDrm(WIDEVINE_UUID)
-        } catch (error: UnsupportedSchemeException) {
-            return null
-        } catch (error: Exception) {
-            throw WidevineUnavailableException("Widevine MediaDrm could not be opened", error)
-        }
+        val drm = openWidevine() ?: return null
         return drm.use {
-            val securityLevel = try {
-                drm.getPropertyString(SECURITY_LEVEL_PROPERTY)
-            } catch (error: Exception) {
-                throw WidevineUnavailableException("Widevine security level unavailable", error)
-            }
-            if (!isL1SecurityLevel(securityLevel)) return@use null
-
-            val deviceId = try {
-                drm.getPropertyByteArray(MediaDrm.PROPERTY_DEVICE_UNIQUE_ID)
-            } catch (error: Exception) {
-                throw WidevineUnavailableException("Widevine device id unavailable", error)
-            }
-            if (deviceId.size !in MIN_DEVICE_ID_BYTES..MAX_DEVICE_ID_BYTES) {
-                throw WidevineUnavailableException(
-                    "Widevine device id must be $MIN_DEVICE_ID_BYTES..$MAX_DEVICE_ID_BYTES bytes, got ${deviceId.size}",
-                    null
-                )
-            }
-            deviceId
+            if (isL1SecurityLevel(readSecurityLevel(drm))) readDeviceId(drm) else null
         }
     }
 
     internal fun isL1SecurityLevel(securityLevel: String): Boolean = securityLevel == SECURITY_LEVEL_L1
+
+    private fun openWidevine(): MediaDrm? {
+        return try {
+            MediaDrm(WIDEVINE_UUID)
+        } catch (error: UnsupportedSchemeException) {
+            null
+        } catch (error: Exception) {
+            throw WidevineUnavailableException("Widevine MediaDrm could not be opened", error)
+        }
+    }
+
+    private fun readSecurityLevel(drm: MediaDrm): String {
+        return try {
+            drm.getPropertyString(SECURITY_LEVEL_PROPERTY)
+        } catch (error: Exception) {
+            throw WidevineUnavailableException("Widevine security level unavailable", error)
+        }
+    }
+
+    private fun readDeviceId(drm: MediaDrm): ByteArray {
+        val deviceId = try {
+            drm.getPropertyByteArray(MediaDrm.PROPERTY_DEVICE_UNIQUE_ID)
+        } catch (error: Exception) {
+            throw WidevineUnavailableException("Widevine device id unavailable", error)
+        }
+        if (deviceId.size !in MIN_DEVICE_ID_BYTES..MAX_DEVICE_ID_BYTES) {
+            throw WidevineUnavailableException(
+                "Widevine device id must be $MIN_DEVICE_ID_BYTES..$MAX_DEVICE_ID_BYTES bytes, got ${deviceId.size}",
+                null
+            )
+        }
+        return deviceId
+    }
 }
