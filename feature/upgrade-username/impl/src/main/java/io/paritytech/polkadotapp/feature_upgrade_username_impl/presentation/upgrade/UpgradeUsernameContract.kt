@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_upgrade_username_impl.presentation.upgrade
 
 import androidx.compose.runtime.Immutable
-import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
 import kotlinx.coroutines.flow.StateFlow
 
 interface UpgradeUsernameContract {
@@ -17,6 +16,6 @@ interface UpgradeUsernameContract {
 @Immutable
 data class UpgradeUsernameUiState(
     val username: String = "",
-    val fieldState: UsernameFieldState = UsernameFieldState.NEUTRAL,
+    val fieldState: UpgradeUsernameFieldState = UpgradeUsernameFieldState.Neutral,
     val isClaimingInProgress: Boolean = false,
 )

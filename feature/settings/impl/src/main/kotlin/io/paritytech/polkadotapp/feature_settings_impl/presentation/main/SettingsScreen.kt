@@ -112,21 +112,25 @@ private fun SettingsScreenInternal(
                         onClick = onBackupClick,
                         isBackupMissing = state.isBackupMissing
                     )
-                    SettingsMenuItem(
-                        icon = NovaIcons.GridOutlined,
-                        title = stringResource(RCommon.string.settings_products),
-                        onClick = onProductsClick
-                    )
+                    if (state.productSettingsEnabled) {
+                        SettingsMenuItem(
+                            icon = NovaIcons.GridOutlined,
+                            title = stringResource(RCommon.string.settings_products),
+                            onClick = onProductsClick
+                        )
+                    }
                     SettingsMenuItem(
                         icon = NovaIcons.BlockOutlined,
                         title = stringResource(RCommon.string.settings_blocked_contacts),
                         onClick = onBlockedUsersClick
                     )
-                    SettingsMenuItem(
-                        icon = NovaIcons.LaptopOutlined,
-                        title = stringResource(RCommon.string.settings_connected_devices),
-                        onClick = onConnectedDevicesClick
-                    )
+                    if (state.linkedDevicesEnabled) {
+                        SettingsMenuItem(
+                            icon = NovaIcons.LaptopOutlined,
+                            title = stringResource(RCommon.string.settings_connected_devices),
+                            onClick = onConnectedDevicesClick
+                        )
+                    }
                 }
 
                 VerticalSpacer { large }
@@ -148,7 +152,7 @@ private fun SettingsScreenInternal(
 
                 VerticalSpacer { large }
 
-                if (state.isDebug) {
+                if (state.debugMenuEnabled) {
                     PolkadotMenuList(
                         headerText = stringResource(RCommon.string.settings_section_debug)
                     ) {
@@ -175,6 +179,9 @@ private fun SettingsScreenPreview() {
         SettingsScreenInternal(
             state = SettingsUiState(
                 isDebug = true,
+                debugMenuEnabled = true,
+                linkedDevicesEnabled = true,
+                productSettingsEnabled = true,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
                 isBackupMissing = false,
                 hasBlockedUsers = false

@@ -78,8 +78,11 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
             initialValue = DigitalDollarCardDetailsUiState(BalanceRestoreUiState.NotDetermined)
         )
 
-    fun onFundClick() {
-        router.openSelectFundAsset()
+    fun onGetCashClick() = launchUnit {
+        interactor.getCashProductId()
+            .logFailure("Failed to resolve Get CASH product id")
+            .onSuccess { router.openProduct(it) }
+            .onFailure { showMessage("Failed to open Get CASH") }
     }
 
     fun onSendClick() {

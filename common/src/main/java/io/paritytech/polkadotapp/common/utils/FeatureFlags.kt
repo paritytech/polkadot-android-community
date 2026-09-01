@@ -3,19 +3,28 @@ package io.paritytech.polkadotapp.common.utils
 import io.paritytech.polkadotapp.common.BuildConfig
 
 object FeatureFlags {
-    fun isEnabled(feature: FeatureOption): Boolean {
-        // disable all for release
-        if (!BuildConfig.DEBUG) return false
+    private val fullFeatured = !BuildConfig.SAFETY_MODE
 
+    fun isEnabled(feature: FeatureOption): Boolean {
         return when (feature) {
+            FeatureOption.SHOW_MOB_RULE_CASE_FOR_DEVELOPMENT,
+            FeatureOption.SHORT_WORKER_BACKOFF,
+            FeatureOption.LOW_BATTERY_EVIDENCE_PROVISION,
+            FeatureOption.SKIP_MOBRULE_CASE,
+            FeatureOption.DEBUG_MENU -> BuildConfig.DEBUG
+
+            FeatureOption.ARBITRARY_PRODUCTS,
+            FeatureOption.BROWSE_TAB,
+            FeatureOption.CHAT_EXTENSIONS,
+            FeatureOption.LINKED_DEVICES,
+            FeatureOption.PRODUCT_SETTINGS,
+            FeatureOption.PERSONHOOD,
+            FeatureOption.COLLECTIBLES -> fullFeatured
+
             FeatureOption.ALLOW_SHORT_EVIDENCE_VIDEO -> BuildConfig.ALLOW_SHORT_EVIDENCE_VIDEO
-            FeatureOption.SHOW_MOB_RULE_CASE_FOR_DEVELOPMENT -> true
-            FeatureOption.SHORT_WORKER_BACKOFF -> true
-            FeatureOption.LOW_BATTERY_EVIDENCE_PROVISION -> true
-            FeatureOption.SKIP_MOBRULE_CASE -> true
             FeatureOption.SAMPLE_BOT -> BuildConfig.SAMPLE_BOT
             FeatureOption.DIM1_BOT_BY_DEFAULT -> BuildConfig.DIM1_BOT_BY_DEFAULT
-            FeatureOption.DIM2_BOT_BY_DEFAULT -> true
+            FeatureOption.DIM2_BOT_BY_DEFAULT -> BuildConfig.DIM2_BOT_BY_DEFAULT
             FeatureOption.PEER_BOT_BY_DEFAULT -> BuildConfig.PEER_BOT_BY_DEFAULT
         }
     }
@@ -30,7 +39,15 @@ enum class FeatureOption {
     SAMPLE_BOT,
     DIM1_BOT_BY_DEFAULT,
     DIM2_BOT_BY_DEFAULT,
-    PEER_BOT_BY_DEFAULT
+    PEER_BOT_BY_DEFAULT,
+    DEBUG_MENU,
+    BROWSE_TAB,
+    CHAT_EXTENSIONS,
+    LINKED_DEVICES,
+    PRODUCT_SETTINGS,
+    PERSONHOOD,
+    COLLECTIBLES,
+    ARBITRARY_PRODUCTS
 }
 
 val FeatureOption.isEnabled

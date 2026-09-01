@@ -33,4 +33,6 @@ dependencies {
     implementation(project(":feature:scan:api"))
     implementation(project(":feature:fund:api"))
     implementation(project(":feature:videogame:api"))
+    implementation(project(":feature:dotns:api"))
+    implementation(project(":feature:products:api"))
 }
