@@ -69,7 +69,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
     /** Load progress of the domain the WebView is currently resolving content for. */
     val loadProgress: Flow<DotNsLoadProgress> = contentLoader.loadProgress
 
-    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider, allowIframes)
+    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider)
     private val chromeClient = productWebChromeClientFactory.create(
         logPrefix = "Browser: $initialUrl",
         callingProductIdProvider = callingProductIdProvider,
@@ -94,7 +94,13 @@ class BrowserWebViewProvider @AssistedInject constructor(
             }
 
             val innerClient =
-                BrowserWebViewClient(contentLoader, dotNsTldProvider, servingHostResolver, navigationPolicy)
+                BrowserWebViewClient(
+                    contentLoader,
+                    dotNsTldProvider,
+                    servingHostResolver,
+                    navigationPolicy,
+                    frameEmbeddingResponseHeaders(allowIframes),
+                )
             webViewClient = InternalWebViewClient(innerClient)
             webChromeClient = chromeClient
         }

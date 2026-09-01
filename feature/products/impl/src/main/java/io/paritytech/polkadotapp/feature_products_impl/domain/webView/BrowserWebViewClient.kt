@@ -23,7 +23,8 @@ class BrowserWebViewClient(
     private val dotNsTldProvider: DotNsTldProvider,
     servingHostResolver: DotNsServingHostResolver,
     private val navigationPolicy: NavigationPolicy,
-) : DotNsWebViewClient(dotNsResolver, dotNsTldProvider, servingHostResolver) {
+    mainDocumentResponseHeaders: Map<String, String>,
+) : DotNsWebViewClient(dotNsResolver, dotNsTldProvider, servingHostResolver, mainDocumentResponseHeaders) {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val origin = view.url?.toUri()
         val destination = request.url
