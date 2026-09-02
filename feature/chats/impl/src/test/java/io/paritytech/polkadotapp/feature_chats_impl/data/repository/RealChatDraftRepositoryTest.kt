@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.repository
 
-import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.database.dao.ChatDraftDao
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
@@ -20,7 +20,7 @@ class RealChatDraftRepositoryTest {
 
     private val chatDraftDao = FakeChatDraftDao()
 
-    private val repository = RealChatDraftRepository(chatDraftDao, CoroutineDispatchers())
+    private val repository = RealChatDraftRepository(chatDraftDao, RealCoroutineDispatchers())
 
     @Test
     fun `save and get round-trip for None relation`() = runBlocking<Unit> {

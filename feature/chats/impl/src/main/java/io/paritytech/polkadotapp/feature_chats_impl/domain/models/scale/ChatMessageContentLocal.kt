@@ -180,6 +180,10 @@ sealed interface CoinagePaymentStatusLocal {
     @Serializable
     @EnumIndex(4)
     object FailedTransfer : CoinagePaymentStatusLocal
+
+    @Serializable
+    @EnumIndex(5)
+    class PartiallyClaimed(val claimed: Balance) : CoinagePaymentStatusLocal
 }
 
 @JvmInline

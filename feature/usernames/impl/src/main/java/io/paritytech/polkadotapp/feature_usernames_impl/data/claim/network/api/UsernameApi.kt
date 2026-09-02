@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api
 
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.model.GetAttesterResponse
+import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.model.QueueStatusResponse
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.model.SearchUsernameBaseResponse
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.model.UsernameAvailableRequest
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.model.UsernameAvailableResponse
@@ -26,6 +27,10 @@ interface UsernameApi {
 
     @GET("api/v1/attester")
     suspend fun getAttester(): GetAttesterResponse
+
+    @GET("api/v1/registration/queue")
+    @CallWithBearerToken
+    suspend fun getRegistrationQueueStatus(): QueueStatusResponse
 
     @GET("api/v1/usernames/search?status=ASSIGNED")
     @CallWithBearerToken

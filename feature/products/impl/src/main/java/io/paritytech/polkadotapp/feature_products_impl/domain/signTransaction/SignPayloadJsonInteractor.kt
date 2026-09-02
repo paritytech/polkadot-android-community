@@ -9,6 +9,7 @@ import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.novasama.substrate_sdk_android.runtime.definitions.types.fromByteArray
 import io.novasama.substrate_sdk_android.runtime.definitions.types.generics.EraType
 import io.novasama.substrate_sdk_android.runtime.definitions.types.generics.GenericCall
+import io.novasama.substrate_sdk_android.runtime.extrinsic.ExtrinsicVersion
 import io.novasama.substrate_sdk_android.runtime.extrinsic.signer.SendableExtrinsic
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
@@ -19,12 +20,12 @@ import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.toResult
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.TransactionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SignedTransaction
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SignerPayloadJson
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningAccount
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
-import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicVersion
 import io.paritytech.polkadotapp.feature_transactions.api.data.Mortality
 import io.paritytech.polkadotapp.feature_transactions.api.di.ExtrinsicSerializer
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
@@ -125,16 +126,30 @@ class SignPayloadJsonInteractor @AssistedInject constructor(
             }
     }
 
+    // Legacy payload format carries no transaction extension version, so V5 assumes 0
+    private fun parseExtrinsicVersion(version: Int): Result<ExtrinsicVersion> {
+        val parsed = when (version) {
+            4 -> ExtrinsicVersion.V4
+            5 -> ExtrinsicVersion.V5(extensionVersion = 0)
+            else -> null
+        }
+
+        return parsed.toResult { "Extrinsic version $version is not supported" }
+    }
+
     private suspend fun buildExtrinsic(context: ExtrinsicBuildingContext): Result<SendableExtrinsic> {
         val (chain, origin, parsedExtrinsic) = context
 
-        return ExtrinsicVersion.fromInt(payload.version).flatMap { version ->
+        return parseExtrinsicVersion(payload.version).flatMap { version ->
             extrinsicService.buildExtrinsic(
                 chain = chain,
                 origin = origin,
                 options = ExtrinsicService.SubmissionOptions(
                     extrinsicVersion = version,
-                    mortality = Mortality(parsedExtrinsic.era, parsedExtrinsic.blockHash.toDataByteArray()),
+                    mortality = Mortality.externallyPassed(
+                        parsedExtrinsic.era,
+                        parsedExtrinsic.blockHash.toDataByteArray(),
+                    ),
                     nonce = parsedExtrinsic.nonce,
                     specVersion = parsedExtrinsic.specVersion,
                     transactionVersion = parsedExtrinsic.transactionVersion,

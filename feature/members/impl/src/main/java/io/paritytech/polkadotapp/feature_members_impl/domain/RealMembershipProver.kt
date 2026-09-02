@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingCollectionId
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingKeys
+import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRoot
 import io.paritytech.polkadotapp.feature_members_api.data.model.ringIndex
 import io.paritytech.polkadotapp.feature_members_api.data.model.toDomainSize
@@ -30,6 +31,7 @@ import io.paritytech.polkadotapp.feature_members_api.data.repository.getMember
 import io.paritytech.polkadotapp.feature_members_api.data.repository.getRingRoot
 import io.paritytech.polkadotapp.feature_members_api.data.repository.getRingStatus
 import io.paritytech.polkadotapp.feature_members_api.domain.MembershipProver
+import io.paritytech.polkadotapp.feature_members_api.domain.PrecomputedMemberMembershipProver
 import io.paritytech.polkadotapp.feature_members_api.domain.RingVrfMembershipProof
 import io.paritytech.polkadotapp.feature_members_api.domain.RingVrfProofError
 import io.paritytech.polkadotapp.feature_members_api.domain.model.MemberSource
@@ -51,15 +53,21 @@ class RealMembershipProver @Inject constructor(
         ringIndex: RingIndex,
         blockHash: BlockHash?,
     ): Result<BandersnatchProofResult> {
-        return pinnedBlockHash(chainId, blockHash).flatMap { pinnedBlockHash ->
-            val entropyResult = runCancellableCatching { member.toEntropy() }
-            val includedRingMembersResult = fetchIncludedRingMembers(chainId, collectionId, ringIndex, pinnedBlockHash)
-            val domainSizeResult = fetchDomainSize(chainId, collectionId)
+        return precomputeRing(chainId, collectionId, ringIndex, blockHash)
+            .flatMap { it.proofMembership(member, message, context) }
+    }
 
-            combineResults(entropyResult, includedRingMembersResult, domainSizeResult) { entropy, ringMembers, domainSize ->
-                entropy.createProof(ringMembers, message, context.value, domainSize)
-            }
-        }
+    override suspend fun proofMembershipBatched(
+        members: List<MemberSource>,
+        message: ByteArray,
+        context: BandersnatchContext,
+        chainId: ChainId,
+        collectionId: RingCollectionId,
+        ringIndex: RingIndex,
+        blockHash: BlockHash?,
+    ): Result<List<BandersnatchProof>> {
+        return precomputeRing(chainId, collectionId, ringIndex, blockHash)
+            .flatMap { it.proofMembershipBatched(members, message, context) }
     }
 
     override suspend fun createRingVrfProof(
@@ -70,17 +78,91 @@ class RealMembershipProver @Inject constructor(
         collectionId: RingCollectionId,
         blockHash: BlockHash?,
     ): Result<RingVrfMembershipProof> {
+        return precomputeForMember(member, chainId, collectionId, blockHash)
+            .flatMap { it.createRingVrfProof(message, context) }
+            .mapErrorNotInstance<_, RingVrfProofError> { RingVrfProofError.DataFetchFailed(it) }
+    }
+
+    override suspend fun precomputeForMember(
+        member: MemberSource,
+        chainId: ChainId,
+        collectionId: RingCollectionId,
+        blockHash: BlockHash?,
+    ): Result<PrecomputedMemberMembershipProver> {
         val pinnedBlockHashResult = pinnedBlockHash(chainId, blockHash)
         val memberKeyResult = runCancellableCatching { member.toEntropy().memberKey() }
 
-        return combineResults(pinnedBlockHashResult, memberKeyResult) { blockHash, memberKey -> blockHash to memberKey }
+        return combineResults(pinnedBlockHashResult, memberKeyResult) { pinned, memberKey -> pinned to memberKey }
             .flatMap { (pinnedBlockHash, memberKey) ->
                 resolveMemberRing(chainId, collectionId, memberKey, pinnedBlockHash).flatMap { (ringIndex, ringRoot) ->
-                    proofMembership(member, message, context, chainId, collectionId, ringIndex, pinnedBlockHash)
-                        .map { RingVrfMembershipProof(it.proof, it.alias, ringIndex, ringRoot.revision) }
+                    precomputeRingPinned(chainId, collectionId, ringIndex, pinnedBlockHash).map { ring ->
+                        PrecomputedMember(member, ringIndex, ringRoot.revision, ring)
+                    }
                 }
             }
             .mapErrorNotInstance<_, RingVrfProofError> { RingVrfProofError.DataFetchFailed(it) }
+    }
+
+    private suspend fun precomputeRing(
+        chainId: ChainId,
+        collectionId: RingCollectionId,
+        ringIndex: RingIndex,
+        blockHash: BlockHash?,
+    ): Result<PrecomputedRing> = pinnedBlockHash(chainId, blockHash).flatMap { pinnedBlockHash ->
+        precomputeRingPinned(chainId, collectionId, ringIndex, pinnedBlockHash)
+    }
+
+    private suspend fun precomputeRingPinned(
+        chainId: ChainId,
+        collectionId: RingCollectionId,
+        ringIndex: RingIndex,
+        pinnedBlockHash: BlockHash,
+    ): Result<PrecomputedRing> = coroutineScope {
+        val ringMembersDeferred = async { fetchIncludedRingMembers(chainId, collectionId, ringIndex, pinnedBlockHash) }
+        val domainSizeDeferred = async { fetchDomainSize(chainId, collectionId) }
+
+        combineResults(ringMembersDeferred.await(), domainSizeDeferred.await()) { ringMembers, domainSize ->
+            PrecomputedRing(ringMembers, domainSize)
+        }
+    }
+
+    /** One ring's members and domain size, resolved once and reused across proofs against it. */
+    private inner class PrecomputedRing(
+        private val ringMembers: RingKeys,
+        private val domainSize: BandersnatchDomainSize,
+    ) {
+        suspend fun proofMembership(
+            member: MemberSource,
+            message: ByteArray,
+            context: BandersnatchContext,
+        ): Result<BandersnatchProofResult> = runCancellableCatching {
+            member.toEntropy().createProof(ringMembers, message, context.value, domainSize)
+        }
+
+        suspend fun proofMembershipBatched(
+            members: List<MemberSource>,
+            message: ByteArray,
+            context: BandersnatchContext,
+        ): Result<List<BandersnatchProof>> = runCancellableCatching {
+            members.map { member ->
+                member.toEntropy().createProof(ringMembers, message, context.value, domainSize).proof
+            }
+        }
+    }
+
+    private class PrecomputedMember(
+        private val member: MemberSource,
+        private val ringIndex: RingIndex,
+        private val ringRevision: RingRevision,
+        private val ring: PrecomputedRing,
+    ) : PrecomputedMemberMembershipProver {
+        override suspend fun createRingVrfProof(
+            message: ByteArray,
+            context: BandersnatchContext,
+        ): Result<RingVrfMembershipProof> {
+            return ring.proofMembership(member, message, context)
+                .map { RingVrfMembershipProof(it.proof, it.alias, ringIndex, ringRevision) }
+        }
     }
 
     private suspend fun resolveMemberRing(
@@ -108,28 +190,6 @@ class RealMembershipProver @Inject constructor(
             ).flatMap { ringRoot ->
                 ringRoot?.let { Result.success(ringIndex to it) }
                     ?: Result.failure(RingVrfProofError.RingNotFound)
-            }
-        }
-    }
-
-    override suspend fun proofMembershipBatched(
-        members: List<MemberSource>,
-        message: ByteArray,
-        context: BandersnatchContext,
-        chainId: ChainId,
-        collectionId: RingCollectionId,
-        ringIndex: RingIndex,
-        blockHash: BlockHash?,
-    ): Result<List<BandersnatchProof>> {
-        return pinnedBlockHash(chainId, blockHash).flatMap { pinnedBlockHash ->
-            val entropiesResult = runCancellableCatching { members.map { it.toEntropy() } }
-            val includedRingMembersResult = fetchIncludedRingMembers(chainId, collectionId, ringIndex, pinnedBlockHash)
-            val domainSizeResult = fetchDomainSize(chainId, collectionId)
-
-            combineResults(entropiesResult, includedRingMembersResult, domainSizeResult) { entropies, ringMembers, domainSize ->
-                entropies.map { entropy ->
-                    entropy.createProof(ringMembers, message, context.value, domainSize).proof
-                }
             }
         }
     }

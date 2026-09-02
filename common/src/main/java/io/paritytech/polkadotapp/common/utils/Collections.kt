@@ -17,6 +17,15 @@ inline fun <K, V, R> Map<K, V>.mapValuesNotNull(crossinline mapper: (Map.Entry<K
         .filterNotNull()
 }
 
+/**
+ * Every key of [keys] present, with null where this map has no entry for it.
+ *
+ * The counterpart to [filterNotNull], for readers that must tell "no value" apart from "not asked about".
+ * Batched storage reads drop keys the chain holds nothing for, which makes a complete response look
+ * identical to a partial one; restoring them turns absence into a value the caller can read.
+ */
+fun <K, V> Map<K, V>.ensureKeysWithNullDefault(keys: Collection<K>): Map<K, V?> = keys.associateWith { this[it] }
+
 @Suppress("UNCHECKED_CAST")
 inline fun <K, V> Map<K, V?>.filterNotNull(): Map<K, V> {
     return filterValues { it != null } as Map<K, V>
@@ -110,6 +119,12 @@ inline fun <T, R> Iterable<T>.countDistinct(selector: (T) -> R): Int = mapToSet(
 suspend fun <T, R> Iterable<T>.mapAsync(operation: suspend (T) -> R): List<R> {
     return coroutineScope {
         map { async { operation(it) } }
+    }.awaitAll()
+}
+
+suspend fun <T, R> Iterable<T>.mapIndexedAsync(operation: suspend (index: Int, T) -> R): List<R> {
+    return coroutineScope {
+        mapIndexed { index, value -> async { operation(index, value) } }
     }.awaitAll()
 }
 

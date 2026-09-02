@@ -66,6 +66,11 @@ data class ChatMessage(
             sealed interface Status {
                 data object Detecting : Status
                 data class Detected(val amount: Balance) : Status
+
+                /** Part of the payment is ours and the rest is still being claimed. */
+                data class PartiallyClaimed(val claimed: Balance) : Status
+
+                /** Claiming is over; [amount] is what landed, which may be less than was sent. */
                 data class Transferred(val amount: Balance) : Status
                 data object FailedDetection : Status
                 data object FailedTransfer : Status

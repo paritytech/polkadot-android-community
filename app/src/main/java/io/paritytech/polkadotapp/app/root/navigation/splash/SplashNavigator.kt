@@ -14,7 +14,19 @@ class SplashNavigator @Inject constructor(
     }
 
     override fun openClaimUsername() {
-        performNavigation(R.id.action_global_to_claim_username_graph)
+        performNavigationToGraph(
+            actionId = R.id.action_global_to_claim_username_graph,
+            graphId = R.id.claim_username_graph,
+            startDestinationId = R.id.claimUsernameFragment
+        )
+    }
+
+    override fun openRegistrationQueue() {
+        performNavigationToGraph(
+            actionId = R.id.action_global_to_registration_queue,
+            graphId = R.id.claim_username_graph,
+            startDestinationId = R.id.registrationQueueFragment
+        )
     }
 
     override fun openThemeSelection() {

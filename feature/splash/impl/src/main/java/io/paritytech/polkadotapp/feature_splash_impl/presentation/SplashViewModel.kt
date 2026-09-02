@@ -37,6 +37,8 @@ class SplashViewModel @Inject constructor(
 
             when {
                 status.isOnboarded -> postOnboardingFlow.openPostOnboarding()
+                status.isWaitingInQueue -> router.openRegistrationQueue()
+                status.accountCreated -> router.openClaimUsername()
                 else -> router.openThemeSelection()
             }
 

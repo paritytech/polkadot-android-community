@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDollarCardDetailsInteractor
@@ -22,7 +23,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -47,8 +47,10 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
             CoinageUiState(
                 tokensState = CoinageUiState.TokensState(
                     totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.totalBalance)),
-                    spendableSecuredBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableSecuredBalance)),
-                    spendableDegradedBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableDegradedBalance)),
+                    spendableBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableBalance)),
+                    gainingPrivacyBalance = tokenAmountMapper.mapFrom(
+                        asset.withAmount(assetInfo.gainingPrivacyBalance)
+                    ),
                     pendingBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.pendingBalance)),
                     coinList = coins.toImmutableList(),
                     voucherList = vouchers.toImmutableList()
@@ -66,24 +68,38 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         initialValue = LoadingState.Loading
     )
 
-    val state: StateFlow<DigitalDollarCardDetailsUiState> = interactor.observeBackupProgress()
-        .map {
-            DigitalDollarCardDetailsUiState(
-                it.toBalanceRestoreUiState()
-            )
-        }
-        .stateIn(
-            scope = this,
-            started = SharingStarted.Eagerly,
-            initialValue = DigitalDollarCardDetailsUiState(BalanceRestoreUiState.NotDetermined)
+    val state: StateFlow<DigitalDollarCardDetailsUiState> = combine(
+        interactor.observeBackupProgress(),
+        interactor.observePrivacyMode()
+    ) { backupProgress, privacyMode ->
+        DigitalDollarCardDetailsUiState(
+            balanceRestore = backupProgress.toBalanceRestoreUiState(),
+            privacyMode = privacyMode
         )
+    }.stateIn(
+        scope = this,
+        started = SharingStarted.Eagerly,
+        initialValue = DigitalDollarCardDetailsUiState(
+            balanceRestore = BalanceRestoreUiState.NotDetermined,
+            privacyMode = null
+        )
+    )
 
-    fun onFundClick() {
-        router.openSelectFundAsset()
+    fun onGetCashClick() = launchUnit {
+        interactor.getCashProductId()
+            .logFailure("Failed to resolve Get CASH product id")
+            .onSuccess { router.openProduct(it) }
+            .onFailure { showMessage("Failed to open Get CASH") }
     }
 
     fun onSendClick() {
         router.openSendPayment()
+    }
+
+    fun onPrivacyModeSelected(mode: RecyclingStrategyType) = launchUnit {
+        interactor.setPrivacyMode(mode)
+            .logFailure("Failed to change payment privacy mode")
+            .onFailure { showMessage("Failed to change payment privacy mode") }
     }
 
     fun onAutoFundClick() = launchUnit {
@@ -93,10 +109,6 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
             .logFailure("Failed to perform testnet fund")
             .onFailure { showMessage("Failed to fund account") }
         fundInProgress.disable()
-    }
-
-    fun makeAllVouchersReady() = launchUnit {
-        interactor.makeAllVouchersReady()
     }
 
     fun onShareLogsClick() = launchUnit {

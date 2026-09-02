@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_transactions.api.data.origins
 
+import io.paritytech.polkadotapp.feature_transactions.api.domain.model.SignedTransactionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 
 /**
@@ -12,5 +13,5 @@ interface TestnetTransactionOrigins {
      */
     fun alice(): TransactionOrigin
 
-    fun fundingOrigin(): TransactionOrigin
+    fun fundingOrigin(): SignedTransactionOrigin
 }

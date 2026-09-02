@@ -29,6 +29,34 @@ class UsernameNavigator @Inject constructor(
         performNavigation(R.id.action_claim_username_to_recoverOptionsBottomSheet)
     }
 
+    override fun openRecoverOptionsFromClaimUnavailable() {
+        performNavigation(R.id.action_claim_unavailable_to_recoverOptionsBottomSheet)
+    }
+
+    override fun openRegistrationQueue() {
+        performNavigationToGraph(
+            actionId = R.id.action_global_to_registration_queue,
+            graphId = R.id.claim_username_graph,
+            startDestinationId = R.id.registrationQueueFragment
+        )
+    }
+
+    override fun openClaimUnavailable() {
+        performNavigationToGraph(
+            actionId = R.id.action_global_to_claim_unavailable,
+            graphId = R.id.claim_username_graph,
+            startDestinationId = R.id.claimUnavailableFragment
+        )
+    }
+
+    override fun openIntegrityFailed() {
+        performNavigationToGraph(
+            actionId = R.id.action_global_to_integrity_failed,
+            graphId = R.id.claim_username_graph,
+            startDestinationId = R.id.integrityFailedFragment
+        )
+    }
+
     override fun openTermsOfUse() {
         browserNavigator.open(LegalUrls.TERMS_OF_USE)
     }

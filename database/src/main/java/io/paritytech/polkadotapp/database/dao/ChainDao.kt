@@ -118,10 +118,17 @@ abstract class ChainDao {
     @Query("SELECT * FROM chain_runtimes")
     abstract suspend fun allRuntimeInfos(): List<ChainRuntimeInfoLocal>
 
-    @Query("UPDATE chain_runtimes SET syncedVersion = :syncedVersion, localMigratorVersion = :localMigratorVersion WHERE chainId = :chainId")
+    @Query(
+        """
+        UPDATE chain_runtimes
+        SET syncedVersion = :syncedVersion, syncedTransactionVersion = :syncedTransactionVersion, localMigratorVersion = :localMigratorVersion
+        WHERE chainId = :chainId
+        """
+    )
     abstract suspend fun updateSyncedRuntimeVersion(
         chainId: String,
         syncedVersion: Int,
+        syncedTransactionVersion: Int?,
         localMigratorVersion: Int,
     )
 
@@ -148,6 +155,7 @@ abstract class ChainDao {
                     syncedVersion = 0,
                     remoteVersion = runtimeVersion,
                     transactionVersion = transactionVersion,
+                    syncedTransactionVersion = null,
                     localMigratorVersion = 1
                 )
             )

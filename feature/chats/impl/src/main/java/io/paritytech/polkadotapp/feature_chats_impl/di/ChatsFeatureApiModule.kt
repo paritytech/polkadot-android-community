@@ -51,7 +51,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageR
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRoomRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSearchRecentsRepository
-import io.paritytech.polkadotapp.feature_chats_impl.data.repository.CoinageTransferDetectionRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.CompactionExpansionRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -63,7 +62,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatMess
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatRoomRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealChatSearchRecentsRepository
-import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealCoinageTransferDetectionRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealCompactionExpansionRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.RealContactsRepository
@@ -198,9 +196,6 @@ internal interface ChatsFeatureApiModule {
 
     @Binds
     fun bindMessageSender(chatEngine: ChatEngine): ChatMessageSender
-
-    @Binds
-    fun bindCoinageTransferDetectionRepository(real: RealCoinageTransferDetectionRepository): CoinageTransferDetectionRepository
 
     @Binds
     fun bindClickedFaqQuestionsStorage(real: RealAskedFaqQuestionsStorage): AskedFaqQuestionsStorage

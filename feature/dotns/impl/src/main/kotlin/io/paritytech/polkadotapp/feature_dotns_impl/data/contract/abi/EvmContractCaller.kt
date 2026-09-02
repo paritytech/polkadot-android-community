@@ -80,23 +80,4 @@ object EvmContractCaller {
         val bytes = (decoded[0] as Address).toString().fromHex()
         return if (bytes.all { it.toInt() == 0 }) null else bytes
     }
-
-    fun encodeTld(): ByteArray {
-        val function = Function(
-            "tld",
-            emptyList(),
-            textOutputParams
-        )
-        return FunctionEncoder.encode(function).fromHex()
-    }
-
-    fun decodeTld(output: ByteArray): String? {
-        if (output.isEmpty()) return null
-
-        val outputHex = output.toHexString(withPrefix = true)
-        val decoded = FunctionReturnDecoder.decode(outputHex, textOutputParams)
-        if (decoded.isEmpty()) return null
-        val tld = (decoded[0] as Utf8String).value
-        return tld.ifEmpty { null }
-    }
 }

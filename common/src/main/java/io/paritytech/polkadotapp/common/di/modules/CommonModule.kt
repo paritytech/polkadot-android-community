@@ -22,6 +22,8 @@ import io.paritytech.polkadotapp.common.data.storage.preferences.Preferences
 import io.paritytech.polkadotapp.common.data.storage.preferences.RealPreferences
 import io.paritytech.polkadotapp.common.data.storage.preferences.encrypted.EncryptedPreferences
 import io.paritytech.polkadotapp.common.data.storage.preferences.encrypted.RealEncryptedPreferences
+import io.paritytech.polkadotapp.common.data.time.RealTimeProvider
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
 import io.paritytech.polkadotapp.common.presentation.BrowserNavigator
 import io.paritytech.polkadotapp.common.presentation.RealBrowserNavigator
@@ -50,6 +52,8 @@ import io.paritytech.polkadotapp.common.presentation.sharing.SharingManager
 import io.paritytech.polkadotapp.common.presentation.theme.RealAppThemeSelector
 import io.paritytech.polkadotapp.common.presentation.ui.mixin.paste.PasteMixin
 import io.paritytech.polkadotapp.common.presentation.ui.mixin.paste.PasteMixinFactory
+import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.calendar.CalendarEventsMixin
 import io.paritytech.polkadotapp.common.utils.calendar.RealCalendarEventsMixin
 import io.paritytech.polkadotapp.common.utils.network.NetworkStateService
@@ -63,7 +67,13 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 internal interface CommonModule {
     @Binds
+    fun bindCoroutineDispatchers(impl: RealCoroutineDispatchers): CoroutineDispatchers
+
+    @Binds
     fun bindsComputationalCache(impl: RealComputationalCache): ComputationalCache
+
+    @Binds
+    fun bindTimeProvider(impl: RealTimeProvider): TimeProvider
 
     @Binds
     fun bindContextManager(impl: RealContextManager): ContextManager

@@ -6,6 +6,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
+import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.network.updaters.Updater
 import io.paritytech.polkadotapp.chains.network.updaters.system.UpdateSystemFactory
 import io.paritytech.polkadotapp.chains.storage.StorageCache
@@ -13,6 +14,7 @@ import io.paritytech.polkadotapp.common.data.network.NetworkApiCreator
 import io.paritytech.polkadotapp.common.data.storage.SingleValueStorageFactory
 import io.paritytech.polkadotapp.feature_account_api.data.WalletAccount
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
+import io.paritytech.polkadotapp.feature_usernames_api.data.LocalFullUsernameStorage
 import io.paritytech.polkadotapp.feature_usernames_api.data.LocalUsernameStorage
 import io.paritytech.polkadotapp.feature_usernames_api.data.UsernameUpdateSystem
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAccountOnboardingStatusUseCase
@@ -25,6 +27,9 @@ import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.User
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.RealUsernameRepository
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameRepository
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.UsernameApi
+import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.QueuedClaimStorage
+import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.fullUsernameStorage
+import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.queuedClaimStorage
 import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.usernameStorage
 import io.paritytech.polkadotapp.feature_usernames_impl.data.updater.UsernameOnChainUpdater
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.RealUsernamesChainProvider
@@ -52,6 +57,14 @@ interface UsernamesFeatureApiModule {
             factory.usernameStorage()
 
         @Provides
+        fun provideFullUsernameStorage(factory: SingleValueStorageFactory): LocalFullUsernameStorage =
+            factory.fullUsernameStorage()
+
+        @Provides
+        fun provideQueuedClaimStorage(factory: SingleValueStorageFactory): QueuedClaimStorage =
+            factory.queuedClaimStorage()
+
+        @Provides
         fun provideUsernamesApi(
             networkApiCreator: NetworkApiCreator,
             @BearerAuth bearerOkHttpClient: OkHttpClient,
@@ -60,15 +73,12 @@ interface UsernamesFeatureApiModule {
             .create(UsernameApi::class.java)
 
         @Provides
-        @Singleton
         fun provideUsernameOnChainUpdater(
-            usernameChainAssetProvider: UsernamesChainProvider,
             @WalletAccount accountUpdateScope: Updater.NoChainScope<MetaAccount>,
             chainRegistry: ChainRegistry,
-            storageCache: StorageCache,
+            storageCache: StorageCache
         ): UsernameOnChainUpdater {
             return UsernameOnChainUpdater(
-                usernameChainAssetProvider,
                 chainRegistry,
                 storageCache,
                 accountUpdateScope
@@ -76,15 +86,14 @@ interface UsernamesFeatureApiModule {
         }
 
         @Provides
-        @Singleton
         fun provideUsernameUpdateSystem(
-            usernamesChainProvider: UsernamesChainProvider,
+            knownChains: KnownChains,
             updateSystemFactory: UpdateSystemFactory,
-            usernameOnChainUpdater: UsernameOnChainUpdater,
+            usernameOnChainUpdater: UsernameOnChainUpdater
         ): UsernameUpdateSystem {
             val updateSystem = updateSystemFactory.createConstantSingleChain(
                 listOf(usernameOnChainUpdater),
-                usernamesChainProvider.chainId
+                knownChains.people
             )
             return UsernameUpdateSystem(updateSystem)
         }

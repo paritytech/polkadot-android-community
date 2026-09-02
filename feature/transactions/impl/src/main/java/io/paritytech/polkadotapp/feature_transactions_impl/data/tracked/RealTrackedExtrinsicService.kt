@@ -6,12 +6,12 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.FormExtrinsic
+import io.paritytech.polkadotapp.feature_transactions.api.data.retry.PreSubmissionValidationFailed
 import io.paritytech.polkadotapp.feature_transactions.api.data.tracked.ActiveTrackedExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.data.tracked.ExtrinsicTag
 import io.paritytech.polkadotapp.feature_transactions.api.data.tracked.TrackedExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.tracked.TrackedExtrinsicStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
-import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.PreSubmissionValidationFailed
 import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.PreSubmissionValidator
 import kotlinx.coroutines.flow.Flow
 import timber.log.Timber

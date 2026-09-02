@@ -36,6 +36,8 @@ class RealExternalPaymentRepository @Inject constructor(
                 surplus = requireNotNull(surplus) { "OFFBOARD row missing surplusPlanks" },
             )
             ExternalPaymentLocal.Stage.COMPLETED -> ExternalPayment.Stage.Completed
+            ExternalPaymentLocal.Stage.PARTIALLY_COMPLETED ->
+                ExternalPayment.Stage.PartiallyCompleted(failureReason.orEmpty())
             ExternalPaymentLocal.Stage.FAILED -> ExternalPayment.Stage.Failed(failureReason.orEmpty())
         }
         return ExternalPayment(
@@ -78,6 +80,10 @@ class RealExternalPaymentRepository @Inject constructor(
             surplusPlanks = surplus.value,
         )
         ExternalPayment.Stage.Completed -> RowStageFields(ExternalPaymentLocal.Stage.COMPLETED)
+        is ExternalPayment.Stage.PartiallyCompleted -> RowStageFields(
+            stage = ExternalPaymentLocal.Stage.PARTIALLY_COMPLETED,
+            failureReason = reason,
+        )
         is ExternalPayment.Stage.Failed -> RowStageFields(
             stage = ExternalPaymentLocal.Stage.FAILED,
             failureReason = reason,

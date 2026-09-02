@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.chains.util.KeyPairGenerator
 import io.paritytech.polkadotapp.common.data.network.TestnetEnvironment
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.TestnetTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.SignedTransactionOrigin
-import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
 import io.paritytech.polkadotapp.feature_transactions_impl.BuildConfig
 import javax.inject.Inject
@@ -25,14 +24,14 @@ internal class RealTestnetTransactionOrigins @Inject constructor(
 
     private fun nightly() = createOrigin(nightlyMnemonic())
 
-    override fun fundingOrigin(): TransactionOrigin {
+    override fun fundingOrigin(): SignedTransactionOrigin {
         return when (environment) {
             TestnetEnvironment.TESTNET -> alice()
             TestnetEnvironment.NIGHTLY, TestnetEnvironment.PRODUCTION -> nightly()
         }
     }
 
-    private fun createOrigin(mnemonic: Mnemonic, derivationPath: String? = null): TransactionOrigin {
+    private fun createOrigin(mnemonic: Mnemonic, derivationPath: String? = null): SignedTransactionOrigin {
         val keypair = KeyPairGenerator.deriveSr25519From(mnemonic, derivationPath)
         val encryption = MultiChainEncryption.Substrate(EncryptionType.SR25519)
         val signerSource = TransactionSignerSource.FromKeyPair(keypair, encryption)

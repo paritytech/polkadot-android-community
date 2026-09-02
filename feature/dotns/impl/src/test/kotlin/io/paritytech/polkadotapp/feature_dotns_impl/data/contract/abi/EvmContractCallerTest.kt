@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_dotns_impl.data.contract.abi
 
 import io.novasama.substrate_sdk_android.extensions.fromHex
+import io.paritytech.polkadotapp.feature_revive_api.NameHash
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -104,34 +105,6 @@ class EvmContractCallerTest {
     @Test
     fun `decodeAddress returns null for empty output`() {
         assertNull(EvmContractCaller.decodeAddress(ByteArray(0)))
-    }
-
-    @Test
-    fun `encodeTld produces correct function selector`() {
-        val encoded = EvmContractCaller.encodeTld()
-
-        // tld() selector = keccak256("tld()")[0:4] = 0x2d551432
-        assertEquals("2d551432", encoded.toHexString())
-    }
-
-    @Test
-    fun `decodeTld round-trips with sample data`() {
-        val abiEncoded = abiEncodeString(".paseo")
-
-        val decoded = EvmContractCaller.decodeTld(abiEncoded)
-        assertEquals(".paseo", decoded)
-    }
-
-    @Test
-    fun `decodeTld returns null for empty string`() {
-        val abiEncoded = abiEncodeString("")
-        val result = EvmContractCaller.decodeTld(abiEncoded)
-        assertNull(result)
-    }
-
-    @Test
-    fun `decodeTld returns null for empty output`() {
-        assertNull(EvmContractCaller.decodeTld(byteArrayOf()))
     }
 
     @Suppress("UNCHECKED_CAST")

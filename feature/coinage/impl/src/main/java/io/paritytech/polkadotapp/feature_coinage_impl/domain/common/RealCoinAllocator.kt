@@ -57,8 +57,9 @@ class RealCoinAllocator @Inject constructor(
     ): Coin = Coin(
         derivationIndex = derivationIndex,
         valueExponent = valueExponent,
+        // Freshly allocated: nothing has minted it yet, so the chain has never held it.
         age = Coin.Age.Unknown,
-        spentState = Coin.SpentState.NOT_SPENT,
+        isOnChain = false,
         accountId = keypairDerivation.getDerivedAccountId(derivationIndex)
     )
 }

@@ -69,10 +69,6 @@ class SettingsNavigator @Inject constructor(
         )
     }
 
-    override fun openForceReclaim() {
-        performNavigation(R.id.action_global_to_forceReclaimFragment)
-    }
-
     override fun openScanQr() {
         if (isCurrentDestination(R.id.scanQrFragment)) return
         performNavigation(R.id.action_global_to_scan_graph)
@@ -102,6 +98,10 @@ class SettingsNavigator @Inject constructor(
     }
 
     override fun openClaimUsername() {
-        performNavigation(R.id.action_global_to_claim_username_graph)
+        performNavigationToGraph(
+            actionId = R.id.action_global_to_claim_username_graph,
+            graphId = R.id.claim_username_graph,
+            startDestinationId = R.id.claimUsernameFragment
+        )
     }
 }

@@ -30,6 +30,12 @@ internal object TrackedExtrinsicStatusReducer {
         // it re-validates or mortality expires, so a terminal Invalid here means the recovery aborted it.
         is ExtrinsicStatus.Invalid -> TrackedExtrinsicStatus.Failed("Extrinsic was rejected as invalid")
 
-        is ExtrinsicStatus.Other -> null
+        // Same: terminal here means recovery already stopped resubmitting.
+        is ExtrinsicStatus.Dropped -> TrackedExtrinsicStatus.Failed("Extrinsic was dropped from the transaction pool")
+
+        is ExtrinsicStatus.Usurped -> TrackedExtrinsicStatus.Failed("Extrinsic was usurped by ${status.by}")
+
+        // Still in flight — no observable change for a tracked extrinsic.
+        is ExtrinsicStatus.Future, is ExtrinsicStatus.Retracted, is ExtrinsicStatus.Other -> null
     }
 }

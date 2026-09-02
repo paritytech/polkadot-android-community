@@ -103,6 +103,7 @@ class BearerTokenInterceptorTest {
             authTokenApi = mock(AuthTokenApi::class.java),
             timeProvider = FakeTimeProvider(1_000_000_000L),
             jwtParser = JWTParser(Gson()),
+            gson = Gson(),
         )
     }
 
@@ -120,6 +121,7 @@ class BearerTokenInterceptorTest {
             authTokenApi = authTokenApi,
             timeProvider = FakeTimeProvider(1_000_000_000L),
             jwtParser = JWTParser(Gson()),
+            gson = Gson(),
         )
     }
 

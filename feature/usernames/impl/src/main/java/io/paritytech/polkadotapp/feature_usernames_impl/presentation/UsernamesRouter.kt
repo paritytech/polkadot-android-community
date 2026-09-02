@@ -10,6 +10,14 @@ interface UsernamesRouter : ReturnableRouter {
 
     fun openRecoverOptions()
 
+    fun openRecoverOptionsFromClaimUnavailable()
+
+    fun openRegistrationQueue()
+
+    fun openClaimUnavailable()
+
+    fun openIntegrityFailed()
+
     fun openTermsOfUse()
 
     fun openPrivacyPolicy()

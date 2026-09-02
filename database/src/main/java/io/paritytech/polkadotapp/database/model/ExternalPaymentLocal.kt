@@ -22,6 +22,7 @@ class ExternalPaymentLocal(
         ENSURE_VOUCHERS,
         OFFBOARD_VOUCHERS,
         COMPLETED,
+        PARTIALLY_COMPLETED,
         FAILED,
     }
 }

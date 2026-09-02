@@ -1,20 +1,23 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flatRecover
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferMemo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferPlan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PreparedTransferMemo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferMemoBuilder
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlanner
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlannerFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategyFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.SplitCoinStrategyFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.UnloadAndSplitVouchersStrategyFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinageAssetSelector
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.SpendScope
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -22,8 +25,7 @@ import java.math.BigDecimal
 import javax.inject.Inject
 
 class RealPrepareCoinageTransferUseCase @Inject constructor(
-    private val coinRepository: CoinRepository,
-    private val voucherRepository: VoucherRepository,
+    private val assetSelector: CoinageAssetSelector,
     private val plannerFactory: TransferPlannerFactory,
     private val exactMatchStrategyFactory: ExactMatchStrategyFactory,
     private val splitStrategyFactory: SplitCoinStrategyFactory,
@@ -32,17 +34,35 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase,
     private val memoBuilder: TransferMemoBuilder
 ) : PrepareCoinageTransferUseCase {
+    /**
+     * Plans against spendable funds first and only widens if they cannot cover the amount.
+     */
     override suspend fun preparePlan(amount: BigDecimal): Result<TransferPlan> {
-        val allCoins = coinRepository.getActiveCoins()
-        val allVouchers = voucherRepository.getActiveVouchers()
+        val coinsByScope = assetSelector.getSelectableCoinsByScope()
+        val vouchersByScope = assetSelector.getSelectableVouchersByScope()
+
+        fun TransferPlanner.planWithin(scope: SpendScope) =
+            plan(amount, coinsByScope.getValue(scope), vouchersByScope.getValue(scope))
 
         return plannerFactory.create()
-            .flatMap { it.plan(amount, allCoins, allVouchers) }
+            .flatMap { planner ->
+                planner.planWithin(SpendScope.SPENDABLE)
+                    .flatRecover { planner.planWithin(SpendScope.WITH_CONFIRMATION) }
+            }
             .onSuccess { coinageLogI("Outgoing TransferPlan: $it") }
-            .onFailure { coinageLogE("Failed to construct transfer plan for amount: $amount", it) }
+            .onFailure { logPlanFailure(amount, it) }
     }
 
-    override suspend fun prepareMemo(plan: TransferPlan): Result<TransferMemo> {
+    /**
+     * An amount the wallet cannot cover is an ordinary state while the user is still typing, so it does not
+     * belong at error level — this same path backs the running plan preview, not just the send.
+     */
+    private fun logPlanFailure(amount: BigDecimal, error: Throwable) = when (error) {
+        is InsufficientBalanceException -> coinageLogD("No transfer plan covers amount: $amount")
+        else -> coinageLogE("Failed to construct transfer plan for amount: $amount", error)
+    }
+
+    override suspend fun prepareMemo(plan: TransferPlan): Result<PreparedTransferMemo> {
         val chain = chainAssetProvider.chain()
 
         val peopleCollection = activePeopleCollectionUseCase.getActivePeopleCollection()
@@ -53,7 +73,10 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
         }
 
         return strategy.run()
-            .flatMap { memoEntries -> memoBuilder.buildMemo(memoEntries) }
-            .onSuccess { memo -> coinageLogD("TransferMemo built: coins=${memo.coins.size}, totalValue=${memo.totalValue}") }
+            .flatMap { prepared ->
+                memoBuilder.buildMemo(prepared.entries)
+                    .map { memo -> PreparedTransferMemo(memo, prepared.handoffCommit) }
+            }
+            .onSuccess { coinageLogD("TransferMemo built: coins=${it.memo.coins.size}, total=${it.memo.totalValue}") }
     }
 }

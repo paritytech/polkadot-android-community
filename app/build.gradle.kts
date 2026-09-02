@@ -81,19 +81,25 @@ android {
                 localProperties.readSecretOrDefault("APP_NAME", "Polkadot")
             )
         }
+        getByName("safetynet") {
+            matchingFallbacks.addAll(listOf("nightly", "debug"))
+
+            signingConfig = signingConfigs.getByName("dev")
+            applicationIdSuffix = ".safetynet"
+            manifestPlaceholders["appName"] = localProperties.readSecretOrDefault(
+                "SAFETYNET_APP_NAME",
+                "[Safetynet] ${localProperties.readSecretOrDefault("APP_NAME", "Polkadot")}"
+            )
+        }
     }
+
+    sourceSets.getByName("safetynet").manifest.srcFile("src/nightly/AndroidManifest.xml")
 
     flavorDimensions += "distribution"
 
     productFlavors {
         create("gp") { dimension = "distribution" }
         create("vanilla") { dimension = "distribution" }
-    }
-}
-
-tasks.configureEach {
-    if (name.startsWith("processVanilla") && name.endsWith("GoogleServices")) {
-        enabled = false
     }
 }
 
@@ -154,6 +160,7 @@ dependencies {
     implementation(project(":feature:calls:impl"))
     implementation(project(":feature:coinage:impl"))
     implementation(project(":feature:dotns:impl"))
+    implementation(project(":feature:dotns-gateway:impl"))
     implementation(project(":feature:connection-status:api"))
     implementation(project(":feature:connection-status:impl"))
     implementation(project(":feature:revive:impl"))

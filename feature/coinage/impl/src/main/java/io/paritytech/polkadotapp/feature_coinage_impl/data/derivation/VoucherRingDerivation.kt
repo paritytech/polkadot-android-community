@@ -2,7 +2,11 @@ package io.paritytech.polkadotapp.feature_coinage_impl.data.derivation
 
 import io.novasama.substrate_sdk_android.encrypt.junction.JunctionType
 import io.novasama.substrate_sdk_android.encrypt.junction.SubstrateJunctionDecoder
+import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchAlias
+import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchEntropy
+import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
+import io.paritytech.polkadotapp.bandersnatch_crypto.aliasInContext
 import io.paritytech.polkadotapp.bandersnatch_crypto.memberKey
 import io.paritytech.polkadotapp.common.utils.blake2b256
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -12,24 +16,44 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationInde
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import javax.inject.Inject
 
-class VoucherRingDerivation @Inject constructor(
+interface VoucherRingDerivation {
+    suspend fun deriveBandersnatch(derivationIndex: DerivationIndex): BandersnatchEntropy
+
+    suspend fun deriveBandersnatchBatch(derivationIndices: List<DerivationIndex>): List<BandersnatchEntropy>
+
+    /**
+     * This and [aliasOf] are interface members rather than top-level extensions so we can fake them in tests - JVM tests cant access Bandersnatch
+     * Mocking via mockStatic is not an option - its too slow for the fuzzer
+     */
+    suspend fun memberKeyOf(derivationIndex: DerivationIndex): BandersnatchPublicKey
+
+    suspend fun aliasOf(derivationIndex: DerivationIndex, context: BandersnatchContext): BandersnatchAlias
+}
+
+class RealVoucherRingDerivation @Inject constructor(
     private val accountRepository: AccountRepository,
     private val accountSecretsStorage: AccountSecretsStorage,
-) {
+) : VoucherRingDerivation {
     companion object {
         private const val DERIVATION_PATH_BASE = "//pps//ring-vrf"
 
         private fun getDerivationPath(derivationIndex: DerivationIndex) = "$DERIVATION_PATH_BASE//$derivationIndex"
     }
 
-    suspend fun deriveBandersnatch(derivationIndex: DerivationIndex): BandersnatchEntropy {
+    override suspend fun deriveBandersnatch(derivationIndex: DerivationIndex): BandersnatchEntropy {
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
 
         return deriveBandersnatchFromEntropy(mnemonic.entropy, derivationIndex)
     }
 
-    suspend fun deriveBandersnatchBatch(derivationIndices: List<DerivationIndex>): List<BandersnatchEntropy> {
+    override suspend fun memberKeyOf(derivationIndex: DerivationIndex): BandersnatchPublicKey =
+        deriveBandersnatch(derivationIndex).memberKey()
+
+    override suspend fun aliasOf(derivationIndex: DerivationIndex, context: BandersnatchContext): BandersnatchAlias =
+        deriveBandersnatch(derivationIndex).aliasInContext(context)
+
+    override suspend fun deriveBandersnatchBatch(derivationIndices: List<DerivationIndex>): List<BandersnatchEntropy> {
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
 

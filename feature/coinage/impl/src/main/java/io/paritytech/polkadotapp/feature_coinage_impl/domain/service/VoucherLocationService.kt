@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.mapValuesNotNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.toRingCollectionId
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingCollectionId
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingCollectionIdWithIndex
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -39,6 +41,7 @@ class VoucherLocationService @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val voucherRepository: VoucherRepository,
     private val membersRepository: MembersRepository,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
 ) {
     context(scope: ComputationalScope)
     fun start() {
@@ -56,11 +59,15 @@ class VoucherLocationService @Inject constructor(
     }
 
     private fun subscribeVoucherPositions(chainId: ChainId): Flow<VoucherPositions> {
-        return voucherRepository.subscribeVouchersNotInRecycler()
+        // Every voucher, not just the ones outside a recycler: a ring keeps filling after a voucher lands
+        // in it, and the member count is what the strategies read to decide when it may be spent.
+        return voucherRepository.subscribeAllVouchers()
             .filter { it.isNotEmpty() }
             .distinctUntilChangedBy { vouchers -> vouchers.mapToSet { it.ringVrfPublicKey } }
             .flatMapLatest { vouchers ->
-                val keys = vouchers.map { it.recyclerValue.toRingCollectionId() to it.ringVrfPublicKey }
+                val instanceId = coinageInstanceIdProvider.instanceId()
+                    .getOrElse { return@flatMapLatest flowOf(Result.failure(it)) }
+                val keys = vouchers.map { it.recyclerValue.toRingCollectionId(instanceId) to it.ringVrfPublicKey }
 
                 membersRepository.subscribeMembers(
                     chainId = chainId,
@@ -101,7 +108,9 @@ class VoucherLocationService @Inject constructor(
             val ringStatus = ringStatuses[ringStatusKey] ?: return@mapValuesNotNull null
 
             if (ringStatus.includesKey(position)) {
-                RecyclerVoucher.Location.InRecycler(position.ringIndex)
+                // included, not total: a proof only verifies against the keys baked into the ring root, so
+                // that is the set this voucher actually hides in.
+                RecyclerVoucher.Location.InRecycler(position.ringIndex, ringStatus.included)
             } else {
                 null
             }

@@ -1,7 +1,9 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.interceptor
 
 import com.google.gson.Gson
+import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
 import io.paritytech.polkadotapp.tools_jwt_auth_api.CallWithBearerToken
+import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.AuthError
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.DelayableAuthTokenApi
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.FakeTimeProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.api.AuthTokenApi
@@ -19,10 +21,12 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import retrofit2.Invocation
+import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -44,6 +48,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = authTokenApi,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -70,6 +75,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = mock(AuthTokenApi::class.java),
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -97,6 +103,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = authTokenApi,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -112,13 +119,16 @@ class BearerTokenAuthenticatorTest {
     }
 
     @Test
-    fun `gives up when refresh throws`() {
+    fun `refresh failure propagates the typed cause`() {
         val tokenStore = createFakeTokenStore()
         val staleJwt = makeValidJWT(exp = 2_000_000_000L)
         tokenStore.saveToken(staleJwt)
         val authTokenApi = mock(AuthTokenApi::class.java)
         runBlocking {
-            `when`(authTokenApi.fetchToken(JwtRequest)).thenThrow(RuntimeException("network down"))
+            // thenThrow rejects a bare Throwable subclass as a checked exception, so the
+            // sealed error is raised from an answer instead.
+            `when`(authTokenApi.fetchToken(JwtRequest))
+                .thenAnswer { throw AuthError.Integrity(IntegrityError.AttestationRejected) }
         }
         val authenticator = BearerTokenAuthenticator(
             tokenProvider = JWTTokenProvider(
@@ -126,6 +136,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = authTokenApi,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -134,8 +145,14 @@ class BearerTokenAuthenticatorTest {
             .header("Authorization", "Bearer $staleJwt")
             .build()
 
-        // Refresh failure must NOT escape authenticate(); return null so OkHttp surfaces the 401.
-        assertNull(authenticator.authenticate(route = null, response = unauthorizedResponse(request)))
+        // Returning null used to drop the cause, leaving the caller with a bare 401. An
+        // Authenticator may throw IOException, so the typed reason rides inside one.
+        val thrown = runCatching {
+            authenticator.authenticate(route = null, response = unauthorizedResponse(request))
+        }.exceptionOrNull()
+
+        assertTrue("expected IOException but was $thrown", thrown is IOException)
+        assertEquals(AuthError.Integrity(IntegrityError.AttestationRejected), thrown?.cause)
     }
 
     @Test
@@ -148,6 +165,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = mock(AuthTokenApi::class.java),
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 
@@ -171,6 +189,7 @@ class BearerTokenAuthenticatorTest {
                 authTokenApi = api,
                 timeProvider = FakeTimeProvider(1_000_000_000L),
                 jwtParser = JWTParser(Gson()),
+                gson = Gson(),
             ),
         )
 

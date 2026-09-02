@@ -24,10 +24,12 @@ import kotlin.reflect.KClass
 import kotlin.time.Instant
 
 interface ChatMessageRepository {
+    /** [onSaved] runs inside the write transaction — see [io.paritytech.polkadotapp.database.dao.ChatMessageDao]. */
     suspend fun saveMessage(
         chatMessage: ChatMessage,
         customContentDecoder: CustomContentDecoder,
         onConflict: ChatMessageSaveConflictStrategy = ChatMessageSaveConflictStrategy.REPLACE,
+        onSaved: suspend () -> Unit = {},
     ): Boolean
 
     /**
@@ -142,17 +144,18 @@ class RealChatMessageRepository @Inject constructor(
         chatMessage: ChatMessage,
         customContentDecoder: CustomContentDecoder,
         onConflict: ChatMessageSaveConflictStrategy,
+        onSaved: suspend () -> Unit,
     ): Boolean {
         val local = chatMessage.toLocal(customContentDecoder)
 
         return when (onConflict) {
             ChatMessageSaveConflictStrategy.REPLACE -> {
-                chatMessageDao.saveMessage(local)
+                chatMessageDao.saveMessage(local, onSaved)
                 true
             }
 
             ChatMessageSaveConflictStrategy.IGNORE -> {
-                chatMessageDao.saveMessageIfNotExists(local) >= 0
+                chatMessageDao.saveMessageIfNotExists(local).also { if (it >= 0) onSaved() } >= 0
             }
         }
     }

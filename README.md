@@ -84,9 +84,11 @@ delivered via remote config, and development and nightly builds are exercised ag
 ./gradlew testGpDebugUnitTest
 ```
 
-The project has two flavors (`gp` with Google services, `vanilla` without) and
-`debug` / `nightly` / `release` build types — e.g. `./gradlew assembleGpRelease`
-for a production build (requires the release keystore and secrets).
+The project has two flavors (`gp` with Google Play Services, `vanilla` without — it
+keeps Firebase Remote Config, which the app requires and which needs no Play Services
+on the device) and `debug` / `nightly` / `release` build types — e.g.
+`./gradlew assembleGpRelease` for a production build (requires the release keystore
+and secrets).
 
 ## How it works
 

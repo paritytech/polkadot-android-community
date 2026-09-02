@@ -16,6 +16,7 @@ import io.paritytech.polkadotapp.database.dao.CoinUpdateLocal
 import io.paritytech.polkadotapp.database.model.CoinLocal
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinUpdate
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinsByOwner
@@ -23,6 +24,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.maxConsoli
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.getNextIndex
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject
 
 private const val MAX_AGE = 16
@@ -33,21 +35,19 @@ interface CoinRepository {
 
     suspend fun saveAll(coins: List<Coin>)
 
+    /** Every coin we know of, on chain or not. */
     fun subscribeAllCoins(): Flow<List<Coin>>
 
     fun subscribeAllCoinsWithUnknownAge(): Flow<List<Coin>>
 
-    fun subscribeAllNotSpentCoins(): Flow<List<Coin>>
+    suspend fun getAllCoins(): List<Coin>
 
-    suspend fun getAllNotSpentCoins(): List<Coin>
+    /** Only the coins at [accountIds], for a caller watching a few of them rather than the wallet. */
+    fun subscribeCoinsBy(accountIds: List<AccountId>): Flow<List<Coin>>
 
-    suspend fun getCoinsWithSpentState(state: Coin.SpentState): List<Coin>
-
-    fun subscribeCoinsExcludingSpentOnChain(): Flow<List<Coin>>
+    suspend fun getCoinsBy(derivationIndices: List<DerivationIndex>): List<Coin>
 
     fun getCoinRecyclingAge(): Int
-
-    fun getMaxCoinAge(): Int
 
     suspend fun getNextDerivationIndex(): Int
 
@@ -57,15 +57,14 @@ interface CoinRepository {
 
     suspend fun updateCoins(updates: List<CoinUpdate>)
 
-    suspend fun getActiveCoins(): List<Coin>
+    /** Coins the chain currently holds. Says nothing about whether they may be spent — see the ledger. */
+    suspend fun getOnChainCoins(): List<Coin>
 
-    suspend fun getActiveCoinsWithKnownAge(minAge: Int): List<Coin>
+    suspend fun getOnChainCoinsWithAgeAtLeast(minAge: Int): List<Coin>
 
-    fun subscribeActiveCoins(): Flow<List<Coin>>
+    fun subscribeOnChainCoins(): Flow<List<Coin>>
 
     suspend fun fetchMaxConsolidation(chainId: ChainId): Result<Int>
-
-    suspend fun setSpentStateByDerivationIndices(indices: List<Int>, state: Coin.SpentState)
 }
 
 class RealCoinRepository @Inject constructor(
@@ -83,26 +82,6 @@ class RealCoinRepository @Inject constructor(
 
     override fun subscribeAllCoins(): Flow<List<Coin>> {
         return coinDao.subscribeAll().mapList { it.toDomain() }
-    }
-
-    override fun subscribeAllNotSpentCoins(): Flow<List<Coin>> =
-        coinDao.subscribeCoinsWithSpentState(CoinLocal.SpentState.NOT_SPENT)
-            .mapList { it.toDomain() }
-
-    override suspend fun getAllNotSpentCoins(): List<Coin> =
-        coinDao.getCoinsWithSpentState(CoinLocal.SpentState.NOT_SPENT)
-            .map { it.toDomain() }
-
-    override suspend fun getCoinsWithSpentState(state: Coin.SpentState): List<Coin> =
-        coinDao.getCoinsWithSpentState(state.toLocal())
-            .map { it.toDomain() }
-
-    override fun subscribeCoinsExcludingSpentOnChain(): Flow<List<Coin>> =
-        coinDao.subscribeCoinsExcludingSpentOnChain(CoinLocal.SpentState.SPENT_ON_CHAIN)
-            .mapList { it.toDomain() }
-
-    override fun getMaxCoinAge(): Int {
-        return MAX_AGE
     }
 
     override fun getCoinRecyclingAge(): Int {
@@ -142,25 +121,32 @@ class RealCoinRepository @Inject constructor(
         coinDao.updateCoins(updateLocals)
     }
 
-    override suspend fun getActiveCoins(): List<Coin> {
-        return coinDao.getAllAgedCoinsWithState(CoinLocal.SpentState.NOT_SPENT)
-            .map { it.toDomain() }
+    override suspend fun getOnChainCoins(): List<Coin> {
+        return coinDao.getOnChainCoins().map { it.toDomain() }
     }
 
-    override suspend fun getActiveCoinsWithKnownAge(minAge: Int): List<Coin> {
-        return coinDao.getCoinsWithKnownAgeAtLeast(CoinLocal.SpentState.NOT_SPENT, minAge)
-            .map { it.toDomain() }
+    override suspend fun getOnChainCoinsWithAgeAtLeast(minAge: Int): List<Coin> {
+        return coinDao.getCoinsWithKnownAgeAtLeast(minAge).map { it.toDomain() }
     }
 
-    override fun subscribeActiveCoins(): Flow<List<Coin>> {
-        return coinDao.subscribeAllAgedCoinsWithState(CoinLocal.SpentState.NOT_SPENT)
-            .mapList { it.toDomain() }
+    override fun subscribeOnChainCoins(): Flow<List<Coin>> {
+        return coinDao.subscribeOnChainCoins().mapList { it.toDomain() }
     }
 
-    override suspend fun setSpentStateByDerivationIndices(indices: List<Int>, state: Coin.SpentState) {
-        if (indices.isEmpty()) return
+    override suspend fun getAllCoins(): List<Coin> {
+        return coinDao.getAll().map { it.toDomain() }
+    }
 
-        coinDao.setSpentStateByDerivationIndices(indices, state.toLocal())
+    override fun subscribeCoinsBy(accountIds: List<AccountId>): Flow<List<Coin>> {
+        if (accountIds.isEmpty()) return flowOf(emptyList())
+
+        return coinDao.subscribeBy(accountIds.map { it.value }).mapList { it.toDomain() }
+    }
+
+    override suspend fun getCoinsBy(derivationIndices: List<DerivationIndex>): List<Coin> {
+        if (derivationIndices.isEmpty()) return emptyList()
+
+        return coinDao.getByDerivationIndices(derivationIndices).map { it.toDomain() }
     }
 
     fun CoinLocal.toDomain(): Coin {
@@ -168,15 +154,9 @@ class RealCoinRepository @Inject constructor(
             derivationIndex = derivationIndex,
             valueExponent = ValueExponent(valueExponent),
             age = ageValue?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
-            spentState = spentState.toDomain(),
+            isOnChain = onChain,
             accountId = accountId.intoAccountId()
         )
-    }
-
-    private fun CoinLocal.SpentState.toDomain(): Coin.SpentState = when (this) {
-        CoinLocal.SpentState.SPENT_LOCALLY -> Coin.SpentState.SPENT_LOCALLY
-        CoinLocal.SpentState.SPENT_ON_CHAIN -> Coin.SpentState.SPENT_ON_CHAIN
-        CoinLocal.SpentState.NOT_SPENT -> Coin.SpentState.NOT_SPENT
     }
 
     fun Coin.toLocal(): CoinLocal {
@@ -185,19 +165,13 @@ class RealCoinRepository @Inject constructor(
             accountId = accountId.value,
             valueExponent = valueExponent.value,
             ageValue = (age as? Coin.Age.Known)?.value,
-            spentState = spentState.toLocal()
+            onChain = isOnChain,
         )
     }
 
-    private fun Coin.SpentState.toLocal(): CoinLocal.SpentState = when (this) {
-        Coin.SpentState.SPENT_LOCALLY -> CoinLocal.SpentState.SPENT_LOCALLY
-        Coin.SpentState.SPENT_ON_CHAIN -> CoinLocal.SpentState.SPENT_ON_CHAIN
-        Coin.SpentState.NOT_SPENT -> CoinLocal.SpentState.NOT_SPENT
-    }
+    private fun CoinUpdate.toLocal() = CoinUpdateLocal(accountId = accountId, onChain = onChain, age = age)
 
-    private fun CoinUpdate.toLocal() = CoinUpdateLocal(
-        accountId = accountId,
-        age = age,
-        spentState = spentState.toLocal()
-    )
+    private fun getMaxCoinAge(): Int {
+        return MAX_AGE
+    }
 }

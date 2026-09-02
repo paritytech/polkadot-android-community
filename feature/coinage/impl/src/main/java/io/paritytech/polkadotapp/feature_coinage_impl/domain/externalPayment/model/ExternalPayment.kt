@@ -26,6 +26,9 @@ data class ExternalPayment(
 
         data object Completed : Stage
 
+        /** Some of the unload executed. Terminal, and reported to callers as completed. */
+        data class PartiallyCompleted(val reason: String) : Stage
+
         data class Failed(val reason: String) : Stage
     }
 

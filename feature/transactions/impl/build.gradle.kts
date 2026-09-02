@@ -29,8 +29,11 @@ dependencies {
     implementation(libs.androidx.work.runtime)
 
     implementation(project(":database"))
+    implementation(project(":tools:remoteconfig:api"))
 
     implementation(libs.nova.substrate.sdk)
 
     testImplementation(project(":test-shared"))
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

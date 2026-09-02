@@ -19,6 +19,26 @@
     </fragment>
 
     <fragment
+        android:id="@+id/registrationQueueFragment"
+        android:name="io.paritytech.polkadotapp.feature_usernames_impl.presentation.registrationQueue.RegistrationQueueFragment"
+        android:label="RegistrationQueueFragment" />
+
+    <fragment
+        android:id="@+id/claimUnavailableFragment"
+        android:name="io.paritytech.polkadotapp.feature_usernames_impl.presentation.claimUnavailable.ClaimUnavailableFragment"
+        android:label="ClaimUnavailableFragment">
+
+        <action
+            android:id="@+id/action_claim_unavailable_to_recoverOptionsBottomSheet"
+            app:destination="@id/recoverOptionsBottomSheet" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/integrityFailedFragment"
+        android:name="io.paritytech.polkadotapp.feature_usernames_impl.presentation.integrityFailed.IntegrityFailedFragment"
+        android:label="IntegrityFailedFragment" />
+
+    <fragment
         android:id="@+id/recoverMnemonicFragment"
         android:name="io.paritytech.polkadotapp.feature_backup_impl.mnemonic.recover.RecoverMnemonicFragment"
         android:label="RecoverMnemonicFragment" />

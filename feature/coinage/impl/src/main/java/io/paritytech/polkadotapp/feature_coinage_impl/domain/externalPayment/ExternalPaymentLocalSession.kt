@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.sta
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.ExternalPaymentState
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.FailedPaymentState
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.OffboardVouchersPaymentState
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.PartiallyCompletedPaymentState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -39,6 +40,7 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
         val stageEnum = state.stage()
         val (selected, surplus) = state.persistedPayload()
         val failureReason = (state as? FailedPaymentState)?.reason
+            ?: (state as? PartiallyCompletedPaymentState)?.reason
         dao.updateStage(
             id = paymentId,
             stage = stageEnum,
@@ -73,6 +75,8 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
                 surplusPlanks = requireNotNull(surplusPlanks) { "OFFBOARD row missing surplusPlanks" },
             )
             ExternalPaymentLocal.Stage.COMPLETED -> CompletedPaymentState(context)
+            ExternalPaymentLocal.Stage.PARTIALLY_COMPLETED ->
+                PartiallyCompletedPaymentState(context, failureReason.orEmpty())
             ExternalPaymentLocal.Stage.FAILED -> FailedPaymentState(context, failureReason.orEmpty())
         }
     }
@@ -81,6 +85,7 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
         is EnsureVouchersPaymentState -> ExternalPaymentLocal.Stage.ENSURE_VOUCHERS
         is OffboardVouchersPaymentState -> ExternalPaymentLocal.Stage.OFFBOARD_VOUCHERS
         is CompletedPaymentState -> ExternalPaymentLocal.Stage.COMPLETED
+        is PartiallyCompletedPaymentState -> ExternalPaymentLocal.Stage.PARTIALLY_COMPLETED
         is FailedPaymentState -> ExternalPaymentLocal.Stage.FAILED
     }
 
@@ -89,6 +94,7 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
 
         is EnsureVouchersPaymentState,
         is CompletedPaymentState,
+        is PartiallyCompletedPaymentState,
         is FailedPaymentState -> null to null
     }
 

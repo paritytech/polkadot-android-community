@@ -31,6 +31,11 @@ android {
             buildConfigString("BACKUP_FILE_SUFFIX", "nightly")
             buildConfigString("BACKUP_KEY_SUFFIX", "-nightly")
         }
+
+        getByName("safetynet") {
+            buildConfigString("BACKUP_FILE_SUFFIX", "safetynet")
+            buildConfigString("BACKUP_KEY_SUFFIX", "-safetynet")
+        }
     }
 
     flavorDimensions += "distribution"

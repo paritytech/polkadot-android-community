@@ -7,5 +7,4 @@ class DotNsConfig(
     val resolverContractAddress: AccountId,
     // Maps a node to its per-name resolver. Null disables manifest resolution.
     val registryContractAddress: AccountId?,
-    val protocolRegistryAddress: AccountId?,
 )

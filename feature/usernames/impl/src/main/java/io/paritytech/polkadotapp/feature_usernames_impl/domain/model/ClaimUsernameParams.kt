@@ -11,4 +11,7 @@ class ClaimUsernameParams(
     val membershipSignature: ByteArray,
     val ringVrfKey: ByteArray,
     val identifierKey: EncodedPublicKey,
+    val dotNsSignature: ByteArray,
+    val dotNsSignedAt: Long,
+    val dotNsReservedUsername: String?
 )

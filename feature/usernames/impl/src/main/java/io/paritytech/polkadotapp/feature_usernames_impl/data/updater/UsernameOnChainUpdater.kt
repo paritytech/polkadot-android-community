@@ -9,17 +9,16 @@ import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.consumers
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.resources
-import io.paritytech.polkadotapp.feature_usernames_impl.domain.UsernamesChainProvider
 
+// TODO: People Chain is used until dotNS resolve-by-address lands (paritytech/dotns#216, #217)
 class UsernameOnChainUpdater(
-    private val usernamesChainProvider: UsernamesChainProvider,
     chainRegistry: ChainRegistry,
     storageCache: StorageCache,
-    scope: Updater.NoChainScope<MetaAccount>,
+    scope: Updater.NoChainScope<MetaAccount>
 ) : SingleStorageKeyUpdater<MetaAccount>(scope, chainRegistry, storageCache) {
     context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String {
-        val accountId = scopeValue.accountIdIn(usernamesChainProvider.chain())
+        val accountId = scopeValue.accountIdIn(chain)
 
         return withRuntime.runtime.metadata.resources.consumers.storageKey(accountId)
     }

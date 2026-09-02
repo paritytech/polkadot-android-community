@@ -2,6 +2,8 @@ package io.paritytech.polkadotapp.feature_usernames_impl.domain.interactor
 
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flatRecover
+import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.storage.newaccount.NewAccountStorage
 import io.paritytech.polkadotapp.feature_backup_api.domain.usecase.TryRecoverFromBackupAndCreateAccountUseCase
@@ -12,9 +14,13 @@ import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAcc
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.RecoverUsernameUseCase
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameAlreadyClaimedException
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameRepository
+import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.QueuedClaimStorage
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.UsernameFlowError
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.asUsernameFlowError
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.toUsernameFlowError
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameOutcome
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameAvailabilityState
-import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.AdoptWalletBackendAuthUseCase
+import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.UsernameClaimResult
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.usecase.CreateClaimParamsUseCase
 import io.paritytech.polkadotapp.tools_backup_api.domain.model.BackupOutcome
 import kotlinx.coroutines.flow.Flow
@@ -42,35 +48,58 @@ class RealUsernamesClaimInteractor @Inject constructor(
     private val usernameRepository: UsernameRepository,
     private val coroutineDispatchers: CoroutineDispatchers,
     private val localUsernameStorage: LocalUsernameStorage,
+    private val queuedClaimStorage: QueuedClaimStorage,
     private val createClaimParamsUseCase: CreateClaimParamsUseCase,
-    private val adoptWalletBackendAuthUseCase: AdoptWalletBackendAuthUseCase,
     private val observeAccountOnboardingStatusUseCase: ObserveAccountOnboardingStatusUseCase,
     private val tryRecoverFromBackupAndCreateAccountUseCase: TryRecoverFromBackupAndCreateAccountUseCase,
     private val accountRepository: AccountRepository,
     private val recoverUsernameUseCase: RecoverUsernameUseCase,
 ) : UsernamesClaimInteractor {
     override suspend fun tryRecoverBackupOrCreateAccount(): Result<BackupOutcome> {
-        return tryRecoverFromBackupAndCreateAccountUseCase()
+        return tryRecoverFromBackupAndCreateAccountUseCase().mapError(Throwable::toUsernameFlowError)
     }
 
     override suspend fun checkUsernameAvailable(username: Username): Result<UsernameAvailabilityState> {
-        return usernameRepository.checkUsernameAvailable(username)
+        return availabilityOf(username).flatRecover { error ->
+            // Attestation blips clear on the next challenge, so spend exactly one more attempt
+            // before telling the user anything.
+            if (error == UsernameFlowError.VerificationBusy) {
+                availabilityOf(username)
+            } else {
+                Result.failure(error)
+            }
+        }
+    }
+
+    private suspend fun availabilityOf(username: Username): Result<UsernameAvailabilityState> {
+        return usernameRepository.checkUsernameAvailable(username).mapError(Throwable::toUsernameFlowError)
     }
 
     override suspend fun claimUsername(username: Username, preferredDigits: String): ClaimUsernameOutcome {
         return withContext(coroutineDispatchers.io) {
-            // The backend only registers a username for the account that
-            // authenticated the request, so switch backend auth over to the
-            // wallet key before claiming (device-uniqueness-backend #77).
-            runCatching { adoptWalletBackendAuthUseCase() }
-                .flatMap { usernameRepository.getVerifier() }
+            usernameRepository.getVerifier()
                 .flatMap { createClaimParamsUseCase(username, it, preferredDigits) }
                 .flatMap { usernameRepository.claimUsername(it) }
-                .map { localUsernameStorage.saveValue(it) }
                 .fold(
-                    onSuccess = { ClaimUsernameOutcome.Claimed },
+                    onSuccess = { handleClaimResult(it) },
                     onFailure = { mapClaimFailure(it, username) }
                 )
+        }
+    }
+
+    private suspend fun handleClaimResult(result: UsernameClaimResult): ClaimUsernameOutcome {
+        return when (result) {
+            is UsernameClaimResult.Registered -> {
+                localUsernameStorage.saveValue(result.username)
+                ClaimUsernameOutcome.Claimed
+            }
+
+            is UsernameClaimResult.Queued -> {
+                queuedClaimStorage.saveValue(result.username)
+                ClaimUsernameOutcome.Queued
+            }
+
+            UsernameClaimResult.PaymentRequired -> ClaimUsernameOutcome.PaymentRequired
         }
     }
 
@@ -78,7 +107,7 @@ class RealUsernamesClaimInteractor @Inject constructor(
         return if (error is UsernameAlreadyClaimedException) {
             recoverFromConflict(username)
         } else {
-            ClaimUsernameOutcome.Failed(error)
+            ClaimUsernameOutcome.Failed(error.asUsernameFlowError())
         }
     }
 
@@ -91,7 +120,7 @@ class RealUsernamesClaimInteractor @Inject constructor(
                     UsernameAvailabilityState.Invalid -> ClaimUsernameOutcome.Unavailable
                 }
             },
-            onFailure = { ClaimUsernameOutcome.Failed(it) }
+            onFailure = { ClaimUsernameOutcome.Failed(it.asUsernameFlowError()) }
         )
     }
 
@@ -101,7 +130,7 @@ class RealUsernamesClaimInteractor @Inject constructor(
 
     override fun observeAccountOnboardingStatus() = observeAccountOnboardingStatusUseCase()
 
-    override suspend fun recoverUsername() = recoverUsernameUseCase()
+    override suspend fun recoverUsername() = recoverUsernameUseCase().mapError(Throwable::toUsernameFlowError)
 
     override suspend fun saveIsNewAccount() {
         newAccountStorage.saveValue(true)

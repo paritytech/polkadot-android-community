@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.d
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.util.planksFromAmount
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.validation.Validation
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.filterResultSuccessNotNull
@@ -17,13 +18,15 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.debug.CoinageDebugSe
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlanner
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.awaitTransferOutcome
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferMemo
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
 import io.paritytech.polkadotapp.feature_coinage_api.domain.submitter.CoinsSubmitter
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTransferUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PreparedTransferMemo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ValidateTransferPlanUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.prepareMemo
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -40,7 +43,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
@@ -73,10 +76,9 @@ class RealSendEnterAmountInteractor @Inject constructor(
     private val prepareCoinageTransferUseCase: PrepareCoinageTransferUseCase,
     private val totalBalanceUseCase: TotalBalanceUseCase,
     private val externalPaymentService: ExternalPaymentService,
-    private val validateTransferPlanUseCase: ValidateTransferPlanUseCase,
     private val externalPaymentPlanner: ExternalPaymentPlanner,
     private val coinsSubmitters: Map<String, @JvmSuppressWildcards CoinsSubmitter>,
-    private val coinageTransferUseCase: CoinageTransferUseCase,
+    private val coinagePaymentStatusUseCase: CoinagePaymentStatusUseCase,
     private val coinageDebugSettings: CoinageDebugSettings,
     private val coroutineDispatchers: CoroutineDispatchers,
     override val sendValidation: SendValidation
@@ -90,7 +92,14 @@ class RealSendEnterAmountInteractor @Inject constructor(
 
     override fun tokenBalance(): Flow<AvailableToSendAmount> {
         return totalBalanceUseCase.subscribeTotalBalance()
-            .mapResult { AvailableToSendAmount(it.spendableBalance, asset()) }
+            .mapResult {
+                AvailableToSendAmount(
+                    spendable = it.availablePrivate,
+                    gainingPrivacy = it.gainingPrivacy.amount,
+                    canSpendGainingPrivacy = it.gainingPrivacy.canSpendWithConfirmation,
+                    chainAsset = asset(),
+                )
+            }
             .filterResultSuccessNotNull()
     }
 
@@ -116,7 +125,8 @@ class RealSendEnterAmountInteractor @Inject constructor(
     override suspend fun plan(value: BigDecimal, transferMethod: TransferMethod): SendPlan? = withContext(coroutineDispatchers.computation) {
         when (transferMethod) {
             is TransferMethod.CoinsViaChat,
-            is TransferMethod.CoinsViaSubmitter -> validateTransferPlanUseCase.validate(value)?.let(SendPlan::Coinage)
+            is TransferMethod.CoinsViaSubmitter ->
+                prepareCoinageTransferUseCase.preparePlan(value).map(SendPlan::Coinage).getOrNull()
 
             is TransferMethod.UnloadIntoExternal -> {
                 val amount = asset().planksFromAmount(value)
@@ -129,7 +139,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
 
     private suspend fun sendCoinage(recipient: AccountId, value: BigDecimal): Result<Unit> {
         return prepareCoinageTransferUseCase.prepareMemo(value)
-            .map { transferMemo -> sendChatMessage(recipient, transferMemo) }
+            .map { prepared -> sendChatMessage(recipient, prepared) }
             .onSuccess { Timber.d("CoinageTransfer: Successful") }
             .logFailure("Coinage transfer failed")
     }
@@ -157,20 +167,33 @@ class RealSendEnterAmountInteractor @Inject constructor(
         }
 
         prepareCoinageTransferUseCase.prepareMemo(value)
-            .flatMap { memo -> submitter.submit(memo, value, method.submitterPayload).map { memo } }
+            .flatMap { prepared ->
+                submitter.submit(prepared.memo, value, method.submitterPayload)
+                    // The submitter took the keys, so the handoff is real from here. There is no local
+                    // transaction to tie this to, unlike the chat path, so the commit is its own step.
+                    .flatMap { prepared.handoffCommit.commit() }
+                    .map { prepared.memo }
+            }
             .logFailure("Coins submission via '${method.submitterId}' failed")
             .onSuccess { memo -> emitAll(settlementStates(memo)) }
             .onFailure { emit(SendState.Failed(it)) }
     }
 
+    /**
+     * Follows the handed-over coins until the recipient takes them.
+     *
+     * The timeout bounds how long the *screen* waits, not the payment: the coins stay ours and stay
+     * recoverable however long the recipient takes, so giving up here only stops watching.
+     */
     private fun settlementStates(memo: TransferMemo): Flow<SendState> = flow {
+        val accountIds = memo.coins.map { it.privateKey.deriveKeypair().publicKey.intoAccountId() }
+
         val completed = withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
-            coinageTransferUseCase(
-                transferCoins = false,
-                coinKeys = memo.coins.map { it.privateKey },
-                pastDetection = null
-            )
-                .map { it.toSendState() }
+            coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
+                .transformWhile { states ->
+                    emit(states.toSendState())
+                    states.values.any { it.status.isPending }
+                }
                 .catch { error ->
                     if (error is CancellationException) throw error
                     emit(SendState.Failed(error))
@@ -183,19 +206,22 @@ class RealSendEnterAmountInteractor @Inject constructor(
         }
     }
 
-    private suspend fun sendChatMessage(
-        recipient: AccountId,
-        transferMemo: TransferMemo
-    ) {
+    /**
+     * The message row is what carries the keys and what will be delivered from, so it is the moment the
+     * handoff becomes real. Committing inside its transaction is the only placement where a crash cannot
+     * either strand the coins or release keys a peer already has.
+     */
+    private suspend fun sendChatMessage(recipient: AccountId, prepared: PreparedTransferMemo) {
         val chatId = ChatId.fromContact(recipient)
         val content = ChatMessage.Content.CoinagePayment(
-            totalValue = transferMemo.totalValue,
-            coinKeys = transferMemo.coins.map { it.privateKey.value },
+            totalValue = prepared.memo.totalValue,
+            coinKeys = prepared.memo.coins.map { it.privateKey.value },
             status = ChatMessage.Content.CoinagePayment.Status.Detecting
         )
         chatMessageSender.sendUserMessage(
             chatId = chatId,
-            content = content
+            content = content,
+            onSaved = { prepared.handoffCommit.commit().getOrThrow() },
         )
     }
 }
@@ -205,15 +231,24 @@ private fun Result<*>.toTerminalState(): SendState = fold(
     onFailure = { SendState.Failed(it) }
 )
 
-private fun CoinageTransferDetection.toSendState(): SendState = when (this) {
-    CoinageTransferDetection.Detecting,
-    is CoinageTransferDetection.Detected -> SendState.Settling(this)
+/**
+ * Complete only when every coin has been taken: one still on chain means the recipient has not finished, and
+ * one not on chain yet means we have not. An empty map is not agreement that nothing is left — it is not
+ * knowing yet.
+ */
+private fun Map<AccountId, CoinagePaymentState>.toSendState(): SendState = when {
+    isEmpty() -> SendState.Detecting
 
-    is CoinageTransferDetection.Transferred -> SendState.Complete
+    values.any { it.status == CoinagePaymentStatus.AwaitingClaim } -> SendState.Detected
 
-    CoinageTransferDetection.Error.Detection ->
-        SendState.Failed(IllegalStateException("Coins to settle were not detected on chain"))
+    // Proven claims only: one seen in a best-chain block can be forked away, and this state is final.
+    values.all { (it.status as? CoinagePaymentStatus.Claimed)?.finalized == true } -> SendState.Complete
 
-    CoinageTransferDetection.Error.Transfer ->
-        SendState.Failed(IllegalStateException("Coins settlement was not confirmed on chain"))
+    values.any { it.status == CoinagePaymentStatus.Failed } ->
+        SendState.Failed(IllegalStateException("Coins to settle were never minted on chain"))
+
+    else -> SendState.Detecting
 }
+
+private val CoinagePaymentStatus.isPending: Boolean
+    get() = this == CoinagePaymentStatus.AwaitingClaim || this == CoinagePaymentStatus.Detecting

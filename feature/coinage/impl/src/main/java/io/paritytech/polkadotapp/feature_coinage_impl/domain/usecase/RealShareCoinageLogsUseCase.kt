@@ -35,12 +35,12 @@ class RealShareCoinageLogsUseCase @Inject constructor(
 
             writer.appendLine("\n=== ALL COINS ===")
             coinRepository.subscribeAllCoins().first().forEach { coin ->
-                writer.appendLine("Coin[idx=${coin.derivationIndex}, exp=${coin.valueExponent.value}, age=${coin.age}, spent=${coin.spentState}]")
+                writer.appendLine("Coin[idx=${coin.derivationIndex}, exp=${coin.valueExponent.value}, age=${coin.age}]")
             }
 
             writer.appendLine("\n=== ALL VOUCHERS ===")
             voucherRepository.subscribeAllVouchers().first().forEach { voucher ->
-                writer.appendLine("Voucher[ringIdx=${voucher.ringVrfKeyIndex}, exp=${voucher.recyclerValue.value}, loc=${voucher.location}, usage=${voucher.usageState}]")
+                writer.appendLine("Voucher[ringIdx=${voucher.ringVrfKeyIndex}, exp=${voucher.recyclerValue.value}, loc=${voucher.location}]")
             }
         }
 

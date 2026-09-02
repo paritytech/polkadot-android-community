@@ -10,16 +10,13 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.Exte
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.VoucherOffboarding
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.filterSpendable
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUse
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinageAssetSelector
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.SpendScope
 import javax.inject.Inject
 
 class RealExternalPaymentPlanner @Inject constructor(
-    private val voucherRepository: VoucherRepository,
-    private val coinRepository: CoinRepository,
+    private val assetSelector: CoinageAssetSelector,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase,
 ) : ExternalPaymentPlanner {
     override suspend fun plan(amount: Balance): Result<ExternalPaymentPlan> = runCancellableCatching {
@@ -37,30 +34,27 @@ class RealExternalPaymentPlanner @Inject constructor(
 
     context(coinageContext: CoinageBalanceConversionContext)
     private suspend fun determinePlan(amount: Balance): ExternalPaymentPlan {
-        val activeVouchers = voucherRepository.getActiveVouchers()
-        val availableVouchers = activeVouchers.filter { it.isReadyToUse() }
+        val availableVouchers = assetSelector.getSelectableVouchers(SpendScope.SPENDABLE)
 
         if (availableVouchers.totalBalance() >= amount) {
             val offboarding = pickVoucherForOffboardingOrThrow(availableVouchers, target = amount)
             return ExternalPaymentPlan.Ready(offboarding)
         }
 
-        // If total number of active vouchers is sufficient but not all of them are available - prefer delay instead of trying to load with coins
+        // Vouchers still gaining privacy become spendable on their own, so waiting for them beats spending
+        // coins to make up the difference. Nobody is here to confirm a private spend, so they are not spent.
+        val activeVouchers = availableVouchers + assetSelector.getVouchersGainingPrivacy()
+
         if (activeVouchers.totalBalance() >= amount) {
             return ExternalPaymentPlan.NeedsDelayedRetry(DelayReason.VOUCHERS_NOT_READY)
         }
 
         val deficit = amount - activeVouchers.totalBalance()
-        val activeCoins = coinRepository.getActiveCoins()
-        val availableCoins = activeCoins.filterSpendable(coinRepository.getCoinRecyclingAge())
-
-        if (availableCoins.totalBalance() >= deficit) {
-            val coinsToLoad = pickCoinsForDeficit(availableCoins, deficit)
-            return ExternalPaymentPlan.LoadCoins(coinsToLoad)
-        }
+        val activeCoins = assetSelector.getSelectableCoins(SpendScope.SPENDABLE)
 
         if (activeCoins.totalBalance() >= deficit) {
-            return ExternalPaymentPlan.NeedsDelayedRetry(DelayReason.COINS_NOT_READY)
+            val coinsToLoad = pickCoinsForDeficit(activeCoins, deficit)
+            return ExternalPaymentPlan.LoadCoins(coinsToLoad)
         }
 
         return ExternalPaymentPlan.NotEnoughAmount(

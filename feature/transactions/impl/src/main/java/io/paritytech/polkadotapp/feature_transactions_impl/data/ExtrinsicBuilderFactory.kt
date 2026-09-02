@@ -25,12 +25,11 @@ import io.paritytech.polkadotapp.feature_transactions_impl.data.ExtrinsicBuilder
 import java.math.BigInteger
 import javax.inject.Inject
 import javax.inject.Singleton
-import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicVersion as ExtrinsicVersionId
 
 interface ExtrinsicBuilderFactory {
     class Options(
         val batchMode: BatchMode,
-        val extrinsicVersion: ExtrinsicVersionId?,
+        val extrinsicVersion: ExtrinsicVersion?,
         val mortality: Mortality?,
         val nonce: Nonce?,
         val tip: Balance?,
@@ -50,14 +49,21 @@ interface ExtrinsicBuilderFactory {
         signer: SubmissionTransactionSigner?,
         requestedSignerAccountId: AccountId?,
         options: Options,
-    ): ExtrinsicBuilder
+    ): Submittable
 
     suspend fun createMultiForSubmission(
         chain: Chain,
         signer: SubmissionTransactionSigner?,
         requestedSignerAccountId: AccountId?,
         options: Options,
-    ): Sequence<ExtrinsicBuilder>
+    ): Sequence<Submittable>
+
+    /**
+     * A builder together with the [Mortality] it was configured with. Resolving mortality is this factory's
+     * job, but the anchor is not recoverable from the signed bytes, so a caller that must record it needs it
+     * reported back rather than re-derived.
+     */
+    class Submittable(val builder: ExtrinsicBuilder, val mortality: Mortality)
 }
 
 @Singleton
@@ -73,7 +79,7 @@ class RealExtrinsicBuilderFactory @Inject constructor(
         signer: FeeTransactionSigner,
         options: Options
     ): ExtrinsicBuilder {
-        return createMultiForFee(signer, chain, options).first()
+        return createMultiForFee(signer, chain, options).first().builder
     }
 
     /**
@@ -84,7 +90,7 @@ class RealExtrinsicBuilderFactory @Inject constructor(
         signer: SubmissionTransactionSigner?,
         requestedSignerAccountId: AccountId?,
         options: Options,
-    ): ExtrinsicBuilder {
+    ): ExtrinsicBuilderFactory.Submittable {
         return createMulti(chain, signer, requestedSignerAccountId, options).first()
     }
 
@@ -93,7 +99,7 @@ class RealExtrinsicBuilderFactory @Inject constructor(
         signer: SubmissionTransactionSigner?,
         requestedSignerAccountId: AccountId?,
         options: Options
-    ): Sequence<ExtrinsicBuilder> {
+    ): Sequence<ExtrinsicBuilderFactory.Submittable> {
         return createMulti(chain, signer, requestedSignerAccountId, options)
     }
 
@@ -101,7 +107,7 @@ class RealExtrinsicBuilderFactory @Inject constructor(
         signer: FeeTransactionSigner,
         chain: Chain,
         options: Options
-    ): Sequence<ExtrinsicBuilder> {
+    ): Sequence<ExtrinsicBuilderFactory.Submittable> {
         return createMulti(chain, signer, signer.fakeSignerId(chain), options)
     }
 
@@ -110,7 +116,7 @@ class RealExtrinsicBuilderFactory @Inject constructor(
         signer: GeneralTransactionSigner?, // null -> V5, else -> V4
         requestedSignerAccountId: AccountId?,
         options: Options
-    ): Sequence<ExtrinsicBuilder> {
+    ): Sequence<ExtrinsicBuilderFactory.Submittable> {
         val runtime = chainRegistry.getRuntime(chain.id)
 
         val nonceSequence = determineNonceSequence(chain, requestedSignerAccountId, options)
@@ -137,7 +143,7 @@ class RealExtrinsicBuilderFactory @Inject constructor(
                 checkMetadataHash = metadataHashMode
             ).apply {
                 chargeAssetTxPayment(tip = tip.value)
-            }
+            }.let { ExtrinsicBuilderFactory.Submittable(it, mortality) }
         }
     }
 
@@ -179,12 +185,8 @@ class RealExtrinsicBuilderFactory @Inject constructor(
     }
 
     private suspend fun determineExtrinsicVersion(chain: Chain, options: Options, isSigned: Boolean): ExtrinsicVersion {
-        val versionId = options.extrinsicVersion ?: extrinsicVersionProvider.getDefaultExtrinsicVersion(chain.id, isSigned)
-
-        return when (versionId) {
-            ExtrinsicVersionId.V4 -> ExtrinsicVersion.V4
-            ExtrinsicVersionId.V5 -> ExtrinsicVersion.V5()
-        }
+        return options.extrinsicVersion
+            ?: extrinsicVersionProvider.getDefaultExtrinsicVersion(chain.id, isSigned).getOrThrow()
     }
 
     private fun incrementingNonceSequence(baseNonce: BigInteger): Sequence<BigInteger> {

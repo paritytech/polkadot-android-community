@@ -13,4 +13,10 @@ sealed interface ExtrinsicSubmissionFailure {
 
     /** The transaction pool reported the extrinsic invalid after it had been broadcast. */
     data object TxInvalidation : ExtrinsicSubmissionFailure
+
+    /** The pool evicted the extrinsic. The bytes stay valid, so resubmitting them can still work. */
+    data object PoolEviction : ExtrinsicSubmissionFailure
+
+    /** Another extrinsic took this one's (sender, nonce). Resubmitting the same bytes cannot succeed. */
+    data class Usurped(val by: String) : ExtrinsicSubmissionFailure
 }

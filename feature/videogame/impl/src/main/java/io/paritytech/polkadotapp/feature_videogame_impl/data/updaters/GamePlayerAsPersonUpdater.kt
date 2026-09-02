@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.data.updaters
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.network.updaters.SingleStorageKeyUpdater
@@ -11,7 +10,7 @@ import io.paritytech.polkadotapp.feature_account_api.data.CandidateAccount
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.BandersnatchSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.getAliasInContext
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
-import io.paritytech.polkadotapp.feature_videogame_impl.data.SCORE
+import io.paritytech.polkadotapp.feature_videogame_impl.data.ScoreContextProvider
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnChainAccountOrPerson
 import io.paritytech.polkadotapp.feature_videogame_impl.data.players
 import io.paritytech.polkadotapp.feature_videogame_impl.data.videoGame
@@ -22,10 +21,11 @@ class GamePlayerAsPersonUpdater @Inject constructor(
     chainRegistry: ChainRegistry,
     storageCache: StorageCache,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
+    private val scoreContextProvider: ScoreContextProvider,
 ) : SingleStorageKeyUpdater<MetaAccount>(scope, chainRegistry, storageCache) {
     context(withRuntime: WithRuntime)
     override suspend fun storageKey(scopeValue: MetaAccount, chain: Chain): String {
-        val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(scopeValue.id, BandersnatchContext.SCORE)
+        val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(scopeValue.id, scoreContextProvider.context())
 
         return withRuntime.runtime.metadata.videoGame
             .players

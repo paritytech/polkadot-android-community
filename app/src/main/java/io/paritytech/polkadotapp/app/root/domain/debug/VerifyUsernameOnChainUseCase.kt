@@ -15,6 +15,7 @@ class VerifyUsernameOnChainUseCase @Inject constructor(
     private val chainRegistry: ChainRegistry,
 ) {
     suspend operator fun invoke(): Result<Boolean> = runCatching {
+        // TODO: People Chain is used until dotNS resolve-by-address lands (paritytech/dotns#216, #217)
         val chain = chainRegistry.getChain(knownChains.people)
         val accountId = accountRepository.getWalletAccountIdIn(chain)
         chain to accountId

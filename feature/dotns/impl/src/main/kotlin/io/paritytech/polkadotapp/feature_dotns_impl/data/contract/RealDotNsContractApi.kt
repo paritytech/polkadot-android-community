@@ -7,7 +7,7 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_dotns_impl.data.config.DotNsConfigProvider
 import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.abi.EvmContractCaller
-import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.abi.NameHash
+import io.paritytech.polkadotapp.feature_revive_api.NameHash
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
 import javax.inject.Inject
 
@@ -45,16 +45,6 @@ class RealDotNsContractApi @Inject constructor(
                     }
                 }
             }
-        }
-    }
-
-    override suspend fun readTld(): Result<String?> {
-        return dotNsConfigProvider.getDotNsConfig().flatMap { config ->
-            val registryAddress = config.protocolRegistryAddress
-                ?: return@flatMap Result.success(null)
-
-            callContract(EvmContractCaller.encodeTld(), registryAddress)
-                .map { EvmContractCaller.decodeTld(it) }
         }
     }
 

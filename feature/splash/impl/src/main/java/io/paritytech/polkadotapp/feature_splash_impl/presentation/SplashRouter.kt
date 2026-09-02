@@ -5,5 +5,7 @@ interface SplashRouter {
 
     fun openClaimUsername()
 
+    fun openRegistrationQueue()
+
     fun openThemeSelection()
 }

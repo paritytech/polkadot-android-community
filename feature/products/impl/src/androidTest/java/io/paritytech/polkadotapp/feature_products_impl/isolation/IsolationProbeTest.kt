@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.gson.Gson
-import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.JsEngineState
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.webView.WebViewJsEngine
@@ -35,7 +35,7 @@ class IsolationProbeTest {
             override suspend fun requestPermission(productId: ProductId, permission: ProductPermission) = true
             override suspend fun check(productId: ProductId, permission: ProductPermission) = true
         }
-        engine = WebViewJsEngine(context, gson, guard, CoroutineDispatchers())
+        engine = WebViewJsEngine(context, gson, guard, RealCoroutineDispatchers())
     }
 
     @After

@@ -23,6 +23,7 @@ import androidx.room.Index
 class ChainRuntimeInfoLocal(
     val chainId: String,
     val syncedVersion: Int,
+    val syncedTransactionVersion: Int?,
     val remoteVersion: Int,
     val transactionVersion: Int?,
     // Pre-existing rows default to 1 so that RuntimeCacheMigrator forces a single metadata re-fetch on upgrade
