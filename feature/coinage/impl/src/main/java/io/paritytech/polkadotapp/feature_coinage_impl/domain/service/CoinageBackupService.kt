@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.service
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.bandersnatch_crypto.aliasInContext
+import io.paritytech.polkadotapp.chains.storage.source.query.api.StorageKey4
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.model.AccountId
@@ -18,6 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.toRingCollectionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBackupService
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.CoinKeypairDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.getDerivedAccountIds
@@ -59,6 +61,7 @@ class RealCoinageBackupService @Inject constructor(
     private val keypairDerivation: CoinKeypairDerivation,
     private val voucherRingDerivation: VoucherRingDerivation,
     private val coinageSigningContextProvider: CoinageSigningContextProvider,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
 ) : CoinageBackupService {
     companion object {
         private const val BATCH_SIZE = 500
@@ -267,24 +270,27 @@ class RealCoinageBackupService @Inject constructor(
 
     private suspend fun fetchNotUnloadedVouchers(detected: List<RecyclerVoucher>): Result<List<RecyclerVoucher>> {
         if (detected.isEmpty()) return Result.success(listOf())
-        val keys = detected.mapNotNull {
-            val location = (it.location as? Location.InRecycler) ?: return@mapNotNull null
-            val aliasContext = coinageSigningContextProvider.recyclerVouchersContext()
-            val alias = voucherRingDerivation.deriveBandersnatch(it.ringVrfKeyIndex).aliasInContext(aliasContext)
+        return coinageInstanceIdProvider.instanceId().flatMap { instanceId ->
+            val keys = detected.mapNotNull {
+                val location = (it.location as? Location.InRecycler) ?: return@mapNotNull null
+                val aliasContext = coinageSigningContextProvider.recyclerVouchersContext()
+                val alias = voucherRingDerivation.deriveBandersnatch(it.ringVrfKeyIndex).aliasInContext(aliasContext)
 
-            it to Triple(
-                it.recyclerValue.value.toBigInteger(),
-                location.recyclerIndex.value,
-                alias.value
-            )
-        }.toMap()
+                it to StorageKey4(
+                    instanceId.toLong().toBigInteger(),
+                    it.recyclerValue.value.toBigInteger(),
+                    location.recyclerIndex.value,
+                    alias.value
+                )
+            }.toMap()
 
-        return voucherRepository.fetchRecyclerAliasStates(chainId, keys.values.toList())
-            .map { aliasStates ->
-                keys
-                    .mapValues { (_, value) -> value.third.toDataByteArray().toString() }
-                    .mapNotNull { if (aliasStates[it.value] is OnChainAliasState.Unloaded) null else it.key }
-            }
+            voucherRepository.fetchRecyclerAliasStates(chainId, keys.values.toList())
+                .map { aliasStates ->
+                    keys
+                        .mapValues { (_, value) -> value.fourth.toDataByteArray().toString() }
+                        .mapNotNull { if (aliasStates[it.value] is OnChainAliasState.Unloaded) null else it.key }
+                }
+        }
     }
 
     private suspend fun backupVouchersDeep() = measureExecution("Restoring vouchers") {
@@ -329,9 +335,6 @@ class RealCoinageBackupService @Inject constructor(
             ringVrfPublicKey = publicKey,
             recyclerValue = values[publicKey] ?: return@mapNotNull null,
             location = onChainInfo.getVoucherLocation(),
-            allocatedAt = System.currentTimeMillis(),
-            delayUnloadUntil = System.currentTimeMillis(),
-            ringHasEnoughRingMembersToWithdraw = false
         )
     }
 
@@ -343,26 +346,30 @@ class RealCoinageBackupService @Inject constructor(
     }
 
     private suspend fun fetchVouchersOnChainData(keys: List<BandersnatchPublicKey>) = measureExecution("Fetching vouchers on chain info") {
-        voucherRepository.fetchValuesForKeys(chainId, keys)
-            .map { it.filterNotNull() }
-            .flatMap { values ->
-                val pairs = values.map { (key, exponent) -> exponent.toRingCollectionId() to key }
+        coinageInstanceIdProvider.instanceId().flatMap { instanceId ->
+            voucherRepository.fetchValuesForKeys(chainId, instanceId, keys)
+                .map { it.filterNotNull() }
+                .flatMap { values ->
+                    val pairs = values.map { (key, exponent) -> exponent.toRingCollectionId(instanceId) to key }
 
-                membersRepository.fetchMembers(
-                    chainId = chainId,
-                    keys = pairs,
-                    consistency = CacheableDataConsistency.CONSISTENT_WITH_REMOTE,
-                ).map { recordsByPair ->
-                    val recordsByKey = recordsByPair.filterNotNull()
-                        .mapKeys { (pair, _) -> pair.second }
+                    membersRepository.fetchMembers(
+                        chainId = chainId,
+                        keys = pairs,
+                        consistency = CacheableDataConsistency.CONSISTENT_WITH_REMOTE,
+                    ).map { recordsByPair ->
+                        val recordsByKey = recordsByPair.filterNotNull()
+                            .mapKeys { (pair, _) -> pair.second }
 
-                    values to recordsByKey
+                        values to recordsByKey
+                    }
                 }
-            }
+        }
     }
 
     private fun RingPosition.getVoucherLocation() = when (this) {
-        is RingPosition.Included -> Location.InRecycler(ringIndex)
+        // Recovery knows where the voucher sits, not how full the ring is. Zero until the location service
+        // reads it, so nothing releases the voucher on an anonymity set we have not seen.
+        is RingPosition.Included -> Location.InRecycler(ringIndex, recyclerMembers = 0)
         is RingPosition.Onboarding -> Location.Onboarding
         is RingPosition.Suspended -> Location.Unknown
     }

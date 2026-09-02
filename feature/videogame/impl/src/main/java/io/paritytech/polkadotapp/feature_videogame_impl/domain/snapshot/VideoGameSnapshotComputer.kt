@@ -2,7 +2,9 @@ package io.paritytech.polkadotapp.feature_videogame_impl.domain.snapshot
 
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.AppInitializer
+import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.combineToPair
+import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_videogame_impl.data.VideoGameInfoSyncService
 import io.paritytech.polkadotapp.feature_videogame_impl.domain.VideoGameLogicStateCalculator
@@ -25,6 +27,8 @@ class VideoGameSnapshotComputer @Inject constructor(
 ) : AppInitializer {
     context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
+        if (FeatureOption.PERSONHOOD.isDisabled) return@runCancellableCatching
+
         combineToPair(
             gameInfoSyncService.subscribeCurrentActiveGameInfo(),
             timelineService.subscribeTimeline(),

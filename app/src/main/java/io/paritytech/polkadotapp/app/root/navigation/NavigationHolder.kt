@@ -23,6 +23,8 @@ class NavigationHolder @Inject constructor(val contextManager: ContextManager) {
     }
 
     fun requestTab(tab: BottomTab) {
+        if (tab !in BottomTab.availableEntries) return
+
         currentTab.value = tab
     }
 

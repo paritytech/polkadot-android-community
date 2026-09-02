@@ -140,8 +140,6 @@ firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics
 firebase-remote-config = { group = "com.google.firebase", name = "firebase-config" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
-firebase-integrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
-firebase-integrity-debug = { group = "com.google.firebase", name = "firebase-appcheck-debug" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 firebase-messaging-ktx = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
 

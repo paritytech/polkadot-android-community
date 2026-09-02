@@ -7,10 +7,15 @@ import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler.Companion.WEB_HTTPS_SCHEME
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.awaitAccountsInitialized
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsUtils
+import io.paritytech.polkadotapp.feature_products_api.model.KnownProductIds
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -23,8 +28,18 @@ internal class ProductSpaDeepLinkHandler @Inject constructor(
 ) : DeepLinkHandler {
     override fun canHandle(data: Uri): Boolean {
         val tld = dotNsTldProvider.currentTldOrNull() ?: return false
-        return DotNsUtils.isDotDomain(data, tld)
+        if (!DotNsUtils.isDotDomain(data, tld)) return false
+
+        return FeatureOption.ARBITRARY_PRODUCTS.isEnabled || data.isBuiltInProduct(tld)
     }
+
+    // The app still owns its own dotNS destinations when arbitrary ones are off, so Get CASH links keep working.
+    private fun Uri.isBuiltInProduct(tld: DotNsTld): Boolean {
+        return ProductId.fromUrl(asWebUri(), tld).getOrNull() == KnownProductIds.getCash(tld)
+    }
+
+    // Swaps the scheme rather than prefixing it: ensureHttpsProtocol would mangle a polkadotapp:// deeplink.
+    private fun Uri.asWebUri(): Uri = buildUpon().scheme(WEB_HTTPS_SCHEME).build()
 
     context(scope: ComputationalScope)
     override suspend fun handle(data: Uri): Result<DeeplinkProcessingOutcome> =
@@ -32,8 +47,7 @@ internal class ProductSpaDeepLinkHandler @Inject constructor(
             dotNsTldProvider.getTld().mapCatching { tld ->
                 accountRepository.awaitAccountsInitialized()
 
-                val httpsUri = data.buildUpon().scheme(WEB_HTTPS_SCHEME).build()
-                val normalized = DotNsUtils.normalize(httpsUri, tld)
+                val normalized = DotNsUtils.normalize(data.asWebUri(), tld)
                     ?: error("Not a $tld domain: $data")
 
                 DeeplinkProcessingOutcome.Navigate {

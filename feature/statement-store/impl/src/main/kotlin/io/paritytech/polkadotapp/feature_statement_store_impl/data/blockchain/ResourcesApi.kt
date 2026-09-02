@@ -5,7 +5,6 @@ import io.novasama.substrate_sdk_android.runtime.metadata.module.Module
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchAlias
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableModule
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry2
-import io.paritytech.polkadotapp.chains.storage.source.query.api.constant
 import io.paritytech.polkadotapp.chains.storage.source.query.api.storage2
 import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.chains.util.resources
@@ -17,18 +16,6 @@ value class StatementStoreResourcesApi(override val module: Module) : QueryableM
 
 val RuntimeMetadata.statementStoreResources: StatementStoreResourcesApi
     get() = StatementStoreResourcesApi(resources())
-
-context(withRuntime: WithRuntime)
-val StatementStoreResourcesApi.stmtStoreSlotsPerPeriod: UInt
-    get() = constant("StmtStoreSlotsPerPeriod")
-
-context(withRuntime: WithRuntime)
-val StatementStoreResourcesApi.liteStmtStoreSlotsPerPeriod: UInt
-    get() = constant("LiteStmtStoreSlotsPerPeriod")
-
-context(withRuntime: WithRuntime)
-val StatementStoreResourcesApi.stmtStoreReplacementCooldown: UInt
-    get() = constant("StmtStoreReplacementCooldown")
 
 context(withRuntime: WithRuntime)
 val StatementStoreResourcesApi.statementStoreAllowances: QueryableStorageEntry2<BigEndianU32Scale, BandersnatchAlias, StmtStoreAllowanceEntry>

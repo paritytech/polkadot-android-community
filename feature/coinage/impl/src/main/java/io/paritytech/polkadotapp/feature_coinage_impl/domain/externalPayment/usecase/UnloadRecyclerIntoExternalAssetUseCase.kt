@@ -19,6 +19,7 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.VoucherAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.balance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstanceId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -33,6 +34,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.FreeUnloadTokenResolver
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenResolverFactory
@@ -45,6 +47,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
@@ -118,7 +121,9 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
     private val coinAmountBreakdownUseCase: CoinAmountBreakdownUseCase,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase,
     private val peopleMembershipProver: PeopleMembershipProver,
+    private val quotaTracker: UnloadQuotaTracker,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
 ) : UnloadRecyclerIntoExternalAssetUseCase {
     override suspend fun initiateUnload(
         vouchers: List<RecyclerVoucher>,
@@ -276,6 +281,10 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         coinageLogI("Unload registering group=${groupId.value} transactions=${transactions.size}")
 
         transactionService.submitTransactions(transactions, groupId).getOrThrow()
+
+        // After submission, not after resolving: a token picked for a transaction that never left is still
+        // there to be picked again.
+        quotaTracker.noteUnloadsHappened(prepared.groups.size)
     }
 
     override fun subscribeUnloadStatus(groupId: CoinageOperationGroupId): Flow<ExternalUnloadStatus> =
@@ -330,18 +339,20 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         )
         val aliases = buildAliases(group.vouchers)
 
-        return extrinsicService.buildExtrinsic(
-            chain = chain,
-            origin = origin,
-            options = ExtrinsicService.SubmissionOptions(),
-            formExtrinsic = {
-                if (group.mixedOutput != null) {
-                    unloadRecyclerIntoExternalAssetAndLoadedCoins(group, aliases, destination)
-                } else {
-                    unloadRecyclerIntoExternalAsset(group, aliases, destination)
-                }
-            },
-        )
+        return coinageInstanceIdProvider.instanceId().flatMap { instanceId ->
+            extrinsicService.buildExtrinsic(
+                chain = chain,
+                origin = origin,
+                options = ExtrinsicService.SubmissionOptions(),
+                formExtrinsic = {
+                    if (group.mixedOutput != null) {
+                        unloadRecyclerIntoExternalAssetAndLoadedCoins(instanceId, group, aliases, destination)
+                    } else {
+                        unloadRecyclerIntoExternalAsset(instanceId, group, aliases, destination)
+                    }
+                },
+            )
+        }
     }
 
     // --- Supporting helpers ---
@@ -358,6 +369,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
 }
 
 private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAsset(
+    instanceId: CoinageInstanceId,
     group: UnloadGroup,
     aliases: List<BandersnatchAlias>,
     destination: AccountId,
@@ -365,15 +377,18 @@ private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAsset(
     moduleName = "Coinage",
     callName = "unload_recycler_into_external_asset",
     arguments = autoEncodedArgs(
+        "instance_id" to instanceId.toLong(),
         "aliases" to aliases,
         "value" to group.recyclerKey.exponent,
         "index" to group.recyclerKey.recyclerIndex,
         "revision" to group.revision,
         "to" to destination,
+        "max_fee" to Balance.ZERO,
     )
 )
 
 private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAssetAndLoadedCoins(
+    instanceId: CoinageInstanceId,
     group: UnloadGroup,
     aliases: List<BandersnatchAlias>,
     destination: AccountId,
@@ -384,6 +399,7 @@ private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAssetAndLoadedCoins(
         moduleName = "Coinage",
         callName = "unload_recycler_into_external_asset_and_loaded_coins",
         arguments = autoEncodedArgs(
+            "instance_id" to instanceId.toLong(),
             "aliases" to aliases,
             "value" to group.recyclerKey.exponent,
             "index" to group.recyclerKey.recyclerIndex,
@@ -393,6 +409,7 @@ private fun ExtrinsicBuilder.unloadRecyclerIntoExternalAssetAndLoadedCoins(
             "loaded_coins" to mixedOutput.newVouchers.map {
                 NewVoucherEntry(value = it.recyclerValue, memberKey = it.ringVrfPublicKey)
             },
+            "max_fee" to Balance.ZERO,
         )
     )
 }

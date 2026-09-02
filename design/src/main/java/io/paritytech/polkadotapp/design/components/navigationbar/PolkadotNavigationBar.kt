@@ -34,6 +34,7 @@ import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ChatFilled
@@ -44,6 +45,7 @@ import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 private val IconSize = 28.dp
@@ -60,10 +62,6 @@ fun PolkadotNavigationBar(
     centerContent: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    require(centerContent == null || itemCount % 2 == 0) {
-        "PolkadotNavigationBar centerContent requires an even itemCount, but was $itemCount"
-    }
-
     val animatedIndex = animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
         animationSpec = spring(
@@ -101,8 +99,21 @@ fun PolkadotNavigationBar(
             }
             val centerWidth = centerPlaceable?.width ?: 0
             val halfWidth = (width - centerWidth) / 2
-            val itemsWidth = if (centerPlaceable != null) halfWidth * 2 else width
-            val slotWidth = itemsWidth.toFloat() / itemCount.coerceAtLeast(1)
+
+            val leftCount = if (centerPlaceable != null) (itemCount + 1) / 2 else itemCount
+            val rightCount = itemCount - leftCount
+            val slotWidth = if (centerPlaceable != null) {
+                halfWidth.toFloat() / maxOf(leftCount, rightCount).coerceAtLeast(1)
+            } else {
+                width.toFloat() / itemCount.coerceAtLeast(1)
+            }
+            val rightStart = halfWidth + centerWidth + (halfWidth - rightCount * slotWidth) / 2f
+
+            fun itemX(index: Int): Float = if (index < leftCount) {
+                slotWidth * index
+            } else {
+                rightStart + slotWidth * (index - leftCount)
+            }
 
             val itemSlotWidth = slotWidth.roundToInt()
             val itemPlaceables = subcompose(NavBarSlot.Items, content).map {
@@ -119,21 +130,18 @@ fun PolkadotNavigationBar(
                 Box(modifier = Modifier.background(color = indicatorColor, shape = indicatorShape))
             }.first().measure(Constraints.fixed(indicatorWidth, height))
 
-            val halfCount = itemCount / 2
+            val lastIndex = (itemCount - 1).coerceAtLeast(0)
 
             layout(width, height) {
-                val gapOffset = if (centerPlaceable != null) {
-                    val gapFraction = (animatedIndex.value - (halfCount - 1)).coerceIn(0f, 1f)
-                    centerWidth * gapFraction
-                } else {
-                    0f
-                }
-                val indicatorX = (slotWidth * animatedIndex.value + gapOffset - overshootPx).roundToInt()
-                indicatorPlaceable.place(indicatorX, 0)
+                val lowerIndex = floor(animatedIndex.value).toInt().coerceIn(0, lastIndex)
+                val upperIndex = (lowerIndex + 1).coerceAtMost(lastIndex)
+                val fraction = (animatedIndex.value - lowerIndex).coerceIn(0f, 1f)
+
+                val indicatorX = lerp(itemX(lowerIndex), itemX(upperIndex), fraction)
+                indicatorPlaceable.place((indicatorX - overshootPx).roundToInt(), 0)
 
                 itemPlaceables.forEachIndexed { index, placeable ->
-                    val gap = if (centerPlaceable != null && index >= halfCount) centerWidth else 0
-                    placeable.place((slotWidth * index).roundToInt() + gap, (height - placeable.height) / 2)
+                    placeable.place(itemX(index).roundToInt(), (height - placeable.height) / 2)
                 }
 
                 centerPlaceable?.place(halfWidth, (height - centerPlaceable.height) / 2)
@@ -258,6 +266,52 @@ private fun PolkadotNavigationBarCenterPreview() {
         "Chats" to NovaIcons.ChatFilled,
         "Pocket" to NovaIcons.MoneyFilled,
         "Explore" to NovaIcons.Search,
+        "Settings" to NovaIcons.Settings
+    )
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    PolkadotTheme {
+        Box(
+            modifier = Modifier.background(Color.Black)
+        ) {
+            PolkadotNavigationBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(PolkadotTheme.spacings.extraMedium),
+                selectedIndex = selectedIndex,
+                itemCount = tabs.size,
+                centerContent = {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = PolkadotTheme.spacings.small)
+                            .size(IconSize)
+                            .background(
+                                color = PolkadotTheme.colors.bg.surface.nested,
+                                shape = CircleShape
+                            )
+                    )
+                }
+            ) {
+                tabs.forEachIndexed { index, (title, icon) ->
+                    PolkadotNavigationBarItem(
+                        selected = selectedIndex == index,
+                        onClick = { selectedIndex = index },
+                        icon = icon,
+                        label = title,
+                        hasNotification = title == "Settings"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun PolkadotNavigationBarOddCenterPreview() {
+    val tabs = listOf(
+        "Chats" to NovaIcons.ChatFilled,
+        "Pocket" to NovaIcons.MoneyFilled,
         "Settings" to NovaIcons.Settings
     )
     var selectedIndex by remember { mutableIntStateOf(0) }

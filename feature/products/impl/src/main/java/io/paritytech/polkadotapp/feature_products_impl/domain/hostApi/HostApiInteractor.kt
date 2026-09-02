@@ -361,7 +361,7 @@ class HostApiInteractor @Inject constructor(
         amount: Balance,
     ): Result<Unit> {
         val balance = totalBalanceUseCase.getBalance().getOrElse { return Result.failure(it) }
-        if (balance.spendableBalance.total >= amount) return Result.success(Unit)
+        if (balance.availablePrivate >= amount) return Result.success(Unit)
 
         val hasBalanceAccess = permissionGuard.check(callingProductId, ProductPermission.BalanceAccess)
         return if (hasBalanceAccess) {
@@ -480,7 +480,7 @@ class HostApiInteractor @Inject constructor(
             .mapNotNull { it.getOrNull() }
             // Only what can actually be spent: a product that tops up against this number must not be
             // told about balance still waiting on a transaction of ours.
-            .map { PaymentBalance(available = it.spendableBalance.total) }
+            .map { PaymentBalance(available = it.availablePrivate) }
     }
 
     suspend fun registerRingVrfKey(

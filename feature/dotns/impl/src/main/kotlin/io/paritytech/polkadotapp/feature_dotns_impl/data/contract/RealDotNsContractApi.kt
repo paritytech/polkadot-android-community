@@ -48,16 +48,6 @@ class RealDotNsContractApi @Inject constructor(
         }
     }
 
-    override suspend fun readTld(): Result<String?> {
-        return dotNsConfigProvider.getDotNsConfig().flatMap { config ->
-            val registryAddress = config.protocolRegistryAddress
-                ?: return@flatMap Result.success(null)
-
-            callContract(EvmContractCaller.encodeTld(), registryAddress)
-                .map { EvmContractCaller.decodeTld(it) }
-        }
-    }
-
     // Legacy names have no registry entry and are served by the fixed content-resolver.
     private suspend fun contentResolverFor(config: DotNsConfig, dotNsName: String): Result<AccountId> {
         return registryResolverOverrideFor(config, dotNsName).map { it ?: config.resolverContractAddress }

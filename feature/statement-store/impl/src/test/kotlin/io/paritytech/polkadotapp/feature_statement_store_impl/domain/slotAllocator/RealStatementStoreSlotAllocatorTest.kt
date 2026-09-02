@@ -337,7 +337,7 @@ class RealStatementStoreSlotAllocatorTest {
 
     /** Cooldown is zero, so any taken slot is immediately replaceable. */
     private suspend fun withZeroCooldown() {
-        whenever(slotRepository.replacementCooldown(eq(chainId))).thenReturn(0.seconds)
+        whenever(slotRepository.replacementCooldown()).thenReturn(Result.success(0.seconds))
     }
 
     private suspend fun withChainSlots(slots: StatementStoreSlots) {
@@ -358,7 +358,8 @@ class RealStatementStoreSlotAllocatorTest {
     }
 
     private suspend fun withSuccessfulSubmission() {
-        whenever(origins.asResourcesStatementStoreSlot(anyUInt(), anyUInt(), any())).thenReturn(mock(TransactionOrigin::class.java))
+        whenever(origins.asResourcesStatementStoreSlot(anyUInt(), anyUInt(), any()))
+            .thenReturn(Result.success(mock(TransactionOrigin::class.java)))
         whenever(
             extrinsicService.submitExtrinsicAndAwaitExecution(any(), any(), any(), any(), any())
         ).thenReturn(Result.success(successExecution()))

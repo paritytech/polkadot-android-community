@@ -5,6 +5,8 @@ import io.paritytech.polkadotapp.common.data.app.AppLifecycleState
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.AppInitializer
 import io.paritytech.polkadotapp.common.presentation.AppLifecycleObserver
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.common.utils.permissions.PermissionAsker
 import io.paritytech.polkadotapp.common.utils.permissions.PermissionResult
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
@@ -36,6 +38,8 @@ class VideoGameAutoLauncher @Inject constructor(
 
     context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
+        if (FeatureOption.PERSONHOOD.isDisabled) return@runCancellableCatching
+
         combine(
             stateReader.gameSnapshot
                 .map(::autoLaunchableSnapshot)

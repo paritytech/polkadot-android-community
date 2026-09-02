@@ -29,6 +29,7 @@ interface TransactionStorageFeatureApiModule {
     fun bindTransactionStorageSlotAllocator(impl: RealTransactionStorageSlotAllocator): TransactionStorageSlotAllocator
 
     @Binds
+    @Singleton
     fun bindLongTermStorageSlotRepository(impl: RealLongTermStorageSlotRepository): LongTermStorageSlotRepository
 
     @Binds

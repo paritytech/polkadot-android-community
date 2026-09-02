@@ -5,6 +5,8 @@ import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.awaitAccountsInitialized
@@ -22,7 +24,9 @@ class VideoGameDeepLinkHandler @Inject constructor(
     private val videoGameLaunchCoordinator: VideoGameLaunchCoordinator
 ) : DeepLinkHandler {
     override fun canHandle(data: Uri): Boolean {
-        return data.scheme == DeepLinkHandler.APP_SCHEME && data.host == WEEKLY_GAME_HOST
+        return FeatureOption.PERSONHOOD.isEnabled &&
+            data.scheme == DeepLinkHandler.APP_SCHEME &&
+            data.host == WEEKLY_GAME_HOST
     }
 
     context(scope: ComputationalScope)

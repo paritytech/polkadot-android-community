@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.domain.usecase
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.model.AccountId
@@ -9,7 +8,7 @@ import io.paritytech.polkadotapp.feature_account_api.data.repository.getCandidat
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.VideoGamesProgressUseCase
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.model.isExternallyRecognized
-import io.paritytech.polkadotapp.feature_videogame_impl.data.SCORE
+import io.paritytech.polkadotapp.feature_videogame_impl.data.ScoreContextProvider
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -25,6 +24,7 @@ class RealPlayingAccountUseCase @Inject constructor(
     private val gamesProgressUseCase: VideoGamesProgressUseCase,
     private val accountRepository: AccountRepository,
     private val chainRegistry: ChainRegistry,
+    private val scoreContextProvider: ScoreContextProvider,
 ) : PlayingAccountUseCase {
     context(scope: ComputationalScope)
     override suspend fun getOurPlayerAccountId(): AccountId {
@@ -38,7 +38,7 @@ class RealPlayingAccountUseCase @Inject constructor(
         return if (gameProgress.isExternallyRecognized()) {
             Timber.d("Playing as person")
 
-            accountRepository.getAliasAccount(BandersnatchContext.SCORE)
+            accountRepository.getAliasAccount(scoreContextProvider.context())
         } else {
             Timber.d("Playing as account")
 
