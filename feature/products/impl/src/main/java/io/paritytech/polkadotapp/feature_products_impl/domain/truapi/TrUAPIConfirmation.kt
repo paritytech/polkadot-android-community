@@ -1,72 +1,84 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.truapi
 
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocatableResource
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
 
 /**
  * A core-initiated action awaiting the user's yes/no.
  *
- * Display-ready values rather than the core's FFI types: the confirmation UI
- * only ever renders and answers, and keeping `uniffi.*` out of presentation
- * means a pin bump cannot reach the screens.
+ * Each variant carries exactly what its native route needs — domain types
+ * rather than the core's FFI ones, so a pin bump cannot reach past this
+ * boundary. The core owns the action either way: the app only answers.
  */
 sealed interface TrUAPIConfirmation {
-    /** Product the core is acting on behalf of, for the prompt's title. */
-    val requesterProductId: String
-
     /**
      * Signing, in all four of its flavours. Goes to the app's own signing sheet
      * rather than a prompt, so the user sees the decoded call. Confirm-only:
      * the core holds the key and signs after approval.
      */
     class Signing(
-        override val requesterProductId: String,
+        val requesterProductId: String,
         val request: SigningRequestBody,
     ) : TrUAPIConfirmation
 
-    /** Everything the app has no dedicated screen for, rendered generically. */
+    /** Everything that answers through a native prompt rather than the signing sheet. */
     sealed interface Prompt : TrUAPIConfirmation
 
-    /** Sign a Statement Store proof payload with a product account. */
+    /**
+     * Sign a Statement Store proof payload with a product account. Native
+     * `createStatementProof` gates on access to the signing account's product.
+     */
     class StatementSign(
-        override val requesterProductId: String,
-        val payloadSize: Int,
-    ) : TrUAPIConfirmation.Prompt
+        val callingProductId: ProductId,
+        val accountOwner: ProductId,
+    ) : Prompt
 
-    /** Derive a contextual alias for a ring. */
+    /**
+     * Derive a contextual alias. Native `getContextualAlias` reuses the
+     * persisted account-access grant for the context's product.
+     */
     class AccountAlias(
-        override val requesterProductId: String,
-        val proofContext: String,
-        val ring: String,
-    ) : TrUAPIConfirmation.Prompt
+        val callingProductId: ProductId,
+        val contextOwner: ProductId,
+    ) : Prompt
 
-    /** Create a ring-VRF proof for a ring. */
+    /**
+     * Create a ring-VRF proof under another product's context. Native
+     * `createProof` asks through the one-time cross-product proof prompt.
+     */
     class CreateProof(
-        override val requesterProductId: String,
-        val proofContext: String,
-        val ring: String,
-        val messageSize: Int,
-    ) : TrUAPIConfirmation.Prompt
+        val callingProductId: ProductId,
+        val contextOwner: ProductId,
+        val suffix: DerivationIndex32,
+        val message: DataByteArray,
+    ) : Prompt
 
-    /** Disclose the user's primary identity to a product. */
+    /** Disclose the user's primary identity. Native `getUserId` gates on the user-identity permission. */
     class IdentityDisclosure(
-        override val requesterProductId: String,
-    ) : TrUAPIConfirmation.Prompt
+        val productId: ProductId,
+    ) : Prompt
 
-    /** Allocate host resources to the product. */
+    /**
+     * Allocate host resources to the product. Confirmed on the native
+     * allocation sheet, but confirm-only: the core performs its own
+     * allocation after a yes.
+     */
     class ResourceAllocation(
-        override val requesterProductId: String,
-        val resources: List<String>,
-    ) : TrUAPIConfirmation.Prompt
+        val callingProductId: ProductId,
+        val resources: List<ApAllocatableResource>,
+    ) : Prompt
 
-    /** Submit a preimage to the host-selected backend. */
+    /** Submit a preimage. Native `submitPreimage` consumes the preimage-submit permission. */
     class PreimageSubmit(
-        override val requesterProductId: String,
-        val sizeBytes: Long,
-    ) : TrUAPIConfirmation.Prompt
+        val callingProductId: ProductId,
+    ) : Prompt
 
-    /** Let one product act on another product's account. */
+    /** Let one product act on another product's account, as native `accountGet` gates it. */
     class AccountAccess(
-        override val requesterProductId: String,
-        val targetProductId: String,
-    ) : TrUAPIConfirmation.Prompt
+        val requestingProductId: ProductId,
+        val targetProductId: ProductId,
+    ) : Prompt
 }

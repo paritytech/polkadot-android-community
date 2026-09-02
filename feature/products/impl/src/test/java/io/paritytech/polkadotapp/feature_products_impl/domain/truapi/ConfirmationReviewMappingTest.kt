@@ -2,7 +2,10 @@ package io.paritytech.polkadotapp.feature_products_impl.domain.truapi
 
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.asDisplayString
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.model.signing.RawPayloadContent
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRequestBody
 import org.junit.Assert.assertArrayEquals
@@ -19,10 +22,15 @@ import uniffi.truapi.HostSignRawRequest
 import uniffi.truapi.HostSignRawWithLegacyAccountRequest
 import uniffi.truapi.LegacyAccountTxPayload
 import uniffi.truapi.ProductAccountTxPayload
+import uniffi.truapi.ProductProofContext
 import uniffi.truapi.RawPayload
+import uniffi.truapi.RingLocation
+import uniffi.truapi.RingLocationJunction
 import uniffi.truapi.TxPayloadExtension
 import uniffi.truapi.VrfTranscriptItem
 import uniffi.truapi_platform.AccountAccessReview
+import uniffi.truapi_platform.AccountAliasReview
+import uniffi.truapi_platform.CreateProofReview
 import uniffi.truapi_platform.CreateTransactionReview
 import uniffi.truapi_platform.IdentityDisclosureReview
 import uniffi.truapi_platform.PreimageSubmitReview
@@ -37,7 +45,7 @@ import uniffi.truapi.ProductAccountId as NativeProductAccountId
 private const val ALICE_SS58 = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
 
 class ConfirmationReviewMappingTest {
-    private val caller = "caller-product.dot"
+    private val caller = ProductId.fromStoredValue("caller-product.dot")
 
     @OptIn(ExperimentalStdlibApi::class)
     private fun aliceAccountId() =
@@ -231,15 +239,64 @@ class ConfirmationReviewMappingTest {
     )
 
     @Test
-    fun `statement store sign maps to a statement confirmation`() {
+    fun `statement store sign requests access to the signing account's product`() {
         val review = UserConfirmationReview.StatementStoreProductSign(
             StatementStoreProductSignReview(account = nativeAccount(), payload = byteArrayOf(1, 2, 3)),
         )
 
         val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.StatementSign
 
-        assertEquals("demo-product.dot", confirmation.requesterProductId)
-        assertEquals(3, confirmation.payloadSize)
+        assertEquals(caller, confirmation.callingProductId)
+        assertEquals(ProductId.fromStoredValue("demo-product.dot"), confirmation.accountOwner)
+    }
+
+    @Test
+    fun `account alias requests access to the context's product`() {
+        val review = UserConfirmationReview.AccountAlias(
+            AccountAliasReview(
+                callingProductId = "caller.dot",
+                context = ProductProofContext(productId = "owner.dot", suffix = DerivationIndex.Index(7u)),
+                ringLocation = ringLocation(),
+            ),
+        )
+
+        val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.AccountAlias
+
+        assertEquals(ProductId.fromStoredValue("caller.dot"), confirmation.callingProductId)
+        assertEquals(ProductId.fromStoredValue("owner.dot"), confirmation.contextOwner)
+    }
+
+    @Test
+    fun `create proof carries the cross-product prompt's inputs`() {
+        val review = UserConfirmationReview.CreateProof(
+            CreateProofReview(
+                callingProductId = "caller.dot",
+                context = ProductProofContext(productId = "owner.dot", suffix = DerivationIndex.Index(7u)),
+                ringLocation = ringLocation(),
+                message = byteArrayOf(9, 8),
+            ),
+        )
+
+        val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.CreateProof
+
+        assertEquals(ProductId.fromStoredValue("caller.dot"), confirmation.callingProductId)
+        assertEquals(ProductId.fromStoredValue("owner.dot"), confirmation.contextOwner)
+        assertEquals(DerivationIndex32.fromUInt(7u).asDisplayString(), confirmation.suffix.asDisplayString())
+        assertArrayEquals(byteArrayOf(9, 8), confirmation.message.value)
+    }
+
+    @Test
+    fun `create proof with a malformed context suffix is unsupported`() {
+        val review = UserConfirmationReview.CreateProof(
+            CreateProofReview(
+                callingProductId = "caller.dot",
+                context = ProductProofContext(productId = "owner.dot", suffix = DerivationIndex.Raw(ByteArray(31))),
+                ringLocation = ringLocation(),
+                message = byteArrayOf(9, 8),
+            ),
+        )
+
+        assertThrows(UnsupportedReviewException::class.java) { review.toConfirmation(caller) }
     }
 
     @Test
@@ -250,8 +307,8 @@ class ConfirmationReviewMappingTest {
 
         val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.AccountAccess
 
-        assertEquals("caller.dot", confirmation.requesterProductId)
-        assertEquals("target.dot", confirmation.targetProductId)
+        assertEquals(ProductId.fromStoredValue("caller.dot"), confirmation.requestingProductId)
+        assertEquals(ProductId.fromStoredValue("target.dot"), confirmation.targetProductId)
     }
 
     @Test
@@ -262,20 +319,20 @@ class ConfirmationReviewMappingTest {
 
         val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.IdentityDisclosure
 
-        assertEquals("discloser.dot", confirmation.requesterProductId)
+        assertEquals(ProductId.fromStoredValue("discloser.dot"), confirmation.productId)
     }
 
     @Test
-    fun `preimage submit carries its size`() {
+    fun `preimage submit carries the calling product`() {
         val review = UserConfirmationReview.PreimageSubmit(PreimageSubmitReview(size = 4096uL))
 
         val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.PreimageSubmit
 
-        assertEquals(4096L, confirmation.sizeBytes)
+        assertEquals(caller, confirmation.callingProductId)
     }
 
     @Test
-    fun `resource allocation labels every resource`() {
+    fun `resource allocation maps every resource to its domain form`() {
         val review = UserConfirmationReview.ResourceAllocation(
             ResourceAllocationReview(
                 callingProductId = "caller.dot",
@@ -288,11 +345,35 @@ class ConfirmationReviewMappingTest {
 
         val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.ResourceAllocation
 
-        assertEquals(2, confirmation.resources.size)
+        assertEquals(ProductId.fromStoredValue("caller.dot"), confirmation.callingProductId)
+        assertEquals(
+            listOf(ApAllocatableResource.StatementStoreAllowance, ApAllocatableResource.AutoSigning),
+            confirmation.resources,
+        )
+    }
+
+    @Test
+    fun `smart-contract allowance keeps its destination index`() {
+        val review = UserConfirmationReview.ResourceAllocation(
+            ResourceAllocationReview(
+                callingProductId = "caller.dot",
+                resources = listOf(AllocatableResource.SmartContractAllowance(DerivationIndex.Index(3u))),
+            ),
+        )
+
+        val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.ResourceAllocation
+
+        val resource = confirmation.resources.single() as ApAllocatableResource.SmartContractAllowance
+        assertEquals(DerivationIndex32.fromUInt(3u).asDisplayString(), resource.dest.asDisplayString())
     }
 
     private fun UserConfirmationReview.signingRequest(): SigningRequestBody =
         (toConfirmation(caller) as TrUAPIConfirmation.Signing).request
+
+    private fun ringLocation() = RingLocation(
+        chainId = ByteArray(32) { 1 },
+        junctions = listOf(RingLocationJunction.PalletInstance(9u)),
+    )
 
     private fun nativeAccount() = NativeProductAccountId(
         dotNsIdentifier = "demo-product.dot",

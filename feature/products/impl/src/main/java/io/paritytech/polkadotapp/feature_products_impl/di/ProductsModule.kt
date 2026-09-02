@@ -53,6 +53,8 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.bot.external.Produ
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.menu.ProductChatMenuInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.menu.RealProductChatMenuInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.browser.RealProductSessionController
+import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofRequester
+import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.RealCrossProductProofRequester
 import io.paritytech.polkadotapp.feature_products_impl.domain.deriveEntropy.RealDeriveEntropyUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.RealExploreProductsService
@@ -175,6 +177,9 @@ internal interface ProductsModule {
 
     @Binds
     fun bindProductPermissionGuard(impl: RealProductPermissionGuard): ProductPermissionGuard
+
+    @Binds
+    fun bindCrossProductProofRequester(impl: RealCrossProductProofRequester): CrossProductProofRequester
 
     @Binds
     fun bindRemotePermissionHandler(

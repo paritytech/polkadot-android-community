@@ -4,8 +4,10 @@ import io.novasama.substrate_sdk_android.extensions.fromHex
 import io.novasama.substrate_sdk_android.ss58.SS58Encoder.toAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
+import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.VrfTranscriptItem
 import io.paritytech.polkadotapp.feature_products_api.model.ProductAccountId
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.model.signing.RawPayloadContent
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SignerPayloadJson
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningRawLegacyPayload
@@ -17,7 +19,6 @@ import uniffi.truapi.AllocatableResource
 import uniffi.truapi.DerivationIndex
 import uniffi.truapi.HostSignPayloadData
 import uniffi.truapi.RawPayload
-import uniffi.truapi.RingLocation
 import uniffi.truapi.TxPayloadExtension
 import uniffi.truapi_platform.CreateTransactionReview
 import uniffi.truapi_platform.SignPayloadReview
@@ -33,76 +34,71 @@ import uniffi.truapi.ProductAccountId as NativeProductAccountId
  * this compile rather than silently become a denial, which is how seven of the
  * eleven variants were being refused.
  */
-fun UserConfirmationReview.toConfirmation(callingProductId: String): TrUAPIConfirmation = when (this) {
+fun UserConfirmationReview.toConfirmation(callingProductId: ProductId): TrUAPIConfirmation = when (this) {
     is UserConfirmationReview.SignPayload ->
-        TrUAPIConfirmation.Signing(callingProductId, v1.toSigningRequestBody())
+        TrUAPIConfirmation.Signing(callingProductId.value, v1.toSigningRequestBody())
     is UserConfirmationReview.SignRaw ->
-        TrUAPIConfirmation.Signing(callingProductId, v1.toSigningRequestBody())
+        TrUAPIConfirmation.Signing(callingProductId.value, v1.toSigningRequestBody())
     is UserConfirmationReview.CreateTransaction ->
-        TrUAPIConfirmation.Signing(callingProductId, v1.toSigningRequestBody())
+        TrUAPIConfirmation.Signing(callingProductId.value, v1.toSigningRequestBody())
     is UserConfirmationReview.SignVrf ->
         TrUAPIConfirmation.Signing(v1.callingProductId, v1.toSigningRequestBody())
 
     is UserConfirmationReview.StatementStoreProductSign ->
         TrUAPIConfirmation.StatementSign(
-            requesterProductId = v1.account.dotNsIdentifier,
-            payloadSize = v1.payload.size,
+            callingProductId = callingProductId,
+            accountOwner = ProductId.fromStoredValue(v1.account.dotNsIdentifier),
         )
 
     is UserConfirmationReview.AccountAlias ->
         TrUAPIConfirmation.AccountAlias(
-            requesterProductId = v1.callingProductId,
-            proofContext = v1.context.productId,
-            ring = v1.ringLocation.describe(),
+            callingProductId = ProductId.fromStoredValue(v1.callingProductId),
+            contextOwner = ProductId.fromStoredValue(v1.context.productId),
         )
 
     is UserConfirmationReview.CreateProof ->
         TrUAPIConfirmation.CreateProof(
-            requesterProductId = v1.callingProductId,
-            proofContext = v1.context.productId,
-            ring = v1.ringLocation.describe(),
-            messageSize = v1.message.size,
+            callingProductId = ProductId.fromStoredValue(v1.callingProductId),
+            contextOwner = ProductId.fromStoredValue(v1.context.productId),
+            suffix = v1.context.suffix.toDomain(),
+            message = v1.message.toDataByteArray(),
         )
 
     is UserConfirmationReview.IdentityDisclosure ->
-        TrUAPIConfirmation.IdentityDisclosure(requesterProductId = v1.productId)
+        TrUAPIConfirmation.IdentityDisclosure(productId = ProductId.fromStoredValue(v1.productId))
 
     is UserConfirmationReview.ResourceAllocation ->
         TrUAPIConfirmation.ResourceAllocation(
-            requesterProductId = v1.callingProductId,
-            resources = v1.resources.map { it.describe() },
+            callingProductId = ProductId.fromStoredValue(v1.callingProductId),
+            resources = v1.resources.map { it.toDomain() },
         )
 
     is UserConfirmationReview.PreimageSubmit ->
-        TrUAPIConfirmation.PreimageSubmit(
-            requesterProductId = callingProductId,
-            sizeBytes = v1.size.toLong(),
-        )
+        TrUAPIConfirmation.PreimageSubmit(callingProductId = callingProductId)
 
     is UserConfirmationReview.AccountAccess ->
         TrUAPIConfirmation.AccountAccess(
-            requesterProductId = v1.requestingProductId,
-            targetProductId = v1.targetProductId,
+            requestingProductId = ProductId.fromStoredValue(v1.requestingProductId),
+            targetProductId = ProductId.fromStoredValue(v1.targetProductId),
         )
 }
 
-@OptIn(ExperimentalStdlibApi::class)
-private fun RingLocation.describe(): String = chainId.toHexString()
+private fun AllocatableResource.toDomain(): ApAllocatableResource = when (this) {
+    AllocatableResource.BulletinAllowance -> ApAllocatableResource.BulletInAllowance
+    AllocatableResource.StatementStoreAllowance -> ApAllocatableResource.StatementStoreAllowance
+    is AllocatableResource.SmartContractAllowance -> ApAllocatableResource.SmartContractAllowance(v1.toDomain())
+    AllocatableResource.AutoSigning -> ApAllocatableResource.AutoSigning
+}
 
-private fun AllocatableResource.describe(): String = when (this) {
-    is AllocatableResource.StatementStoreAllowance -> "statement-store allowance"
-    is AllocatableResource.BulletinAllowance -> "bulletin allowance"
-    is AllocatableResource.SmartContractAllowance -> "smart-contract allowance"
-    is AllocatableResource.AutoSigning -> "auto-signing"
+private fun DerivationIndex.toDomain(): DerivationIndex32 = when (this) {
+    is DerivationIndex.Index -> DerivationIndex32.fromUInt(v1)
+    is DerivationIndex.Raw -> DerivationIndex32.fromBytes(v1.toDataByteArray())
+        .getOrElse { throw UnsupportedReviewException("raw derivation index must be 32 bytes") }
 }
 
 private fun NativeProductAccountId.toDomain(): ProductAccountId = ProductAccountId(
     productId = dotNsIdentifier,
-    index = when (val index = derivationIndex) {
-        is DerivationIndex.Index -> DerivationIndex32.fromUInt(index.v1)
-        is DerivationIndex.Raw -> DerivationIndex32.fromBytes(index.v1.toDataByteArray())
-            .getOrElse { throw UnsupportedReviewException("raw derivation index must be 32 bytes") }
-    },
+    index = derivationIndex.toDomain(),
 )
 
 private fun <Signer> HostSignPayloadData.toSignerPayloadJson(account: Signer) = SignerPayloadJson(

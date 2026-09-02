@@ -323,7 +323,7 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
         callingProductId: ProductId,
         review: UserConfirmationReview,
     ): Boolean {
-        val confirmation = runCatching { review.toConfirmation(callingProductId.value) }
+        val confirmation = runCatching { review.toConfirmation(callingProductId) }
             .getOrElse {
                 Timber.w(it, "truapi.confirm: could not describe review, rejecting")
                 return false

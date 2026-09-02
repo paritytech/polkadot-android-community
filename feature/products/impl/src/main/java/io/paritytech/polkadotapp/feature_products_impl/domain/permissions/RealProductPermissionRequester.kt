@@ -38,7 +38,11 @@ class RealProductPermissionRequester @Inject constructor(
         try {
             permissionContextHolder.set(context)
             productsRouter.openPermissionPrompt()
-            context.awaitDecision()
+            val decision = context.awaitDecision()
+            // Holding the lock until the sheet is gone keeps a queued request
+            // from pushing its sheet under the one still animating out.
+            context.awaitDismissal()
+            decision
         } finally {
             permissionContextHolder.clear()
         }

@@ -29,7 +29,7 @@ class RealAccountsProtocolSignVrfTest {
         ringVrfKeyRegistry = mock(),
         ringVrfKeySource = mock(),
         permissionGuard = mock(),
-        crossProductProofContextHolder = mock(),
+        crossProductProofRequester = mock(),
         productSigningScreenLauncher = signingScreenLauncher,
     )
 
