@@ -49,6 +49,7 @@ class RealWidevineIntegrityInterceptorTest {
         val sentBody = sentRequest.jsonBody()
         assertEquals(JsonPrimitive("alice.07"), sentBody["username"])
         assertEquals(JsonPrimitive("sig"), sentBody["dotns"].asJsonObject["signature"])
+        assertTrue(sentRequest.rawBody().contains(""""signedAt":1725000000"""))
         assertEquals(JsonPrimitive("challenge"), sentBody["deviceChallenge"])
         assertEquals(JsonPrimitive("device-id"), sentBody["deviceId"])
         assertEquals(
@@ -250,7 +251,7 @@ class RealWidevineIntegrityInterceptorTest {
     }
 
     private fun buildRequest(annotated: Boolean): Request {
-        val body = """{"username":"alice.07","dotns":{"signature":"sig"}}"""
+        val body = """{"username":"alice.07","dotns":{"signature":"sig","signedAt":1725000000}}"""
         val builder = Request.Builder()
             .url("https://example.com/api/v1/usernames")
             .post(body.toRequestBody(JSON_MEDIA_TYPE))
@@ -261,10 +262,9 @@ class RealWidevineIntegrityInterceptorTest {
         return builder.build()
     }
 
-    private fun Request.jsonBody(): JsonObject {
-        val body = requireNotNull(body).toByteArray().toString(Charsets.UTF_8)
-        return JsonParser.parseString(body).asJsonObject
-    }
+    private fun Request.rawBody(): String = requireNotNull(body).toByteArray().toString(Charsets.UTF_8)
+
+    private fun Request.jsonBody(): JsonObject = JsonParser.parseString(rawBody()).asJsonObject
 
     private interface AnnotatedApi {
         @CallWithWidevineIntegrity

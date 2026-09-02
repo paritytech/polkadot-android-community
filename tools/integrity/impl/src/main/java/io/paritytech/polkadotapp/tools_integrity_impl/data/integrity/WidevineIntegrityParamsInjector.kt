@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.tools_integrity_impl.data.integrity
 
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonObject
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
@@ -39,14 +39,14 @@ class WidevineIntegrityParamsInjector @Inject constructor(
     private fun injectEvidence(request: Request, evidence: ClaimDeviceEvidence): Result<Request> =
         runCancellableCatching {
             val originalBody = requireNotNull(request.body)
-            val bodyMap: MutableMap<String, Any?> = gson.fromJson(
+            val bodyJson = gson.fromJson(
                 originalBody.toByteArray().toString(Charsets.UTF_8),
-                MAP_TYPE,
+                JsonObject::class.java,
             )
-            bodyMap[FIELD_ATTESTATION_CHAIN] = evidence.attestationChain
-            bodyMap[FIELD_DEVICE_CHALLENGE] = evidence.deviceChallenge
-            bodyMap[FIELD_DEVICE_ID] = evidence.deviceId
-            val replacementBody = gson.toJson(bodyMap).toRequestBody(originalBody.contentType())
+            bodyJson.add(FIELD_ATTESTATION_CHAIN, gson.toJsonTree(evidence.attestationChain))
+            bodyJson.addProperty(FIELD_DEVICE_CHALLENGE, evidence.deviceChallenge)
+            bodyJson.addProperty(FIELD_DEVICE_ID, evidence.deviceId)
+            val replacementBody = gson.toJson(bodyJson).toRequestBody(originalBody.contentType())
 
             request.newBuilder()
                 .method(request.method, replacementBody)
@@ -57,7 +57,6 @@ class WidevineIntegrityParamsInjector @Inject constructor(
         const val FIELD_ATTESTATION_CHAIN = "attestationChain"
         const val FIELD_DEVICE_CHALLENGE = "deviceChallenge"
         const val FIELD_DEVICE_ID = "deviceId"
-        val MAP_TYPE = object : TypeToken<MutableMap<String, Any?>>() {}.type
     }
 }
 
