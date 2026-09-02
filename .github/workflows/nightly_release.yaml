@@ -31,6 +31,7 @@ env:
 permissions:
   contents: write
   pull-requests: read
+  packages: read
 
 jobs:
   nightly-release:

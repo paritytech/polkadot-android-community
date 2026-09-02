@@ -12,6 +12,22 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // The prebuilt TrUAPI core (io.parity:truapi-host-android), published by
+        // paritytech/host-rust-core's release-android workflow. GitHub Packages
+        // requires authentication even for public artifacts: locally a PAT with
+        // read:packages as gpr.user/gpr.key in ~/.gradle/gradle.properties, on CI
+        // the workflow token via GITHUB_ACTOR/GITHUB_TOKEN.
+        //
+        // Declared before mavenLocal so a released version always comes from the
+        // registry even when a same-numbered artifact lingers in ~/.m2; the
+        // core-dev flow pins 0.0.0-local, which only mavenLocal can serve.
+        maven("https://maven.pkg.github.com/paritytech/host-rust-core") {
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
+            }
+            content { includeGroup("io.parity") }
+        }
         mavenLocal()
         maven("https://jitpack.io")
     }
@@ -26,40 +42,7 @@ include(":database")
 include(":bindings:bandersnatch-crypto")
 include(":bindings:hydra-dx-math")
 include(":bindings:sr25519-vrf")
-
-// The :bindings:truapi-host module compiles the TrUAPI Rust core from an
-// out-of-repo checkout, located via `truapi.dir` in local.properties or the
-// TRUAPI_DIR env var. The module is required — :feature:products:impl depends
-// on it in every variant — so a missing or stale checkout fails configuration
-// here, with instructions, instead of later with a missing-project error.
-run {
-    val localProps = java.util.Properties().apply {
-        val f = file("local.properties")
-        if (f.exists()) f.inputStream().use { load(it) }
-    }
-    val truapiDir = (localProps.getProperty("truapi.dir") ?: System.getenv("TRUAPI_DIR"))
-        ?.takeIf { it.isNotBlank() }
-    val resolved = truapiDir?.let {
-        val d = File(it).let { p -> if (p.isAbsolute) p else file(it) }
-        if (File(d, "rust/crates/truapi-server").isDirectory) d else null
-    }
-    if (resolved == null) {
-        val configured = truapiDir?.let { "truapi.dir=$it does not contain rust/crates/truapi-server" }
-            ?: "truapi.dir is not set"
-        error(
-            "A truapi checkout is required to build this project ($configured). " +
-                "Run scripts/setup-truapi.py, which clones " +
-                "https://github.com/paritytech/host-rust-core at the `truapi_ref` pin from " +
-                ".github/actions/install/action.yaml and sets truapi.dir in local.properties. " +
-                "Pass --dir to keep the checkout somewhere else, or set TRUAPI_DIR yourself.",
-        )
-    }
-    include(":bindings:truapi-host")
-    // Standalone demo app that loads a product through the TrUAPI core.
-    if (file("bindings/truapi-host-demo/build.gradle.kts").exists()) {
-        include(":bindings:truapi-host-demo")
-    }
-}
+include(":bindings:truapi-host")
 
 include(":test-shared")
 
