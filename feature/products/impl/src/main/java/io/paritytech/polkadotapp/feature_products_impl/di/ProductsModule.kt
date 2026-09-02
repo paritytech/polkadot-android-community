@@ -9,9 +9,11 @@ import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.common.utils.isEnabled
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
+import io.paritytech.polkadotapp.feature_products_api.domain.FundingDomainProvider
 import io.paritytech.polkadotapp.feature_products_api.domain.ProductAccountIdProvider
 import io.paritytech.polkadotapp.feature_products_api.domain.ProductRequestAccountResolver
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AccountsProtocol
@@ -21,8 +23,8 @@ import io.paritytech.polkadotapp.feature_products_api.domain.deriveEntropy.Deriv
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.PreimageSubmitSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.StatementStoreSubmissionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.TransactionSponsoring
-import io.paritytech.polkadotapp.feature_products_api.model.KnownProductIds
 import io.paritytech.polkadotapp.feature_products_api.presentation.spaHost.SpaHost
+import io.paritytech.polkadotapp.feature_products_impl.data.config.RemoteConfigFundingDomainProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.BrowserTabRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductIntegrationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductRepository
@@ -246,6 +248,10 @@ internal interface ProductsModule {
     fun bindProductRequestAccountResolver(impl: RealProductRequestAccountResolver): ProductRequestAccountResolver
 
     @Binds
+    @Singleton
+    fun bindFundingDomainProvider(impl: RemoteConfigFundingDomainProvider): FundingDomainProvider
+
+    @Binds
     fun bindDeriveEntropyUseCase(impl: RealDeriveEntropyUseCase): DeriveEntropyUseCase
 
     @Binds
@@ -254,8 +260,11 @@ internal interface ProductsModule {
     companion object {
         @Provides
         @Singleton
-        fun providePermissionRequester(real: RealProductPermissionRequester): ProductPermissionRequester {
-            return AutoAllowProductPermissionRequester(autoAllowedLabels(), real)
+        fun providePermissionRequester(
+            real: RealProductPermissionRequester,
+            fundingDomainProvider: FundingDomainProvider,
+        ): ProductPermissionRequester {
+            return AutoAllowProductPermissionRequester(autoAllowedLabels(fundingDomainProvider), real)
         }
 
         @Provides
@@ -271,11 +280,15 @@ internal interface ProductsModule {
             )
         }
 
-        private fun autoAllowedLabels(): Set<String> {
+        private fun autoAllowedLabels(fundingDomainProvider: FundingDomainProvider): suspend () -> Set<String> {
             return if (FeatureOption.PRODUCT_SETTINGS.isDisabled) {
-                setOf(KnownProductIds.GET_CASH_LABEL)
+                {
+                    fundingDomainProvider.getFundingDomain()
+                        .logFailure("Failed to resolve the funding domain to auto-allow")
+                        .fold({ setOf(it) }, { emptySet() })
+                }
             } else {
-                emptySet()
+                { emptySet() }
             }
         }
     }

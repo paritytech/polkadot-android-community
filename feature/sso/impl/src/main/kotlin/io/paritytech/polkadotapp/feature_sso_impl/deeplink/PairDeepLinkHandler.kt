@@ -18,7 +18,7 @@ internal class PairDeepLinkHandler @Inject constructor(
     private val ssoHandshakeProtocol: SsoHandshakeProtocol,
     private val ssoRouter: SsoRouter,
 ) : DeepLinkHandler {
-    override fun canHandle(data: Uri): Boolean {
+    override suspend fun canHandle(data: Uri): Boolean {
         return FeatureOption.LINKED_DEVICES.isEnabled && ssoHandshakeProtocol.isPairingDeeplink(data)
     }
 

@@ -24,7 +24,7 @@ internal class DsFinVkScanContentParser @Inject constructor(
     private val payloadFactory: W3sPaymentPayloadFactory,
     private val router: W3sPayRouter,
 ) : ScanContentParser {
-    override fun canHandle(content: String): Boolean {
+    override suspend fun canHandle(content: String): Boolean {
         return DsFinVkReceiptParser.parse(content).isSuccess
     }
 

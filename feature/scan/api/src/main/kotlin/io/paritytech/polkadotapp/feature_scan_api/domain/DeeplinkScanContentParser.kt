@@ -9,7 +9,7 @@ import io.paritytech.polkadotapp.common.utils.toUriResult
 class DeeplinkScanContentParser(
     private val deepLinkHandler: DeepLinkHandler,
 ) : ScanContentParser {
-    override fun canHandle(content: String): Boolean {
+    override suspend fun canHandle(content: String): Boolean {
         return content.toUriResult()
             .map { deepLinkHandler.canHandle(it) }
             .getOrDefault(false)

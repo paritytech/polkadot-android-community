@@ -25,7 +25,7 @@ class ContactAddressScanContentParser @Inject constructor(
     private val startChatDataUseCase: StartChatDataUseCase,
     private val router: ChatsRouter
 ) : ScanContentParser {
-    override fun canHandle(content: String): Boolean {
+    override suspend fun canHandle(content: String): Boolean {
         return runCatching { content.toAccountId() }.isSuccess
     }
 

@@ -10,7 +10,7 @@ class RootDeeplinkHandler @Inject constructor(
     private val coroutineDispatchers: CoroutineDispatchers,
     private val handlers: Set<@JvmSuppressWildcards DeepLinkHandler>,
 ) : DeepLinkHandler {
-    override fun canHandle(data: Uri): Boolean {
+    override suspend fun canHandle(data: Uri): Boolean {
         return data.candidates().any { uri -> handlers.any { it.canHandle(uri) } }
     }
 

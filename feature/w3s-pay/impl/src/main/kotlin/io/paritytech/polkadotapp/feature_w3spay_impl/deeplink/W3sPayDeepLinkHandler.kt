@@ -34,7 +34,7 @@ internal class W3sPayDeepLinkHandler @Inject constructor(
     private val payloadFactory: W3sPaymentPayloadFactory,
     private val router: W3sPayRouter,
 ) : DeepLinkHandler {
-    override fun canHandle(data: Uri): Boolean {
+    override suspend fun canHandle(data: Uri): Boolean {
         return data.scheme == DeepLinkHandler.APP_SCHEME && data.host == PAY_HOST && data.path == PAY_PATH
     }
 

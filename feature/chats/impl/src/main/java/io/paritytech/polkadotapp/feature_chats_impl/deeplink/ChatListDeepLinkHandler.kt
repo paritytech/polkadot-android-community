@@ -16,7 +16,7 @@ internal class ChatListDeepLinkHandler @Inject constructor(
     private val accountRepository: AccountRepository,
     private val chatsRouter: ChatsRouter,
 ) : DeepLinkHandler {
-    override fun canHandle(data: Uri) =
+    override suspend fun canHandle(data: Uri) =
         data.scheme == DeepLinkHandler.APP_SCHEME && data.host == CHAT_LIST_HOST
 
     context(scope: ComputationalScope)
