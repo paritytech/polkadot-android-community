@@ -39,8 +39,6 @@ class SendValidation @Inject constructor(
 
         val action = ConfirmGainingPrivacySpendUserAction(
             totalTransfer = tokenAmountMapper.mapFrom(transferAmountPlanks.withAsset(asset)),
-            spendable = tokenAmountMapper.mapFrom(balance.availablePrivate.withAsset(asset)),
-            gainingPrivacy = tokenAmountMapper.mapFrom((transferAmountPlanks - balance.availablePrivate).withAsset(asset)),
         )
 
         return when (validationProcess.presentUserInput(action)) {
@@ -51,13 +49,11 @@ class SendValidation @Inject constructor(
 }
 
 /**
- * [gainingPrivacy] is the part of [totalTransfer] that [spendable] cannot cover, so sending costs the
- * privacy those funds have earned so far.
+ * [totalTransfer] is the amount the user asked for. Part of it can only come from funds the privacy system
+ * has not finished processing, which is what the confirmation is about.
  */
 data class ConfirmGainingPrivacySpendUserAction(
     val totalTransfer: TokenAmountModel,
-    val spendable: TokenAmountModel,
-    val gainingPrivacy: TokenAmountModel,
 ) : ValidationUserInputAction<ConfirmGainingPrivacySpendDecision>
 
 /**

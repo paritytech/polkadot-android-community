@@ -37,7 +37,6 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     private val shareCoinageLogsUseCase: ShareCoinageLogsUseCase,
     private val coinageRecyclingUseCase: CoinageRecyclingUseCase,
     private val coinageBackupService: CoinageBackupService,
-    private val recyclingStrategySettings: CoinageRecyclingStrategySettings,
     private val fundingDomainProvider: FundingDomainProvider
 ) {
     companion object {

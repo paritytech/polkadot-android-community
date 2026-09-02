@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="send_gaining_privacy_title">Some funds are still gaining privacy</string>
-    <string name="send_gaining_privacy_spendable">You can send %1$s right now.</string>
-    <string name="send_gaining_privacy_full_amount">To send %1$s, the remaining %2$s has to come from funds that are still gaining privacy.</string>
-    <string name="send_gaining_privacy_why_link">Why is %1$s still gaining privacy?</string>
+    <string name="send_gaining_privacy_title">This payment might reduce your privacy</string>
+    <string name="send_gaining_privacy_full_amount">In this payment you are using funds that have not yet been fully processed by the privacy system.</string>
     <string name="send_gaining_privacy_send_anyway_button">Send %1$s anyway</string>
-    <string name="send_gaining_privacy_why_title">About funds gaining privacy</string>
-    <string name="send_gaining_privacy_why_body">Recycled funds hide among everyone else in their bucket, and the more of it fills up, the harder they are to trace back to you. Spending them before it fills gives up the privacy they have earned so far. Wait, and they become spendable on their own.</string>
 
     <string name="send_payment_failed">Failed to submit transaction</string>
     <string name="common_intent_failed">Failed to find application to perform specified action</string>
