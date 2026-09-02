@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -37,7 +34,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Local
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.balanceDetails.compose.BalanceDetailsBottomSheet
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountContract
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress
@@ -53,7 +49,6 @@ import io.paritytech.polkadotapp.common.R as RCommon
 @Composable
 internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
     val state = contract.state.collectAsStateWithLifecycle().value
-    var isBalanceDetailsVisible by remember { mutableStateOf(false) }
 
     PolkadotSurface {
         when (state) {
@@ -61,18 +56,12 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
                 state = state.data,
                 onAmountChange = contract::onNewInput,
                 onConfirmClick = contract::onConfirmClick,
-                onBackClick = contract::onBackClick,
-                onInfoClick = { isBalanceDetailsVisible = true }
+                onBackClick = contract::onBackClick
             )
 
             else -> LoadingScreenState()
         }
     }
-
-    BalanceDetailsBottomSheet(
-        isVisible = isBalanceDetailsVisible,
-        onDismissRequest = { isBalanceDetailsVisible = false },
-    )
 
     GainingPrivacyConfirmationHost(contract)
 }
@@ -99,7 +88,6 @@ private fun SendEnterAmountScreenInternal(
     state: SendEnterAmountUiState,
     onAmountChange: (String) -> Unit,
     onConfirmClick: () -> Unit,
-    onInfoClick: () -> Unit,
     onBackClick: () -> Unit,
 ) {
     val formatter = LocalTokenAmountFormatter.current
@@ -146,7 +134,11 @@ private fun SendEnterAmountScreenInternal(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            EnterAmountBalance(amount, gainingPrivacy, onInfoClick)
+            EnterAmountBalance(
+                modifier = Modifier.padding(horizontal = PolkadotTheme.spacings.large),
+                amount = amount,
+                gainingPrivacy = gainingPrivacy
+            )
 
             VerticalSpacer { small }
 
@@ -233,8 +225,7 @@ private fun SendEnterAmountScreenAllWidgetPreview() {
                 ),
                 onAmountChange = {},
                 onConfirmClick = {},
-                onBackClick = {},
-                onInfoClick = {}
+                onBackClick = {}
             )
         }
     }

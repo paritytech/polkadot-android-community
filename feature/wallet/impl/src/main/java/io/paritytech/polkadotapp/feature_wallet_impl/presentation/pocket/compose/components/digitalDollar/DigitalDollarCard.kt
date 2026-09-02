@@ -5,14 +5,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -28,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.common.utils.CurrencyConfig
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.Info
 import io.paritytech.polkadotapp.design.components.icon.vectors.Refreshing
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
@@ -40,7 +36,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.forma
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.R
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.balanceDetails.compose.BalanceDetailsBottomSheet
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.LocalCardTilt
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.MotionShineParameters
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.maskedMotionShine
@@ -58,13 +53,7 @@ fun DigitalDollarCard(
     onSelected: ((PocketCardUiModel.DigitalDollar) -> Unit)? = null,
     isExpanded: Boolean
 ) {
-    var isBalanceDetailsVisible by remember { mutableStateOf(false) }
     val tiltState = LocalCardTilt.current
-
-    BalanceDetailsBottomSheet(
-        isVisible = isBalanceDetailsVisible,
-        onDismissRequest = { isBalanceDetailsVisible = false }
-    )
 
     val borderBrush = remember {
         Brush.radialGradient(
@@ -187,10 +176,7 @@ fun DigitalDollarCard(
                     ) { status ->
                         when (status) {
                             BalanceStatus.Syncing -> SyncProgress()
-                            BalanceStatus.Available -> AvailableBalance(
-                                amount = card.available,
-                                onBalanceDetails = { isBalanceDetailsVisible = true }
-                            )
+                            BalanceStatus.Available -> AvailableBalance(amount = card.available)
 
                             BalanceStatus.Hidden -> Unit
                         }
@@ -209,10 +195,7 @@ fun DigitalDollarCard(
 }
 
 @Composable
-fun AvailableBalance(
-    amount: TokenAmountModel,
-    onBalanceDetails: () -> Unit
-) {
+fun AvailableBalance(amount: TokenAmountModel) {
     Row(
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -228,16 +211,6 @@ fun AvailableBalance(
             text = stringResource(RCommon.string.pocket_digital_dollar_available),
             style = PolkadotTheme.typography.body.medium,
             color = PocketCardColors.Secondary
-        )
-
-        HorizontalSpacer { small }
-
-        NovaIcon(
-            modifier = Modifier
-                .size(16.dp)
-                .clickable(onClick = onBalanceDetails),
-            imageVector = NovaIcons.Info,
-            tint = PocketCardColors.Secondary
         )
     }
 }

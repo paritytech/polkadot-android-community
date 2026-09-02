@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.main
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -24,6 +25,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.NotificationsBel
 import io.paritytech.polkadotapp.design.components.icon.vectors.PaletteOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.Settings
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuList
+import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuListCustomItem
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
@@ -31,9 +33,11 @@ import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleSize
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.AppDeviceInfoSection
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.BackupSettingsMenuItem
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.SettingsMenuItem
+import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode.PaymentPrivacyModeSelector
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -46,6 +50,7 @@ fun SettingsScreen() {
         onNotificationsClick = viewModel::onNotificationsClick,
         onLanguageClick = viewModel::onLanguageClick,
         onThemeClick = viewModel::onThemeClick,
+        onPrivacyModeSelected = viewModel::onPrivacyModeSelected,
         onBackupClick = viewModel::onBackupClick,
         onProductsClick = viewModel::onProductsClick,
         onBlockedUsersClick = viewModel::onBlockedUsersClick,
@@ -62,6 +67,7 @@ private fun SettingsScreenInternal(
     onNotificationsClick: () -> Unit,
     onLanguageClick: () -> Unit,
     onThemeClick: () -> Unit,
+    onPrivacyModeSelected: (RecyclingStrategyType) -> Unit,
     onBackupClick: () -> Unit,
     onProductsClick: () -> Unit,
     onBlockedUsersClick: () -> Unit,
@@ -118,6 +124,16 @@ private fun SettingsScreenInternal(
                 PolkadotMenuList(
                     headerText = stringResource(RCommon.string.settings_section_security)
                 ) {
+                    state.privacyMode?.let { privacyMode ->
+                        PolkadotMenuListCustomItem { shape ->
+                            PaymentPrivacyModeSelector(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = shape,
+                                selectedMode = privacyMode,
+                                onModeSelected = onPrivacyModeSelected
+                            )
+                        }
+                    }
                     BackupSettingsMenuItem(
                         onClick = onBackupClick,
                         isBackupMissing = state.isBackupMissing
@@ -193,6 +209,7 @@ private fun SettingsScreenPreview() {
                 linkedDevicesEnabled = true,
                 productSettingsEnabled = true,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
+                privacyMode = RecyclingStrategyType.BALANCED,
                 isLanguageSettingsAvailable = true,
                 isBackupMissing = false,
                 hasBlockedUsers = false
@@ -200,6 +217,7 @@ private fun SettingsScreenPreview() {
             onNotificationsClick = {},
             onLanguageClick = {},
             onThemeClick = {},
+            onPrivacyModeSelected = {},
             onBackupClick = {},
             onProductsClick = {},
             onBlockedUsersClick = {},

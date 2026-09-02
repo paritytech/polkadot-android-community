@@ -1,16 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="balance_details_title">Balance details</string>
-    <string name="balance_details_subtitle">See what makes up your balance</string>
-    <string name="balance_details_available_private">Available private</string>
-    <string name="balance_details_available_private_description">Funds you can spend without privacy concerns</string>
-    <string name="balance_details_available_exposed">Available exposed</string>
-    <string name="balance_details_available_exposed_description">Spendable funds, but without full privacy guarantees</string>
-    <string name="balance_details_exposed_unavailable">Exposed, not available</string>
-    <string name="balance_details_exposed_unavailable_description">Technically spendable, but your selected privacy mode disallows its usage</string>
-    <string name="balance_details_not_available">Not available</string>
-    <string name="balance_details_not_available_description">Funds being prepared by the private payment system. Processing usually takes around 1-5 minutes</string>
-
     <string name="send_gaining_privacy_title">Some funds are still gaining privacy</string>
     <string name="send_gaining_privacy_spendable">You can send %1$s right now.</string>
     <string name="send_gaining_privacy_full_amount">To send %1$s, the remaining %2$s has to come from funds that are still gaining privacy.</string>
@@ -745,6 +734,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_enter_amount_title">Enter amount</string>
     <string name="send_enter_amount_placeholder">Enter Amount</string>
     <string name="send_enter_amount_max_balance_prefix">Max:</string>
+    <string name="send_enter_amount_privacy_cost_hint">Extra %1$s is spendable, but at the risk of reducing your privacy</string>
     <string name="send_enter_amount_not_enough_funds_error">You don’t have enough funds</string>
     <string name="send_enter_amount_cash_title">%1$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>

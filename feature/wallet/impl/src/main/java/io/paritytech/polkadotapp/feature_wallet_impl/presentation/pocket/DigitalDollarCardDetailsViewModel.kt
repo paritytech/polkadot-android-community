@@ -11,7 +11,6 @@ import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDollarCardDetailsInteractor
@@ -23,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -68,22 +68,15 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         initialValue = LoadingState.Loading
     )
 
-    val state: StateFlow<DigitalDollarCardDetailsUiState> = combine(
-        interactor.observeBackupProgress(),
-        interactor.observePrivacyMode()
-    ) { backupProgress, privacyMode ->
-        DigitalDollarCardDetailsUiState(
-            balanceRestore = backupProgress.toBalanceRestoreUiState(),
-            privacyMode = privacyMode
+    val state: StateFlow<DigitalDollarCardDetailsUiState> = interactor.observeBackupProgress()
+        .map { DigitalDollarCardDetailsUiState(balanceRestore = it.toBalanceRestoreUiState()) }
+        .stateIn(
+            scope = this,
+            started = SharingStarted.Eagerly,
+            initialValue = DigitalDollarCardDetailsUiState(
+                balanceRestore = BalanceRestoreUiState.NotDetermined
+            )
         )
-    }.stateIn(
-        scope = this,
-        started = SharingStarted.Eagerly,
-        initialValue = DigitalDollarCardDetailsUiState(
-            balanceRestore = BalanceRestoreUiState.NotDetermined,
-            privacyMode = null
-        )
-    )
 
     fun onGetCashClick() = launchUnit {
         interactor.getCashProductId()
@@ -94,12 +87,6 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
 
     fun onSendClick() {
         router.openSendPayment()
-    }
-
-    fun onPrivacyModeSelected(mode: RecyclingStrategyType) = launchUnit {
-        interactor.setPrivacyMode(mode)
-            .logFailure("Failed to change payment privacy mode")
-            .onFailure { showMessage("Failed to change payment privacy mode") }
     }
 
     fun onAutoFundClick() = launchUnit {
