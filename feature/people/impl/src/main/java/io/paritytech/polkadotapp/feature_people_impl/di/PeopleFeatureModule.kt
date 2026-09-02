@@ -103,14 +103,13 @@ internal interface PeopleFeatureModule {
     fun bindBandersnatchKeyResolver(impl: RealBandersnatchKeyResolver): BandersnatchKeyResolver
 
     companion object {
-
-         @Provides
-         @Singleton
-         fun providePersonStatusUseCase(
-             enabled: RealPersonStatusUseCase,
-             disabled: DisabledPersonStatusUseCase
-         ): PersonStatusUseCase {
-             return if (FeatureOption.PERSONHOOD.isEnabled) enabled else disabled
-         }
+        @Provides
+        @Singleton
+        fun providePersonStatusUseCase(
+            enabled: RealPersonStatusUseCase,
+            disabled: DisabledPersonStatusUseCase
+        ): PersonStatusUseCase {
+            return if (FeatureOption.PERSONHOOD.isEnabled) enabled else disabled
+        }
     }
 }

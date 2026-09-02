@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject
 
-class DisabledPersonStatusUseCase @Inject constructor(): PersonStatusUseCase {
+class DisabledPersonStatusUseCase @Inject constructor() : PersonStatusUseCase {
     override fun personhoodStatusFlow(): Flow<PersonhoodStatus> {
         return flowOf(PersonhoodStatus.NotPerson)
     }
