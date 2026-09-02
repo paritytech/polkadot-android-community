@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBot
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatExtensionId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatVariant
+import io.paritytech.polkadotapp.feature_chats_impl.domain.extension.CoinagePaymentProcessingExtension
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,11 +28,13 @@ typealias ChatExtensionsById = Map<ChatExtensionId, ChatExtension>
 @Singleton
 class ChatExtensionRegistry @Inject constructor(
     private val staticExtensions: Set<@JvmSuppressWildcards ChatExtension>,
+    private val paymentProcessingExtension: CoinagePaymentProcessingExtension,
     private val externalExtensionProvider: ExternalExtensionProvider,
     private val botStateController: ChatBotStateController,
 ) : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
-    private val extensionsEnabled = FeatureOption.CHAT_EXTENSIONS.isEnabled
-    private val enabledStaticExtensions = if (extensionsEnabled) staticExtensions else emptySet()
+    private val extensionsEnabled = FeatureOption.ALL_CHAT_EXTENSIONS.isEnabled
+
+    private val enabledStaticExtensions = if (extensionsEnabled) staticExtensions else setOf(paymentProcessingExtension)
 
     private val externalExtensions: SharedFlow<List<ExternalExtension>> = if (extensionsEnabled) {
         externalExtensionProvider.observeExtensions()

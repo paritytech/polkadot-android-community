@@ -5,7 +5,10 @@ import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
+import io.paritytech.polkadotapp.common.utils.FeatureFlags
+import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.flowOfAll
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.repository.getCandidateAccount
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.BandersnatchSecretsStorage
@@ -41,6 +44,9 @@ class RealPersonStatusUseCase @Inject constructor(
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
     @SetAliasContext private val assignableContexts: Set<@JvmSuppressWildcards AliasContextProvider>
 ) : PersonStatusUseCase {
+
+    private val personhoodEnabled = FeatureOption.PERSONHOOD.isEnabled
+
     override fun personhoodStatusFlow(): Flow<PersonhoodStatus> = flowOfAll {
         val chain = peopleChain()
 
@@ -144,3 +150,4 @@ class RealPersonStatusUseCase @Inject constructor(
         return chainRegistry.getChain(knownChains.people)
     }
 }
+

@@ -29,9 +29,7 @@ class MainInteractor @Inject constructor(
             AppSetIdManager.get(context)
         }
 
-        if (FeatureOption.CHAT_EXTENSIONS.isEnabled) {
-            messageSender.startExtensions()
-        }
+        messageSender.startExtensions()
     }
 
     fun observeTabWarnings(): Flow<Map<BottomTab, Boolean>> = observeTabWarningsUseCase()
