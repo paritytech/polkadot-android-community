@@ -15,8 +15,7 @@ internal class RemoteConfigFundingDomainProvider @Inject constructor(
 ) : FundingDomainProvider {
     // Unwrapping inside the compute keeps a failed read out of the cache; getCatching re-wraps the throw.
     private val fundingDomainCache = SingleValueCache {
-        // Remote Config answers an unset key with an empty string rather than failing, and a blank
-        // label would resolve to the bare TLD - a domain the funding product is not served under.
+        // Remote Config answers an unset key with an empty string rather than failing.
         remoteConfigService.getSyncedString(CONFIG_KEY).getOrThrow()
             .ifBlank { error("Remote Config carries no $CONFIG_KEY") }
     }
@@ -25,7 +24,7 @@ internal class RemoteConfigFundingDomainProvider @Inject constructor(
 
     override suspend fun getFundingProductId(): Result<ProductId> {
         return getFundingDomain().flatMap { domain ->
-            dotNsTldProvider.getTld().map { tld -> ProductId.fromStoredValue(domain + tld.suffix) }
+            dotNsTldProvider.getTld().flatMap { tld -> ProductId.fromString(domain + tld.suffix, tld) }
         }
     }
 
