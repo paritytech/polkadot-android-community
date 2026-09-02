@@ -5,6 +5,7 @@ on:
     types: [closed]
     branches:
       - main
+      - truapi-dev
   workflow_dispatch:
 
 env:
@@ -18,16 +19,86 @@ env:
   SENTRY_ORG: ${{ vars.SENTRY_ORG }}
   SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
   TERMS_OF_USE_URL: ${{ vars.TERMS_OF_USE_URL }}
-  CI_FIREBASE_RELEASENOTES: ${{ github.event.pull_request.title }} ${{ github.event.pull_request.merge_commit_sha }}
-  CI_FIREBASE_GROUP: android-dev-testers
   VERSIONS_KT_PATH: build-logic/convention/src/main/kotlin/Versions.kt
+  # Firebase App Distribution tester groups, one per branch this workflow serves.
+  CI_FIREBASE_GROUP_MAIN: android-dev-testers
+  CI_FIREBASE_GROUP_TRUAPI_DEV: truapi-dev-testers
 
 jobs:
+  resolve:
+    name: Resolve distribution target
+    runs-on: ubuntu-latest
+    # Gates the whole workflow: every other job depends on this one. Closed but
+    # unmerged PRs stop here, and so do release-* PRs: those are built and
+    # distributed by firebase_release_distribution.yml while the PR is open, so
+    # merging one must not also ship a debug build.
+    if: (github.event_name == 'pull_request' && github.event.pull_request.merged == true && !startsWith(github.event.pull_request.head.ref, 'release-')) || github.event_name == 'workflow_dispatch'
+    outputs:
+      branch: ${{ steps.target.outputs.branch }}
+      firebase_group: ${{ steps.target.outputs.firebase_group }}
+      release_notes: ${{ steps.target.outputs.release_notes }}
+    steps:
+      - name: Resolve branch, Firebase group and release notes
+        id: target
+        # Values arrive through env rather than inline ${{ }} so that a PR title
+        # is never parsed by the shell.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # On pull_request, github.ref_name is the merge ref ("42/merge"), so
+          # the target is the PR base. On workflow_dispatch it is the ref the run
+          # was started from.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BRANCH="${BASE_REF:-}"
+            NOTES="[$BRANCH] $PR_TITLE $PR_SHA"
+          else
+            BRANCH="${REF_NAME:-}"
+            NOTES="[$BRANCH] manual build $DISPATCH_SHA"
+          fi
+
+          if [ -z "$BRANCH" ]; then
+            echo "::error::Could not resolve a target branch for event $EVENT_NAME"
+            exit 1
+          fi
+
+          case "$BRANCH" in
+            main)       GROUP="$CI_FIREBASE_GROUP_MAIN" ;;
+            truapi-dev) GROUP="$CI_FIREBASE_GROUP_TRUAPI_DEV" ;;
+            # workflow_dispatch can be started from any ref. Keep the previous
+            # default instead of failing, but make the surprise visible.
+            *)
+              GROUP="$CI_FIREBASE_GROUP_MAIN"
+              echo "::warning::No tester group mapped for '$BRANCH'; defaulting to $GROUP"
+              ;;
+          esac
+
+          echo "Branch: $BRANCH -> Firebase group: $GROUP"
+
+          # The notes carry an untrusted PR title into GITHUB_OUTPUT. Collapse it
+          # to a single line and close the heredoc with an unguessable delimiter,
+          # so a title can never forge additional outputs such as firebase_group.
+          NOTES="$(printf '%s' "$NOTES" | tr '\r\n' '  ')"
+          DELIMITER="RELEASE_NOTES_$(openssl rand -hex 16)"
+
+          {
+            echo "branch=$BRANCH"
+            echo "firebase_group=$GROUP"
+            echo "release_notes<<$DELIMITER"
+            echo "$NOTES"
+            echo "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
   build:
     name: Build app
     runs-on: ubuntu-latest
-    # Skip if PR is from a release-* branch (handled by release_firebase.yml)
-    if: (github.event_name == 'pull_request' && github.event.pull_request.merged == true && !startsWith(github.event.pull_request.head.ref, 'release-')) || github.event_name == 'workflow_dispatch'
+    needs: resolve
     outputs:
       build_number: ${{ steps.build_number.outputs.build_number }}
       marketing_version: ${{ steps.read_version.outputs.marketing_version }}
@@ -92,9 +163,7 @@ jobs:
   upload-to-firebase:
     name: Upload APK to Firebase
     runs-on: ubuntu-latest
-    needs: build
-    # Skip if PR is from a release-* branch (handled by release_firebase.yml)
-    if: (github.event_name == 'pull_request' && github.event.pull_request.merged == true && !startsWith(github.event.pull_request.head.ref, 'release-')) || github.event_name == 'workflow_dispatch'
+    needs: [resolve, build]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,15 +179,18 @@ jobs:
         with:
           appId: ${{ secrets.ANDROID_FIREBASE_APP_ID }}
           firebase-token: ${{ secrets.FIREBASE_GOOGLE_SERVICE_ACCOUNT }}
-          releaseNotes: ${{ env.CI_FIREBASE_RELEASENOTES }}
-          test-groups: ${{ env.CI_FIREBASE_GROUP }}
+          releaseNotes: ${{ needs.resolve.outputs.release_notes }}
+          test-groups: ${{ needs.resolve.outputs.firebase_group }}
           upload-file: app/app-gp-debug.apk
 
   upload-to-s3:
     name: Upload APK to S3
     runs-on: ubuntu-latest
-    needs: build
-    if: success()
+    needs: [resolve, build]
+    # S3 holds the canonical debug artefacts, including a static "latest"
+    # pointer. Only main publishes there so a branch build can never masquerade
+    # as the latest main build; branch builds are distributed via Firebase only.
+    if: needs.resolve.outputs.branch == 'main'
     env:
       S3_BUCKET: s3://polkadot-app-artefacts
       S3_REGION: fr-par

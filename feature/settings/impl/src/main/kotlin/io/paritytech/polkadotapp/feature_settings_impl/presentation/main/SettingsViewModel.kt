@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main
 
+import android.os.Build
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.FeatureOption
@@ -21,6 +22,8 @@ class SettingsViewModel @Inject constructor(
     appThemeSelector: AppThemeSelector,
     private val router: SettingsRouter
 ) : BaseViewModel() {
+    private val isLanguageSettingsAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
     val state: StateFlow<SettingsUiState> = combine(
         interactor.observeBackupExists(),
         interactor.subscribeHasBlockedContacts(),
@@ -31,6 +34,7 @@ class SettingsViewModel @Inject constructor(
             debugMenuEnabled = FeatureOption.DEBUG_MENU.isEnabled,
             linkedDevicesEnabled = FeatureOption.LINKED_DEVICES.isEnabled,
             productSettingsEnabled = FeatureOption.PRODUCT_SETTINGS.isEnabled,
+            isLanguageSettingsAvailable = isLanguageSettingsAvailable,
             selectedTheme = selectedTheme,
             isBackupMissing = !backupExists,
             hasBlockedUsers = hasBlockedUsers
@@ -44,6 +48,7 @@ class SettingsViewModel @Inject constructor(
                 debugMenuEnabled = FeatureOption.DEBUG_MENU.isEnabled,
                 linkedDevicesEnabled = FeatureOption.LINKED_DEVICES.isEnabled,
                 productSettingsEnabled = FeatureOption.PRODUCT_SETTINGS.isEnabled,
+                isLanguageSettingsAvailable = isLanguageSettingsAvailable,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
                 isBackupMissing = false,
                 hasBlockedUsers = false
@@ -76,6 +81,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onNotificationsClick() {
         router.openNotificationSettings()
+    }
+
+    fun onLanguageClick() {
+        router.openLanguageSettings()
     }
 
     fun onThemeClick() {

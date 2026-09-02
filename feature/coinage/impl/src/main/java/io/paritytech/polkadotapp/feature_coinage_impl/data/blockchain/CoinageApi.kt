@@ -7,17 +7,19 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableModule
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry1
 import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry2
-import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry3
+import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableStorageEntry4
 import io.paritytech.polkadotapp.chains.storage.source.query.api.constant
 import io.paritytech.polkadotapp.chains.storage.source.query.api.storage1
 import io.paritytech.polkadotapp.chains.storage.source.query.api.storage2
-import io.paritytech.polkadotapp.chains.storage.source.query.api.storage3
+import io.paritytech.polkadotapp.chains.storage.source.query.api.storage4
 import io.paritytech.polkadotapp.chains.util.WithRuntime
 import io.paritytech.polkadotapp.chains.util.coinage
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
+import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainInstanceRecord
+import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainRecyclerLocation
 import java.math.BigInteger
 
 typealias TokenPeriod = BigIntegerSerializable
@@ -46,8 +48,8 @@ val CoinageApi.coinsByOwner: QueryableStorageEntry1<AccountId, OnChainCoinInfo>
     get() = storage1("CoinsByOwner")
 
 context(withRuntime: WithRuntime)
-val CoinageApi.underlyingAssetUnit: BigInteger
-    get() = constant("UnderlyingAssetUnit")
+val CoinageApi.instances: QueryableStorageEntry1<BigInteger, OnChainInstanceRecord>
+    get() = storage1("Instances")
 
 context(withRuntime: WithRuntime)
 val CoinageApi.unloadTokenTimePeriodPeopleLitePeople: Long
@@ -58,11 +60,11 @@ val CoinageApi.maxFreeUnloadTokensPerTimePeriod: Long
     get() = constant("MaxFreeUnloadTokensPerTimePeriod")
 
 context(withRuntime: WithRuntime)
-val CoinageApi.recyclersCoinToRecycler: QueryableStorageEntry1<BandersnatchPublicKey, BigInteger>
+val CoinageApi.recyclersCoinToRecycler: QueryableStorageEntry1<BandersnatchPublicKey, OnChainRecyclerLocation>
     get() = storage1("RecyclersCoinToRecycler")
 
-val CoinageApi.recyclerAliasStates: QueryableStorageEntry3<BigInteger, BigInteger, ByteArray, OnChainAliasState>
-    get() = storage3("RecyclerAliasStates")
+val CoinageApi.recyclerAliasStates: QueryableStorageEntry4<BigInteger, BigInteger, BigInteger, ByteArray, OnChainAliasState>
+    get() = storage4("RecyclerAliasStates")
 
 context(withRuntime: WithRuntime)
 val CoinageApi.maxConsolidation: Int

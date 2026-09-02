@@ -36,6 +36,22 @@ fun Context.openAppNotificationSettings() {
     startActivity(intent)
 }
 
+fun Context.openAppLanguageSettings() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        openAppSettings()
+        return
+    }
+
+    val intent = Intent(
+        Settings.ACTION_APP_LOCALE_SETTINGS,
+        Uri.fromParts("package", packageName, null)
+    )
+
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    runCatching { startActivity(intent) }.onFailure { openAppSettings() }
+}
+
 fun Context.getResourceUri(resId: Int): Uri {
     return "android.resource://$packageName/$resId".toUri()
 }

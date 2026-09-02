@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.data
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
@@ -57,7 +56,8 @@ class RealVideoGameInfoSyncService @Inject constructor(
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
     private val computationalCache: ComputationalCache,
-    private val bandersnatchSecretsStorage: BandersnatchSecretsStorage
+    private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
+    private val scoreContextProvider: ScoreContextProvider
 ) : VideoGameInfoSyncService {
     companion object {
         private const val CACHE_KEY = "VideoGameInfoSyncService:CurrentActiveGameInfo"
@@ -78,7 +78,7 @@ class RealVideoGameInfoSyncService @Inject constructor(
         val chain = peopleChain()
         val candidateAccount = accountRepository.getCandidateAccount()
         val candidateAccountId = candidateAccount.accountIdIn(chain)
-        val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, BandersnatchContext.SCORE)
+        val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, scoreContextProvider.context())
 
         combine(
             videoGameRepository.subscribeGameInfoAtBlock(chain.id),

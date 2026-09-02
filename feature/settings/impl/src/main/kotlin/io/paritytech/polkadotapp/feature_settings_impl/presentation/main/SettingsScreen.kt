@@ -18,6 +18,7 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.BlockOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.FileOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.GridOutlined
+import io.paritytech.polkadotapp.design.components.icon.vectors.Language
 import io.paritytech.polkadotapp.design.components.icon.vectors.LaptopOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.NotificationsBellOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.PaletteOutlined
@@ -43,6 +44,7 @@ fun SettingsScreen() {
     SettingsScreenInternal(
         state = state,
         onNotificationsClick = viewModel::onNotificationsClick,
+        onLanguageClick = viewModel::onLanguageClick,
         onThemeClick = viewModel::onThemeClick,
         onBackupClick = viewModel::onBackupClick,
         onProductsClick = viewModel::onProductsClick,
@@ -58,6 +60,7 @@ fun SettingsScreen() {
 private fun SettingsScreenInternal(
     state: SettingsUiState,
     onNotificationsClick: () -> Unit,
+    onLanguageClick: () -> Unit,
     onThemeClick: () -> Unit,
     onBackupClick: () -> Unit,
     onProductsClick: () -> Unit,
@@ -101,6 +104,13 @@ private fun SettingsScreenInternal(
                         title = stringResource(RCommon.string.settings_notifications),
                         onClick = onNotificationsClick
                     )
+                    if (state.isLanguageSettingsAvailable) {
+                        SettingsMenuItem(
+                            icon = NovaIcons.Language,
+                            title = stringResource(RCommon.string.settings_language),
+                            onClick = onLanguageClick
+                        )
+                    }
                 }
 
                 VerticalSpacer { large }
@@ -183,10 +193,12 @@ private fun SettingsScreenPreview() {
                 linkedDevicesEnabled = true,
                 productSettingsEnabled = true,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
+                isLanguageSettingsAvailable = true,
                 isBackupMissing = false,
                 hasBlockedUsers = false
             ),
             onNotificationsClick = {},
+            onLanguageClick = {},
             onThemeClick = {},
             onBackupClick = {},
             onProductsClick = {},

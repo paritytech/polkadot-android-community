@@ -45,7 +45,7 @@ fun CoinageChainState.leaveRecycler(member: BandersnatchPublicKey) =
     copy(recyclerMembers = recyclerMembers - member, ringPositions = ringPositions - member)
 
 fun CoinageChainState.mintCoin(key: AccountId, value: Int, age: Int): CoinageChainState =
-    copy(coins = coins + (key to OnChainCoinInfo(value = value, age = age)))
+    copy(coins = coins + (key to OnChainCoinInfo(instanceId = 0, value = value, age = age)))
 
 fun CoinageChainState.consumeCoin(key: AccountId): CoinageChainState = copy(coins = coins - key)
 

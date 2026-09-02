@@ -46,8 +46,8 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.co
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountInput
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountRecipient
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountToolbar
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmDegradedVouchersDecision
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmDegradedVouchersUserAction
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmGainingPrivacySpendDecision
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.ConfirmGainingPrivacySpendUserAction
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -69,28 +69,27 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
         }
     }
 
-    DegradedConfirmationHost(contract)
-
     BalanceDetailsBottomSheet(
         isVisible = isBalanceDetailsVisible,
         onDismissRequest = { isBalanceDetailsVisible = false },
     )
+
+    GainingPrivacyConfirmationHost(contract)
 }
 
 @Composable
-private fun DegradedConfirmationHost(contract: SendEnterAmountContract) {
+private fun GainingPrivacyConfirmationHost(contract: SendEnterAmountContract) {
     val handle = contract.sendValidationMixin
-        .rememberValidationActionHandle<ConfirmDegradedVouchersUserAction, ConfirmDegradedVouchersDecision>()
+        .rememberValidationActionHandle<ConfirmGainingPrivacySpendUserAction, ConfirmGainingPrivacySpendDecision>()
 
     val action = handle.payload
 
     if (action != null) {
-        SendConfirmDegradedStateBottomSheet(
+        SendConfirmGainingPrivacyBottomSheet(
             isVisible = handle.isVisible,
             action = action,
-            onSendPrivatelyOnly = { handle.respond(ConfirmDegradedVouchersDecision.SendPrivatelyOnly) },
-            onSendWithDegraded = { handle.respond(ConfirmDegradedVouchersDecision.SendWithDegraded) },
-            onDismiss = { handle.respond(ConfirmDegradedVouchersDecision.Cancel) },
+            onSendAnyway = { handle.respond(ConfirmGainingPrivacySpendDecision.SendAnyway) },
+            onDismiss = { handle.respond(ConfirmGainingPrivacySpendDecision.Cancel) },
         )
     }
 }
@@ -115,8 +114,11 @@ private fun SendEnterAmountScreenInternal(
     val symbol = remember(state.available) {
         formatter.formatToSymbol(state.available)
     }
-    val amount = remember(state.available) {
-        formatter.formatTokenAmount(state.available, RoundPrecision.FIAT, withSymbol = false)
+    val amount = remember(state.spendable) {
+        formatter.formatTokenAmount(state.spendable, RoundPrecision.FIAT, withSymbol = false)
+    }
+    val gainingPrivacy = remember(state.gainingPrivacy) {
+        state.gainingPrivacy?.let { formatter.formatTokenAmount(it, RoundPrecision.FIAT, withSymbol = false) }
     }
 
     Column(
@@ -144,7 +146,7 @@ private fun SendEnterAmountScreenInternal(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            EnterAmountBalance(amount, onInfoClick)
+            EnterAmountBalance(amount, gainingPrivacy, onInfoClick)
 
             VerticalSpacer { small }
 
@@ -210,7 +212,7 @@ private fun DebugPlanInfo(info: SendPlanDebugInfo) {
 
 @Preview
 @Composable
-private fun SendEnterAmountScreenPreview() {
+private fun SendEnterAmountScreenAllWidgetPreview() {
     CompositionLocalProvider(
         LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
     ) {
@@ -221,6 +223,8 @@ private fun SendEnterAmountScreenPreview() {
                     recipient = "2o4ytihgkgrjbsk4kjb45lnqlkn35lk3ny73l54jnu45lkjulk5u4lu4lubhv",
                     recipientType = ExtractedAddress.DisplayType.ADDRESS,
                     available = TokenAmountModel.mock,
+                    spendable = TokenAmountModel.mock(300),
+                    gainingPrivacy = TokenAmountModel.mock(150),
                     sendProgress = SendProgress.Idle,
                     showBalanceError = true,
                     isSendEnabled = false,

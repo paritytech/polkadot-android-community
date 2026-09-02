@@ -6,7 +6,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 interface LongTermStorageSlotRepository {
     suspend fun periodDurationSeconds(chainId: ChainId): UInt
 
-    suspend fun maxClaimsPerPeriod(chainId: ChainId): UByte
+    suspend fun maxClaimsPerPeriod(): Result<UByte>
 
     suspend fun spentAliases(
         chainId: ChainId,

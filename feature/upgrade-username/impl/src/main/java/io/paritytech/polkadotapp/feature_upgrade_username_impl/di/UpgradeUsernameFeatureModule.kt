@@ -6,12 +6,12 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.ElementsIntoSet
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
+import io.paritytech.polkadotapp.feature_people_api.data.AliasContextProvider
 import io.paritytech.polkadotapp.feature_people_api.data.SetAliasContext
 import io.paritytech.polkadotapp.feature_upgrade_username_api.domain.bot.UsernameUpgradedMessageProcessor
 import io.paritytech.polkadotapp.feature_upgrade_username_api.domain.usecase.CheckUsernameAvailabilityUseCase
 import io.paritytech.polkadotapp.feature_upgrade_username_api.domain.usecase.ReadyToUpgradeUsernameUseCase
-import io.paritytech.polkadotapp.feature_upgrade_username_impl.data.RESOURCES
+import io.paritytech.polkadotapp.feature_upgrade_username_impl.data.ResourcesContextProvider
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.domain.bot.RealUsernameUpgradedMessageProcessor
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.domain.interactor.RealUsernameUpgradeInteractor
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.domain.interactor.UsernameUpgradeInteractor
@@ -37,6 +37,8 @@ interface UpgradeUsernameFeatureModule {
         @Provides
         @ElementsIntoSet
         @SetAliasContext
-        fun provideResourcesContext(): Set<BandersnatchContext> = setOf(BandersnatchContext.RESOURCES)
+        fun provideResourcesContext(resourcesContextProvider: ResourcesContextProvider): Set<AliasContextProvider> {
+            return setOf(AliasContextProvider { resourcesContextProvider.context() })
+        }
     }
 }

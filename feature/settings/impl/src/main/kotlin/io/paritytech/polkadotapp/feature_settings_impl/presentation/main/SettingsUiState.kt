@@ -9,6 +9,7 @@ data class SettingsUiState(
     val debugMenuEnabled: Boolean,
     val linkedDevicesEnabled: Boolean,
     val productSettingsEnabled: Boolean,
+    val isLanguageSettingsAvailable: Boolean,
     val selectedTheme: PolkadotAppTheme,
     val isBackupMissing: Boolean = false,
     val hasBlockedUsers: Boolean = false,

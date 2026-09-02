@@ -8,5 +8,5 @@ interface StatementStoreOrigins {
         period: UInt,
         seq: UInt,
         collection: PeopleCollection,
-    ): TransactionOrigin
+    ): Result<TransactionOrigin>
 }
