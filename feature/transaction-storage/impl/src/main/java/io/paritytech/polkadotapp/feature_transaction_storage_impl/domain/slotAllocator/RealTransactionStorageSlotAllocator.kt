@@ -9,9 +9,9 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
-import io.paritytech.polkadotapp.chains.network.rpc.RpcCalls
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.utils.awaitTrue
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
@@ -39,8 +39,6 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.flattenExecutionFailure
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import java.math.BigInteger
@@ -61,7 +59,6 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val dotNsTldProvider: DotNsTldProvider,
-    private val rpcCalls: RpcCalls,
 ) : TransactionStorageSlotAllocator {
     /**
      * The claim is submitted on the **people** chain, but the resulting allowance is propagated to
@@ -82,9 +79,7 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
                     Timber.i("existing allocation=${ctx.previousCount}; strategy=IGNORE — skipping claim")
                     return@flatMap Result.success(Unit)
                 }
-                pickFreeCounter(ctx.claim.chain.id, ctx.claim.period, ctx.claim.collection)
-                    .mapError { TransactionStorageSlotAllocationError.NoAllocationAvailable(it) }
-                    .flatMap { counter -> submitClaim(ctx.claim, counter, target) }
+                claimFreeSlot(ctx.claim, target)
                     .onSuccess {
                         awaitAllocationVisibleOnBulletIn(target, ctx.previousCount)
                             .logFailure("Failed to awaitAllocationVisibleOnBulletIn")
@@ -96,28 +91,23 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     }
 
     /**
-     * Uses `HopRuntimeApi.can_account_promote` instead of the `Authorizations` storage entry: HOP promotion
-     * requires an unexpired authorization; the remaining extent is not checked. A failed runtime call fails
-     * the result and does not trigger a claim.
+     * Gates on `HopRuntimeApi.can_account_promote`: a failed runtime call fails the result and does not
+     * trigger a claim.
      */
     context(diagnostics: StalenessReportCollector)
     override suspend fun ensurePromotable(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_allocating) {
         Timber.i("ensuring active bullet-in authorization for HOP promotion")
 
         chainConnectionRefCounter.withConnectionEnabled(
-            chainIds = setOf(knownChains.people, knownChains.bulletIn),
+            chainId = knownChains.bulletIn,
             label = CONNECTION_LABEL
         ) {
             canPromote(target).flatMap { promotable ->
                 if (promotable) {
                     Timber.i("active authorization present on bullet-in — skipping claim")
-                    return@flatMap Result.success(Unit)
-                }
-                resolveClaimContext().flatMap { ctx ->
-                    pickFreeCounter(ctx.chain.id, ctx.period, ctx.collection)
-                        .mapError { TransactionStorageSlotAllocationError.NoAllocationAvailable(it) }
-                        .flatMap { counter -> submitClaim(ctx, counter, target) }
-                        .flatMap { awaitPromotableOnBulletIn(target) }
+                    Result.success(Unit)
+                } else {
+                    claimAndAwaitPromotable(target)
                 }
             }
         }
@@ -126,23 +116,37 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     }
 
     context(diagnostics: StalenessReportCollector)
+    private suspend fun claimAndAwaitPromotable(target: AccountId): Result<Unit> {
+        return chainConnectionRefCounter.withConnectionEnabled(
+            chainId = knownChains.people,
+            label = CONNECTION_LABEL
+        ) {
+            resolveClaimContext().flatMap { ctx -> claimFreeSlot(ctx, target) }
+        }.flatMap { awaitPromotableOnBulletIn(target) }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun claimFreeSlot(ctx: ClaimContext, target: AccountId): Result<Unit> {
+        return pickFreeCounter(ctx.chain.id, ctx.period, ctx.collection)
+            .mapError { TransactionStorageSlotAllocationError.NoAllocationAvailable(it) }
+            .flatMap { counter -> submitClaim(ctx, counter, target) }
+    }
+
+    context(diagnostics: StalenessReportCollector)
     private suspend fun canPromote(target: AccountId): Result<Boolean> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
-        transactionStorageRepository.canAccountPromote(knownChains.bulletIn, target, dataLength = 0u)
+        transactionStorageRepository.canAccountPromote(knownChains.bulletIn, target)
             .onSuccess { Timber.i("can_account_promote=$it") }
     }
 
-    /** Evaluates `can_account_promote` once immediately and then on every new bullet-in head. */
     context(diagnostics: StalenessReportCollector)
     private suspend fun awaitPromotableOnBulletIn(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_awaiting_bulletin) {
         runCatching {
             withTimeout(AWAIT_PROMOTABLE_TIMEOUT) {
                 Timber.i("waiting for bullet-in to report the authorization active")
 
-                rpcCalls.subscribeNewHeads(knownChains.bulletIn)
-                    .map { }
-                    .onStart { emit(Unit) }
-                    .map { transactionStorageRepository.canAccountPromote(knownChains.bulletIn, target, dataLength = 0u).getOrThrow() }
-                    .first { it }
+                transactionStorageRepository
+                    .subscribeCanAccountPromote(knownChains.bulletIn, target)
+                    .awaitTrue()
 
                 Timber.i("authorization active on bullet-in")
             }

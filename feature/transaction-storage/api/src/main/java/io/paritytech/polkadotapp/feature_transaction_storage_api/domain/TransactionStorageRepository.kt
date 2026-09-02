@@ -39,9 +39,13 @@ interface TransactionStorageRepository {
     suspend fun authorizationPeriod(chainId: ChainId): Result<BlockNumber>
 
     /**
-     * Calls `HopRuntimeApi.can_account_promote(who, data_len)` on the Bullet-In chain. The HOP node applies
-     * the same check to `hop_submit`. The runtime returns `true` when the account holds an unexpired
-     * `TransactionStorage` authorization; the spent extent and `data_len` are not checked.
+     * Calls `HopRuntimeApi.can_account_promote` on [chainId]. The HOP node applies the same check to
+     * `hop_submit`. Returns `true` when the account holds an unexpired `TransactionStorage` authorization.
      */
-    suspend fun canAccountPromote(chainId: ChainId, accountId: AccountId, dataLength: UInt): Result<Boolean>
+    suspend fun canAccountPromote(chainId: ChainId, accountId: AccountId): Result<Boolean>
+
+    /**
+     * Evaluates [canAccountPromote] once immediately and then on every new [chainId] head.
+     */
+    fun subscribeCanAccountPromote(chainId: ChainId, accountId: AccountId): Flow<Boolean>
 }

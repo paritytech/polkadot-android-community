@@ -29,9 +29,6 @@ data class TransactionStorageExtentExtra(
     val bytesPermanent: BigIntegerSerializable
 )
 
-val TransactionStorageExtent.bytesPermanent: BigInteger
-    get() = extra.bytesPermanent
-
 val TransactionStorageExtent.remainingTransactions: BigInteger
     get() = (transactionsAllowance - transactions).atLeastZero()
 

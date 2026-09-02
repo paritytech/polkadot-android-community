@@ -15,7 +15,7 @@ class HopSigner @Inject constructor(
     private val accountDerivation: AccountDerivationUseCase,
     private val slotAllocator: TransactionStorageSlotAllocator
 ) {
-    suspend fun ensureAllocated() {
+    suspend fun ensurePromotable() {
         val target = deriveKeypair().publicKey.intoAccountId()
 
         with(StalenessReportCollector.NoOp) {
