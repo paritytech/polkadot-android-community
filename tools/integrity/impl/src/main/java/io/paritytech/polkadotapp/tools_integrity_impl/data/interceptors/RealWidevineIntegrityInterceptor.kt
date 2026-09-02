@@ -1,12 +1,12 @@
 package io.paritytech.polkadotapp.tools_integrity_impl.data.interceptors
 
+import androidx.annotation.Keep
+import com.google.gson.Gson
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.kilobytes
 import io.paritytech.polkadotapp.tools_integrity_api.interceptors.CallWithWidevineIntegrity
 import io.paritytech.polkadotapp.tools_integrity_api.interceptors.WidevineIntegrityInterceptor
 import io.paritytech.polkadotapp.tools_integrity_impl.data.integrity.WidevineIntegrityParamsInjector
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
@@ -16,6 +16,7 @@ import javax.inject.Inject
 
 class RealWidevineIntegrityInterceptor @Inject constructor(
     private val paramsInjector: WidevineIntegrityParamsInjector,
+    private val gson: Gson,
 ) : WidevineIntegrityInterceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
@@ -47,7 +48,7 @@ class RealWidevineIntegrityInterceptor @Inject constructor(
         if (code != HTTP_FORBIDDEN) return false
         val errorBody = runCatching { peekBody(MAX_ERROR_BODY_SIZE.inWholeBytes).string() }.getOrNull() ?: return false
         val parsed = runCatching {
-            claimErrorJson.decodeFromString(ClaimErrorResponse.serializer(), errorBody)
+            gson.fromJson(errorBody, ClaimErrorResponse::class.java)
         }.getOrNull()
         return parsed?.error == DEVICE_EVIDENCE_INVALID
     }
@@ -56,14 +57,10 @@ class RealWidevineIntegrityInterceptor @Inject constructor(
         const val HTTP_FORBIDDEN = 403
         const val DEVICE_EVIDENCE_INVALID = "DEVICE_EVIDENCE_INVALID"
         val MAX_ERROR_BODY_SIZE = 64.kilobytes
-
-        val claimErrorJson = Json {
-            ignoreUnknownKeys = true
-        }
     }
 }
 
-@Serializable
+@Keep
 private class ClaimErrorResponse(
     val error: String?,
 )

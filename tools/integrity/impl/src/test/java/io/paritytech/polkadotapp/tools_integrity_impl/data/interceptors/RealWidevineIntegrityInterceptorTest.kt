@@ -1,5 +1,10 @@
 package io.paritytech.polkadotapp.tools_integrity_impl.data.interceptors
 
+import com.google.gson.Gson
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.google.gson.JsonPrimitive
 import io.paritytech.polkadotapp.common.utils.toByteArray
 import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidence
 import io.paritytech.polkadotapp.tools_integrity_api.claim.ClaimDeviceEvidenceProvider
@@ -7,11 +12,6 @@ import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
 import io.paritytech.polkadotapp.tools_integrity_api.interceptors.CallWithWidevineIntegrity
 import io.paritytech.polkadotapp.tools_integrity_impl.data.integrity.WidevineIntegrityParamsInjector
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
@@ -48,12 +48,14 @@ class RealWidevineIntegrityInterceptorTest {
         val sentRequest = chain.requests.single()
         val sentBody = sentRequest.jsonBody()
         assertEquals(JsonPrimitive("alice.07"), sentBody["username"])
-        assertEquals(JsonNull, sentBody["preferredDigits"])
-        assertEquals(JsonPrimitive("sig"), (sentBody["dotns"] as JsonObject)["signature"])
+        assertEquals(JsonPrimitive("sig"), sentBody["dotns"].asJsonObject["signature"])
         assertEquals(JsonPrimitive("challenge"), sentBody["deviceChallenge"])
         assertEquals(JsonPrimitive("device-id"), sentBody["deviceId"])
         assertEquals(
-            JsonArray(listOf(JsonPrimitive("leaf"), JsonPrimitive("root"))),
+            JsonArray().apply {
+                add("leaf")
+                add("root")
+            },
             sentBody["attestationChain"],
         )
         assertEquals(JSON_MEDIA_TYPE, sentRequest.body?.contentType())
@@ -137,7 +139,7 @@ class RealWidevineIntegrityInterceptorTest {
 
         assertEquals(3, chain.requests.size)
         assertSame(originalRequest, chain.requests[2])
-        assertFalse(chain.requests[2].jsonBody().containsKey("deviceId"))
+        assertFalse(chain.requests[2].jsonBody().has("deviceId"))
         assertEquals(2, provider.calls)
         assertTrue(chain.responses[0].trackingBody().closed)
         assertTrue(chain.responses[1].trackingBody().closed)
@@ -244,11 +246,11 @@ class RealWidevineIntegrityInterceptorTest {
     }
 
     private fun createInterceptor(provider: ClaimDeviceEvidenceProvider): RealWidevineIntegrityInterceptor {
-        return RealWidevineIntegrityInterceptor(WidevineIntegrityParamsInjector(provider))
+        return RealWidevineIntegrityInterceptor(WidevineIntegrityParamsInjector(provider, gson), gson)
     }
 
     private fun buildRequest(annotated: Boolean): Request {
-        val body = """{"username":"alice.07","preferredDigits":null,"dotns":{"signature":"sig"}}"""
+        val body = """{"username":"alice.07","dotns":{"signature":"sig"}}"""
         val builder = Request.Builder()
             .url("https://example.com/api/v1/usernames")
             .post(body.toRequestBody(JSON_MEDIA_TYPE))
@@ -261,7 +263,7 @@ class RealWidevineIntegrityInterceptorTest {
 
     private fun Request.jsonBody(): JsonObject {
         val body = requireNotNull(body).toByteArray().toString(Charsets.UTF_8)
-        return json.decodeFromString(JsonObject.serializer(), body)
+        return JsonParser.parseString(body).asJsonObject
     }
 
     private interface AnnotatedApi {
@@ -272,9 +274,7 @@ class RealWidevineIntegrityInterceptorTest {
     private companion object {
         const val INVALID_EVIDENCE_BODY =
             """{"error":"DEVICE_EVIDENCE_INVALID","message":"stale evidence"}"""
-        val json = Json {
-            ignoreUnknownKeys = true
-        }
+        val gson = Gson()
         val initialEvidence = ClaimDeviceEvidence(
             attestationChain = listOf("leaf", "root"),
             deviceChallenge = "challenge",
