@@ -7,9 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.common.utils.FeatureOption
-import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.common.utils.isEnabled
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
@@ -70,6 +68,8 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.Produc
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealProductPermissionRepository
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealProductPermissionRequester
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealWhitelistedProductsProvider
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.WhitelistedProductsProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.AccountAccessPermissionHandler
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.BalanceAccessPermissionHandler
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.DeviceCapabilityPermissionHandler
@@ -252,6 +252,9 @@ internal interface ProductsModule {
     fun bindFundingDomainProvider(impl: RemoteConfigFundingDomainProvider): FundingDomainProvider
 
     @Binds
+    fun bindWhitelistedProductsProvider(impl: RealWhitelistedProductsProvider): WhitelistedProductsProvider
+
+    @Binds
     fun bindDeriveEntropyUseCase(impl: RealDeriveEntropyUseCase): DeriveEntropyUseCase
 
     @Binds
@@ -262,9 +265,9 @@ internal interface ProductsModule {
         @Singleton
         fun providePermissionRequester(
             real: RealProductPermissionRequester,
-            fundingDomainProvider: FundingDomainProvider,
+            whitelistedProductsProvider: WhitelistedProductsProvider,
         ): ProductPermissionRequester {
-            return AutoAllowProductPermissionRequester(autoAllowedLabels(fundingDomainProvider), real)
+            return AutoAllowProductPermissionRequester(whitelistedProductsProvider, real)
         }
 
         @Provides
@@ -278,18 +281,6 @@ internal interface ProductsModule {
                 productRepository = productRepository,
                 productsRouter = productsRouter,
             )
-        }
-
-        private fun autoAllowedLabels(fundingDomainProvider: FundingDomainProvider): suspend () -> Set<String> {
-            return if (FeatureOption.PRODUCT_SETTINGS.isDisabled) {
-                {
-                    fundingDomainProvider.getFundingDomain()
-                        .logFailure("Failed to resolve the funding domain to auto-allow")
-                        .fold({ setOf(it) }, { emptySet() })
-                }
-            } else {
-                { emptySet() }
-            }
         }
     }
 }
