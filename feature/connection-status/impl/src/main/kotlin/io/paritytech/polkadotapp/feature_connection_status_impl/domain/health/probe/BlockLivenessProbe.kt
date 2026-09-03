@@ -31,6 +31,7 @@ class BlockLivenessProbe @Inject constructor(
     override fun observe(context: ChainMetricContext): Flow<ChainMetricReading> = flow {
         val window = BlockLatencyWindow(ChainHealthThresholds.LATENCY_WINDOW_SIZE)
         val blockTimeMillis = context.expectedBlockTime.inWholeMilliseconds
+        val target = context.expectedBlockTime * ChainHealthThresholds.LIVENESS_PLATEAU_MULTIPLIER
         val connectAnchor = now()
 
         val blocks = context.bestBlockNumber.distinctUntilChanged().map { Event.Block }
@@ -47,6 +48,7 @@ class BlockLivenessProbe @Inject constructor(
 
                 ChainMetricReading.BlockLatency(
                     latency = representativeLatency.milliseconds,
+                    target = target,
                     score = livenessScorer.score(blockTimeMillis, averageLatency, elapsedSinceLastBlock),
                 )
             }.distinctUntilChanged()

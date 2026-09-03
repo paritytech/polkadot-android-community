@@ -13,11 +13,13 @@ sealed interface ChainMetricReading {
 
     data class BlockLatency(
         val latency: Duration,
+        val target: Duration,
         override val score: ChainHealthScore,
     ) : ChainMetricReading
 
     data class FinalityGap(
         val gapBlocks: Int,
+        val targetBlocks: Int,
         override val score: ChainHealthScore,
     ) : ChainMetricReading
 }

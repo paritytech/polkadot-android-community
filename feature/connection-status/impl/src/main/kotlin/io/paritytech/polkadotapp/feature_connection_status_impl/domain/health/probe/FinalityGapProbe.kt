@@ -29,6 +29,7 @@ class FinalityGapProbe @Inject constructor(
 
             ChainMetricReading.FinalityGap(
                 gapBlocks = gap,
+                targetBlocks = idealGap,
                 score = finalityGapScorer.score(gap, idealGap, outageGap),
             )
         }.distinctUntilChanged()

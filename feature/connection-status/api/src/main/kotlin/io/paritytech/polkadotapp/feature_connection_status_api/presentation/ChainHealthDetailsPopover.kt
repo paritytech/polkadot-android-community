@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -27,6 +28,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
+import kotlin.time.Duration
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private val POPUP_MARGIN = 12.dp
@@ -89,6 +91,7 @@ private fun ReadingRow(reading: ChainMetricReading) {
             .fillMaxWidth()
             .padding(vertical = PolkadotTheme.spacings.extraTiny),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         NovaText(
             text = stringResource(reading.labelRes()),
@@ -96,11 +99,18 @@ private fun ReadingRow(reading: ChainMetricReading) {
             color = PolkadotTheme.colors.fg.secondary,
         )
         HorizontalSpacer { medium }
-        NovaText(
-            text = reading.formattedValue(),
-            style = PolkadotTheme.typography.body.small,
-            color = PolkadotTheme.colors.fg.primary,
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            NovaText(
+                text = reading.actualValue(),
+                style = PolkadotTheme.typography.body.small,
+                color = PolkadotTheme.colors.fg.primary,
+            )
+            NovaText(
+                text = stringResource(RCommon.string.chain_health_target, reading.targetValue()),
+                style = PolkadotTheme.typography.caption.medium,
+                color = PolkadotTheme.colors.fg.tertiary,
+            )
+        }
     }
 }
 
@@ -119,12 +129,20 @@ private fun ChainMetricReading.labelRes(): Int = when (this) {
 }
 
 @Composable
-private fun ChainMetricReading.formattedValue(): String = when (this) {
-    is ChainMetricReading.BlockLatency ->
-        "%.1fs".format(latency.inWholeMilliseconds / MILLIS_PER_SECOND)
+private fun ChainMetricReading.actualValue(): String = when (this) {
+    is ChainMetricReading.BlockLatency -> latency.formatSeconds()
     is ChainMetricReading.FinalityGap ->
         pluralStringResource(RCommon.plurals.chain_health_blocks, gapBlocks, gapBlocks)
 }
+
+@Composable
+private fun ChainMetricReading.targetValue(): String = when (this) {
+    is ChainMetricReading.BlockLatency -> target.formatSeconds()
+    is ChainMetricReading.FinalityGap ->
+        pluralStringResource(RCommon.plurals.chain_health_blocks, targetBlocks, targetBlocks)
+}
+
+private fun Duration.formatSeconds(): String = "%.1fs".format(inWholeMilliseconds / MILLIS_PER_SECOND)
 
 /**
  * Positions the popup just below the tapped anchor. The anchor already sits below the system status
