@@ -6,6 +6,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatFaqInteractor
+import io.paritytech.polkadotapp.feature_chats_api.presentation.ChatStarter
+import io.paritytech.polkadotapp.feature_chats_impl.RealChatStarter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatSearch.ChatSearchInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatSearch.RealChatSearchInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.AddContactInteractor
@@ -39,4 +41,7 @@ interface ChatsFeatureModule {
     @Binds
     @IntoSet
     fun bindContactAddressScanContentParser(impl: ContactAddressScanContentParser): ScanContentParser
+
+    @Binds
+    fun bindChatStarter(real: RealChatStarter): ChatStarter
 }

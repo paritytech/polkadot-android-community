@@ -6,15 +6,21 @@ import io.paritytech.polkadotapp.common.presentation.clipboard.ClipboardService
 import io.paritytech.polkadotapp.common.presentation.loading.mapLoading
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.flowOf
+import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.mapList
+import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.mapValuesNotNull
+import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.design.components.avatar.AvatarUiModel
 import io.paritytech.polkadotapp.design.configs.colors.AvatarColorScheme
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.converter.ParseAddressConverterFactory
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.mixin.AddressInputMixin
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.toParcel
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasEstablishedChat
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasPendingChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.GetContactsUseCase
+import io.paritytech.polkadotapp.feature_chats_api.presentation.ChatStarter
 import io.paritytech.polkadotapp.feature_transfers_api.presentation.PreviousPaymentsAddressConverterFactory
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.ParseAddressUsernameConverterFactory
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.UsernameAddressConverterFactory
@@ -30,7 +36,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -42,6 +50,7 @@ class SendPaymentViewModel @Inject constructor(
     private val walletRouter: PocketRouter,
     private val clipboardService: ClipboardService,
     private val getContactsUseCase: GetContactsUseCase,
+    private val chatStarter: ChatStarter,
     addressInputMixinFactory: AddressInputMixin.Factory,
     usernameAddressConverterFactory: UsernameAddressConverterFactory,
     parseAddressConverterFactory: ParseAddressConverterFactory,
@@ -49,9 +58,9 @@ class SendPaymentViewModel @Inject constructor(
     previousPaymentsAddressConverterFactory: PreviousPaymentsAddressConverterFactory,
     interactor: SendPaymentInteractor,
 ) : BaseViewModel(), SendPaymentContract {
+
     private val contacts = flowOf { getContactsUseCase() }
-        .mapList { it.accountId }
-        .stateIn(this, SharingStarted.Eagerly, listOf())
+        .shareInBackground()
 
     private val addressInputMixin = addressInputMixinFactory.create(
         coroutineScope = viewModelScope,
@@ -68,14 +77,11 @@ class SendPaymentViewModel @Inject constructor(
 
     private val addressCandidates = addressInputMixin.addressCandidates
         .mapLoading { result ->
-            val contacts = contacts.value
-
             buildList {
                 result.forEach {
                     addAll(it.value)
                 }
             }
-                .filter { contacts.contains(it.accountId) }
                 .groupBy { it.accountId }
                 .mapValuesNotNull { (_, group) ->
                     group
@@ -131,14 +137,22 @@ class SendPaymentViewModel @Inject constructor(
         input.update { value.filterAvailableUsernameSymbols() }
     }
 
-    override fun onRecipientSelect(recipient: PaymentSearchResultUiModel) {
-        walletRouter.openSendEnterAmount(
-            SendEnterAmountPayload(
-                showTransactionResult = true,
-                transferMethod = TransferMethodPayload.CoinsViaChat(recipient.extractedAddress.toParcel()),
-                amountPreset = null,
+    override fun onRecipientSelect(recipient: PaymentSearchResultUiModel) = launchUnit {
+        val accountId = recipient.extractedAddress.accountId
+        val contact = contacts.first().find { it.accountId == accountId }
+
+        if (contact != null && contact.hasEstablishedChat()) {
+            walletRouter.openSendEnterAmount(
+                SendEnterAmountPayload(
+                    showTransactionResult = true,
+                    transferMethod = TransferMethodPayload.CoinsViaChat(recipient.extractedAddress.toParcel()),
+                    amountPreset = null,
+                )
             )
-        )
+        } else {
+            chatStarter.openChatWith(accountId)
+                .onFailure(::showError)
+        }
     }
 
     override fun onPasteClick() {
