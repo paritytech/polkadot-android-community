@@ -62,7 +62,7 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val dotNsTldProvider: DotNsTldProvider,
 ) : TransactionStorageSlotAllocator {
-    private val promotionMutex = Mutex()
+    private val claimMutex = Mutex()
 
     /**
      * The claim is submitted on the **people** chain, but the resulting allowance is propagated to
@@ -99,29 +99,29 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
      * trigger a claim.
      */
     context(diagnostics: StalenessReportCollector)
-    override suspend fun ensurePromotable(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_allocating) {
-        Timber.i("ensuring active bullet-in authorization for HOP promotion")
+    override suspend fun ensureCanSubmit(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_allocating) {
+        Timber.i("ensuring active Bulletin authorization for HOP")
 
         chainConnectionRefCounter.withConnectionEnabled(
             chainId = knownChains.bulletIn,
             label = CONNECTION_LABEL
         ) {
-            canPromote(target).flatMap { promotable ->
-                if (promotable) {
-                    Timber.i("active authorization present on bullet-in — skipping claim")
+            canSubmit(target).flatMap { submittable ->
+                if (submittable) {
+                    Timber.i("active authorization present on Bulletin — skipping claim")
                     Result.success(Unit)
                 } else {
                     // Serialize the claim so concurrent uploads don't each claim a slot; re-check under
                     // the lock in case a prior in-flight claim already produced the authorization.
-                    promotionMutex.withLock {
-                        canPromote(target).flatMap { promotableNow ->
-                            if (promotableNow) {
+                    claimMutex.withLock {
+                        canSubmit(target).flatMap { submittableNow ->
+                            if (submittableNow) {
                                 Timber.i("authorization appeared while awaiting claim lock — skipping claim")
                                 Result.success(Unit)
                             } else {
                                 runCatching {
                                     withTimeout(CLAIM_TOTAL_TIMEOUT) {
-                                        claimAndAwaitPromotable(target).getOrThrow()
+                                        claimAndAwaitSubmittable(target).getOrThrow()
                                     }
                                 }
                             }
@@ -130,18 +130,18 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
                 }
             }
         }
-            .onFailure { Timber.e(it, "ensurePromotable failed") }
+            .onFailure { Timber.e(it, "ensureCanSubmit failed") }
             .mapErrorNotInstance<_, TransactionStorageSlotAllocationError> { TransactionStorageSlotAllocationError.Unknown(it) }
     }
 
     context(diagnostics: StalenessReportCollector)
-    private suspend fun claimAndAwaitPromotable(target: AccountId): Result<Unit> {
+    private suspend fun claimAndAwaitSubmittable(target: AccountId): Result<Unit> {
         return chainConnectionRefCounter.withConnectionEnabled(
             chainId = knownChains.people,
             label = CONNECTION_LABEL
         ) {
             resolveClaimContext().flatMap { ctx -> claimFreeSlot(ctx, target) }
-        }.flatMap { awaitPromotableOnBulletIn(target) }
+        }.flatMap { awaitSubmittableOnBulletIn(target) }
     }
 
     context(diagnostics: StalenessReportCollector)
@@ -152,22 +152,22 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     }
 
     context(diagnostics: StalenessReportCollector)
-    private suspend fun canPromote(target: AccountId): Result<Boolean> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
+    private suspend fun canSubmit(target: AccountId): Result<Boolean> = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
         transactionStorageRepository.canAccountPromote(knownChains.bulletIn, target)
             .onSuccess { Timber.i("can_account_promote=$it") }
     }
 
     context(diagnostics: StalenessReportCollector)
-    private suspend fun awaitPromotableOnBulletIn(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_awaiting_bulletin) {
+    private suspend fun awaitSubmittableOnBulletIn(target: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.transaction_storage_stall_awaiting_bulletin) {
         runCatching {
-            withTimeout(AWAIT_PROMOTABLE_TIMEOUT) {
-                Timber.i("waiting for bullet-in to report the authorization active")
+            withTimeout(AWAIT_SUBMITTABLE_TIMEOUT) {
+                Timber.i("waiting for Bulletin to report the authorization active")
 
                 transactionStorageRepository
                     .subscribeCanAccountPromote(knownChains.bulletIn, target)
                     .awaitTrue()
 
-                Timber.i("authorization active on bullet-in")
+                Timber.i("authorization active on Bulletin")
             }
         }
     }
@@ -268,10 +268,10 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
 
     companion object {
         val AWAIT_BULLETIN_TIMEOUT = 30.seconds
-        val AWAIT_PROMOTABLE_TIMEOUT = 60.seconds
+        val AWAIT_SUBMITTABLE_TIMEOUT = 60.seconds
 
         // Overall bound for one serialized check-and-claim, so a stalled claim can never hold the
-        // promotion lock (and block every other upload) forever.
+        // claim lock (and block every other upload) forever.
         val CLAIM_TOTAL_TIMEOUT = 120.seconds
         private const val CONNECTION_LABEL = "TransactionStorageSlotAllocator"
     }

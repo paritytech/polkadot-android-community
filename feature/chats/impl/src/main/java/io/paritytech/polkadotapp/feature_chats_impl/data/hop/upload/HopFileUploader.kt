@@ -34,7 +34,7 @@ class HopFileUploader @Inject constructor(
     private val preProcessors: Set<@JvmSuppressWildcards FileUploadPreProcessor>
 ) {
     suspend fun upload(upload: FileUpload) {
-        hopSigner.ensurePromotable()
+        hopSigner.ensureCanSubmit()
 
         hopService.withSession(upload.nodeUrl) {
             val raw = attachmentFileStorage.readFileBytes(upload.meta.uri)

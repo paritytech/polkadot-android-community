@@ -12,12 +12,12 @@ interface TransactionStorageSlotAllocator {
     suspend fun allocate(target: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit>
 
     /**
-     * Ensures [target] holds an unexpired Bullet-In authorization, the condition HOP promotion requires.
+     * Ensures [target] holds an unexpired Bulletin authorization, the condition HOP requires.
      * Calls `HopRuntimeApi.can_account_promote`; when it returns `false`, submits `claim_long_term_storage`
      * and waits until the runtime returns `true`.
      */
     context(diagnostics: StalenessReportCollector)
-    suspend fun ensurePromotable(target: AccountId): Result<Unit>
+    suspend fun ensureCanSubmit(target: AccountId): Result<Unit>
 }
 
 sealed class TransactionStorageSlotAllocationError(cause: Throwable?) : Throwable(cause) {
