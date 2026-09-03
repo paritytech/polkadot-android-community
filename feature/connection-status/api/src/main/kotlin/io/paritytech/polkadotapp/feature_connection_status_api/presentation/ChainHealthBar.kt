@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -21,14 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.progress.NovaCircularProgressIndicator
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
-import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealthScore
@@ -46,41 +45,40 @@ private const val TIER_HIGH = 90
 private const val TIER_GOOD = 70
 private const val TIER_FAIR = 40
 
+object ChainHealthBarDefaults {
+    /**
+     * Height of the bar's content row, excluding the status-bar inset. The root also inflates the
+     * content's top window inset by this amount so screens sit below the bar while their backgrounds
+     * still draw full-bleed behind it.
+     */
+    val ContentHeight = 36.dp
+}
+
 /**
- * The always-on chain-health bar shown directly under the system status bar. One icon per monitored
- * chain: the inner glyph reflects connection, the ring reflects the health score. Renders nothing
- * when there are no chains to show.
+ * The always-on chain-health bar, overlaid at the very top like the system status indicators: one
+ * icon per monitored chain, the inner glyph reflecting connection and the ring the health score.
+ * Transparent, so whatever the screen draws behind it (including custom backgrounds) stays visible.
  */
 @Composable
 fun ChainHealthBar(
     modifier: Modifier = Modifier,
     model: ChainHealthBarModel,
 ) {
-    // Always rendered (even with no chains yet) so it consistently reserves the status-bar region
-    // that the content below has been told not to pad for.
-    PolkadotSurface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RectangleShape,
-        color = PolkadotTheme.colors.bg.surface.main,
-    ) {
-        // Clickable icons otherwise inflate the row to the 48dp minimum touch target; the bar is
-        // deliberately tighter than that.
-        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
-            Row(
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = PolkadotTheme.spacings.medium,
-                        vertical = PolkadotTheme.spacings.extraTiny,
-                    ),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                model.chains.forEachIndexed { index, item ->
-                    if (index > 0) HorizontalSpacer { small }
-                    ChainHealthIcon(item = item)
-                }
+    // Clickable icons otherwise inflate the row to the 48dp minimum touch target; the bar is
+    // deliberately tighter than that.
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(ChainHealthBarDefaults.ContentHeight)
+                .padding(horizontal = PolkadotTheme.spacings.medium),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            model.chains.forEachIndexed { index, item ->
+                if (index > 0) HorizontalSpacer { small }
+                ChainHealthIcon(item = item)
             }
         }
     }

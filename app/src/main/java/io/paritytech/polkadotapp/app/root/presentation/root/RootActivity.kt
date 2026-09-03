@@ -16,7 +16,6 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isVisible
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
@@ -37,7 +36,9 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseScreenDelegate
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBarDefaults
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class RootActivity : AppCompatActivity(R.layout.activity_root) {
@@ -149,8 +150,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
     }
 
     private fun setupChainHealthBar() {
-        // The bar lives in the in-flow slot above the nav host (activity_root.xml), so it reserves
-        // height and pushes screen content down rather than overlaying it.
+        // Overlaid on top like a system indicator (activity_root.xml FrameLayout).
         findViewById<ComposeView>(R.id.connectionStatusBanner).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
@@ -159,26 +159,28 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
                     ChainHealthBar(model = model)
                 }
             }
-            isVisible = true
         }
 
-        // The bar already fills the status-bar region, so screens below must not pad for it again.
+        // Push screen content below the bar by inflating its top inset; backgrounds still draw
+        // full-bleed behind it.
         val navHost = findViewById<View>(R.id.rootNavHost)
+        val barHeightPx = (ChainHealthBarDefaults.ContentHeight.value * resources.displayMetrics.density).roundToInt()
         ViewCompat.setOnApplyWindowInsetsListener(navHost) { _, insets ->
-            insets.consumeTopInsets()
+            insets.inflateTopInsets(barHeightPx)
         }
     }
 
-    private fun WindowInsetsCompat.consumeTopInsets(): WindowInsetsCompat {
+    private fun WindowInsetsCompat.inflateTopInsets(extraTopPx: Int): WindowInsetsCompat {
         val systemBars = getInsets(WindowInsetsCompat.Type.systemBars())
+        val statusBars = getInsets(WindowInsetsCompat.Type.statusBars())
         return WindowInsetsCompat.Builder(this)
             .setInsets(
                 WindowInsetsCompat.Type.systemBars(),
-                Insets.of(systemBars.left, 0, systemBars.right, systemBars.bottom),
+                Insets.of(systemBars.left, systemBars.top + extraTopPx, systemBars.right, systemBars.bottom),
             )
             .setInsets(
                 WindowInsetsCompat.Type.statusBars(),
-                Insets.of(0, 0, 0, 0),
+                Insets.of(statusBars.left, statusBars.top + extraTopPx, statusBars.right, statusBars.bottom),
             )
             .build()
     }
