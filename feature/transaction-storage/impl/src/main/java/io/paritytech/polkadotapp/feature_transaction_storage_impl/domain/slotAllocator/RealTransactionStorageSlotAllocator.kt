@@ -39,6 +39,8 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.flattenExecutionFailure
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import java.math.BigInteger
@@ -60,6 +62,8 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val dotNsTldProvider: DotNsTldProvider,
 ) : TransactionStorageSlotAllocator {
+    private val promotionMutex = Mutex()
+
     /**
      * The claim is submitted on the **people** chain, but the resulting allowance is propagated to
      * the **bullet-in** chain automatically — there is no separate allocate step on bullet-in.
@@ -107,7 +111,22 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
                     Timber.i("active authorization present on bullet-in — skipping claim")
                     Result.success(Unit)
                 } else {
-                    claimAndAwaitPromotable(target)
+                    // Serialize the claim so concurrent uploads don't each claim a slot; re-check under
+                    // the lock in case a prior in-flight claim already produced the authorization.
+                    promotionMutex.withLock {
+                        canPromote(target).flatMap { promotableNow ->
+                            if (promotableNow) {
+                                Timber.i("authorization appeared while awaiting claim lock — skipping claim")
+                                Result.success(Unit)
+                            } else {
+                                runCatching {
+                                    withTimeout(CLAIM_TOTAL_TIMEOUT) {
+                                        claimAndAwaitPromotable(target).getOrThrow()
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -250,6 +269,10 @@ class RealTransactionStorageSlotAllocator @Inject constructor(
     companion object {
         val AWAIT_BULLETIN_TIMEOUT = 30.seconds
         val AWAIT_PROMOTABLE_TIMEOUT = 60.seconds
+
+        // Overall bound for one serialized check-and-claim, so a stalled claim can never hold the
+        // promotion lock (and block every other upload) forever.
+        val CLAIM_TOTAL_TIMEOUT = 120.seconds
         private const val CONNECTION_LABEL = "TransactionStorageSlotAllocator"
     }
 }
