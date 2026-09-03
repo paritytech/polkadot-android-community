@@ -10,8 +10,7 @@ import javax.inject.Inject
 class RealChatStarter @Inject constructor(
     private val startChatDataUseCase: StartChatDataUseCase,
     private val chatsRouter: ChatsRouter
-): ChatStarter {
-
+) : ChatStarter {
     override suspend fun openChatWith(accountId: AccountId): Result<Unit> {
         return startChatDataUseCase.invoke(accountId)
             .map { it.toChatFeedPayload() }

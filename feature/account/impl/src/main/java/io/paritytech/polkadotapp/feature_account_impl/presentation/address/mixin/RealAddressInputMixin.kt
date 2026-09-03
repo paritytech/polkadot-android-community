@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_account_impl.presentation.address.mixin
 
-import io.paritytech.polkadotapp.common.presentation.search.withSearching
 import io.paritytech.polkadotapp.common.presentation.ui.mixin.paste.PasteMixin
 import io.paritytech.polkadotapp.common.utils.debounceIndexed
 import io.paritytech.polkadotapp.common.utils.shareInBackground

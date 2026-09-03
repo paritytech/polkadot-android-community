@@ -7,8 +7,6 @@ import io.paritytech.polkadotapp.common.presentation.loading.mapLoading
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.launchUnit
-import io.paritytech.polkadotapp.common.utils.mapList
-import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.mapValuesNotNull
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.design.components.avatar.AvatarUiModel
@@ -18,7 +16,6 @@ import io.paritytech.polkadotapp.feature_account_api.presentation.address.mixin.
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.toParcel
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasEstablishedChat
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasPendingChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.GetContactsUseCase
 import io.paritytech.polkadotapp.feature_chats_api.presentation.ChatStarter
 import io.paritytech.polkadotapp.feature_transfers_api.presentation.PreviousPaymentsAddressConverterFactory
@@ -58,7 +55,6 @@ class SendPaymentViewModel @Inject constructor(
     previousPaymentsAddressConverterFactory: PreviousPaymentsAddressConverterFactory,
     interactor: SendPaymentInteractor,
 ) : BaseViewModel(), SendPaymentContract {
-
     private val contacts = flowOf { getContactsUseCase() }
         .shareInBackground()
 
