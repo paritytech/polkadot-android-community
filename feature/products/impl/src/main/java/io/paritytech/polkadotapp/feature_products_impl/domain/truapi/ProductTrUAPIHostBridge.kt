@@ -46,11 +46,14 @@ import uniffi.truapi.RemotePermission
 import uniffi.truapi.ThemeName
 import uniffi.truapi_platform.AuthState
 import uniffi.truapi_platform.HostChainSet
+import uniffi.truapi_platform.PermissionAuthorizationRequest
+import uniffi.truapi_platform.PermissionAuthorizationStatus
 import uniffi.truapi_platform.UserConfirmationReview
 import uniffi.truapi_server.HostNavigateRejection
 import uniffi.truapi_server.HostRejection
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Instant
+import uniffi.truapi.RemotePermissionRequest as NativeRemotePermissionRequest
 import uniffi.truapi.ThemeVariant as NativeThemeVariant
 
 private val EMPTY_CHAINS = TrUAPIChains(
@@ -247,29 +250,44 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
         }
         val callingProductId = ProductId.fromStoredValue(config.productId)
         cachedChains.set(chains)
-        // A config carrying localSessionSecret derives the session keypairs
-        // inside the constructor, so it cannot run on the main thread. The
-        // callback below still resolves back to the caller's context, which is
-        // where the bootstrap has to be registered on the WebView.
-        val startedCore = withContext(Dispatchers.Default) {
-            TrUAPIHostCore(buildBridge(callingProductId, navigationPolicy), config)
-        }
-        chainProvider.attach(
-            onResponse = startedCore::notifyChainResponse,
-            onClosed = startedCore::notifyChainClosed,
-        )
-        val endpoint = startedCore.startWsBridge()
-        core = startedCore
-        observeAppTheme()
-        observeAppLifecycle()
-        val bootstrap = LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token)
-        // The core is live by now, so a failure here would strand the loopback
-        // bridge with its token while `core != null` blocks any re-attach.
-        runCatching { onReadyToInject(bootstrap) }
-            .onFailure {
-                stop()
-                throw it
+        try {
+            // A config carrying localSessionSecret derives the session keypairs
+            // inside the constructor, and the WebRTC read below is a synchronous
+            // FFI call into encrypted storage, so neither may run on the main
+            // thread. The callback below still resolves back to the caller's
+            // context, which is where the bootstrap has to be registered on the
+            // WebView. `core` is set inside the block so a cancellation landing
+            // on the way out of withContext still reaches the teardown below.
+            val (startedCore, webRtcAllowed) = withContext(Dispatchers.Default) {
+                val booted = TrUAPIHostCore(buildBridge(callingProductId, navigationPolicy), config)
+                core = booted
+                // A peek at the core-persisted WebRTC decision, never a prompt:
+                // the bootstrap bakes the policy into the page, so a fresh grant
+                // only takes effect on reload. A storage failure reads as not
+                // granted.
+                val allowed = runCatching {
+                    booted.permissionAuthorizationStatus(
+                        PermissionAuthorizationRequest.Remote(NativeRemotePermissionRequest(RemotePermission.WebRtc)),
+                    ) == PermissionAuthorizationStatus.AUTHORIZED
+                }.logFailure("truapi: could not read the WebRTC authorization").getOrDefault(false)
+                booted to allowed
             }
+            chainProvider.attach(
+                onResponse = startedCore::notifyChainResponse,
+                onClosed = startedCore::notifyChainClosed,
+            )
+            val endpoint = startedCore.startWsBridge()
+            observeAppTheme()
+            observeAppLifecycle()
+            val bootstrap = LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token, webRtcAllowed)
+            onReadyToInject(bootstrap)
+        } catch (failure: Throwable) {
+            // Anything failing past construction would otherwise strand a live
+            // native core — and, late enough, the loopback bridge with its
+            // token — while `core != null` blocks any re-attach.
+            runCatching { stop() }.logFailure("truapi: teardown after a failed attach")
+            throw failure
+        }
     }
 
     private fun observeAppLifecycle() {

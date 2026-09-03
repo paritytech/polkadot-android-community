@@ -26,6 +26,7 @@ import uniffi.truapi_platform.AccountAccessReview
 import uniffi.truapi_platform.CreateTransactionReview
 import uniffi.truapi_platform.IdentityDisclosureReview
 import uniffi.truapi_platform.PreimageSubmitReview
+import uniffi.truapi_platform.ProductSubtreeReview
 import uniffi.truapi_platform.ResourceAllocationReview
 import uniffi.truapi_platform.SignPayloadReview
 import uniffi.truapi_platform.SignRawReview
@@ -289,6 +290,13 @@ class ConfirmationReviewMappingTest {
         val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.ResourceAllocation
 
         assertEquals(2, confirmation.resources.size)
+    }
+
+    @Test
+    fun `product subtree is refused while the app cannot pair with an account holder`() {
+        val review = UserConfirmationReview.ProductSubtree(ProductSubtreeReview(productId = "owner.dot"))
+
+        assertThrows(UnsupportedReviewException::class.java) { review.toConfirmation(caller) }
     }
 
     private fun UserConfirmationReview.signingRequest(): SigningRequestBody =

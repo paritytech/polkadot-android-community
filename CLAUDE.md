@@ -4,7 +4,7 @@ This file is intentionally **thin**. Detailed architecture and code rules are in
 
 ## Build prerequisites
 
-The build **fails at configuration time** until the TrUAPI Rust core checkout resolves, because `:feature:products:impl` depends on `:bindings:truapi-host` in every variant. Run `scripts/setup-truapi.py` once: it clones `paritytech/host-rust-core` at the `truapi_ref` pin from `.github/actions/install/action.yaml` and writes `truapi.dir` to `local.properties`. Re-run it after the pin moves.
+The prebuilt TrUAPI Rust core (`io.parity:truapi-host-android`) comes from the GitHub Packages repo of `paritytech/host-rust-core`, which rejects anonymous downloads even for public artifacts. Set a GitHub token with `read:packages` once, as `gpr.user` / `gpr.key` in `~/.gradle/gradle.properties` (or export `GITHUB_ACTOR` / `GITHUB_TOKEN`), or dependency resolution fails before anything compiles. The version is pinned as `truapiHostAndroid` in `gradle/libs.versions.toml`.
 
 `FIRESTORE_DATABASE_ID` must also be in `local.properties`, or configuration fails before anything compiles. It is a CI secret, so ask for the value.
 

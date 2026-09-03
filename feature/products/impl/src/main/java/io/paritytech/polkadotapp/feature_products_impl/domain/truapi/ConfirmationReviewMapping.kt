@@ -84,6 +84,13 @@ fun UserConfirmationReview.toConfirmation(callingProductId: String): TrUAPIConfi
             requesterProductId = v1.requestingProductId,
             targetProductId = v1.targetProductId,
         )
+
+    // Raised only by an SSO pairing session, which the app cannot create yet
+    // (truapi#334); local-entropy sessions never resolve through an Account
+    // Holder. Refused deliberately rather than left unmapped, so wiring
+    // pairing later finds a decision, not a crash.
+    is UserConfirmationReview.ProductSubtree ->
+        throw UnsupportedReviewException("ProductSubtree needs an SSO pairing session (truapi#334)")
 }
 
 @OptIn(ExperimentalStdlibApi::class)

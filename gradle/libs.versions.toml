@@ -68,7 +68,10 @@ exifInterface = "1.4.2"
 blurhash = "0.3.0"
 design-system = "1.0.0"
 
+truapiHostAndroid = "0.1.0"
+
 [libraries]
+truapi-host-android = { group = "io.parity", name = "truapi-host-android", version.ref = "truapiHostAndroid" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
 androidx-fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "fragment-ktx" }

@@ -1,5 +1,6 @@
 package io.parity.truapi
 
+import android.content.Context
 import android.webkit.WebView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -35,6 +36,68 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class TrUAPIDiagnosticsTest {
 
+    /**
+     * Self-contained smoke check for the packaged core: the cdylib loads, the
+     * UniFFI checksums agree with the bindings, a local signing session
+     * activates and the WS bridge starts. No playground, no network, safe on a
+     * bare emulator — this is the on-device proof that the published
+     * `truapi-host-android` artifact is internally consistent.
+     */
+    @Test
+    fun coreBoots_localSession_bridgeStarts() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val chainProvider = WebSocketChainProvider({ emptyList() }, OkHttpClient())
+        val authStates = ArrayList<AuthState>()
+
+        val bridge = object : HostBridge {
+            override val storage = PrefsHostStorage(
+                context.getSharedPreferences("truapi_smoke_product_storage", Context.MODE_PRIVATE),
+            )
+            override val coreStorage = PrefsHostCoreStorage(
+                context.getSharedPreferences("truapi_smoke_core_storage", Context.MODE_PRIVATE),
+            )
+            override fun onCoreLog(marker: String, detail: String) = Unit
+            override fun authStateChanged(state: AuthState) {
+                synchronized(authStates) { authStates.add(state) }
+            }
+            override suspend fun navigateTo(url: String) = Unit
+            override suspend fun devicePermission(request: HostDevicePermissionRequest): Boolean = false
+            override suspend fun remotePermission(request: RemotePermission): Boolean = false
+            override suspend fun confirmUserAction(review: UserConfirmationReview): Boolean = false
+            override suspend fun featureSupported(request: HostFeatureSupportedRequest): Boolean = false
+            override fun chainConnect(genesisHash: ByteArray): UInt? = chainProvider.connect(genesisHash)
+            override fun chainSend(connectionId: UInt, request: String) = chainProvider.send(connectionId, request)
+            override fun chainClose(connectionId: UInt) = chainProvider.close(connectionId)
+        }
+
+        val config = RuntimeConfig(
+            productId = "dotli.dot",
+            hostName = "Polkadot Android (smoke)",
+            hostIcon = "https://dot.li/dotli.png",
+            peopleChainGenesisHash = ByteArray(32),
+            bulletinChainGenesisHash = ByteArray(32),
+            localSessionSecret = ByteArray(32) { (it + 1).toByte() },
+            localSessionLiteUsername = "android-smoke",
+        )
+
+        val core = TrUAPIHostCore(bridge, config)
+        try {
+            val endpoint = core.startWsBridge()
+            assertTrue("ws bridge port must be assigned", endpoint.port.toInt() > 0)
+            assertTrue("ws bridge token must be non-empty", endpoint.token.isNotEmpty())
+
+            val sawConnected = synchronized(authStates) {
+                authStates.any { it is AuthState.Connected }
+            }
+            assertTrue("expected a Connected auth state from the local session", sawConnected)
+        } finally {
+            chainProvider.closeAll()
+            chainProvider.detach()
+            core.stopWsBridge()
+            core.close()
+        }
+    }
+
     @Test
     fun coreBoots_localSession_playgroundReachesConnected() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -67,10 +130,10 @@ class TrUAPIDiagnosticsTest {
         // non-interactive diagnostics run; confirmUserAction gates signing.
         val bridge = object : HostBridge {
             override val storage = PrefsHostStorage(
-                context.getSharedPreferences("truapi_product_storage", android.content.Context.MODE_PRIVATE),
+                context.getSharedPreferences("truapi_product_storage", Context.MODE_PRIVATE),
             )
             override val coreStorage = PrefsHostCoreStorage(
-                context.getSharedPreferences("truapi_core_storage", android.content.Context.MODE_PRIVATE),
+                context.getSharedPreferences("truapi_core_storage", Context.MODE_PRIVATE),
             )
             override fun onCoreLog(marker: String, detail: String) {
                 synchronized(logs) { logs.add("$marker: $detail") }
@@ -116,7 +179,7 @@ class TrUAPIDiagnosticsTest {
         }
         assertTrue("expected a Connected auth state from the local session", sawConnected)
 
-        val bootstrap = LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token)
+        val bootstrap = LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token, webRtcAllowed = false)
         val url = args.getString("truapi.playgroundUrl") ?: "http://localhost:3000/"
 
         // The playground is a static export; a `?e2e` query param does not

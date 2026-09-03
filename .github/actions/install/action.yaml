@@ -1,17 +1,5 @@
 name: Install dependencies for Android build
 description: Contains all dependencies for Android build
-inputs:
-  truapi_ref:
-    description: >-
-      paritytech/host-rust-core commit to build the TrUAPI core from. Pinned to a
-      SHA so an unrelated merge there cannot turn this build red; bump it
-      deliberately.
-      The app's HostCallbacks implementation must match the native API surface
-      at this commit. Currently the 0.7.1 release tag, which is what
-      polkadot-app-ios-v2 pins.
-    required: false
-    default: "3f9ba7368f52fc3c9e8930803cb71ca46a9b1ae7"
-
 runs:
   using: "composite"
   steps:
@@ -97,29 +85,19 @@ runs:
       with:
         clang-version: "21"
 
-    # :bindings:truapi-host compiles the TrUAPI Rust core from an out-of-repo
-    # checkout, and :feature:products:impl depends on that module, so without a
-    # truapi checkout the whole build fails to configure. Pinned to a SHA rather
-    # than a branch so an unrelated truapi merge cannot turn this build red;
-    # bump it deliberately.
-    #
-    # Ordered before the Rust toolchain because that action's built-in rust-cache
-    # keys on the Cargo.lock files present when it runs. Checking truapi out
-    # afterwards leaves `.truapi/target` uncached, so the core is rebuilt from
-    # scratch on every job.
-    - name: 🧩 Checkout truapi
-      uses: actions/checkout@v4
-      with:
-        repository: paritytech/host-rust-core
-        ref: ${{ inputs.truapi_ref }}
-        path: .truapi
-
-    # The host cdylib build and UniFFI Kotlin generation are Gradle task
-    # dependencies of compileKotlin (buildHostCdylib -> generateUniffiKotlin),
-    # so any compile task triggers them; no explicit steps needed here.
-    - name: Set truapi.dir in local.properties
+    # The prebuilt TrUAPI core (io.parity:truapi-host-android) comes from the
+    # GitHub Packages repo declared in settings.gradle.kts, which reads
+    # GITHUB_ACTOR/GITHUB_TOKEN. GitHub Packages rejects anonymous downloads
+    # even for public artifacts, so the workflow token is exported for every
+    # later step. The default token can read public packages, but a workflow
+    # that declares an explicit `permissions:` block zeroes that out and must
+    # also grant `packages: read` (nightly_release does).
+    - name: Expose the workflow token for GitHub Packages
       shell: bash
-      run: echo "truapi.dir=$GITHUB_WORKSPACE/.truapi" >> ./local.properties
+      run: |
+        if [ -z "${GITHUB_TOKEN:-}" ]; then
+          echo "GITHUB_TOKEN=${{ github.token }}" >> "$GITHUB_ENV"
+        fi
 
     - name: 🦀 Install Rust
       uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -127,11 +105,6 @@ runs:
         toolchain: stable
         override: true
         components: rustfmt, clippy
-        # truapi is a separate cargo workspace outside this repo's tree, so
-        # rust-cache does not discover it on its own.
-        cache-workspaces: |
-          .
-          .truapi -> target
 
     - name: Add targets
       run: |
