@@ -64,6 +64,12 @@ enum class CoinageTransactionStatus {
      * a coin that plainly existed a moment ago as one that may never have.
      */
     val isArrived: Boolean get() = this == PENDING_SUCCESS || this == FINALIZED_SUCCESS
+
+    /**
+     * Whether there's a way for this transaction to be completed (already or in the future)
+     * The only transaction that cannot provably complete is the one marked as terminal FAILURE
+     */
+    val canArrive: Boolean get() = this != FAILURE
 }
 
 data class CoinageTransactionState(

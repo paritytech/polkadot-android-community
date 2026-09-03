@@ -128,6 +128,22 @@ class RealTotalBalanceUseCaseTest {
         )
     }
 
+    /**
+     * The regression: a transfer's change coin finalized while presence still read as absent, and the total
+     * fell by the change instead of the amount sent. Total may lag into `available`, never out of existence.
+     */
+    @Test
+    fun `a coin whose mint finalized before presence caught up stays pending`() {
+        val coin = coinOf(exponent = 1, age = null, onChain = false)
+
+        assertBalance(
+            coins = listOf(coin),
+            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.FINALIZED_SUCCESS)),
+            vouchers = emptyList(),
+            expected = balanceOf(pending = 1.exponentToBalance()),
+        )
+    }
+
     @Test
     fun `a coin whose mint failed counts nowhere`() {
         val coin = coinOf(exponent = 1, age = null, onChain = false)
