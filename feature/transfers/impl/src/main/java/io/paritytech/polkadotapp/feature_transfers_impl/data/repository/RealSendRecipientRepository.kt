@@ -6,8 +6,6 @@ import io.paritytech.polkadotapp.database.dao.SendRecipientDao
 import io.paritytech.polkadotapp.database.model.SendRecipientLocal
 import io.paritytech.polkadotapp.feature_transfers_api.data.repository.SendRecipientRepository
 import io.paritytech.polkadotapp.feature_transfers_api.domain.model.SendRecipient
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class RealSendRecipientRepository @Inject constructor(
@@ -15,11 +13,6 @@ class RealSendRecipientRepository @Inject constructor(
 ) : SendRecipientRepository {
     override suspend fun getSendRecipients(): Result<List<SendRecipient>> {
         return runCatching { dao.getSendRecipients().map { it.toDomain() } }
-    }
-
-    override fun getSendRecipientsForChainAssetFlow(chainAssetId: FullChainAssetId): Flow<List<SendRecipient>> {
-        return dao.getSendRecipientsForChainAssetFlow(chainAssetId.chainId, chainAssetId.assetId)
-            .map { it.map { it.toDomain() } }
     }
 
     override suspend fun addSendRecipient(recipient: SendRecipient): Result<Unit> {

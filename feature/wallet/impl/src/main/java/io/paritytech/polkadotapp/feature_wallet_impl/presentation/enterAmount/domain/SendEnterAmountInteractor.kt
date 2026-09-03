@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain
 
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.paritytech.polkadotapp.chains.util.fullId
 import io.paritytech.polkadotapp.chains.util.planksFromAmount
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
@@ -32,7 +33,9 @@ import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetPr
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.FreeTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.Fee
+import io.paritytech.polkadotapp.feature_transfers_api.data.repository.SendRecipientRepository
 import io.paritytech.polkadotapp.feature_transfers_api.data.type.TokenTransfersTypeRegistry
+import io.paritytech.polkadotapp.feature_transfers_api.domain.model.SendRecipient
 import io.paritytech.polkadotapp.feature_transfers_api.domain.model.TransferArguments
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.AvailableToSendAmount
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.SendPlan
@@ -71,6 +74,7 @@ interface SendEnterAmountInteractor {
 class RealSendEnterAmountInteractor @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val transfersTypeRegistry: TokenTransfersTypeRegistry,
+    private val sendRecipientRepository: SendRecipientRepository,
     private val freeTransactionOrigins: FreeTransactionOrigins,
     private val chatMessageSender: ChatMessageSender,
     private val prepareCoinageTransferUseCase: PrepareCoinageTransferUseCase,
@@ -117,8 +121,18 @@ class RealSendEnterAmountInteractor @Inject constructor(
     }
 
     override fun send(value: BigDecimal, transferMethod: TransferMethod): Flow<SendState> = when (transferMethod) {
-        is TransferMethod.CoinsViaChat -> flowOf { sendCoinage(transferMethod.recipient, value).toTerminalState() }
-        is TransferMethod.UnloadIntoExternal -> flowOf { sendExternalPayment(transferMethod.recipient, value).toTerminalState() }
+        is TransferMethod.CoinsViaChat -> flowOf {
+            sendCoinage(transferMethod.recipient, value)
+                .onSuccess { rememberRecipient(transferMethod.recipient) }
+                .toTerminalState()
+        }
+
+        is TransferMethod.UnloadIntoExternal -> flowOf {
+            // Note: we don't recall a recipient for external unload
+            sendExternalPayment(transferMethod.recipient, value)
+                .toTerminalState()
+        }
+
         is TransferMethod.CoinsViaSubmitter -> sendViaSubmitterFlow(transferMethod, value)
     }.flowOn(coroutineDispatchers.computation)
 
@@ -142,6 +156,11 @@ class RealSendEnterAmountInteractor @Inject constructor(
             .map { prepared -> sendChatMessage(recipient, prepared) }
             .onSuccess { Timber.d("CoinageTransfer: Successful") }
             .logFailure("Coinage transfer failed")
+    }
+
+    private suspend fun rememberRecipient(recipient: AccountId) {
+        sendRecipientRepository.addSendRecipient(SendRecipient(accountId = recipient, fullChainAssetId = asset().fullId))
+            .logFailure("Failed to remember send recipient")
     }
 
     private suspend fun sendExternalPayment(recipient: AccountId, value: BigDecimal): Result<Unit> {
