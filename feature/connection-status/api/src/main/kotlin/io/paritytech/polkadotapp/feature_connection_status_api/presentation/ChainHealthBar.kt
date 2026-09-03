@@ -36,7 +36,7 @@ import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixi
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
 import io.paritytech.polkadotapp.feature_connection_status_api.R as RApi
 
-private val ICON_SIZE = 28.dp
+private val ICON_SIZE = 20.dp
 private val GLYPH_SIZE = 11.dp
 private val RING_STROKE = 1.5f.dp
 
@@ -70,7 +70,7 @@ fun ChainHealthBar(
         Row(
             modifier = modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
+//                .statusBarsPadding()
                 .height(ChainHealthBarDefaults.ContentHeight)
                 .padding(horizontal = PolkadotTheme.spacings.medium),
             horizontalArrangement = Arrangement.End,
