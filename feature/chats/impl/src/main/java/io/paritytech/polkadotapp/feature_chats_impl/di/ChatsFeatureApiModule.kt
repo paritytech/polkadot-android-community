@@ -29,6 +29,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.DeleteRoomUseC
 import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.GetContactsUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
 import io.paritytech.polkadotapp.feature_chats_api.presentation.TextMessageDrawer
+import io.paritytech.polkadotapp.feature_chats_api.presentation.address.ContactsAddressConverterFactory
 import io.paritytech.polkadotapp.feature_chats_api.presentation.transfer.MultimediaMessageController
 import io.paritytech.polkadotapp.feature_chats_impl.data.attachment.GeneralAttachmentMetaBuilder
 import io.paritytech.polkadotapp.feature_chats_impl.data.attachment.ImageAttachmentMetaBuilder
@@ -113,6 +114,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.RealDeleteRoo
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.RealGetContactsUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.username.RealFallbackUsernameGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.RealTextMessageDrawer
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.address.RealContactsAddressConverterFactory
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.RealChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.initialization.ContactSessionChainBridge
@@ -285,6 +287,9 @@ internal interface ChatsFeatureApiModule {
 
     @Binds
     fun bindRealGetContactsUseCase(impl: RealGetContactsUseCase): GetContactsUseCase
+
+    @Binds
+    fun bindContactsAddressConverterFactory(impl: RealContactsAddressConverterFactory): ContactsAddressConverterFactory
 
     @Binds
     @IntoSet

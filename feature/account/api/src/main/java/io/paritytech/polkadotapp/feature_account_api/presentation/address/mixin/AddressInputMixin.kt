@@ -1,8 +1,8 @@
 package io.paritytech.polkadotapp.feature_account_api.presentation.address.mixin
 
-import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
-import io.paritytech.polkadotapp.common.presentation.ui.list.GroupedList
+import io.paritytech.polkadotapp.common.presentation.search.SearchState
 import io.paritytech.polkadotapp.common.presentation.ui.mixin.paste.PasteMixin
+import io.paritytech.polkadotapp.common.utils.SizedMap
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddressesCategory
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddressesSection
@@ -26,5 +26,5 @@ interface AddressInputMixin {
 
     val input: MutableStateFlow<String>
 
-    val addressCandidates: Flow<LoadingState<GroupedList<ExtractedAddressesCategory, ExtractedAddress>>>
+    val addressCandidates: Flow<SearchState<SizedMap<ExtractedAddressesCategory, List<ExtractedAddress>>>>
 }

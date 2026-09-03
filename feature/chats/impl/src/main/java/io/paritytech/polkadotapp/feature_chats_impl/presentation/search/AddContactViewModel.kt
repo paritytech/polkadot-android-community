@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.search.SearchState
 import io.paritytech.polkadotapp.common.presentation.search.withQuerySearching
+import io.paritytech.polkadotapp.common.utils.SizedList
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
@@ -33,7 +34,7 @@ internal class AddContactViewModel @Inject constructor(
 ) : BaseViewModel(), AddContactContract {
     private val searchQuery = MutableStateFlow("")
 
-    private val searchResult: Flow<SearchState<UserSearchResultUiModel>> = searchQuery
+    private val searchResult: Flow<SearchState<SizedList<UserSearchResultUiModel>>> = searchQuery
         .withQuerySearching { query ->
             interactor.searchContacts(query)
                 .mapList { it.toUi() }

@@ -1021,6 +1021,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_search_section_apps">APPS</string>
     <string name="chat_search_section_chats">CHATS AND CONTACTS</string>
     <string name="chat_search_section_messages">MESSAGES</string>
+    <string name="address_section_previous_payments">Previous payments</string>
+    <string name="address_section_my_contacts">My Contacts</string>
+    <string name="send_payment_section_global_search">Global search</string>
     <string name="chat_search_recents_header">RECENT</string>
     <string name="chat_search_recents_clear">CLEAR</string>
     <string name="chat_search_recent_menu_remove">Remove from Recents</string>
