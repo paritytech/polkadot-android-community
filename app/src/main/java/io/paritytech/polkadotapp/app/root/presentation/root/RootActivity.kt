@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.app.root.presentation.root
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -13,7 +14,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
@@ -33,6 +36,7 @@ import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.BaseScreenDelegate
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -85,9 +89,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         setupAppNotificationOverlay()
 
         setupChatExtensionOverlay()
-        // TODO network status currently is annoying: during real reconnects it may appear and disappear a lot
-        // We need to improve stability of ConnectionStatusMonitor before bringing it back
-//        setupConnectionStatusBanner()
+        setupChainHealthBar()
 
         delegate.subscribeViewModelEvents()
     }
@@ -144,6 +146,27 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             }
         }
         addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+
+    private fun setupChainHealthBar() {
+        // The bar lives in the in-flow slot above the nav host (activity_root.xml), so it reserves
+        // height and pushes screen content down rather than overlaying it.
+        findViewById<ComposeView>(R.id.connectionStatusBanner).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val model by viewModel.chainsHealth.collectAsStateWithLifecycle()
+                PolkadotTheme {
+                    ChainHealthBar(model = model)
+                }
+            }
+            isVisible = true
+        }
+
+        // The bar already fills the status-bar region, so screens below must not pad for it again.
+        val navHost = findViewById<View>(R.id.rootNavHost)
+        ViewCompat.setOnApplyWindowInsetsListener(navHost) { _, insets ->
+            insets.consumeTopInsets()
+        }
     }
 
     private fun WindowInsetsCompat.consumeTopInsets(): WindowInsetsCompat {

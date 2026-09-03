@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.remote.model.ChainAssetRemote
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.remote.model.ChainRemote
+import io.paritytech.polkadotapp.common.utils.asGsonParsedIntOrNull
 import io.paritytech.polkadotapp.common.utils.asGsonParsedLongOrNull
 import io.paritytech.polkadotapp.database.model.chain.ChainAssetLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainExplorerLocal
@@ -18,6 +19,8 @@ private const val ETHEREUM_OPTION = "ethereumBased"
 private const val TESTNET_OPTION = "testnet"
 private const val NO_SUBSTRATE_RUNTIME = "noSubstrateRuntime"
 const val DEFAULT_BLOCK_TIME = "defaultBlockTime"
+const val FINALITY_GAP_IDEAL = "finalityGapIdeal"
+const val FINALITY_GAP_OUTAGE = "finalityGapOutage"
 
 private const val EXTERNAL_API_HOP = "hop"
 
@@ -36,6 +39,8 @@ fun mapRemoteChainToLocal(
     val additional = chainRemote.additional?.let {
         Chain.Additional(
             defaultBlockTimeMillis = it[DEFAULT_BLOCK_TIME].asGsonParsedLongOrNull(),
+            finalityGapIdeal = it[FINALITY_GAP_IDEAL].asGsonParsedIntOrNull(),
+            finalityGapOutage = it[FINALITY_GAP_OUTAGE].asGsonParsedIntOrNull(),
         )
     }
 

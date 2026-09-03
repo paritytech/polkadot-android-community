@@ -4,19 +4,32 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import io.paritytech.polkadotapp.feature_connection_status_api.domain.ConnectionStatusMonitor
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ConnectionStatusMixin
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.RealConnectionStatusMonitor
-import io.paritytech.polkadotapp.feature_connection_status_impl.presentation.mixin.RealConnectionStatusMixinFactory
+import dagger.multibindings.IntoSet
+import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.RealChainHealthMonitor
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.BlockLivenessProbe
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.FinalityGapProbe
+import io.paritytech.polkadotapp.feature_connection_status_impl.presentation.mixin.RealChainHealthMixinFactory
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 interface ConnectionStatusFeatureModule {
-    @Binds
-    @Singleton
-    fun bindConnectionStatusMonitor(impl: RealConnectionStatusMonitor): ConnectionStatusMonitor
 
     @Binds
-    fun bindConnectionStatusMixinFactory(impl: RealConnectionStatusMixinFactory): ConnectionStatusMixin.Factory
+    @Singleton
+    fun bindChainHealthMonitor(impl: RealChainHealthMonitor): ChainHealthMonitor
+
+    @Binds
+    fun bindChainHealthMixinFactory(impl: RealChainHealthMixinFactory): ChainHealthMixin.Factory
+
+    @Binds
+    @IntoSet
+    fun bindBlockLivenessProbe(impl: BlockLivenessProbe): ChainHealthProbe
+
+    @Binds
+    @IntoSet
+    fun bindFinalityGapProbe(impl: FinalityGapProbe): ChainHealthProbe
 }
