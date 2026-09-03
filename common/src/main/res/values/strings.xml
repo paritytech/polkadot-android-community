@@ -726,6 +726,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_payment_toolbar_title">Send payment</string>
     <string name="send_payment_search_placeholder">Type username or wallet address</string>
     <string name="send_payment_to">To:</string>
+    <string name="send_payment_open_chat_message">You need to first establish a chat before sending a payment</string>
 
     <string name="send_enter_amount_title">Enter amount</string>
     <string name="send_enter_amount_placeholder">Enter Amount</string>

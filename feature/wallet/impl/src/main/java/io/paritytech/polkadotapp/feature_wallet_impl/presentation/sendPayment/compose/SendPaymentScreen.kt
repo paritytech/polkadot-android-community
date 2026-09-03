@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.compose
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,7 @@ import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.PaymentSearchResultUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.PaymentSearchSectionUiModel
@@ -47,6 +49,10 @@ import io.paritytech.polkadotapp.common.R as RCommon
 @Composable
 fun SendPaymentScreen(contract: SendPaymentContract) {
     val uiState = contract.state.collectAsStateWithLifecycle().value
+
+    contract.messageEvents.collectAsEffect { context, resId ->
+        Toast.makeText(context, context.getString(resId), Toast.LENGTH_SHORT).show()
+    }
 
     SendPaymentScreenInternal(
         state = uiState,

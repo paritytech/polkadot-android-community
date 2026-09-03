@@ -5,6 +5,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.clipboard.ClipboardService
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.search.mapSearchResults
+import io.paritytech.polkadotapp.common.utils.OneShotEventChannel
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.shareInBackground
@@ -29,9 +30,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 @HiltViewModel
 class SendPaymentViewModel @Inject constructor(
@@ -49,6 +52,9 @@ class SendPaymentViewModel @Inject constructor(
 ) : BaseViewModel(), SendPaymentContract {
     private val contacts = flowOf { getContactsUseCase() }
         .shareInBackground()
+
+    private val _messageEvents = OneShotEventChannel<Int>()
+    override val messageEvents = _messageEvents.receiveAsFlow()
 
     private val addressInputMixin = addressInputMixinFactory.create(
         coroutineScope = viewModelScope,
@@ -100,6 +106,8 @@ class SendPaymentViewModel @Inject constructor(
                 )
             )
         } else {
+            _messageEvents.trySend(RCommon.string.send_payment_open_chat_message)
+
             chatStarter.openChatWith(accountId)
                 .onFailure(::showError)
         }
