@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessRepor
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.AccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.HopMultiSignature
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.HopMultiSigner
-import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.slotAllocator.OnExistingAllocationStrategy
 import io.paritytech.polkadotapp.feature_transaction_storage_api.domain.slotAllocator.TransactionStorageSlotAllocator
 import javax.inject.Inject
 
@@ -16,11 +15,11 @@ class HopSigner @Inject constructor(
     private val accountDerivation: AccountDerivationUseCase,
     private val slotAllocator: TransactionStorageSlotAllocator
 ) {
-    suspend fun ensureAllocated() {
+    suspend fun ensureCanSubmit() {
         val target = deriveKeypair().publicKey.intoAccountId()
 
         with(StalenessReportCollector.NoOp) {
-            slotAllocator.allocate(target = target, strategy = OnExistingAllocationStrategy.IGNORE)
+            slotAllocator.ensureCanSubmit(target)
         }.getOrThrow()
     }
 
