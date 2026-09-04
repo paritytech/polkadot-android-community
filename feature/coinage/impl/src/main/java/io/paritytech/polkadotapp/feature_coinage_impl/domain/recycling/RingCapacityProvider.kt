@@ -3,7 +3,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
 import io.paritytech.polkadotapp.common.data.memory.AccumulatingMapCache
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.toRingCollectionId
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
@@ -48,10 +47,14 @@ class RingCapacityProvider @Inject constructor(
      * rings that are never full — so a strategy waiting on anonymity keeps waiting instead of releasing a
      * voucher on a capacity we do not have.
      */
-    suspend fun capacitiesFor(denominations: Set<ValueExponent>): Map<ValueExponent, Int> {
+    suspend fun capacitiesFor(denominations: Set<ValueExponent>): Result<Map<ValueExponent, Int>> {
         return capacities.get(denominations)
-            .logFailure("Can't fetch ring capacities for recycler denominations")
-            .getOrDefault(emptyMap())
-            .filterKeys(denominations::contains)
+    }
+
+    /**
+     * Returns already cached values of [capacitiesFor]. null in case there isn't sufficient cache data to cover [denominations]
+     */
+    suspend fun peekCapacitiesFor(denominations: Set<ValueExponent>): Map<ValueExponent, Int>? {
+        return capacities.peek(denominations)
     }
 }

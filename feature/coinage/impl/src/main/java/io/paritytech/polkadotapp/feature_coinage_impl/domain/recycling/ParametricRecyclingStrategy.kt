@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdi
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerMembersOrZero
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecyclingStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingParams
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
@@ -20,8 +21,13 @@ import java.math.RoundingMode
  * position between them is a new set of numbers rather than a new class.
  */
 class ParametricRecyclingStrategy(private val params: RecyclingParams) : CoinRecyclingStrategy {
+    // The mode is nothing to this policy: it reads no limit of its own, so it is already as fast as it gets.
     context(conversion: CoinageBalanceConversionContext)
-    override suspend fun evaluate(coins: List<Coin>, snapshot: RecyclingSnapshot): RecyclingVerdicts {
+    override suspend fun evaluate(
+        coins: List<Coin>,
+        snapshot: RecyclingSnapshot,
+        mode: BalanceEvaluationMode,
+    ): RecyclingVerdicts {
         val budget = snapshot.total * params.maxUnavailableBalance.fraction
         var unavailable = snapshot.unavailable
 

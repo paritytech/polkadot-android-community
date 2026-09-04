@@ -36,8 +36,8 @@ import io.paritytech.polkadotapp.database.dao.MessageRevisionDao
 import io.paritytech.polkadotapp.database.dao.MetaAccountDao
 import io.paritytech.polkadotapp.database.dao.ProcessedChatMessageDao
 import io.paritytech.polkadotapp.database.dao.ProductDao
-import io.paritytech.polkadotapp.database.dao.ProductIntegrationDao
 import io.paritytech.polkadotapp.database.dao.ProductFundingOperationDao
+import io.paritytech.polkadotapp.database.dao.ProductIntegrationDao
 import io.paritytech.polkadotapp.database.dao.ProductPermissionGrantDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RemovedChatDao
@@ -111,9 +111,9 @@ import io.paritytech.polkadotapp.database.model.MessageNotificationSentLocal
 import io.paritytech.polkadotapp.database.model.MessageRevisionLocal
 import io.paritytech.polkadotapp.database.model.MetaAccountLocal
 import io.paritytech.polkadotapp.database.model.ProcessedChatMessageLocal
+import io.paritytech.polkadotapp.database.model.ProductFundingOperationLocal
 import io.paritytech.polkadotapp.database.model.ProductIntegrationLocal
 import io.paritytech.polkadotapp.database.model.ProductLocal
-import io.paritytech.polkadotapp.database.model.ProductFundingOperationLocal
 import io.paritytech.polkadotapp.database.model.ProductPermissionGrantLocal
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
 import io.paritytech.polkadotapp.database.model.RemovedChatLocal

@@ -64,7 +64,6 @@ class RealProductWorkerRefCounter @Inject constructor(
     private val bootFactory: Lazy<WorkerBootFactory>,
     dispatchers: CoroutineDispatchers,
 ) : ProductWorkerRefCounter, CoroutineScope by CoroutineScope(SupervisorJob() + dispatchers.computation) {
-
     private val handles = ConcurrentHashMap<ProductId, ProductWorkerHandle>()
 
     override suspend fun acquire(productId: ProductId, label: String): ProductWorkerReference {

@@ -26,7 +26,6 @@ import org.mockito.Mockito.mock
 import java.util.concurrent.atomic.AtomicInteger
 
 class ProductWorkerRefCounterTest {
-
     private val productId = ProductId.fromStoredValue("coinflip.dot")
     private val hostApiInteractor: HostApiInteractor = mock()
 

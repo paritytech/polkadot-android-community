@@ -4,8 +4,8 @@ import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.FundingOperationRecord
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductFundingOperationRepository
 import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorker
-import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorkerReference
 import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorkerRefCounter
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorkerReference
 import io.paritytech.polkadotapp.feature_products_impl.domain.worker.WorkerModalityApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 class ProductOperationServiceTest {
-
     private val productId = ProductId.fromStoredValue("coinflip.dot")
 
     private class FakeRefCounter : ProductWorkerRefCounter {

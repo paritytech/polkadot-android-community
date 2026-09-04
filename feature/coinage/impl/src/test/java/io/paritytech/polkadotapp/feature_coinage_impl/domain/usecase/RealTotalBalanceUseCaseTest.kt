@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyc
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
 import io.paritytech.polkadotapp.test_shared.any
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -56,7 +57,10 @@ class RealTotalBalanceUseCaseTest {
     init {
         runBlocking {
             `when`(coinageBalanceConverterUseCase.create()).thenReturn(Result.success(testConversionContext))
-            `when`(ringCapacityProvider.capacitiesFor(any()))
+
+            // The balance asks for an IMMEDIATE context so it never waits on the chain, which makes the
+            // cached capacities — not a fetch — what it classifies vouchers against.
+            `when`(ringCapacityProvider.peekCapacitiesFor(any()))
                 .thenReturn(mapOf(ValueExponent(1) to FULL_RING, ValueExponent(2) to FULL_RING))
         }
         `when`(coinRepository.getCoinRecyclingAge()).thenReturn(FORCED_AGE)
@@ -65,9 +69,9 @@ class RealTotalBalanceUseCaseTest {
             coinageAssetsUseCase = coinageAssetsUseCase,
             coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
             strategyProvider = strategyProvider,
-            ringCapacityProvider = ringCapacityProvider,
             settings = settings,
             evaluator = evaluator,
+            usabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider),
         )
     }
 

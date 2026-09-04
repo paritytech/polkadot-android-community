@@ -8,10 +8,10 @@ import io.paritytech.polkadotapp.common.utils.throttleLatest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.totalBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
@@ -47,7 +47,7 @@ class CoinRecyclingEvaluator @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val settings: CoinageRecyclingStrategySettings,
     private val strategyProvider: RecyclingStrategyProvider,
-    private val ringCapacityProvider: RingCapacityProvider,
+    private val usabilityContextFactory: VoucherUsabilityContextFactory,
     private val balanceConverter: CoinageBalanceConverterUseCase,
     private val recyclingUseCase: CoinageRecyclingUseCase,
     private val dispatchers: CoroutineDispatchers,
@@ -79,7 +79,12 @@ class CoinRecyclingEvaluator @Inject constructor(
                 // to an interval later. Only the asset churn needs damping.
                 .combine(settings.strategyFlow(), ::Input)
                 .collect { input ->
-                    evaluate(input)
+                    // Both passes run off the same input rather than waiting for the next emission: the
+                    // wallet may not change again for minutes, and the immediate verdicts must not stand
+                    // that long.
+                    if (verdictsState.value == null) publishImmediate(input)
+
+                    evaluate(input, BalanceEvaluationMode.COMPLETE)
                         .onSuccess { verdicts ->
                             verdictsState.value = verdicts
 
@@ -92,12 +97,24 @@ class CoinRecyclingEvaluator @Inject constructor(
         }
     }
 
-    private suspend fun evaluate(input: Input): Result<RecyclingVerdicts> {
+    /**
+     * Gets a balance on screen without waiting for the chain, at the cost of a verdict that only the chain's
+     * own age limit has shaped — so a coin the policy would hold back shows as spendable until the complete
+     * pass moves it. Nothing is recycled off it: recycling is a chain write of its own, so starting it here
+     * would buy nothing over the pass that follows immediately.
+     */
+    private suspend fun publishImmediate(input: Input) {
+        evaluate(input, BalanceEvaluationMode.IMMEDIATE)
+            .onSuccess { verdictsState.value = it }
+            .logFailure(LOG_TAG)
+    }
+
+    private suspend fun evaluate(input: Input, mode: BalanceEvaluationMode): Result<RecyclingVerdicts> {
         val strategy = strategyProvider.strategyFor(input.strategyType)
         val conversion = balanceConverter.create().getOrElse { return Result.failure(it) }
 
         val denominations = input.assets.vouchers.mapToSet { it.voucher.recyclerValue }
-        val usability = VoucherUsabilityContext(ringCapacityProvider.capacitiesFor(denominations))
+        val usability = usabilityContextFactory.create(mode, denominations)
 
         val coinBuckets = input.assets.coins.preClassifyCoins()
         val voucherBuckets = input.assets.vouchers.preClassifyVouchers(strategy, usability)
@@ -112,10 +129,10 @@ class CoinRecyclingEvaluator @Inject constructor(
                     voucherBuckets.gainingPrivacy.totalBalance(),
             )
 
-            val verdicts = strategy.evaluate(coinBuckets.minted, snapshot)
+            val verdicts = strategy.evaluate(coinBuckets.minted, snapshot, mode)
 
             coinageLogD(
-                "Recycling evaluation strategy=${input.strategyType}" +
+                "Recycling evaluation mode=$mode strategy=${input.strategyType}" +
                     " minted=${coinBuckets.minted.size} arriving=${coinBuckets.minting.size}" +
                     " vouchers(usable=${voucherBuckets.usable.size} gaining=${voucherBuckets.gainingPrivacy.size})" +
                     " verdicts=${verdicts.values.groupingBy { it }.eachCount()}"
