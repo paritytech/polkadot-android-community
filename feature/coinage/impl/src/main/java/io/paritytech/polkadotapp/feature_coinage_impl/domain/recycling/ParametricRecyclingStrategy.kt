@@ -14,14 +14,17 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecycl
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingParams
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.resolveAgainst
 import java.math.RoundingMode
 
 /**
  * The only recycling policy there is. The named strategies differ by [params] alone, so an intermediate
  * position between them is a new set of numbers rather than a new class.
  */
-class ParametricRecyclingStrategy(private val params: RecyclingParams) : CoinRecyclingStrategy {
-    // The mode is nothing to this policy: it reads no limit of its own, so it is already as fast as it gets.
+class ParametricRecyclingStrategy(
+    private val params: RecyclingParams,
+    private val forcedRecyclingAgeProvider: ForcedRecyclingAgeProvider,
+) : CoinRecyclingStrategy {
     context(conversion: CoinageBalanceConversionContext)
     override suspend fun evaluate(
         coins: List<Coin>,
@@ -29,6 +32,8 @@ class ParametricRecyclingStrategy(private val params: RecyclingParams) : CoinRec
         mode: BalanceEvaluationMode,
     ): RecyclingVerdicts {
         val budget = snapshot.total * params.maxUnavailableBalance.fraction
+        val forcedRecyclingAge = forcedRecyclingAgeProvider.getForBalanceEvaluation(mode)
+        val minRecyclingAge = params.minRecyclingAge.resolveAgainst(forcedRecyclingAge)
         var unavailable = snapshot.unavailable
 
         // Oldest first: a coin nearer the age the chain stops accepting has the most to lose by waiting,
@@ -39,7 +44,7 @@ class ParametricRecyclingStrategy(private val params: RecyclingParams) : CoinRec
             // Headroom, not fit. While any budget is left the next coin is admitted even if it overshoots,
             // so a coin worth more than the whole budget still recycles instead of sitting untouched until
             // the age limit forces it. The coin after an overshoot then finds no headroom and waits.
-            val gated = age != null && age >= params.minRecyclingAge && unavailable < budget
+            val gated = age != null && age >= minRecyclingAge && unavailable < budget
 
             if (gated) unavailable += coin.balance()
 

@@ -6,7 +6,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.paramsFor
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
@@ -22,8 +22,8 @@ import java.math.BigInteger
 private const val FULL_RING = 767
 
 class CoinagePreClassificationTest {
-    private val minPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MIN_PRIVACY.paramsFor(FORCED_AGE))
-    private val maxPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MAX_PRIVACY.paramsFor(FORCED_AGE))
+    private val minPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MIN_PRIVACY.params, forcedAgeOf(FORCED_AGE))
+    private val maxPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MAX_PRIVACY.params, forcedAgeOf(FORCED_AGE))
 
     @Test
     fun `a settled coin is minted`() {

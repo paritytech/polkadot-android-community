@@ -18,3 +18,11 @@ suspend fun ViewFunctionsApi.getFreeUnloadTokenInfo(): Result<FreeUnloadTokenInf
         arguments = noArgs()
     )
 }
+
+suspend fun ViewFunctionsApi.getMaximumAge(): Result<UShort> {
+    return call(
+        pallet = Modules.COINAGE,
+        name = "get_maximum_age",
+        arguments = noArgs()
+    )
+}
