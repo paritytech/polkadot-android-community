@@ -150,6 +150,10 @@ private fun ModeSelector(
         derivedStateOf { position.value.roundToInt().coerceIn(modes.indices) }
     }
 
+    // Outside a drag the selected mode is the truth; only while a finger is down does the nearest one lead,
+    // so the circles, markers and labels follow the dragged circle rather than the mode still committed.
+    val highlightedIndex = if (isDragging) nearestIndex else selectedIndex
+
     // A tap never slides the selection along the track: the position jumps, and the two circles animate
     // their own size in place. Only a drag moves a circle, which is what keeps `position` continuous.
     LaunchedEffect(selectedIndex) {
@@ -157,10 +161,6 @@ private fun ModeSelector(
             position.snapTo(selectedIndex.toFloat())
         }
     }
-
-    // Outside a drag the selected mode is the truth; only while a finger is down does the nearest one lead,
-    // so the labels and markers follow the circle rather than the mode that is still committed.
-    val highlightedIndex = if (isDragging) nearestIndex else selectedIndex
 
     Column {
         Box(
@@ -183,7 +183,9 @@ private fun ModeSelector(
                     // While a drag is in flight the circle under the finger is the dragged one below, so the
                     // mode it currently covers hands its place over: it dissolves under that circle and
                     // fades back in as the circle leaves, rather than blinking out and back.
-                    val isCovered = isDragging && index == nearestIndex
+                    // It stays lit and grown the whole time it is covered, because the drag ends by removing
+                    // the circle above it: anything left to animate then plays out in plain sight.
+                    val isCovered = isDragging && index == highlightedIndex
                     val reveal = animateFloatAsState(
                         targetValue = if (isCovered) 0f else 1f,
                         // The handover at the end of a drag has to be instant: the dragged circle leaves the
@@ -202,7 +204,7 @@ private fun ModeSelector(
                             .offset(centreOffset({ index.toFloat() }, { trackWidth }, modes.lastIndex))
                             .graphicsLayer { alpha = reveal.value },
                         appearance = appearances[index],
-                        isSelected = !isDragging && index == selectedIndex,
+                        isSelected = index == highlightedIndex,
                         fadeMillis = { dragFade.millis },
                         interactionSource = interactionSources[index]
                     )
