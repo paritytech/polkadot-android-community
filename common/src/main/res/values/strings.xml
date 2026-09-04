@@ -778,6 +778,13 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pgas_stall_claiming">Allocating smart contract allowance</string>
     <string name="pgas_stall_picking_slot">Looking for a free gas claim</string>
     <string name="chats_stall_broadcasting_device">Broadcasting to network</string>
+    <string name="coinage_stall_preparing_transfer">Preparing payment</string>
+    <string name="coinage_stall_picking_unload_token">Looking for a free transfer allowance</string>
+    <string name="coinage_stall_reading_anonymity_set">Reading the anonymity set</string>
+    <string name="coinage_stall_generating_proofs">Generating privacy proofs</string>
+    <string name="wallet_stall_sending">Sending your payment</string>
+    <string name="wallet_stall_delivering">Delivering payment to recipient</string>
+    <string name="wallet_stall_awaiting_claim">Waiting for the recipient to receive the payment</string>
     <string name="pair_request_link_action">Link</string>
     <string name="pair_request_cancel_action">Cancel</string>
     <string name="pair_request_close_action">Close</string>

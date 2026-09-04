@@ -11,11 +11,15 @@ import io.paritytech.polkadotapp.chains.util.call
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapIndexedAsync
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionRequest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
@@ -43,6 +47,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableE
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
     private val chainStateRepository: ChainStateRepository,
@@ -118,12 +123,32 @@ class UnloadAndSplitVouchersStrategy(
      * registered and submitted on its own. A crash part-way leaves the registered ones to reach FAILURE at
      * mortality and return their vouchers, and the unregistered ones never reserved anything.
      */
-    override suspend fun run(): Result<PreparedTransfer> = runCatching {
-        require(vouchers.isNotEmpty()) { "TransferStrategyError.emptyVouchers" }
-        require(vouchers.all { it.isInRecycler() }) { "TransferStrategyError.missingRecyclerInfo" }
+    context(diagnostics: StalenessReportCollector)
+    override suspend fun run(): Result<PreparedTransfer> = diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
+        runCatching {
+            require(vouchers.isNotEmpty()) { "TransferStrategyError.emptyVouchers" }
+            require(vouchers.all { it.isInRecycler() }) { "TransferStrategyError.missingRecyclerInfo" }
 
+            val unloadContext = resolveUnloadContext()
+            val freeUnloadTokens = resolveFreeUnloadTokens(unloadContext.batches.size)
+            val personProver = precomputePersonProver(unloadContext.pinnedBlockHash)
+
+            val prepared = buildBatches(unloadContext, freeUnloadTokens, personProver)
+
+            val handedOffExactCoins = exactCoins.map { OwnAsset.Coin(it.derivationIndex) }
+            val handoffCommit = submitBatches(prepared, handedOffExactCoins)
+
+            // After submission, not after resolving: a token picked for a transaction that never left is still
+            // there to be picked again.
+            quotaTracker.noteUnloadsHappened(freeUnloadTokens.size)
+
+            PreparedTransfer((exactCoins + prepared.flatMap { it.recipientCoins }).toMemoEntries(), handoffCommit)
+        }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun resolveUnloadContext(): UnloadContext = diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
         val batches = resolveBatches()
-        val freeUnloadTokens = freeUnloadTokenResolver.resolve(chain.id, batches.size)
 
         val pinnedBlockHash = chainStateRepository.currentBlockHash(chain.id)
         val groupRevisions = recyclerProofDataProvider
@@ -131,15 +156,41 @@ class UnloadAndSplitVouchersStrategy(
             .logFailure("Failed to get recycler revisions")
             .getOrThrow()
 
-        // One prover for the whole transfer: every batch proves the same person against the same pinned
-        // block, so the ring lookups behind it are paid once instead of once per extrinsic.
-        val personProver = peopleMembershipProver.precomputeForMember(
-            chainId = chain.id,
-            peopleCollection = peopleCollection,
-            at = pinnedBlockHash,
-        ).getOrThrow()
+        UnloadContext(batches, pinnedBlockHash, groupRevisions)
+    }
 
-        val prepared = batches.mapIndexedAsync { index, batch ->
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun resolveFreeUnloadTokens(batchCount: Int): List<FreeUnloadTokenResolver.ResolvedUnloadToken> =
+        diagnostics.markRegion(RCommon.string.coinage_stall_picking_unload_token) {
+            freeUnloadTokenResolver.resolve(chain.id, batchCount)
+        }
+
+    /**
+     * One prover for the whole transfer: every batch proves the same person against the same pinned block, so
+     * the ring lookups behind it are paid once instead of once per extrinsic.
+     */
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun precomputePersonProver(pinnedBlockHash: BlockHash): PrecomputedPersonMembershipProver =
+        diagnostics.markRegion(RCommon.string.coinage_stall_reading_anonymity_set) {
+            peopleMembershipProver.precomputeForMember(
+                chainId = chain.id,
+                peopleCollection = peopleCollection,
+                at = pinnedBlockHash,
+            ).getOrThrow()
+        }
+
+    /**
+     * The ring-VRF proofs each extrinsic carries are produced lazily while it is being built, and they are the
+     * slowest thing in the transfer. The batches run concurrently, so one region covers the whole fan-out
+     * rather than one row per batch.
+     */
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun buildBatches(
+        unloadContext: UnloadContext,
+        freeUnloadTokens: List<FreeUnloadTokenResolver.ResolvedUnloadToken>,
+        personProver: PrecomputedPersonMembershipProver,
+    ): List<PreparedBatch> = diagnostics.markRegion(RCommon.string.coinage_stall_generating_proofs) {
+        unloadContext.batches.mapIndexedAsync { index, batch ->
             val transaction = coinageTransactionFactory.newTransaction()
             val outputs = transaction.mintGroupOutputs(batch)
 
@@ -151,14 +202,19 @@ class UnloadAndSplitVouchersStrategy(
                     outputCoins = outputs.all,
                     unloadToken = freeUnloadTokens[index],
                     personProver = personProver,
-                    recyclerRevisionBlockHash = pinnedBlockHash,
-                    revision = groupRevisions.getValue(batch.recyclerKey),
+                    recyclerRevisionBlockHash = unloadContext.pinnedBlockHash,
+                    revision = unloadContext.groupRevisions.getValue(batch.recyclerKey),
                 ).getOrThrow(),
             )
         }
+    }
 
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun submitBatches(
+        prepared: List<PreparedBatch>,
+        handedOffExactCoins: List<OwnAsset.Coin>,
+    ): CoinageHandoffCommit = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
         val groupId = CoinageOperationGroupId.generateNew()
-        val handedOffExactCoins = exactCoins.map { OwnAsset.Coin(it.derivationIndex) }
 
         val handoffCommit = transactionService
             .preCommitHandoff(handedOffExactCoins + prepared.flatMap { it.assets.handedOff })
@@ -174,12 +230,14 @@ class UnloadAndSplitVouchersStrategy(
 
         transactionService.submitTransactions(requests, groupId).getOrThrow()
 
-        // After submission, not after resolving: a token picked for a transaction that never left is still
-        // there to be picked again.
-        quotaTracker.noteUnloadsHappened(freeUnloadTokens.size)
-
-        PreparedTransfer((exactCoins + prepared.flatMap { it.recipientCoins }).toMemoEntries(), handoffCommit)
+        handoffCommit
     }
+
+    private class UnloadContext(
+        val batches: List<VoucherBatch>,
+        val pinnedBlockHash: BlockHash,
+        val groupRevisions: Map<RecyclerKey, RingRevision>,
+    )
 
     private class PreparedBatch(
         val assets: CoinageTransactionAssets,
