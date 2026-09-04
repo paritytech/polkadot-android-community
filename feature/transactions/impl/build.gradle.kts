@@ -13,7 +13,7 @@ android {
         buildConfigField(
             "String",
             "NIGHTLY_FUNDING_MNEMONIC",
-            "\"${localProperties.readSecretOrNull("NIGHTLY_FUNDING_MNEMONIC") ?: ""}\""
+            "\"${localProperties.readSecretOrThrow("NIGHTLY_FUNDING_MNEMONIC")}\""
         )
     }
 }
