@@ -18,7 +18,6 @@ import org.junit.Test
 import org.mockito.Mockito.mock
 
 class BindableProductsBotApiTest {
-
     private val productId = ProductId.fromStoredValue("coinflip.dot")
     private val hostApiInteractor: HostApiInteractor = mock()
     private val chatIdParam = ProductChatIdParameter("room")

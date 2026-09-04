@@ -22,7 +22,6 @@ class BindableProductsBotApi(
     hostApiInteractor: HostApiInteractor,
     callingProductIdProvider: CallingProductIdProvider,
 ) : BaseProductsBotApi(hostApiInteractor, callingProductIdProvider) {
-
     val chatSlot: ModalityApiSlot<ProductChatMessaging> = WeakModalityApiSlot()
 
     override suspend fun createRoom(request: CreateProductRoomRequest): Result<CreateProductRoomResult> {

@@ -33,7 +33,6 @@ class RealProductOperationService @Inject constructor(
     private val workerRefCounter: ProductWorkerRefCounter,
     private val repository: ProductFundingOperationRepository,
 ) : ProductOperationService {
-
     private data class OperationKey(val productId: ProductId, val id: OperationId)
 
     private val mutex = Mutex()

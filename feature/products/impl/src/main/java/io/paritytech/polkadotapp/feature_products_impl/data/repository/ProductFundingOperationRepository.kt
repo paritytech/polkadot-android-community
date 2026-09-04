@@ -28,7 +28,6 @@ interface ProductFundingOperationRepository {
 class RealProductFundingOperationRepository @Inject constructor(
     private val dao: ProductFundingOperationDao,
 ) : ProductFundingOperationRepository {
-
     override suspend fun insert(productId: ProductId, label: String?): Result<OperationId> = runCancellableCatching {
         val rowId = dao.insert(ProductFundingOperationLocal(operationId = 0, productId = productId.value, label = label))
         OperationId(rowId)
