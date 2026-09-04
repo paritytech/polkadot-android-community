@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_connection_status_api.presentation
 
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -22,10 +21,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
+import io.paritytech.polkadotapp.design.components.icon.NovaIcons
+import io.paritytech.polkadotapp.design.components.icon.vectors.AssetHub
+import io.paritytech.polkadotapp.design.components.icon.vectors.Bulletin
+import io.paritytech.polkadotapp.design.components.icon.vectors.People
 import io.paritytech.polkadotapp.design.components.progress.NovaCircularProgressIndicator
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
@@ -34,7 +37,6 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthBarModel
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
-import io.paritytech.polkadotapp.feature_connection_status_api.R as RApi
 
 private val ICON_SIZE = 20.dp
 private val GLYPH_SIZE = 11.dp
@@ -114,8 +116,11 @@ private fun ChainHealthIcon(item: ChainHealthItemModel) {
         }
 
         NovaIcon(
-            modifier = Modifier.size(GLYPH_SIZE),
-            painter = painterResource(item.glyph.drawableRes()),
+            // extraTiny inset so the glyph doesn't crowd the ring.
+            modifier = Modifier
+                .size(GLYPH_SIZE)
+                .padding(1.dp),
+            imageVector = item.glyph.imageVector(),
             tint = glyphTint(item.connection),
             contentDescription = item.chainName,
         )
@@ -145,9 +150,8 @@ private fun glyphTint(connection: ChainConnectionPresentation): Color = when (co
     -> PolkadotTheme.colors.fg.disabled
 }
 
-@DrawableRes
-private fun ChainGlyph.drawableRes(): Int = when (this) {
-    ChainGlyph.People -> RApi.drawable.ic_chain_people
-    ChainGlyph.AssetHub -> RApi.drawable.ic_chain_asset_hub
-    ChainGlyph.Bulletin -> RApi.drawable.ic_chain_bulletin
+private fun ChainGlyph.imageVector(): ImageVector = when (this) {
+    ChainGlyph.People -> NovaIcons.People
+    ChainGlyph.AssetHub -> NovaIcons.AssetHub
+    ChainGlyph.Bulletin -> NovaIcons.Bulletin
 }
