@@ -19,7 +19,7 @@ data class CoinageBalance(
             availablePrivate = Balance.ZERO,
             gainingPrivacy = GainingPrivacyBalance(
                 amount = Balance.ZERO,
-                canSpendWithConfirmation = false
+                canSpendWithConfirmation = true
             ),
             pending = Balance.ZERO
         )
