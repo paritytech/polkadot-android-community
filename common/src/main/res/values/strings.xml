@@ -903,6 +903,11 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_reply_to">Reply to %1$s</string>
 
     <string name="chat_reactions_expand">Show more reactions</string>
+    <string name="chat_reactions_details_title">Reactions</string>
+    <plurals name="chat_reactions_details_total">
+        <item quantity="one">%1$d total</item>
+        <item quantity="other">%1$d total</item>
+    </plurals>
     <string name="chat_emoji_category_smileys">Smileys</string>
     <string name="chat_emoji_category_people">People</string>
     <string name="chat_emoji_category_animals">Animals &amp; Nature</string>
@@ -1291,6 +1296,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
 
     <string name="products_toolbar_title">Apps</string>
     <string name="products_empty_state_message">No products found</string>
+    <string name="products_message_custom_preview">Custom message</string>
+    <string name="products_message_load_failed">Couldn\'t load this message.</string>
+    <string name="products_message_render_failed">Couldn\'t display this message.</string>
     <string name="product_settings_version">version %1$s</string>
     <string name="product_settings_created_by">created by %1$s</string>
     <string name="product_settings_section_privacy">Privacy &amp; Security</string>
@@ -1457,6 +1465,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
         <item quantity="one">%1$d block</item>
         <item quantity="other">%1$d blocks</item>
     </plurals>
+
+    <string name="splash_waiting_for_network_title">Waiting for network connection…</string>
+    <string name="splash_waiting_for_network_message">Turn off Airplane Mode or check your internet</string>
 
     <string name="pocket_digital_dollar_title">Balance Card</string>
     <string name="pocket_digital_dollar_card_title">%1$s</string>
