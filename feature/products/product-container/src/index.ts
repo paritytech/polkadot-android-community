@@ -49,16 +49,17 @@ function freezeValue(obj: any, prop: string, value: any) {
 
 // --- Network: intercept with error (future: permission-gated) ---
 
-freezeValue(window, 'XMLHttpRequest', function XMLHttpRequest() {
-  throw new TypeError('Network access is not allowed');
-});
-
-freezeValue(window, 'WebSocket', function WebSocket() {
-  throw new TypeError('Network access is not allowed');
-});
+// TODO commented out for now since we only have trusted products
+// freezeValue(window, 'XMLHttpRequest', function XMLHttpRequest() {
+//   throw new TypeError('Network access is not allowed');
+// });
+//
+// freezeValue(window, 'WebSocket', function WebSocket() {
+//   throw new TypeError('Network access is not allowed');
+// });
 
 // --- Network: delete (no future permission path) ---
-freezeAndDelete(window, 'EventSource');
+// freezeAndDelete(window, 'EventSource');
 
 freezeValue(navigator, 'sendBeacon', () => false);
 
