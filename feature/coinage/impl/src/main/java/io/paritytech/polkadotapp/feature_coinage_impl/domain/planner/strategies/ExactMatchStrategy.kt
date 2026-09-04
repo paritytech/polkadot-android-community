@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
@@ -22,7 +23,10 @@ class ExactMatchStrategy(
     /**
      * Submits no extrinsic of ours: the coins are handed to the recipient as they are, so the only durable
      * record is the handoff mark. What becomes of them afterwards is read from the chain, not tracked here.
+     *
+     * Marks no region: a local handoff mark cannot stall.
      */
+    context(_: StalenessReportCollector)
     override suspend fun run(): Result<PreparedTransfer> {
         val handedOff = coins.map { OwnAsset.Coin(it.derivationIndex) }
 

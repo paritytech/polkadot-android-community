@@ -11,6 +11,9 @@ import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.validation.ValidationMixin
 import io.paritytech.polkadotapp.common.utils.orZero
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.launchWithDiagnostics
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.design.configs.colors.AvatarColorScheme
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
@@ -111,6 +114,8 @@ class SendEnterAmountViewModel @Inject constructor(
 
     override val sendValidationMixin = ValidationMixin.create()
 
+    override val stalenessReport = StalenessReport(this)
+
     private val balanceSplit = interactor.tokenBalance()
         .map { balance ->
             val spendable = tokenAmountMapper.mapFrom(balance.chainAsset.withAmount(balance.spendable))
@@ -161,7 +166,9 @@ class SendEnterAmountViewModel @Inject constructor(
     }
 
     override fun onConfirmClick() {
-        launch {
+        // The validation can present a confirmation sheet, but it opens no region, so the time the user
+        // spends reading it cannot trip the report's reveal timer.
+        launchWithDiagnostics(stalenessReport) {
             sendProgress.value = SendProgress.Submitting
 
             val amount = amountInputMixin.value.first().amount
@@ -175,6 +182,7 @@ class SendEnterAmountViewModel @Inject constructor(
         }
     }
 
+    context(diagnostics: StalenessReportCollector)
     private suspend fun sendValidatedTransfer(payload: SendValidationPayload) {
         interactor.send(payload.value, payload.transferMethod)
             .collect { state ->
