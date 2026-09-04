@@ -91,6 +91,9 @@ class BrowserWebViewProvider @AssistedInject constructor(
                 domStorageEnabled = true
                 allowFileAccess = false
                 allowContentAccess = false
+                // A camera preview is a MediaStream in an autoplaying <video>; the default gesture
+                // requirement would keep it black even once the capture permission is granted.
+                mediaPlaybackRequiresUserGesture = false
             }
 
             val innerClient =

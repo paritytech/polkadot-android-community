@@ -14,6 +14,17 @@ data class CoinageBalance(
     /** On its way, or past the age the chain still accepts. Not spendable on any terms. */
     val pending: Balance,
 ) {
+    companion object {
+        val EMPTY = CoinageBalance(
+            availablePrivate = Balance.ZERO,
+            gainingPrivacy = GainingPrivacyBalance(
+                amount = Balance.ZERO,
+                canSpendWithConfirmation = false
+            ),
+            pending = Balance.ZERO
+        )
+    }
+
     data class GainingPrivacyBalance(
         val amount: Balance,
         /**

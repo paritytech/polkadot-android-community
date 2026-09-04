@@ -19,11 +19,13 @@ import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.PocketInt
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketScreenState
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -40,21 +42,28 @@ class PocketViewModel @Inject constructor(
     private val selectedCardId = MutableStateFlow<String?>(null)
     private val collectiblesShown = MutableStateFlow(false)
 
-    val cards = combine(
+    private val balanceCard = combine<_, _, PocketCardUiModel.DigitalDollar?>(
         interactor.observeDigitalDollarBalance(),
-        interactor.observeUsername(),
         interactor.observeBackupProgress(),
+    ) { balance, backupProgress ->
+        PocketCardUiModel.DigitalDollar(
+            balance = tokenAmountMapper.mapFrom(balance.total),
+            available = tokenAmountMapper.mapFrom(balance.available),
+            syncInProgress = backupProgress.isInProgress()
+        )
+    }
+        .onStart { emit(null) }
+
+    private val addressCard = combine<_, _, _, PocketCardUiModel.IdCard?>(
+        interactor.observeUsername(),
         interactor.observeRank(),
         interactor.observeAddress()
-    ) { balance, username, backupProgress, rank, address ->
-        persistentListOf(
-            PocketCardUiModel.DigitalDollar(
-                balance = tokenAmountMapper.mapFrom(balance.total),
-                available = tokenAmountMapper.mapFrom(balance.available),
-                syncInProgress = backupProgress.isInProgress()
-            ),
-            PocketCardUiModel.IdCard(username = username, address = address, rank = rank)
-        )
+    ) { username, rank, address ->
+        PocketCardUiModel.IdCard(username = username, address = address, rank = rank)
+    }.onStart { emit(null) }
+
+    val cards = combine(balanceCard, addressCard) { balance, address ->
+        listOfNotNull(balance, address).toImmutableList()
     }
         .distinctUntilChangedBy { cards -> cards.map(::cardDisplayKey) }
         .inBackground()

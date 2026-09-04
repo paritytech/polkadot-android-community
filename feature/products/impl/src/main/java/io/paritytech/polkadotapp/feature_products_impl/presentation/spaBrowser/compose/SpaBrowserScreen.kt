@@ -1,8 +1,6 @@
 package io.paritytech.polkadotapp.feature_products_impl.presentation.spaBrowser.compose
 
-import android.view.ViewGroup
 import android.webkit.WebView
-import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.AnimationSpec
@@ -17,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.design.components.error.DefaultErrorState
 import io.paritytech.polkadotapp.design.components.progress.NovaLinearProgressIndicator
@@ -25,6 +22,7 @@ import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import io.paritytech.polkadotapp.feature_products_api.domain.error.ProductResolutionError
+import io.paritytech.polkadotapp.feature_products_impl.presentation.compose.ProductWebViewHost
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaBrowser.SpaBrowserPageState
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaBrowser.SpaBrowserUiState
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaBrowser.SpaBrowserViewModel
@@ -123,23 +121,10 @@ private fun SpaBrowserPageContent(
     webView: WebView?,
 ) {
     when (pageState) {
-        SpaBrowserPageState.Content -> {
-            // The factory runs once, so the active tab's WebView is swapped in `update` (detached
-            // from its previous parent first) — otherwise a tab switch would show the wrong product.
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { context -> FrameLayout(context) },
-                update = { host ->
-                    if (host.getChildAt(0) !== webView) {
-                        host.removeAllViews()
-                        webView?.let {
-                            (it.parent as? ViewGroup)?.removeView(it)
-                            host.addView(it)
-                        }
-                    }
-                },
-            )
-        }
+        SpaBrowserPageState.Content -> ProductWebViewHost(
+            modifier = Modifier.fillMaxSize(),
+            webView = webView,
+        )
 
         SpaBrowserPageState.NoAppSurface -> DefaultErrorState(
             text = stringResource(RCommon.string.spa_browser_page_no_app_surface),
