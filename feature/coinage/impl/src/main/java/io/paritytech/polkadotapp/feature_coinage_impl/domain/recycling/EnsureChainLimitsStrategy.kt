@@ -23,7 +23,6 @@ class EnsureChainLimitsStrategy(
     private val inner: CoinRecyclingStrategy,
     private val forcedRecyclingAgeProvider: ForcedRecyclingAgeProvider,
 ) : CoinRecyclingStrategy by inner {
-
     context(conversion: CoinageBalanceConversionContext)
     override suspend fun evaluate(
         coins: List<Coin>,
