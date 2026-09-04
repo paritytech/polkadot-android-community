@@ -90,7 +90,7 @@ internal fun ModeCircle(
 
     val diameter = lerp(CIRCLE_SIZE, SELECTED_CIRCLE_SIZE, selection)
     val glowColor = blended.accentColor
-    val shadowColor = PolkadotTheme.colors.avatar.bg.onyx
+    val shadowColor = PolkadotTheme.colors.shadow.medium
 
     // Held across frames and reconfigured in place: the circle's size animates, which rebuilds the draw
     // cache on every frame of a selection change, and allocating paints there would allocate per frame.
@@ -178,7 +178,10 @@ internal const val GLOW_ALPHA = 0.45f
 
 private val SHADOW_BLUR = 4.dp
 private val SHADOW_OFFSET = 4.dp
-private const val SHADOW_ALPHA = 0.4f
+
+// The palette's shadow colour is black at 48% and the design asks for 70% here, with nothing darker in the
+// set to reach for; the token supplies the colour and this supplies the depth the design drew.
+private const val SHADOW_ALPHA = 0.7f
 
 // Selected circle plus the glow spreading either side of it.
 internal val CIRCLE_BOX_SIZE = SELECTED_CIRCLE_SIZE + GLOW_BLUR * 2
