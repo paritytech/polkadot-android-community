@@ -171,13 +171,12 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
     }
 
     private fun WindowInsetsCompat.inflateTopInsets(extraTopPx: Int): WindowInsetsCompat {
-        val systemBars = getInsets(WindowInsetsCompat.Type.systemBars())
+        // Inflate only the status-bar top. systemBars/safeDrawing pick this up via their union (so
+        // top-bar screens still clear the bar), while the bottom navigation-bar inset is left intact.
+        // Setting the compound systemBars type here would also clobber navigationBars.top and push
+        // bottom-anchored content (e.g. the chat input row) upward.
         val statusBars = getInsets(WindowInsetsCompat.Type.statusBars())
         return WindowInsetsCompat.Builder(this)
-            .setInsets(
-                WindowInsetsCompat.Type.systemBars(),
-                Insets.of(systemBars.left, systemBars.top + extraTopPx, systemBars.right, systemBars.bottom),
-            )
             .setInsets(
                 WindowInsetsCompat.Type.statusBars(),
                 Insets.of(statusBars.left, statusBars.top + extraTopPx, statusBars.right, statusBars.bottom),
