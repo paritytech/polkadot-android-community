@@ -10,7 +10,6 @@ class RealChainHealthMixinFactory @Inject constructor(
     private val monitor: ChainHealthMonitor,
     private val knownChains: KnownChains,
 ) : ChainHealthMixin.Factory {
-
     override fun create(scope: ComputationalScope): ChainHealthMixin =
         RealChainHealthMixin(scope, monitor, knownChains)
 }

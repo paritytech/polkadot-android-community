@@ -49,7 +49,6 @@ class RealChainHealthMonitor @Inject constructor(
     private val connectionSmoother: ConnectionSmoother,
     private val probes: Set<@JvmSuppressWildcards ChainHealthProbe>,
 ) : ChainHealthMonitor {
-
     override fun observeChainsHealth(): Flow<List<ChainHealth>> =
         monitoredChainIds().map(::observeChainHealth).combine()
 

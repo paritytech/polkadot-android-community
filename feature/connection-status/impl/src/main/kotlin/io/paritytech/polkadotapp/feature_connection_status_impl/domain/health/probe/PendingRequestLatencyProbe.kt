@@ -25,7 +25,6 @@ class PendingRequestLatencyProbe @Inject constructor(
     private val scorer: LatencyScorer,
     private val timeProvider: TimeProvider,
 ) : ChainHealthProbe {
-
     override fun observe(context: ChainMetricContext): Flow<ChainMetricReading> {
         val tracker = PendingRequestTracker()
         val idealMillis = ChainHealthThresholds.PENDING_REQUEST_IDEAL.inWholeMilliseconds

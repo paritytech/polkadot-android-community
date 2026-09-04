@@ -9,7 +9,6 @@ import java.util.IdentityHashMap
  * identity (Sendable has no id). Not thread-safe — drive it from a single collector.
  */
 class RequestResponseTracker(private val windowMillis: Long) {
-
     private val firstSeenMillis = IdentityHashMap<Any, Long>()
     private val completions = ArrayDeque<Completion>()
 

@@ -53,7 +53,6 @@ class ConnectionSmoother internal constructor(
     private val config: ConnectionSmoothingConfig,
     private val timeProvider: TimeProvider,
 ) {
-
     @Inject
     constructor(timeProvider: TimeProvider) : this(ConnectionSmoothingConfig.Default, timeProvider)
 

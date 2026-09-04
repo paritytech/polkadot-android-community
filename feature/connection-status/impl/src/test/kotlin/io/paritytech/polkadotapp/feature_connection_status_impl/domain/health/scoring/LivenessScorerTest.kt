@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LivenessScorerTest {
-
     private val scorer = LivenessScorer()
     private val blockTime = 2_000L
 

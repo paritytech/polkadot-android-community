@@ -21,7 +21,6 @@ internal class RealChainHealthMixin(
     monitor: ChainHealthMonitor,
     private val knownChains: KnownChains,
 ) : ChainHealthMixin, ComputationalScope by scope {
-
     override val model: StateFlow<ChainHealthBarModel> = monitor.observeChainsHealth()
         .map { healths -> healths.toBarModel() }
         .stateInBackground(SharingStarted.WhileSubscribed(), EMPTY_MODEL)

@@ -22,8 +22,8 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
-import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
+import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
@@ -157,7 +157,6 @@ private fun Duration.formatSeconds(): String = "%.1fs".format(inWholeMillisecond
 private class BelowAnchorPositionProvider(
     private val gapPx: Int,
 ) : PopupPositionProvider {
-
     // Full-width content (margins come from the surface's own padding); only the vertical anchor
     // matters — drop just below the tapped icon, which already sits below the system status bar.
     override fun calculatePosition(

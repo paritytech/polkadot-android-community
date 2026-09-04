@@ -18,7 +18,6 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 class ConnectionSmootherTest {
-
     private val config = ConnectionSmoothingConfig(
         stabilityWindow = 3.seconds,
         flapWindow = 30.seconds,

@@ -16,7 +16,6 @@ import javax.inject.Inject
 class FinalityGapProbe @Inject constructor(
     private val finalityGapScorer: FinalityGapScorer,
 ) : ChainHealthProbe {
-
     override fun observe(context: ChainMetricContext): Flow<ChainMetricReading> {
         val idealGap = context.chain.additional?.finalityGapIdeal ?: ChainHealthThresholds.FINALITY_GAP_IDEAL
         val outageGap = context.chain.additional?.finalityGapOutage ?: ChainHealthThresholds.FINALITY_GAP_OUTAGE

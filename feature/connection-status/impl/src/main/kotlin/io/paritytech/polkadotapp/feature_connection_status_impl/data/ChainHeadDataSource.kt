@@ -16,7 +16,6 @@ import javax.inject.Singleton
 class ChainHeadDataSource @Inject constructor(
     private val rpcCalls: RpcCalls,
 ) {
-
     fun bestBlockNumber(chainId: ChainId): Flow<Int> =
         flowOfAll { rpcCalls.subscribeNewHeads(chainId) }.map { it.number }
 

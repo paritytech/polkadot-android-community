@@ -6,7 +6,6 @@ package io.paritytech.polkadotapp.feature_connection_status_api.domain.model
  */
 @JvmInline
 value class ChainHealthScore private constructor(val value: Int) : Comparable<ChainHealthScore> {
-
     val fraction: Float
         get() = value / MAX_VALUE.toFloat()
 

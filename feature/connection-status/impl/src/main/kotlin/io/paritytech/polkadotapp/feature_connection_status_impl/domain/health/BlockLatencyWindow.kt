@@ -6,7 +6,6 @@ package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
  * single collector.
  */
 class BlockLatencyWindow(private val maxSamples: Int) {
-
     private val intervals = ArrayDeque<Long>()
     private var lastArrival: Long? = null
 

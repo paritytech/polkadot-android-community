@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class FinalityGapScorerTest {
-
     private val scorer = FinalityGapScorer()
     private val ideal = 6
     private val outage = 24

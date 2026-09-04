@@ -11,7 +11,6 @@ import kotlin.math.roundToInt
  * yet) is treated optimistically as perfect so the ring starts full and self-corrects.
  */
 class LivenessScorer @Inject constructor() {
-
     fun score(
         expectedBlockTimeMillis: Long,
         averageLatencyMillis: Long?,

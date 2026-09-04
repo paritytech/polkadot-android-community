@@ -5,7 +5,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class BlockLatencyWindowTest {
-
     @Test
     fun `no average until an interval is observed`() {
         val window = BlockLatencyWindow(maxSamples = 3)

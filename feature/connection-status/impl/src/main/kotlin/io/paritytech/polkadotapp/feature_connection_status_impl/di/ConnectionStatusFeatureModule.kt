@@ -19,7 +19,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 interface ConnectionStatusFeatureModule {
-
     @Binds
     @Singleton
     fun bindChainHealthMonitor(impl: RealChainHealthMonitor): ChainHealthMonitor

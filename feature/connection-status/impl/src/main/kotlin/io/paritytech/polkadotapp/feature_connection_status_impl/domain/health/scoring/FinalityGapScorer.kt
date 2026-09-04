@@ -10,7 +10,6 @@ import kotlin.math.roundToInt
  * even when healthy. A stalling finality grows the gap, so gap magnitude captures monotonic stall.
  */
 class FinalityGapScorer @Inject constructor() {
-
     /**
      * @param idealGap gap at or below which the chain scores full marks.
      * @param outageGap gap at or above which the chain scores zero.

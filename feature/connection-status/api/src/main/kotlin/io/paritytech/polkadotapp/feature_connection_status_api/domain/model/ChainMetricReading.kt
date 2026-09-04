@@ -8,7 +8,6 @@ import kotlin.time.Duration
  * that emits it, and a UI branch that formats it. Formatting stays in the presentation layer.
  */
 sealed interface ChainMetricReading {
-
     val score: ChainHealthScore
 
     data class BlockLatency(

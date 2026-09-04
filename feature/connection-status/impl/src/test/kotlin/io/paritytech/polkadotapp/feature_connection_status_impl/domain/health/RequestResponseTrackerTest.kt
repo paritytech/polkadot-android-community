@@ -5,7 +5,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RequestResponseTrackerTest {
-
     private val window = 30_000L
 
     @Test

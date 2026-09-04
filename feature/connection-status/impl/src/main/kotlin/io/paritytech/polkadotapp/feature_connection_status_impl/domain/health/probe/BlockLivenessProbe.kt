@@ -27,7 +27,6 @@ class BlockLivenessProbe @Inject constructor(
     private val livenessScorer: LivenessScorer,
     private val timeProvider: TimeProvider,
 ) : ChainHealthProbe {
-
     override fun observe(context: ChainMetricContext): Flow<ChainMetricReading> = flow {
         val window = BlockLatencyWindow(ChainHealthThresholds.LATENCY_WINDOW_SIZE)
         val blockTimeMillis = context.expectedBlockTime.inWholeMilliseconds

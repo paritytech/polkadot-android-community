@@ -9,7 +9,6 @@ import kotlin.math.roundToInt
  * decaying linearly to zero by the outage threshold.
  */
 class LatencyScorer @Inject constructor() {
-
     fun score(oldestPendingMillis: Long, idealMillis: Long, outageMillis: Long): ChainHealthScore {
         val value = oldestPendingMillis.coerceAtLeast(0)
 

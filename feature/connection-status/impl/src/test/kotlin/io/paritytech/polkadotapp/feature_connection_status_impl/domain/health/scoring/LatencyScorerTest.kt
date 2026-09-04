@@ -5,7 +5,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LatencyScorerTest {
-
     private val scorer = LatencyScorer()
     private val ideal = 3_000L
     private val outage = 20_000L

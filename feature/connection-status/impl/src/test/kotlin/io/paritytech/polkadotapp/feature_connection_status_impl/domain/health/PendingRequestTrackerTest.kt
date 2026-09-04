@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PendingRequestTrackerTest {
-
     @Test
     fun `no pending requests reports zero`() {
         val tracker = PendingRequestTracker()
