@@ -53,7 +53,7 @@ object ChainHealthBarDefaults {
      * content's top window inset by this amount so screens sit below the bar while their backgrounds
      * still draw full-bleed behind it.
      */
-    val ContentHeight = 36.dp
+    val ContentHeight = ICON_SIZE
 }
 
 /**
