@@ -1,7 +1,5 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode
 
-import android.graphics.BlurMaskFilter
-import android.graphics.Paint
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -14,13 +12,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 
@@ -73,25 +65,21 @@ internal fun PrivacyModeTrack(modifier: Modifier) {
                 endX = scaleEnd
             )
 
-            // A stroke of the groove's own outline, blurred and pushed down, then clipped to the groove:
-            // only the part that falls inside survives, which reads as a shadow cast by the upper rim.
-            val recessPaint = Paint().apply {
-                isAntiAlias = true
-                style = Paint.Style.STROKE
-                strokeWidth = RECESS_STROKE.toPx()
-                color = recessColor.copy(alpha = RECESS_ALPHA).toArgb()
-                maskFilter = BlurMaskFilter(RECESS_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
-            }
-            val androidTrough = trough.asAndroidPath()
+            // The shadow the upper rim casts into the groove: darkest against that rim and gone about a
+            // third of the way down. Measured off the design, and a gradient rather than a blurred outline
+            // because a blur soft enough to read as a shadow also spreads the darkness away to nothing.
+            val recessBrush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to recessColor.copy(alpha = RECESS_ALPHA),
+                    RECESS_DEPTH to recessColor.copy(alpha = 0f)
+                ),
+                startY = 0f,
+                endY = size.height
+            )
 
             onDrawBehind {
                 drawPath(trough, color = troughColor)
-
-                clipPath(trough) {
-                    translate(top = RECESS_OFFSET.toPx()) {
-                        drawIntoCanvas { canvas -> canvas.nativeCanvas.drawPath(androidTrough, recessPaint) }
-                    }
-                }
+                drawPath(trough, brush = recessBrush)
 
                 drawPath(ticks, brush = scaleBrush)
                 drawPath(trough, color = rimColor, style = Stroke(width = RIM_STROKE.toPx()))
@@ -135,12 +123,9 @@ internal val TICK_STEP = 8.dp
 private const val SCALE_BALANCED_STOP = 0.49f
 private const val SCALE_SAPPHIRE_STOP = 0.73f
 
-private val RECESS_STROKE = 4.dp
-private val RECESS_BLUR = 6.dp
-private val RECESS_OFFSET = 4.dp
+private const val RECESS_ALPHA = 0.7f
 
-// The recess colour is a static dark one, so it has to be laid on thin: over a dark trough the alpha barely
-// shows, while over a light one an opaque stroke reads as a hard band rather than a shadow.
-private const val RECESS_ALPHA = 0.35f
+/** Share of the groove's height the rim shadow spans before it fades out. */
+private const val RECESS_DEPTH = 0.3f
 
 private val RIM_STROKE = 1.dp

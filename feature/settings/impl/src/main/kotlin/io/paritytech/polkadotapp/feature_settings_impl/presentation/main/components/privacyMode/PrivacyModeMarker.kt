@@ -35,8 +35,11 @@ internal fun ModeMarker(
     val side = lerp(MARKER_SIZE, SELECTED_MARKER_SIZE, selection)
 
     Spacer(
+        // The caller's modifier carries the offset that puts this marker under its mode, so it has to sit
+        // before the drawing: a draw modifier paints at the node's own position, ignoring a later shift.
         modifier = Modifier
             .size(MARKER_BOX_SIZE)
+            .then(modifier)
             .drawWithCache {
                 // An upward triangle inscribed in a square of `side`, centred in the box.
                 val half = side.toPx() / 2f
@@ -64,7 +67,6 @@ internal fun ModeMarker(
                     drawPath(triangle, color = color)
                 }
             }
-            .then(modifier)
     )
 }
 
