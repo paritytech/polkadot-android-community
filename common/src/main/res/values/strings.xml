@@ -1448,6 +1448,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_digital_dollar_available">Available</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
+    <string name="pocket_digital_dollar_advanced">Advanced</string>
 
     <string name="payment_privacy_mode_title">Payment Privacy Mode</string>
     <string name="payment_privacy_mode_subtitle">This setting controls how your payments are processed</string>
