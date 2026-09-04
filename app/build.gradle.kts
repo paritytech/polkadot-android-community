@@ -15,27 +15,27 @@ android {
     namespace = "io.paritytech.polkadotapp.app"
 
     defaultConfig {
-        applicationId = localProperties.readSecretOrDefault("APPLICATION_ID", "io.paritytech.polkadotapp")
+        applicationId = localProperties.readSecretOrThrow("APPLICATION_ID")
 
         versionCode = computeVersionCode()
         versionName = computeVersionName()
 
         testInstrumentationRunner = "io.paritytech.polkadotapp.app.HiltTestRunner"
 
-        manifestPlaceholders["appName"] = localProperties.readSecretOrDefault("APP_NAME", "Polkadot")
+        manifestPlaceholders["appName"] = localProperties.readSecretOrThrow("APP_NAME")
         manifestPlaceholders["sentryDsn"] = localProperties.readSecretOrNull("SENTRY_DSN") ?: ""
 
         buildConfigString(
             "LOG_COLLECTION_EMAIL",
-            localProperties.readSecretOrDefault("LOG_COLLECTION_EMAIL", "logs@example.com")
+            localProperties.readSecretOrThrow("LOG_COLLECTION_EMAIL")
         )
         buildConfigString(
             "PRIVACY_POLICY_URL",
-            localProperties.readSecretOrDefault("PRIVACY_POLICY_URL", "https://example.com/privacy")
+            localProperties.readSecretOrThrow("PRIVACY_POLICY_URL")
         )
         buildConfigString(
             "TERMS_OF_USE_URL",
-            localProperties.readSecretOrDefault("TERMS_OF_USE_URL", "https://example.com/terms")
+            localProperties.readSecretOrThrow("TERMS_OF_USE_URL")
         )
     }
 
@@ -64,10 +64,8 @@ android {
         getByName("debug") {
             signingConfig = signingConfigs.getByName("dev")
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["appName"] = localProperties.readSecretOrDefault(
-                "DEBUG_APP_NAME",
-                "[Debug] ${localProperties.readSecretOrDefault("APP_NAME", "Polkadot")}"
-            )
+            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("DEBUG_APP_NAME")
+                ?: "[Debug] ${localProperties.readSecretOrThrow("APP_NAME")}"
 
             buildConfigField("String", "BuildType", "\"debug\"")
         }
@@ -76,20 +74,16 @@ android {
 
             signingConfig = signingConfigs.getByName("dev")
             applicationIdSuffix = ".nightly"
-            manifestPlaceholders["appName"] = localProperties.readSecretOrDefault(
-                "NIGHTLY_APP_NAME",
-                localProperties.readSecretOrDefault("APP_NAME", "Polkadot")
-            )
+            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("NIGHTLY_APP_NAME")
+                ?: localProperties.readSecretOrThrow("APP_NAME")
         }
         getByName("safetynet") {
             matchingFallbacks.addAll(listOf("nightly", "debug"))
 
             signingConfig = signingConfigs.getByName("dev")
             applicationIdSuffix = ".safetynet"
-            manifestPlaceholders["appName"] = localProperties.readSecretOrDefault(
-                "SAFETYNET_APP_NAME",
-                "[Safetynet] ${localProperties.readSecretOrDefault("APP_NAME", "Polkadot")}"
-            )
+            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("SAFETYNET_APP_NAME")
+                ?: "[Safetynet] ${localProperties.readSecretOrThrow("APP_NAME")}"
         }
     }
 
@@ -200,8 +194,8 @@ dependencies {
 }
 
 sentry {
-    org.set(localProperties.readSecretOrNull("SENTRY_ORG") ?: "your-sentry-org")
-    projectName.set(localProperties.readSecretOrNull("SENTRY_PROJECT") ?: "your-sentry-project")
+    org.set(localProperties.readSecretOrThrow("SENTRY_ORG"))
+    projectName.set(localProperties.readSecretOrThrow("SENTRY_PROJECT"))
 
     // this will upload your source code to Sentry to show it as part of the stack traces
     // disable if you don't want to expose your sources
