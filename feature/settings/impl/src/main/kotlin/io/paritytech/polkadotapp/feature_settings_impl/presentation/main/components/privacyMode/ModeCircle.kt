@@ -2,7 +2,9 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.compon
 
 import android.graphics.BlurMaskFilter
 import android.graphics.Paint
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -15,10 +17,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -32,12 +38,15 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 // One mode as it sits on the track. Selecting a mode grows its circle and lights it; the mode losing the
 // selection shrinks back in the same motion, so a tap reads as the selection passing between two circles
 // rather than one circle travelling along the track.
+// A dragged circle is a single circle that adopts each mode as it passes the midpoint towards it, so
+// [appearance] changes under it mid-gesture and is cross-faded rather than swapped — see [fadeMillis].
 // The box is wider than the circle so the glow has room to spread without being clipped by the layout.
 @Composable
 internal fun ModeCircle(
     modifier: Modifier,
     appearance: ModeAppearance,
     isSelected: Boolean,
+    fadeMillis: () -> Int,
     interactionSource: MutableInteractionSource? = null
 ) {
     val selection by animateFloatAsState(
@@ -46,8 +55,33 @@ internal fun ModeCircle(
         label = "circleSelection"
     )
 
+    // The mode the circle is coming from, held until the fade away from it completes. A crossing that
+    // interrupts an unfinished fade restarts from this same mode: two crossings inside one fade would mean
+    // the finger covered half a mode in under one fade, which is faster than the track allows.
+    var fadeFrom by remember { mutableStateOf(appearance) }
+    val fade = remember { Animatable(1f) }
+
+    LaunchedEffect(appearance) {
+        if (fadeFrom == appearance) return@LaunchedEffect
+
+        fade.snapTo(0f)
+        // Linear on purpose: two glyphs dissolving into each other with an eased curve lose ink in the
+        // middle of the exchange, which reads as a blink.
+        fade.animateTo(1f, tween(durationMillis = fadeMillis(), easing = LinearEasing))
+        fadeFrom = appearance
+    }
+
+    // Composition sees the new mode one frame before the effect above can start the animation, so until it
+    // is running the circle stays on the outgoing mode instead of flashing the incoming one.
+    val progress = when {
+        fadeFrom == appearance -> 1f
+        fade.isRunning -> fade.value
+        else -> 0f
+    }
+    val blended = appearance.accentBlendedFrom(fadeFrom, progress)
+
     val diameter = lerp(CIRCLE_SIZE, SELECTED_CIRCLE_SIZE, selection)
-    val glowColor = appearance.accentColor
+    val glowColor = blended.accentColor
     val shadowColor = PolkadotTheme.colors.avatar.bg.onyx
 
     // Held across frames and reconfigured in place: the circle's size animates, which rebuilds the draw
@@ -87,8 +121,8 @@ internal fun ModeCircle(
         PolkadotSurface(
             modifier = Modifier.size(diameter),
             shape = CircleShape,
-            brush = appearance.circleBrush(selection),
-            border = BorderStroke(CIRCLE_BORDER, appearance.circleBorderBrush())
+            brush = blended.circleBrush(selection),
+            border = BorderStroke(CIRCLE_BORDER, blended.circleBorderBrush())
         ) {
             val ripple = if (interactionSource != null) {
                 Modifier.indication(interactionSource, LocalIndication.current)
@@ -104,8 +138,18 @@ internal fun ModeCircle(
                     .then(ripple),
                 contentAlignment = Alignment.Center
             ) {
+                val iconSize = diameter * MODE_ICON_SIZE_FRACTION
+
+                if (progress < 1f) {
+                    NovaIcon(
+                        modifier = Modifier.size(iconSize).alpha(1f - progress),
+                        imageVector = fadeFrom.icon,
+                        tint = fadeFrom.iconColor
+                    )
+                }
+
                 NovaIcon(
-                    modifier = Modifier.size(diameter * MODE_ICON_SIZE_FRACTION),
+                    modifier = Modifier.size(iconSize).alpha(progress),
                     imageVector = appearance.icon,
                     tint = appearance.iconColor
                 )

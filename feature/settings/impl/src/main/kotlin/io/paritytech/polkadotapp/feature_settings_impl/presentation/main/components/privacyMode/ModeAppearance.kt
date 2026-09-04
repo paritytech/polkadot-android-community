@@ -111,6 +111,13 @@ internal fun ModeAppearance.markerColor(selection: Float): Color {
     return lerp(lerp(accentColor, dark, MARKER_MUTED_SHADE), accentColor, selection)
 }
 
+// A dragged circle takes on the mode it is nearest to, so it changes appearance mid-gesture. Swapping the
+// accent in a single frame is what reads as a jump; blending it lets the colour travel together with the
+// glyph cross-fade in [ModeCircle]. [fraction] is 0 while the circle still shows [previous] and 1 once it
+// has fully become this mode.
+internal fun ModeAppearance.accentBlendedFrom(previous: ModeAppearance, fraction: Float): ModeAppearance =
+    copy(accentColor = lerp(previous.accentColor, accentColor, fraction))
+
 private const val SELECTED_TOP_TINT = 0.1f
 private const val SELECTED_BOTTOM_SHADE = 0.35f
 

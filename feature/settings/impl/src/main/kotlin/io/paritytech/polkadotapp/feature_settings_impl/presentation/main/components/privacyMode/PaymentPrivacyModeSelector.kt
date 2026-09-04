@@ -1,6 +1,10 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -25,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -35,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldOutlined
@@ -47,6 +53,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingS
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.roundToInt
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -128,6 +135,11 @@ private fun ModeSelector(
 
     val interactionSources = remember { List(modes.size) { MutableInteractionSource() }.toImmutableList() }
 
+    // How long a crossing's cross-fades run. Written on every pointer sample and read only when a
+    // crossing starts one, so it is deliberately kept out of the snapshot system: an observable value here
+    // would recompose the selector on every sample of every drag without changing anything on screen.
+    val dragFade = remember { DragFade() }
+
     val haptics = LocalHapticFeedback.current
     // The mark the dragged circle was last over. Held across drag events so a tick fires on crossing one,
     // not on every pointer sample.
@@ -169,17 +181,31 @@ private fun ModeSelector(
 
                 modes.indices.forEach { index ->
                     // While a drag is in flight the circle under the finger is the dragged one below, so the
-                    // mode it currently covers does not draw a second circle in its own place.
-                    if (!isDragging || index != nearestIndex) {
-                        ModeCircle(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .offset(centreOffset({ index.toFloat() }, { trackWidth }, modes.lastIndex)),
-                            appearance = appearances[index],
-                            isSelected = !isDragging && index == selectedIndex,
-                            interactionSource = interactionSources[index]
-                        )
-                    }
+                    // mode it currently covers hands its place over: it dissolves under that circle and
+                    // fades back in as the circle leaves, rather than blinking out and back.
+                    val isCovered = isDragging && index == nearestIndex
+                    val reveal = animateFloatAsState(
+                        targetValue = if (isCovered) 0f else 1f,
+                        // The handover at the end of a drag has to be instant: the dragged circle leaves the
+                        // composition in the same frame, and a fade here would show a gap where it stood.
+                        animationSpec = if (isDragging) {
+                            tween(durationMillis = dragFade.millis, easing = LinearEasing)
+                        } else {
+                            snap()
+                        },
+                        label = "circleReveal"
+                    )
+
+                    ModeCircle(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(centreOffset({ index.toFloat() }, { trackWidth }, modes.lastIndex))
+                            .graphicsLayer { alpha = reveal.value },
+                        appearance = appearances[index],
+                        isSelected = !isDragging && index == selectedIndex,
+                        fadeMillis = { dragFade.millis },
+                        interactionSource = interactionSources[index]
+                    )
                 }
 
                 if (isDragging) {
@@ -189,6 +215,7 @@ private fun ModeSelector(
                             .offset(centreOffset({ position.value }, { trackWidth }, modes.lastIndex)),
                         appearance = appearances[nearestIndex],
                         isSelected = true,
+                        fadeMillis = { dragFade.millis },
                         interactionSource = interactionSources[nearestIndex]
                     )
                 }
@@ -204,6 +231,7 @@ private fun ModeSelector(
                         detectHorizontalDragGestures(
                             onDragStart = {
                                 isDragging = true
+                                dragFade.millis = SLOW_DRAG_FADE_MILLIS
                                 lastMarkIndex = markIndexOf(position.value, size.width, TRACK_INSET.toPx(), TICK_STEP.toPx(), modes.lastIndex)
                             },
                             onDragCancel = {
@@ -226,11 +254,14 @@ private fun ModeSelector(
                                     isDragging = false
                                 }
                             },
-                            onHorizontalDrag = { change, _ ->
+                            onHorizontalDrag = { change, dragAmount ->
                                 change.consume()
 
                                 val step = trackStep(size.width, TRACK_INSET.toPx(), modes.lastIndex)
                                 if (step > 0f) {
+                                    val elapsed = change.uptimeMillis - change.previousUptimeMillis
+                                    dragFade.observe(dragAmount, step, elapsed)
+
                                     val dragged = (change.position.x - TRACK_INSET.toPx()) / step
                                     val clamped = dragged.coerceIn(0f, modes.lastIndex.toFloat())
 
@@ -337,6 +368,30 @@ private fun ModeMarkers(
         }
     }
 }
+
+// The cross-fades a crossing starts run for as long as the gesture that triggered them warrants: a flick
+// must not leave the previous glyph hanging behind the finger, while a slow drag has room for a gentler
+// dissolve. Both ends stay well clear of the instant swap this replaces.
+private class DragFade {
+    var millis: Int = SLOW_DRAG_FADE_MILLIS
+
+    fun observe(dragAmount: Float, step: Float, elapsedMillis: Long) {
+        val speed = abs(dragAmount) / step * MILLIS_IN_SECOND / elapsedMillis.coerceAtLeast(1L)
+        val fraction = (speed / FAST_DRAG_SPEED).coerceIn(0f, 1f)
+
+        // A single pointer sample is jittery; the fade should follow the gesture, not one frame of it.
+        millis = lerp(millis, lerp(SLOW_DRAG_FADE_MILLIS, FAST_DRAG_FADE_MILLIS, fraction), FADE_SMOOTHING)
+    }
+}
+
+private const val SLOW_DRAG_FADE_MILLIS = 280
+private const val FAST_DRAG_FADE_MILLIS = 140
+
+// Mode widths per second at which the fade reaches its shortest.
+private const val FAST_DRAG_SPEED = 3f
+
+private const val FADE_SMOOTHING = 0.4f
+private const val MILLIS_IN_SECOND = 1000f
 
 private val HEADER_ICON_SIZE = 24.dp
 
