@@ -70,7 +70,7 @@ fun ChainHealthBar(
         Row(
             modifier = modifier
                 .fillMaxWidth()
-//                .statusBarsPadding()
+                .statusBarsPadding()
                 .height(ChainHealthBarDefaults.ContentHeight)
                 .padding(horizontal = PolkadotTheme.spacings.medium),
             horizontalArrangement = Arrangement.End,

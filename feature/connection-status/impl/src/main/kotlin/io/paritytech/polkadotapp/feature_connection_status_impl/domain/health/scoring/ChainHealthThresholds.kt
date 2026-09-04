@@ -12,7 +12,7 @@ object ChainHealthThresholds {
 
     // --- Block liveness (latency), relative to the chain's expected block time ---
     // Full score while average latency stays within this multiple of the block time.
-    const val LIVENESS_PLATEAU_MULTIPLIER = 2.0
+    const val LIVENESS_PLATEAU_MULTIPLIER = 1.3
     // Zero score once latency reaches this multiple of the block time.
     const val LIVENESS_ZERO_MULTIPLIER = 10.0
     // Samples in the moving-average latency window.
