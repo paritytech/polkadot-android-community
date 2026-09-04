@@ -28,8 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -54,6 +56,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingS
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -134,6 +137,11 @@ private fun ModeSelector(
 
     val interactionSources = remember { List(modes.size) { MutableInteractionSource() }.toImmutableList() }
 
+    val haptics = LocalHapticFeedback.current
+    // The mark the dragged circle was last over. Held across drag events so a tick fires on crossing one,
+    // not on every pointer sample.
+    var lastMarkIndex by remember { mutableIntStateOf(0) }
+
     // A dragged circle spends most of the gesture between two modes; this is the one it is closest to.
     val nearestIndex by remember {
         derivedStateOf { position.value.roundToInt().coerceIn(modes.indices) }
@@ -203,7 +211,10 @@ private fun ModeSelector(
                     .selectableGroup()
                     .pointerInput(modes.size) {
                         detectHorizontalDragGestures(
-                            onDragStart = { isDragging = true },
+                            onDragStart = {
+                                isDragging = true
+                                lastMarkIndex = markIndexOf(position.value, size.width, TRACK_INSET.toPx(), TICK_STEP.toPx(), modes.lastIndex)
+                            },
                             onDragCancel = {
                                 scope.launch {
                                     position.animateTo(selectedIndex.toFloat(), SELECTION_ANIMATION)
@@ -212,6 +223,9 @@ private fun ModeSelector(
                             },
                             onDragEnd = {
                                 val nearest = position.value.roundToInt().coerceIn(modes.indices)
+                                if (modes[nearest] != selectedMode) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                                }
                                 onModeSelected(modes[nearest])
 
                                 // The flag drops only after the circle has arrived, so the dragged circle
@@ -227,9 +241,21 @@ private fun ModeSelector(
                                 val step = trackStep(size.width, TRACK_INSET.toPx(), modes.lastIndex)
                                 if (step > 0f) {
                                     val dragged = (change.position.x - TRACK_INSET.toPx()) / step
-                                    scope.launch {
-                                        position.snapTo(dragged.coerceIn(0f, modes.lastIndex.toFloat()))
+                                    val clamped = dragged.coerceIn(0f, modes.lastIndex.toFloat())
+
+                                    val mark = markIndexOf(
+                                        clamped,
+                                        size.width,
+                                        TRACK_INSET.toPx(),
+                                        TICK_STEP.toPx(),
+                                        modes.lastIndex
+                                    )
+                                    if (mark != lastMarkIndex) {
+                                        lastMarkIndex = mark
+                                        haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
                                     }
+
+                                    scope.launch { position.snapTo(clamped) }
                                 }
                             }
                         )
@@ -240,7 +266,12 @@ private fun ModeSelector(
                         appearance = appearances[index],
                         isSelected = mode == selectedMode,
                         interactionSource = interactionSources[index],
-                        onClick = { onModeSelected(mode) }
+                        onClick = {
+                            if (mode != selectedMode) {
+                                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                            }
+                            onModeSelected(mode)
+                        }
                     )
                 }
             }
@@ -279,6 +310,19 @@ private fun trackStep(trackWidth: Int, inset: Float, lastIndex: Int): Float {
     val span = trackWidth - inset * 2f
 
     return if (span > 0f && lastIndex > 0) span / lastIndex else 0f
+}
+
+/** Which scale mark the circle currently sits over, counted from the left end of the scale. */
+private fun markIndexOf(
+    position: Float,
+    trackWidth: Int,
+    inset: Float,
+    markStep: Float,
+    lastIndex: Int
+): Int {
+    val offsetFromScaleStart = position * trackStep(trackWidth, inset, lastIndex)
+
+    return if (markStep > 0f) floor(offsetFromScaleStart / markStep).toInt() else 0
 }
 
 @Composable
