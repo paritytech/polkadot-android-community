@@ -1,8 +1,9 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe
 
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
+import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealthScore
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.PendingRequestTracker
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.RequestResponseTracker
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.LatencyScorer
 import kotlinx.coroutines.delay
@@ -16,28 +17,31 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 
 /**
- * Latency of the oldest still-pending socket request. Requests carry no timestamp, so a
- * [PendingRequestTracker] records when each was first seen (by referential identity) and reports the
- * age of the oldest one. A ticker re-evaluates the age while the pending set is unchanged.
+ * Estimates connection throughput as the average round-trip of recently-completed requests, derived
+ * from pending-set churn (a request that leaves the pending set has completed). Reuses the same
+ * pending-requests stream as [PendingRequestLatencyProbe]. Optimistic (full score) until at least one
+ * request completes within the window.
  */
 @OptIn(ExperimentalTime::class)
-class PendingRequestLatencyProbe @Inject constructor(
+class ResponseLatencyProbe @Inject constructor(
     private val scorer: LatencyScorer,
     private val timeProvider: TimeProvider,
 ) : ChainHealthProbe {
 
     override fun observe(context: ChainMetricContext): Flow<ChainMetricReading> {
-        val tracker = PendingRequestTracker()
-        val idealMillis = ChainHealthThresholds.PENDING_REQUEST_IDEAL.inWholeMilliseconds
-        val outageMillis = ChainHealthThresholds.PENDING_REQUEST_OUTAGE.inWholeMilliseconds
+        val tracker = RequestResponseTracker(ChainHealthThresholds.RESPONSE_LATENCY_WINDOW.inWholeMilliseconds)
+        val idealMillis = ChainHealthThresholds.RESPONSE_LATENCY_IDEAL.inWholeMilliseconds
+        val outageMillis = ChainHealthThresholds.RESPONSE_LATENCY_OUTAGE.inWholeMilliseconds
 
         return combine(context.pendingRequests, ticker(ChainHealthThresholds.LIVENESS_TICK)) { pending, _ ->
-            val oldestMillis = tracker.update(pending, now())
+            val averageMillis = tracker.update(pending, now())
 
-            ChainMetricReading.PendingRequestLatency(
-                latency = oldestMillis.milliseconds,
-                target = ChainHealthThresholds.PENDING_REQUEST_IDEAL,
-                score = scorer.score(oldestMillis, idealMillis, outageMillis),
+            ChainMetricReading.ResponseLatency(
+                latency = (averageMillis ?: 0L).milliseconds,
+                target = ChainHealthThresholds.RESPONSE_LATENCY_IDEAL,
+                score = averageMillis
+                    ?.let { scorer.score(it, idealMillis, outageMillis) }
+                    ?: ChainHealthScore.Perfect,
             )
         }.distinctUntilChanged()
     }

@@ -4,9 +4,9 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class PendingRequestLatencyScorerTest {
+class LatencyScorerTest {
 
-    private val scorer = PendingRequestLatencyScorer()
+    private val scorer = LatencyScorer()
     private val ideal = 3_000L
     private val outage = 20_000L
 

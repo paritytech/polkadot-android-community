@@ -34,4 +34,12 @@ object ChainHealthThresholds {
     val PENDING_REQUEST_IDEAL: Duration = 500.milliseconds
     // Zero score once the oldest pending request has waited this long.
     val PENDING_REQUEST_OUTAGE: Duration = 5.seconds
+
+    // --- Response latency: average round-trip of recently-completed requests (throughput proxy) ---
+    // Full score while the average completed-request round-trip stays under this.
+    val RESPONSE_LATENCY_IDEAL: Duration = 300.milliseconds
+    // Zero score once the average round-trip reaches this.
+    val RESPONSE_LATENCY_OUTAGE: Duration = 3.seconds
+    // Sliding window over which completed requests are averaged.
+    val RESPONSE_LATENCY_WINDOW: Duration = 30.seconds
 }

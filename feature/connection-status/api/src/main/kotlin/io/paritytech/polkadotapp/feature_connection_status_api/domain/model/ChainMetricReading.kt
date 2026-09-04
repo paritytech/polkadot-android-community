@@ -29,4 +29,11 @@ sealed interface ChainMetricReading {
         val target: Duration,
         override val score: ChainHealthScore,
     ) : ChainMetricReading
+
+    /** Average round-trip of recently-completed socket requests (a connection-throughput proxy). */
+    data class ResponseLatency(
+        val latency: Duration,
+        val target: Duration,
+        override val score: ChainHealthScore,
+    ) : ChainMetricReading
 }

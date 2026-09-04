@@ -8,7 +8,7 @@ import kotlin.math.roundToInt
  * Scores the age of the oldest pending socket request: full marks while it stays under the ideal,
  * decaying linearly to zero by the outage threshold.
  */
-class PendingRequestLatencyScorer @Inject constructor() {
+class LatencyScorer @Inject constructor() {
 
     fun score(oldestPendingMillis: Long, idealMillis: Long, outageMillis: Long): ChainHealthScore {
         val value = oldestPendingMillis.coerceAtLeast(0)
