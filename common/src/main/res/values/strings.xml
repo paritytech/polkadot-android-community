@@ -1438,8 +1438,18 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="collectibles_title">Collectibles</string>
     <string name="collectibles_unavailable">Collectibles are temporarily unavailable. Please try again later.</string>
 
-    <string name="connection_status_waiting_for_network">Waiting for network...</string>
-    <string name="connection_status_connecting">Connecting... %1$d/%2$d</string>
+    <string name="chain_health_connection_connected">Connected</string>
+    <string name="chain_health_connection_connecting">Connecting…</string>
+    <string name="chain_health_connection_disconnected">Disconnected</string>
+    <string name="chain_health_metric_block_latency">Block latency</string>
+    <string name="chain_health_metric_finality_gap">Finality gap</string>
+    <string name="chain_health_metric_pending_request">Pending request</string>
+    <string name="chain_health_metric_response">Response time</string>
+    <string name="chain_health_target">target ≤ %1$s</string>
+    <plurals name="chain_health_blocks">
+        <item quantity="one">%1$d block</item>
+        <item quantity="other">%1$d blocks</item>
+    </plurals>
 
     <string name="pocket_digital_dollar_title">Balance Card</string>
     <string name="pocket_digital_dollar_card_title">%1$s</string>

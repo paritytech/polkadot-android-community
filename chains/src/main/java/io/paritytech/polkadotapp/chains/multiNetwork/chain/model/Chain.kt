@@ -37,6 +37,8 @@ data class Chain(
 
     data class Additional(
         val defaultBlockTimeMillis: Long?,
+        val finalityGapIdeal: Int?,
+        val finalityGapOutage: Int?,
     )
 
     data class Types(
