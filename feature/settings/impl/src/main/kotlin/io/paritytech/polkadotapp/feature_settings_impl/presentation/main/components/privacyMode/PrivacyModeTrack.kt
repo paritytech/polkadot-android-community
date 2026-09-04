@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -41,7 +42,7 @@ internal fun PrivacyModeTrack(modifier: Modifier) {
         TROUGH_SHADE
     )
     // Black at 48%, which is what the design's two inner shadows — 45% and 50% — both round to.
-    val recessColor = PolkadotTheme.colors.shadow.medium
+    val recessColor = PolkadotTheme.colors.shadow.medium.softenedOn(troughColor)
     // The lip the groove is cut into catches light along its top and bottom edges. A surface shade rather
     // than a stroke token: the design's edge is #2A2B30, and every stroke token is far brighter than that.
     val rimColor = PolkadotTheme.colors.bg.surface.nested
@@ -119,6 +120,14 @@ internal fun PrivacyModeTrack(modifier: Modifier) {
     )
 }
 
+// The design exists only in the dark theme, where the palette's shadow — black at 48%, the same value in
+// every theme — falls on a #14151B floor and is a whisper. Contrast is an absolute difference though, so on
+// the light palettes' near-white floor that alpha is a bruise: heavy enough that the groove reads as
+// top-weighted and the modes sitting in it as sitting low. Scaling by what the surface has left to give
+// keeps the shadow exactly as drawn wherever the floor is dark, and lets it fall away as the floor brightens.
+private fun Color.softenedOn(surface: Color): Color =
+    copy(alpha = alpha * (1f - surface.luminance() * LIGHT_SURFACE_FALLOFF))
+
 private fun roundRectPath(rect: Rect, cornerRadius: Float): Path = Path().apply {
     addRoundRect(RoundRect(rect, CornerRadius(cornerRadius)))
 }
@@ -184,6 +193,9 @@ private const val SCALE_SAPPHIRE_STOP = 0.73f
 
 /** How far the floor sits below the card it is cut into: #1A1B20 towards #0B0C0F lands on the design's #14151B. */
 private const val TROUGH_SHADE = 0.4f
+
+/** How much of the shadow a fully lit surface takes away; a dark one keeps nearly all of it. */
+private const val LIGHT_SURFACE_FALLOFF = 0.8f
 
 private val RIM_OFFSET = 1.dp
 
