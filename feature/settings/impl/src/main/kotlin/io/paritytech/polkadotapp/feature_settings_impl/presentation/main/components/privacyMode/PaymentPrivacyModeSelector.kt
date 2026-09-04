@@ -1,8 +1,6 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -12,6 +10,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
@@ -19,6 +18,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,10 +39,12 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldLock
+import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldOutlined
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
@@ -59,9 +61,10 @@ import io.paritytech.polkadotapp.common.R as RCommon
  * The primary operating-mode control of the payment system: how much of what the user receives is held back
  * to gain privacy before it can be spent again.
  *
- * The selection is marked by a pair of arrows that can be dragged along the track as well as tapped into
- * place. The track carries intermediate units between the three presets: the underlying model is continuous
- * in two parameters, so the positions between presets are the ones a later release opens up.
+ * The selected mode is a raised circle on the track, moved either by tapping a mode or by dragging it, in
+ * which case it snaps to the nearest one on release. The track carries intermediate units between the three
+ * presets: the underlying model is continuous in two parameters, so the positions between presets are the
+ * ones a later release opens up.
  *
  * Quota is deliberately absent from the copy — it is managed automatically and the user cannot act on it.
  */
@@ -96,30 +99,20 @@ fun PaymentPrivacyModeSelector(
 
 @Composable
 private fun Header() {
-    Row(verticalAlignment = Alignment.Top) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         NovaIcon(
             modifier = Modifier.size(HEADER_ICON_SIZE),
-            imageVector = NovaIcons.ShieldLock,
+            imageVector = NovaIcons.ShieldOutlined,
             tint = PolkadotTheme.colors.fg.secondary
         )
 
         HorizontalSpacer { small }
 
-        Column(modifier = Modifier.weight(1f)) {
-            NovaText(
-                text = stringResource(RCommon.string.payment_privacy_mode_title),
-                style = PolkadotTheme.typography.title.small,
-                color = PolkadotTheme.colors.fg.primary
-            )
-
-            VerticalSpacer { extraTiny }
-
-            NovaText(
-                text = stringResource(RCommon.string.payment_privacy_mode_subtitle),
-                style = PolkadotTheme.typography.body.small,
-                color = PolkadotTheme.colors.fg.secondary
-            )
-        }
+        NovaText(
+            text = stringResource(RCommon.string.payment_privacy_mode_title),
+            style = PolkadotTheme.typography.title.small,
+            color = PolkadotTheme.colors.fg.primary
+        )
     }
 }
 
@@ -141,97 +134,197 @@ private fun ModeSelector(
 
     val interactionSources = remember { List(modes.size) { MutableInteractionSource() }.toImmutableList() }
 
+    // A dragged circle spends most of the gesture between two modes; this is the one it is closest to.
+    val nearestIndex by remember {
+        derivedStateOf { position.value.roundToInt().coerceIn(modes.indices) }
+    }
+
+    // A tap never slides the selection along the track: the position jumps, and the two circles animate
+    // their own size in place. Only a drag moves a circle, which is what keeps `position` continuous.
     LaunchedEffect(selectedIndex) {
-        if (!isDragging && position.targetValue != selectedIndex.toFloat()) {
-            position.animateTo(selectedIndex.toFloat(), SELECTION_ANIMATION)
+        if (!isDragging) {
+            position.snapTo(selectedIndex.toFloat())
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onSizeChanged { trackWidth = it.width }
-    ) {
-        // The visuals carry no semantics of their own; the touch targets below describe each mode in one
-        // node, so a screen reader reads a mode once rather than as three loose fragments.
-        Column(modifier = Modifier.clearAndSetSemantics { }) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(INDICATOR_BAND_HEIGHT)
-            ) {
-                ConnectorTrack(gapCount = modes.size - 1)
+    // Outside a drag the selected mode is the truth; only while a finger is down does the nearest one lead,
+    // so the labels and markers follow the circle rather than the mode that is still committed.
+    val highlightedIndex = if (isDragging) nearestIndex else selectedIndex
 
-                ModeCircles(appearances = appearances, interactionSources = interactionSources)
-
-                SelectionArrows(
-                    appearances = appearances,
-                    position = { position.value },
-                    trackWidth = { trackWidth },
-                    cellCount = modes.size
-                )
-            }
-
-            VerticalSpacer { small }
-
-            ModeLabels(appearances)
-
-            VerticalSpacer { extraTiny }
-
-            ModeDescriptions(appearances)
-        }
-
-        // The drag lives on the parent of the touch targets: a tap never crosses the slop, so it reaches the
-        // cell below, and once a drag starts the cell's own click is cancelled.
-        Row(
+    Column {
+        Box(
             modifier = Modifier
-                .matchParentSize()
-                .selectableGroup()
-                .pointerInput(modes.size) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { isDragging = true },
-                        onDragCancel = { isDragging = false },
-                        onDragEnd = {
-                            isDragging = false
+                .fillMaxWidth()
+                .height(CIRCLE_BOX_SIZE)
+                .onSizeChanged { trackWidth = it.width }
+        ) {
+            // The visuals carry no semantics of their own; the touch targets below describe each mode in one
+            // node, so a screen reader reads a mode once rather than as three loose fragments.
+            Box(modifier = Modifier.clearAndSetSemantics { }) {
+                PrivacyModeTrack(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .height(TRACK_HEIGHT)
+                )
 
-                            val nearest = position.value.roundToInt().coerceIn(modes.indices)
-                            scope.launch { position.animateTo(nearest.toFloat(), SELECTION_ANIMATION) }
-                            onModeSelected(modes[nearest])
-                        },
-                        onHorizontalDrag = { change, _ ->
-                            change.consume()
+                modes.indices.forEach { index ->
+                    // While a drag is in flight the circle under the finger is the dragged one below, so the
+                    // mode it currently covers does not draw a second circle in its own place.
+                    if (!isDragging || index != nearestIndex) {
+                        ModeCircle(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .offset(centreOffset({ index.toFloat() }, { trackWidth }, modes.lastIndex)),
+                            appearance = appearances[index],
+                            isSelected = !isDragging && index == selectedIndex,
+                            interactionSource = interactionSources[index]
+                        )
+                    }
+                }
 
-                            val cellWidth = size.width / modes.size.toFloat()
-                            val dragged = change.position.x / cellWidth - CELL_CENTRE_FRACTION
-                            scope.launch {
-                                position.snapTo(dragged.coerceIn(0f, modes.lastIndex.toFloat()))
-                            }
-                        }
+                if (isDragging) {
+                    ModeCircle(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(centreOffset({ position.value }, { trackWidth }, modes.lastIndex)),
+                        appearance = appearances[nearestIndex],
+                        isSelected = true,
+                        interactionSource = interactionSources[nearestIndex]
                     )
                 }
-        ) {
-            modes.forEachIndexed { index, mode ->
-                ModeTouchTarget(
-                    appearance = appearances[index],
-                    isSelected = mode == selectedMode,
-                    interactionSource = interactionSources[index],
-                    onClick = { onModeSelected(mode) }
-                )
             }
+
+            // The drag lives on the parent of the touch targets: a tap never crosses the slop, so it reaches
+            // the cell below, and once a drag starts the cell's own click is cancelled.
+            Row(
+                modifier = Modifier
+                    .matchParentSize()
+                    .selectableGroup()
+                    .pointerInput(modes.size) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { isDragging = true },
+                            onDragCancel = {
+                                scope.launch {
+                                    position.animateTo(selectedIndex.toFloat(), SELECTION_ANIMATION)
+                                    isDragging = false
+                                }
+                            },
+                            onDragEnd = {
+                                val nearest = position.value.roundToInt().coerceIn(modes.indices)
+                                onModeSelected(modes[nearest])
+
+                                // The flag drops only after the circle has arrived, so the dragged circle
+                                // hands over to the static one exactly where it came to rest.
+                                scope.launch {
+                                    position.animateTo(nearest.toFloat(), SELECTION_ANIMATION)
+                                    isDragging = false
+                                }
+                            },
+                            onHorizontalDrag = { change, _ ->
+                                change.consume()
+
+                                val step = trackStep(size.width, TRACK_INSET.toPx(), modes.lastIndex)
+                                if (step > 0f) {
+                                    val dragged = (change.position.x - TRACK_INSET.toPx()) / step
+                                    scope.launch {
+                                        position.snapTo(dragged.coerceIn(0f, modes.lastIndex.toFloat()))
+                                    }
+                                }
+                            }
+                        )
+                    }
+            ) {
+                modes.forEachIndexed { index, mode ->
+                    ModeTouchTarget(
+                        appearance = appearances[index],
+                        isSelected = mode == selectedMode,
+                        interactionSource = interactionSources[index],
+                        onClick = { onModeSelected(mode) }
+                    )
+                }
+            }
+        }
+
+        ModeMarkers(
+            appearances = appearances,
+            nearestIndex = { highlightedIndex },
+            trackWidth = { trackWidth }
+        )
+
+        ModeLabels(appearances = appearances, highlightedIndex = highlightedIndex)
+
+        VerticalSpacer { small }
+
+        SelectedModeDescription(appearance = appearances[highlightedIndex])
+    }
+}
+
+/**
+ * Modes are pinned centre-to-centre: half a selected circle of inset at each end, then an equal step between
+ * neighbours. [position] is a fractional mode index, so the selection tracks a finger continuously.
+ */
+private fun centreOffset(
+    position: () -> Float,
+    trackWidth: () -> Int,
+    lastIndex: Int
+): Density.() -> IntOffset = {
+    val inset = TRACK_INSET.toPx()
+    val centre = inset + position() * trackStep(trackWidth(), inset, lastIndex)
+
+    IntOffset(x = (centre - CIRCLE_BOX_SIZE.toPx() / 2f).roundToInt(), y = 0)
+}
+
+private fun trackStep(trackWidth: Int, inset: Float, lastIndex: Int): Float {
+    val span = trackWidth - inset * 2f
+
+    return if (span > 0f && lastIndex > 0) span / lastIndex else 0f
+}
+
+@Composable
+private fun ModeMarkers(
+    appearances: ImmutableList<ModeAppearance>,
+    nearestIndex: () -> Int,
+    trackWidth: () -> Int
+) {
+    Box(modifier = Modifier.fillMaxWidth().height(MARKER_BOX_SIZE)) {
+        appearances.forEachIndexed { index, appearance ->
+            ModeMarker(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset {
+                        val inset = TRACK_INSET.toPx()
+                        val centre = inset + index * trackStep(trackWidth(), inset, appearances.lastIndex)
+
+                        IntOffset(x = (centre - MARKER_BOX_SIZE.toPx() / 2f).roundToInt(), y = 0)
+                    },
+                appearance = appearance,
+                isSelected = index == nearestIndex()
+            )
         }
     }
 }
 
 @Composable
-private fun ModeLabels(appearances: ImmutableList<ModeAppearance>) {
+private fun ModeLabels(appearances: ImmutableList<ModeAppearance>, highlightedIndex: Int) {
     Row(modifier = Modifier.fillMaxWidth()) {
-        appearances.forEach { appearance ->
+        appearances.forEachIndexed { index, appearance ->
             NovaText(
                 modifier = Modifier.weight(1f),
                 text = appearance.label,
                 style = PolkadotTheme.typography.title.tiny,
-                color = appearance.labelColor,
-                textAlign = TextAlign.Center,
+                color = if (index == highlightedIndex) {
+                    PolkadotTheme.colors.fg.primary
+                } else {
+                    PolkadotTheme.colors.fg.secondary
+                },
+                // The outer labels hug the ends of the track the way their circles do; only the middle one
+                // is free to centre.
+                textAlign = when (index) {
+                    0 -> TextAlign.Start
+                    appearances.lastIndex -> TextAlign.End
+                    else -> TextAlign.Center
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -240,15 +333,30 @@ private fun ModeLabels(appearances: ImmutableList<ModeAppearance>) {
 }
 
 @Composable
-private fun ModeDescriptions(appearances: ImmutableList<ModeAppearance>) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        appearances.forEach { appearance ->
+private fun SelectedModeDescription(appearance: ModeAppearance) {
+    PolkadotSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(DESCRIPTION_RADIUS),
+        color = PolkadotTheme.colors.bg.surface.nested
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = PolkadotTheme.spacings.mediumIncreased,
+                    vertical = PolkadotTheme.spacings.medium
+                )
+        ) {
             NovaText(
-                modifier = Modifier.weight(1f),
+                text = appearance.label,
+                style = PolkadotTheme.typography.title.small,
+                color = PolkadotTheme.colors.fg.primary
+            )
+
+            NovaText(
                 text = appearance.description,
-                style = PolkadotTheme.typography.label.small,
-                color = PolkadotTheme.colors.fg.secondary,
-                textAlign = TextAlign.Center
+                style = PolkadotTheme.typography.body.small,
+                color = PolkadotTheme.colors.fg.secondary
             )
         }
     }
@@ -274,8 +382,8 @@ private fun RowScope.ModeTouchTarget(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            // A ripple across label and description would read as a card press, so the indication is handed
-            // to the circle instead — the thing the user is actually choosing.
+            // A ripple across the whole cell would read as a card press, so the indication is handed to the
+            // circle instead — the thing the user is actually choosing.
             .selectable(
                 selected = isSelected,
                 interactionSource = interactionSource,
@@ -292,7 +400,7 @@ private fun RowScope.ModeTouchTarget(
 
 private val HEADER_ICON_SIZE = 24.dp
 
-private val SELECTION_ANIMATION = tween<Float>(durationMillis = 200, easing = FastOutSlowInEasing)
+private val DESCRIPTION_RADIUS = 12.dp
 
 @Preview
 @Composable

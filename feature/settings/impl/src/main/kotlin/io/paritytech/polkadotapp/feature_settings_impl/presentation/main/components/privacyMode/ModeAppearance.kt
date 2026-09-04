@@ -2,13 +2,16 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.compon
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.Bolt
-import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldCheck
-import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldLock
+import io.paritytech.polkadotapp.design.components.icon.vectors.BoltCircleFilled
+import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldHalf
+import io.paritytech.polkadotapp.design.components.icon.vectors.VisibilityOffOutlined
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -19,16 +22,15 @@ internal data class ModeAppearance(
     val description: String,
     val accessibilityDescription: String,
     val icon: ImageVector,
-    /** Fills the circle and tints the selection arrows. */
+    /** Fills the circle, tints the marker, and seeds every shade derived from them. */
     val accentColor: Color,
-    val iconColor: Color,
-    val labelColor: Color
+    val iconColor: Color
 )
 
 @Composable
 internal fun RecyclingStrategyType.appearance(): ModeAppearance {
-    // Every accent below is the same value in all palettes, so each glyph colour is chosen once and holds in
-    // both themes: amber only carries a dark glyph, green and violet only a light one.
+    // Every accent below is the same value in all palettes, so one light glyph colour is chosen here and
+    // holds in both themes.
     val onDarkAccent = PolkadotTheme.colors.fg.staticWhite
 
     return when (this) {
@@ -36,22 +38,18 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance {
             label = stringResource(RCommon.string.payment_privacy_mode_fastest_label),
             description = stringResource(RCommon.string.payment_privacy_mode_fastest_description),
             accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_fastest_accessibility),
-            icon = NovaIcons.Bolt,
+            icon = NovaIcons.BoltCircleFilled,
             accentColor = PolkadotTheme.colors.bg.status.warning,
-            iconColor = PolkadotTheme.colors.avatar.bg.onyx,
-            // Amber is too light to read as a label on a light background; fg.warning is the darkened variant
-            // the palette keeps for exactly that.
-            labelColor = PolkadotTheme.colors.fg.warning
+            iconColor = onDarkAccent
         )
 
         RecyclingStrategyType.BALANCED -> ModeAppearance(
             label = stringResource(RCommon.string.payment_privacy_mode_balanced_label),
             description = stringResource(RCommon.string.payment_privacy_mode_balanced_description),
             accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_balanced_accessibility),
-            icon = NovaIcons.ShieldCheck,
+            icon = NovaIcons.ShieldHalf,
             accentColor = PolkadotTheme.colors.bg.status.success,
-            iconColor = onDarkAccent,
-            labelColor = PolkadotTheme.colors.fg.success
+            iconColor = onDarkAccent
         )
 
         RecyclingStrategyType.MAX_PRIVACY -> ModeAppearance(
@@ -60,10 +58,69 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance {
             accessibilityDescription = stringResource(
                 RCommon.string.payment_privacy_mode_most_private_accessibility
             ),
-            icon = NovaIcons.ShieldLock,
+            icon = NovaIcons.VisibilityOffOutlined,
             accentColor = PolkadotTheme.colors.avatar.bg.amethyst,
-            iconColor = onDarkAccent,
-            labelColor = PolkadotTheme.colors.avatar.bg.amethyst
+            iconColor = onDarkAccent
         )
     }
 }
+
+/**
+ * The design system carries one flat accent per mode, while the design asks for a lit sphere. The shades are
+ * therefore derived from that accent rather than tokenised: mixing towards the palette's own static white and
+ * onyx keeps every theme self-consistent, which hardcoded hex values would not.
+ *
+ * [selection] is the animated 0..1 selectedness of the mode, so a mode lights up and dims in step with the
+ * circle growing and shrinking instead of switching colour a frame apart from it.
+ */
+@Composable
+internal fun ModeAppearance.circleBrush(selection: Float): Brush {
+    val light = PolkadotTheme.colors.fg.staticWhite
+    val dark = PolkadotTheme.colors.avatar.bg.onyx
+
+    val top = lerp(
+        lerp(accentColor, dark, MUTED_TOP_SHADE),
+        lerp(accentColor, light, SELECTED_TOP_TINT),
+        selection
+    )
+    val bottom = lerp(
+        lerp(accentColor, dark, MUTED_BOTTOM_SHADE),
+        lerp(accentColor, dark, SELECTED_BOTTOM_SHADE),
+        selection
+    )
+
+    return Brush.verticalGradient(listOf(top, bottom))
+}
+
+@Composable
+internal fun ModeAppearance.circleBorderBrush(): Brush {
+    val light = PolkadotTheme.colors.fg.staticWhite
+    val dark = PolkadotTheme.colors.avatar.bg.onyx
+
+    return remember(accentColor, light, dark) {
+        Brush.verticalGradient(
+            listOf(
+                lerp(accentColor, light, BORDER_TOP_TINT),
+                lerp(accentColor, dark, BORDER_BOTTOM_SHADE)
+            )
+        )
+    }
+}
+
+@Composable
+internal fun ModeAppearance.markerColor(selection: Float): Color {
+    val dark = PolkadotTheme.colors.avatar.bg.onyx
+
+    return lerp(lerp(accentColor, dark, MARKER_MUTED_SHADE), accentColor, selection)
+}
+
+private const val SELECTED_TOP_TINT = 0.1f
+private const val SELECTED_BOTTOM_SHADE = 0.35f
+
+private const val MUTED_TOP_SHADE = 0.25f
+private const val MUTED_BOTTOM_SHADE = 0.55f
+
+private const val BORDER_TOP_TINT = 0.4f
+private const val BORDER_BOTTOM_SHADE = 0.55f
+
+private const val MARKER_MUTED_SHADE = 0.45f

@@ -1467,16 +1467,15 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_collectibles_title">Collectibles</string>
     <string name="pocket_digital_dollar_advanced">Advanced</string>
 
-    <string name="payment_privacy_mode_title">Payment Privacy Mode</string>
-    <string name="payment_privacy_mode_subtitle">This setting controls how your payments are processed</string>
-    <string name="payment_privacy_mode_fastest_label">FASTEST</string>
-    <string name="payment_privacy_mode_fastest_description">Fastest payments\nLower privacy</string>
+    <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
+    <string name="payment_privacy_mode_fastest_label">Fastest</string>
+    <string name="payment_privacy_mode_fastest_description">Fastest payments, lower privacy</string>
     <string name="payment_privacy_mode_fastest_accessibility">Fastest. Fastest payments, lower privacy.</string>
-    <string name="payment_privacy_mode_balanced_label">BALANCED</string>
-    <string name="payment_privacy_mode_balanced_description">Stronger privacy\nModerate speed</string>
+    <string name="payment_privacy_mode_balanced_label">Balanced</string>
+    <string name="payment_privacy_mode_balanced_description">Stronger privacy, moderate speed</string>
     <string name="payment_privacy_mode_balanced_accessibility">Balanced. Stronger privacy, moderate speed.</string>
-    <string name="payment_privacy_mode_most_private_label">MOST PRIVATE</string>
-    <string name="payment_privacy_mode_most_private_description">Maximum privacy\nLowest speed</string>
+    <string name="payment_privacy_mode_most_private_label">Most Private</string>
+    <string name="payment_privacy_mode_most_private_description">Maximum privacy, lowest speed</string>
     <string name="payment_privacy_mode_most_private_accessibility">Most private. Maximum privacy, lowest speed.</string>
     <string name="payment_privacy_mode_state_selected">Selected</string>
     <string name="payment_privacy_mode_state_not_selected">Not selected</string>
