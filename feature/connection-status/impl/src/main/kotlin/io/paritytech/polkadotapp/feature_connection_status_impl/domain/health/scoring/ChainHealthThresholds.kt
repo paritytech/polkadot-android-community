@@ -27,4 +27,10 @@ object ChainHealthThresholds {
     // Zero score once the gap reaches this many blocks. A stalling finality grows the gap, so
     // magnitude alone already captures monotonic finality stall.
     const val FINALITY_GAP_OUTAGE = 24
+
+    // --- Pending-request latency: how long the oldest in-flight socket request may wait ---
+    // Full score while the oldest pending request is younger than this.
+    val PENDING_REQUEST_IDEAL: Duration = 3.seconds
+    // Zero score once the oldest pending request has waited this long.
+    val PENDING_REQUEST_OUTAGE: Duration = 20.seconds
 }

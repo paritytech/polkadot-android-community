@@ -15,6 +15,9 @@ data class ChainMetricContext(
     val bestBlockNumber: Flow<Int>,
     val finalizedBlockNumber: Flow<Int>,
     val expectedBlockTime: Duration,
+    // Requests currently pending on the socket, as stable identities (Sendable has no id, so tracked
+    // by referential identity).
+    val pendingRequests: Flow<Set<Any>>,
 )
 
 /**

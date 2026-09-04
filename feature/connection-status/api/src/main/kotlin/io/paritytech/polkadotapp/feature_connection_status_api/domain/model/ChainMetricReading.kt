@@ -22,4 +22,11 @@ sealed interface ChainMetricReading {
         val targetBlocks: Int,
         override val score: ChainHealthScore,
     ) : ChainMetricReading
+
+    /** How long the oldest still-pending socket request has been waiting. */
+    data class PendingRequestLatency(
+        val latency: Duration,
+        val target: Duration,
+        override val score: ChainHealthScore,
+    ) : ChainMetricReading
 }

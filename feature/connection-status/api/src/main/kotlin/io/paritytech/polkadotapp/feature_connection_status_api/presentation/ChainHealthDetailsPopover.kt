@@ -126,6 +126,7 @@ private fun connectionLabel(connection: ChainConnectionPresentation): String = s
 private fun ChainMetricReading.labelRes(): Int = when (this) {
     is ChainMetricReading.BlockLatency -> RCommon.string.chain_health_metric_block_latency
     is ChainMetricReading.FinalityGap -> RCommon.string.chain_health_metric_finality_gap
+    is ChainMetricReading.PendingRequestLatency -> RCommon.string.chain_health_metric_pending_request
 }
 
 @Composable
@@ -133,6 +134,7 @@ private fun ChainMetricReading.actualValue(): String = when (this) {
     is ChainMetricReading.BlockLatency -> latency.formatSeconds()
     is ChainMetricReading.FinalityGap ->
         pluralStringResource(RCommon.plurals.chain_health_blocks, gapBlocks, gapBlocks)
+    is ChainMetricReading.PendingRequestLatency -> latency.formatSeconds()
 }
 
 @Composable
@@ -140,6 +142,7 @@ private fun ChainMetricReading.targetValue(): String = when (this) {
     is ChainMetricReading.BlockLatency -> target.formatSeconds()
     is ChainMetricReading.FinalityGap ->
         pluralStringResource(RCommon.plurals.chain_health_blocks, targetBlocks, targetBlocks)
+    is ChainMetricReading.PendingRequestLatency -> target.formatSeconds()
 }
 
 private fun Duration.formatSeconds(): String = "%.1fs".format(inWholeMilliseconds / MILLIS_PER_SECOND)

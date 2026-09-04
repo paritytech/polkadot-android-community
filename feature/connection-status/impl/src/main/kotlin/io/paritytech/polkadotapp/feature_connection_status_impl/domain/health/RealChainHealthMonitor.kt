@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
 
 import io.novasama.substrate_sdk_android.wsrpc.state.SocketStateMachine.State
+import io.novasama.substrate_sdk_android.wsrpc.state.pendingRequests
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
@@ -68,7 +69,13 @@ class RealChainHealthMonitor @Inject constructor(
             val finalizedBlock = chainHeadDataSource.finalizedBlockNumber(chainId)
                 .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
 
-            val context = ChainMetricContext(chain, bestBlock, finalizedBlock, blockTime)
+            val context = ChainMetricContext(
+                chain = chain,
+                bestBlockNumber = bestBlock,
+                finalizedBlockNumber = finalizedBlock,
+                expectedBlockTime = blockTime,
+                pendingRequests = observePendingRequests(chainId),
+            )
             val readings = probes.map { it.observe(context) }.combine()
             val connection = connectionSmoother.smooth(observeSocketState(chainId))
 
@@ -90,6 +97,13 @@ class RealChainHealthMonitor @Inject constructor(
             .distinctUntilChanged()
             .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
             .map { it.toRawConnectivity() }
+
+    private fun observePendingRequests(chainId: ChainId): Flow<Set<Any>> =
+        chainRegistry.chainsById
+            .map { connectionPool.getConnectionOrNull(chainId) }
+            .distinctUntilChanged()
+            .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
+            .map { state -> state?.pendingRequests.orEmpty() }
 
     private fun State?.toRawConnectivity(): RawConnectivity = when (this) {
         is State.Connected -> RawConnectivity.Connected

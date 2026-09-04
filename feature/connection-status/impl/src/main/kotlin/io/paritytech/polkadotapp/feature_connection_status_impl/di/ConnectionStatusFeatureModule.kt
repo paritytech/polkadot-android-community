@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.Re
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.BlockLivenessProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.FinalityGapProbe
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.PendingRequestLatencyProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.presentation.mixin.RealChainHealthMixinFactory
 import javax.inject.Singleton
 
@@ -32,4 +33,8 @@ interface ConnectionStatusFeatureModule {
     @Binds
     @IntoSet
     fun bindFinalityGapProbe(impl: FinalityGapProbe): ChainHealthProbe
+
+    @Binds
+    @IntoSet
+    fun bindPendingRequestLatencyProbe(impl: PendingRequestLatencyProbe): ChainHealthProbe
 }

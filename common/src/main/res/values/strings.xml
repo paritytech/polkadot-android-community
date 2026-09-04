@@ -1443,6 +1443,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chain_health_connection_disconnected">Disconnected</string>
     <string name="chain_health_metric_block_latency">Block latency</string>
     <string name="chain_health_metric_finality_gap">Finality gap</string>
+    <string name="chain_health_metric_pending_request">Pending request</string>
     <string name="chain_health_target">target ≤ %1$s</string>
     <plurals name="chain_health_blocks">
         <item quantity="one">%1$d block</item>
