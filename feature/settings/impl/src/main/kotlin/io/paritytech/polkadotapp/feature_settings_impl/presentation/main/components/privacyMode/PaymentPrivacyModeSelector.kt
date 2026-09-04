@@ -6,14 +6,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -33,13 +30,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
@@ -291,10 +282,8 @@ private fun ModeSelector(
     }
 }
 
-/**
- * Modes are pinned centre-to-centre: half a selected circle of inset at each end, then an equal step between
- * neighbours. [position] is a fractional mode index, so the selection tracks a finger continuously.
- */
+// Modes are pinned centre-to-centre: half a selected circle of inset at each end, then an equal step between
+// neighbours. [position] is a fractional mode index, so the selection tracks a finger continuously.
 private fun centreOffset(
     position: () -> Float,
     trackWidth: () -> Int,
@@ -312,7 +301,7 @@ private fun trackStep(trackWidth: Int, inset: Float, lastIndex: Int): Float {
     return if (span > 0f && lastIndex > 0) span / lastIndex else 0f
 }
 
-/** Which scale mark the circle currently sits over, counted from the left end of the scale. */
+// Which scale mark the circle currently sits over, counted from the left end of the scale.
 private fun markIndexOf(
     position: Float,
     trackWidth: Int,
@@ -347,99 +336,6 @@ private fun ModeMarkers(
             )
         }
     }
-}
-
-@Composable
-private fun ModeLabels(appearances: ImmutableList<ModeAppearance>, highlightedIndex: Int) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        appearances.forEachIndexed { index, appearance ->
-            NovaText(
-                modifier = Modifier.weight(1f),
-                text = appearance.label,
-                style = PolkadotTheme.typography.title.tiny,
-                color = if (index == highlightedIndex) {
-                    PolkadotTheme.colors.fg.primary
-                } else {
-                    PolkadotTheme.colors.fg.secondary
-                },
-                // The outer labels hug the ends of the track the way their circles do; only the middle one
-                // is free to centre.
-                textAlign = when (index) {
-                    0 -> TextAlign.Start
-                    appearances.lastIndex -> TextAlign.End
-                    else -> TextAlign.Center
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun SelectedModeDescription(appearance: ModeAppearance) {
-    PolkadotSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(DESCRIPTION_RADIUS),
-        color = PolkadotTheme.colors.bg.surface.nested
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = PolkadotTheme.spacings.mediumIncreased,
-                    vertical = PolkadotTheme.spacings.medium
-                )
-        ) {
-            NovaText(
-                text = appearance.label,
-                style = PolkadotTheme.typography.title.small,
-                color = PolkadotTheme.colors.fg.primary
-            )
-
-            NovaText(
-                text = appearance.description,
-                style = PolkadotTheme.typography.body.small,
-                color = PolkadotTheme.colors.fg.secondary
-            )
-        }
-    }
-}
-
-@Composable
-private fun RowScope.ModeTouchTarget(
-    appearance: ModeAppearance,
-    isSelected: Boolean,
-    interactionSource: MutableInteractionSource,
-    onClick: () -> Unit
-) {
-    val itemDescription = appearance.accessibilityDescription
-    val itemState = stringResource(
-        if (isSelected) {
-            RCommon.string.payment_privacy_mode_state_selected
-        } else {
-            RCommon.string.payment_privacy_mode_state_not_selected
-        }
-    )
-
-    Box(
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight()
-            // A ripple across the whole cell would read as a card press, so the indication is handed to the
-            // circle instead — the thing the user is actually choosing.
-            .selectable(
-                selected = isSelected,
-                interactionSource = interactionSource,
-                indication = null,
-                role = Role.RadioButton,
-                onClick = onClick
-            )
-            .semantics {
-                contentDescription = itemDescription
-                stateDescription = itemState
-            }
-    )
 }
 
 private val HEADER_ICON_SIZE = 24.dp

@@ -17,10 +17,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 
-/**
- * The pointer under a mode, tying its circle to its label. The selected one is larger and glows in the mode's
- * own accent, which is what carries the selection down into the labels.
- */
+// The pointer under a mode, tying its circle to its label. The selected one is larger and glows in the mode's
+// own accent, which is what carries the selection down into the labels.
 @Composable
 internal fun ModeMarker(
     modifier: Modifier,
@@ -37,7 +35,7 @@ internal fun ModeMarker(
     val side = lerp(MARKER_SIZE, SELECTED_MARKER_SIZE, selection)
 
     Spacer(
-        modifier = modifier
+        modifier = Modifier
             .size(MARKER_BOX_SIZE)
             .drawWithCache {
                 // An upward triangle inscribed in a square of `side`, centred in the box.
@@ -66,6 +64,7 @@ internal fun ModeMarker(
                     drawPath(triangle, color = color)
                 }
             }
+            .then(modifier)
     )
 }
 

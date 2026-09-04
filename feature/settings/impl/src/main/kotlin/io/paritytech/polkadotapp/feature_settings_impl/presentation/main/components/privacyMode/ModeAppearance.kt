@@ -22,7 +22,7 @@ internal data class ModeAppearance(
     val description: String,
     val accessibilityDescription: String,
     val icon: ImageVector,
-    /** Fills the circle, tints the marker, and seeds every shade derived from them. */
+    // Fills the circle, tints the marker, and seeds every shade derived from them.
     val accentColor: Color,
     val iconColor: Color
 )
@@ -65,14 +65,11 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance {
     }
 }
 
-/**
- * The design system carries one flat accent per mode, while the design asks for a lit sphere. The shades are
- * therefore derived from that accent rather than tokenised: mixing towards the palette's own static white and
- * onyx keeps every theme self-consistent, which hardcoded hex values would not.
- *
- * [selection] is the animated 0..1 selectedness of the mode, so a mode lights up and dims in step with the
- * circle growing and shrinking instead of switching colour a frame apart from it.
- */
+// The design system carries one flat accent per mode, while the design asks for a lit sphere. The shades are
+// therefore derived from that accent rather than tokenised: mixing towards the palette's own static white and
+// onyx keeps every theme self-consistent, which hardcoded hex values would not.
+// [selection] is the animated 0..1 selectedness of the mode, so a mode lights up and dims in step with the
+// circle growing and shrinking instead of switching colour a frame apart from it.
 @Composable
 internal fun ModeAppearance.circleBrush(selection: Float): Brush {
     val light = PolkadotTheme.colors.fg.staticWhite

@@ -24,13 +24,10 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 
-/**
- * The recessed groove the modes sit in, carrying the continuous speed-to-privacy scale as tick marks.
- *
- * Drawn rather than composed: an inner shadow has no Compose primitive, and `Modifier.blur` is API 31+ while
- * the app ships from 29 — so the recess is a blurred stroke clipped to the groove, the same `BlurMaskFilter`
- * approach the design system already uses for blurred mnemonics.
- */
+// The recessed groove the modes sit in, carrying the continuous speed-to-privacy scale as tick marks.
+// Drawn rather than composed: an inner shadow has no Compose primitive, and `Modifier.blur` is API 31+ while
+// the app ships from 29 — so the recess is a blurred stroke clipped to the groove, the same `BlurMaskFilter`
+// approach the design system already uses for blurred mnemonics.
 @Composable
 internal fun PrivacyModeTrack(modifier: Modifier) {
     // One level below the card that hosts it, not the page background: the groove is a recess in the card,
@@ -47,7 +44,7 @@ internal fun PrivacyModeTrack(modifier: Modifier) {
     )
 
     Spacer(
-        modifier = modifier.drawWithCache {
+        modifier = Modifier.drawWithCache {
             val cornerRadius = size.height / 2f
             val trough = Path().apply {
                 addRoundRect(RoundRect(size.toRect(), CornerRadius(cornerRadius)))
@@ -99,11 +96,11 @@ internal fun PrivacyModeTrack(modifier: Modifier) {
                 drawPath(ticks, brush = scaleBrush)
                 drawPath(trough, color = rimColor, style = Stroke(width = RIM_STROKE.toPx()))
             }
-        }
+        }.then(modifier)
     )
 }
 
-/** One upright bar per step, laid left to right; the gradient brush colours them by position. */
+// One upright bar per step, laid left to right; the gradient brush colours them by position.
 private fun buildTicks(
     startX: Float,
     endX: Float,
@@ -124,7 +121,7 @@ private fun buildTicks(
     return path
 }
 
-/** Half the selected circle, so the outer modes sit fully inside the groove. */
+// Half the selected circle, so the outer modes sit fully inside the groove.
 internal val TRACK_INSET = 20.dp
 
 internal val TRACK_HEIGHT = 40.dp
@@ -132,7 +129,7 @@ internal val TRACK_HEIGHT = 40.dp
 private val TICK_WIDTH = 2.dp
 private val TICK_HEIGHT = 6.dp
 
-/** Also the haptic grain of a drag: the selector ticks once per mark the circle passes. */
+// Also the haptic grain of a drag: the selector ticks once per mark the circle passes.
 internal val TICK_STEP = 8.dp
 
 private const val SCALE_BALANCED_STOP = 0.49f

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -28,13 +29,10 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 
-/**
- * One mode as it sits on the track. Selecting a mode grows its circle and lights it; the mode losing the
- * selection shrinks back in the same motion, so a tap reads as the selection passing between two circles
- * rather than one circle travelling along the track.
- *
- * The box is wider than the circle so the glow has room to spread without being clipped by the layout.
- */
+// One mode as it sits on the track. Selecting a mode grows its circle and lights it; the mode losing the
+// selection shrinks back in the same motion, so a tap reads as the selection passing between two circles
+// rather than one circle travelling along the track.
+// The box is wider than the circle so the glow has room to spread without being clipped by the layout.
 @Composable
 internal fun ModeCircle(
     modifier: Modifier,
@@ -52,7 +50,12 @@ internal fun ModeCircle(
     val glowColor = appearance.accentColor
     val shadowColor = PolkadotTheme.colors.avatar.bg.onyx
 
-    Box(modifier = modifier.size(CIRCLE_BOX_SIZE), contentAlignment = Alignment.Center) {
+    // Held across frames and reconfigured in place: the circle's size animates, which rebuilds the draw
+    // cache on every frame of a selection change, and allocating paints there would allocate per frame.
+    val shadowPaint = remember { Paint().apply { isAntiAlias = true } }
+    val glowPaint = remember { Paint().apply { isAntiAlias = true } }
+
+    Box(modifier = Modifier.size(CIRCLE_BOX_SIZE).then(modifier), contentAlignment = Alignment.Center) {
         Spacer(
             modifier = Modifier
                 .size(diameter)
@@ -61,16 +64,12 @@ internal fun ModeCircle(
                     val centreX = size.width / 2f
                     val centreY = size.height / 2f
 
-                    val shadowPaint = Paint().apply {
-                        isAntiAlias = true
-                        color = shadowColor.copy(alpha = SHADOW_ALPHA).toArgb()
-                        maskFilter = BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
-                    }
-                    val glowPaint = Paint().apply {
-                        isAntiAlias = true
-                        color = glowColor.copy(alpha = selection * GLOW_ALPHA).toArgb()
-                        maskFilter = BlurMaskFilter(GLOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
-                    }
+                    shadowPaint.color = shadowColor.copy(alpha = SHADOW_ALPHA).toArgb()
+                    shadowPaint.maskFilter = BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
+
+                    glowPaint.color = glowColor.copy(alpha = selection * GLOW_ALPHA).toArgb()
+                    glowPaint.maskFilter = BlurMaskFilter(GLOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
+
                     val shadowOffset = SHADOW_OFFSET.toPx()
 
                     onDrawBehind {
@@ -122,17 +121,17 @@ private val CIRCLE_BORDER = 1.dp
 
 private val GLOW_BLUR = 12.dp
 
-/** The glow is a halo, not a second light source: at full opacity the accent bleeds over the whole track. */
+// The glow is a halo, not a second light source: at full opacity the accent bleeds over the whole track.
 internal const val GLOW_ALPHA = 0.45f
 
 private val SHADOW_BLUR = 4.dp
 private val SHADOW_OFFSET = 4.dp
 private const val SHADOW_ALPHA = 0.4f
 
-/** Selected circle plus the glow spreading either side of it. */
+// Selected circle plus the glow spreading either side of it.
 internal val CIRCLE_BOX_SIZE = SELECTED_CIRCLE_SIZE + GLOW_BLUR * 2
 
-/** Share of the circle the glyph takes up; the rest is the inset around it. */
+// Share of the circle the glyph takes up; the rest is the inset around it.
 private const val MODE_ICON_SIZE_FRACTION = 0.6f
 
 internal val SELECTION_ANIMATION = tween<Float>(durationMillis = 200, easing = FastOutSlowInEasing)
