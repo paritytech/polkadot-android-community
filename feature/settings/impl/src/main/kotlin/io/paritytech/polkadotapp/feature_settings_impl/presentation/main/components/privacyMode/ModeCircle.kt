@@ -40,12 +40,15 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 // rather than one circle travelling along the track.
 // A dragged circle is a single circle that adopts each mode as it passes the midpoint towards it, so
 // [appearance] changes under it mid-gesture and is cross-faded rather than swapped — see [fadeMillis].
+// The glow is what says a mode has been settled on rather than merely passed over, so it is [hasGlow]'s to
+// decide and not the selected size's: a circle under a finger is grown but unlit.
 // The box is wider than the circle so the glow has room to spread without being clipped by the layout.
 @Composable
 internal fun ModeCircle(
     modifier: Modifier,
     appearance: ModeAppearance,
     isSelected: Boolean,
+    hasGlow: Boolean,
     fadeMillis: () -> Int,
     interactionSource: MutableInteractionSource? = null
 ) {
@@ -53,6 +56,11 @@ internal fun ModeCircle(
         targetValue = if (isSelected) 1f else 0f,
         animationSpec = SELECTION_ANIMATION,
         label = "circleSelection"
+    )
+    val glow by animateFloatAsState(
+        targetValue = if (hasGlow) 1f else 0f,
+        animationSpec = SELECTION_ANIMATION,
+        label = "circleGlow"
     )
 
     // The mode the circle is coming from, held until the fade away from it completes. A crossing that
@@ -101,7 +109,7 @@ internal fun ModeCircle(
                     shadowPaint.color = shadowColor.copy(alpha = SHADOW_ALPHA).toArgb()
                     shadowPaint.maskFilter = BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
 
-                    glowPaint.color = glowColor.copy(alpha = selection * GLOW_ALPHA).toArgb()
+                    glowPaint.color = glowColor.copy(alpha = glow * GLOW_ALPHA).toArgb()
                     glowPaint.maskFilter = BlurMaskFilter(GLOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
 
                     val shadowOffset = SHADOW_OFFSET.toPx()
@@ -110,7 +118,7 @@ internal fun ModeCircle(
                         drawIntoCanvas { canvas ->
                             canvas.nativeCanvas.drawCircle(centreX, centreY + shadowOffset, radius, shadowPaint)
 
-                            if (selection > 0f) {
+                            if (glow > 0f) {
                                 canvas.nativeCanvas.drawCircle(centreX, centreY, radius, glowPaint)
                             }
                         }

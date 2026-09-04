@@ -2,8 +2,6 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.compon
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -183,28 +181,41 @@ private fun ModeSelector(
                     // While a drag is in flight the circle under the finger is the dragged one below, so the
                     // mode it currently covers hands its place over: it dissolves under that circle and
                     // fades back in as the circle leaves, rather than blinking out and back.
-                    // It stays lit and grown the whole time it is covered, because the drag ends by removing
-                    // the circle above it: anything left to animate then plays out in plain sight.
+                    // It stays grown the whole time it is covered, because the drag ends by removing the
+                    // circle above it: anything left to animate then plays out in plain sight.
                     val isCovered = isDragging && index == highlightedIndex
-                    val reveal = animateFloatAsState(
-                        targetValue = if (isCovered) 0f else 1f,
-                        // The handover at the end of a drag has to be instant: the dragged circle leaves the
-                        // composition in the same frame, and a fade here would show a gap where it stood.
-                        animationSpec = if (isDragging) {
-                            tween(durationMillis = dragFade.millis, easing = LinearEasing)
-                        } else {
-                            snap()
-                        },
-                        label = "circleReveal"
-                    )
+                    val reveal = remember { Animatable(1f) }
+
+                    LaunchedEffect(isCovered, isDragging) {
+                        when {
+                            // Going covered and coming out of a drag are both handovers with the dragged
+                            // circle: it appears or disappears in a single frame, so anything gradual here
+                            // would show through as a flicker beside it.
+                            !isDragging -> reveal.snapTo(1f)
+                            isCovered -> reveal.snapTo(0f)
+                            else -> reveal.animateTo(1f, tween(dragFade.millis, easing = LinearEasing))
+                        }
+                    }
 
                     ModeCircle(
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .offset(centreOffset({ index.toFloat() }, { trackWidth }, modes.lastIndex))
-                            .graphicsLayer { alpha = reveal.value },
+                            // The animation above only reaches the value a frame after the composition that
+                            // asked for it, which is one frame too late for a handover; the two settled
+                            // cases are therefore stated here, where they hold from the first frame.
+                            .graphicsLayer {
+                                alpha = when {
+                                    !isDragging -> 1f
+                                    isCovered -> 0f
+                                    else -> reveal.value
+                                }
+                            },
                         appearance = appearances[index],
                         isSelected = index == highlightedIndex,
+                        // A mode lights up once the selection has settled on it, so nothing glows while a
+                        // finger is still choosing.
+                        hasGlow = !isDragging && index == selectedIndex,
                         fadeMillis = { dragFade.millis },
                         interactionSource = interactionSources[index]
                     )
@@ -217,6 +228,7 @@ private fun ModeSelector(
                             .offset(centreOffset({ position.value }, { trackWidth }, modes.lastIndex)),
                         appearance = appearances[nearestIndex],
                         isSelected = true,
+                        hasGlow = false,
                         fadeMillis = { dragFade.millis },
                         interactionSource = interactionSources[nearestIndex]
                     )
