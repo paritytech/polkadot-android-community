@@ -2,18 +2,17 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecyclingStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.paramsFor
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import javax.inject.Inject
 
 /**
  * Builds the strategy for a chosen preset, wrapped in the two limits no preference may override.
  *
- * Assembly only: each limit reads what it needs when it is asked to decide, so nothing here has to know
- * what the chain will still accept or how much allowance is left.
+ * Assembly only: each limit reads what it needs when it is asked to decide, so nothing here has to know what
+ * the chain will still accept or how much allowance is left.
  */
 class RecyclingStrategyProvider @Inject constructor(
-    private val coinRepository: CoinRepository,
+    private val forcedRecyclingAgeProvider: ForcedRecyclingAgeProvider,
     private val quotaTracker: UnloadQuotaTracker,
 ) {
     fun strategyFor(type: RecyclingStrategyType): CoinRecyclingStrategy = EnsureChainLimitsStrategy(
@@ -21,7 +20,7 @@ class RecyclingStrategyProvider @Inject constructor(
             inner = policyFor(type),
             quotaTracker = quotaTracker,
         ),
-        coinRepository = coinRepository,
+        forcedRecyclingAgeProvider = forcedRecyclingAgeProvider,
     )
 
     /**
@@ -34,5 +33,5 @@ class RecyclingStrategyProvider @Inject constructor(
     fun voucherStrategyFor(type: RecyclingStrategyType): CoinRecyclingStrategy = policyFor(type)
 
     private fun policyFor(type: RecyclingStrategyType) =
-        ParametricRecyclingStrategy(type.paramsFor(coinRepository.getCoinRecyclingAge()))
+        ParametricRecyclingStrategy(type.params, forcedRecyclingAgeProvider)
 }

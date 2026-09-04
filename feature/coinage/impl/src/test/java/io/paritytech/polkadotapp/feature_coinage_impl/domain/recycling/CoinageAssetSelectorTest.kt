@@ -36,7 +36,7 @@ class CoinageAssetSelectorTest {
 
     private val selector = CoinageAssetSelector(
         coinageAssetsUseCase = coinageAssetsUseCase,
-        strategyProvider = RecyclingStrategyProvider(coinRepository, quotaTracker),
+        strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker),
         settings = settings,
         evaluator = evaluator,
         voucherUsabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider),
@@ -47,9 +47,9 @@ class CoinageAssetSelectorTest {
     private val pastChainLimit = coinOf(derivationIndex = 3)
 
     init {
-        `when`(coinRepository.getCoinRecyclingAge()).thenReturn(FORCED_AGE)
-
         runBlocking {
+            `when`(coinRepository.getCoinRecyclingAge()).thenReturn(Result.success(FORCED_AGE))
+
             // The selector always asks for a COMPLETE context, so the fetched capacities are what it sees.
             whenever(ringCapacityProvider.capacitiesFor(any()))
                 .thenReturn(Result.success(mapOf(ValueExponent(1) to FULL_RING)))
