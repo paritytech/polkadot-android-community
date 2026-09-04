@@ -15,7 +15,7 @@ android {
     namespace = "io.paritytech.polkadotapp.app"
 
     defaultConfig {
-        applicationId = localProperties.readSecretOrDefault("APPLICATION_ID", "io.paritytech.polkadotapp")
+        applicationId = localProperties.readSecretOrDefault("APPLICATION_ID", "io.parity.polkadotapp")
 
         versionCode = computeVersionCode()
         versionName = computeVersionName()

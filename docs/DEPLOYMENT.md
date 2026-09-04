@@ -220,7 +220,7 @@ field. Set them in `local.properties` / CI to point at your own infrastructure.
 
 | Variable                    | Used by (module)              | Required | Default (placeholder)          | Description                                                                 |
 |-----------------------------|-------------------------------|----------|--------------------------------|-----------------------------------------------------------------------------|
-| `APPLICATION_ID`            | `app`                         | no       | `io.paritytech.polkadotapp`    | Installed application ID; changing it creates a different app identity      |
+| `APPLICATION_ID`            | `app`                         | no       | `io.parity.polkadotapp`        | Installed application ID; changing it creates a different app identity      |
 | `APP_NAME`                  | `app`                         | no       | `Polkadot`                     | Base/release launcher name                                                   |
 | `DEBUG_APP_NAME`            | `app` debug build             | no       | `[Debug] <APP_NAME>`           | Debug launcher name                                                          |
 | `NIGHTLY_APP_NAME`          | `app` nightly build           | no       | `<APP_NAME>`                   | Nightly launcher name                                                        |
