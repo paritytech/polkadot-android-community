@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring
 
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -30,7 +31,7 @@ object ChainHealthThresholds {
 
     // --- Pending-request latency: how long the oldest in-flight socket request may wait ---
     // Full score while the oldest pending request is younger than this.
-    val PENDING_REQUEST_IDEAL: Duration = 3.seconds
+    val PENDING_REQUEST_IDEAL: Duration = 500.milliseconds
     // Zero score once the oldest pending request has waited this long.
-    val PENDING_REQUEST_OUTAGE: Duration = 20.seconds
+    val PENDING_REQUEST_OUTAGE: Duration = 5.seconds
 }

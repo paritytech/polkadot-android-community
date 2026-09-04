@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
 
-import java.util.Collections
 import java.util.IdentityHashMap
 
 /**
@@ -18,8 +17,9 @@ class PendingRequestTracker {
             if (!firstSeenMillis.containsKey(request)) firstSeenMillis[request] = nowMillis
         }
 
-        val stillPending = Collections.newSetFromMap(IdentityHashMap<Any, Boolean>()).apply { addAll(pending) }
-        firstSeenMillis.keys.retainAll { it in stillPending }
+        // Sendables have no equals override, so membership in `pending` is by reference — consistent
+        // with the identity-keyed map above.
+        firstSeenMillis.keys.retainAll { it in pending }
 
         val oldest = firstSeenMillis.values.minOrNull() ?: return 0L
         return nowMillis - oldest
