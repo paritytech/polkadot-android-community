@@ -7,9 +7,9 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
@@ -19,7 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -35,9 +35,9 @@ class RealTotalBalanceUseCase @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase,
     private val strategyProvider: RecyclingStrategyProvider,
-    private val ringCapacityProvider: RingCapacityProvider,
     private val settings: CoinageRecyclingStrategySettings,
     private val evaluator: CoinRecyclingEvaluator,
+    private val usabilityContextFactory: VoucherUsabilityContextFactory,
 ) : TotalBalanceUseCase {
     override fun subscribeTotalBalance(): Flow<Result<CoinageBalance>> = combine(
         coinageAssetsUseCase.subscribeCoins(),
@@ -70,7 +70,9 @@ class RealTotalBalanceUseCase @Inject constructor(
     ): Result<CoinageBalance> = coinageBalanceConverterUseCase.create().map { conversionContext ->
         val strategy = strategyProvider.voucherStrategyFor(strategyType)
         val denominations = vouchers.mapToSet { it.voucher.recyclerValue }
-        val usability = VoucherUsabilityContext(ringCapacities = ringCapacityProvider.capacitiesFor(denominations))
+
+        // We use IMMEDIATE since we don't want to delay balance computation
+        val usability = usabilityContextFactory.create(BalanceEvaluationMode.IMMEDIATE, denominations)
 
         val coinBuckets = coins.preClassifyCoins()
         val voucherBuckets = vouchers.preClassifyVouchers(strategy, usability)

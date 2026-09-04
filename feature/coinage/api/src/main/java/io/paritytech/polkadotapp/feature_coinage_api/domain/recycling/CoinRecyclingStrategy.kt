@@ -5,7 +5,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanc
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 
 /**
  * Decides which coins go into the recycler, and when what comes back out may be spent again.
@@ -21,10 +20,15 @@ interface CoinRecyclingStrategy {
      * part of it, so a coin's verdict depends on what earlier ones in the same batch took.
      *
      * Suspends because the limits an implementation enforces are read rather than given to it: what the
-     * chain will still accept, what allowance is left. Callers pass what to decide, not what to decide with.
+     * chain will still accept, what allowance is left. Callers pass what to decide, not what to decide with
+     * — bar [mode], which is how long they can wait for those reads.
      */
     context(conversion: CoinageBalanceConversionContext)
-    suspend fun evaluate(coins: List<Coin>, snapshot: RecyclingSnapshot): RecyclingVerdicts
+    suspend fun evaluate(
+        coins: List<Coin>,
+        snapshot: RecyclingSnapshot,
+        mode: BalanceEvaluationMode,
+    ): RecyclingVerdicts
 
     fun isVoucherUsable(voucher: RecyclerVoucher, context: VoucherUsabilityContext): Boolean
 
@@ -38,6 +42,24 @@ interface CoinRecyclingStrategy {
 }
 
 /**
+ * How much of the policy a caller can afford to wait for.
+ *
+ * The balance renders nothing until the first verdicts land, so the pass that produces them cannot be held
+ * up by a chain read that a lagging node may take seconds to answer.
+ */
+enum class BalanceEvaluationMode {
+    /** Every limit is consulted, however long the chain takes to answer. */
+    COMPLETE,
+
+    /**
+     * Only the limits already in hand are applied. Whatever a slower limit would have gated stays spendable
+     * until the [COMPLETE] pass that follows says otherwise, so this trades a downward correction moments
+     * later for a balance the user can see at once.
+     */
+    IMMEDIATE,
+}
+
+/**
  * What the budget is measured against, as it stands *before* the current pass gates anything.
  *
  * [evaluate] accumulates into [unavailable] as it admits coins, so the pending balance it leaves behind is
@@ -48,16 +70,3 @@ data class RecyclingSnapshot(
     val total: Balance,
     val unavailable: Balance,
 )
-
-/**
- * Ring capacity per denomination, so a required fill fraction can become a member count.
- *
- * Resolved up front rather than fetched on demand: the predicate runs once per voucher every time the
- * balance recomputes, so it has to stay cheap and non-suspending.
- */
-data class VoucherUsabilityContext(
-    val ringCapacities: Map<ValueExponent, Int>,
-) {
-    /** A ring we could not resolve reads as never full, so only the unload delay can make it usable. */
-    fun capacityFor(recyclerValue: ValueExponent): Int = ringCapacities[recyclerValue] ?: Int.MAX_VALUE
-}

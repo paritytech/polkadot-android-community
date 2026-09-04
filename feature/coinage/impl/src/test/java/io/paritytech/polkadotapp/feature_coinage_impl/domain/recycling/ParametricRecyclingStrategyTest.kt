@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.paramsFor
@@ -132,7 +133,11 @@ class ParametricRecyclingStrategyTest {
         val strategy = ParametricRecyclingStrategy(type.paramsFor(FORCED_AGE))
 
         with(testConversionContext) {
-            strategy.evaluate(coins, RecyclingSnapshot(total = total, unavailable = unavailable))
+            strategy.evaluate(
+                coins = coins,
+                snapshot = RecyclingSnapshot(total = total, unavailable = unavailable),
+                mode = BalanceEvaluationMode.COMPLETE,
+            )
         }
     }
 
