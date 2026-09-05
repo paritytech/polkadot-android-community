@@ -15,6 +15,7 @@ object FeatureFlags {
 
             FeatureOption.ARBITRARY_PRODUCTS,
             FeatureOption.BROWSE_TAB,
+            FeatureOption.ID_CARD_RANK,
             FeatureOption.ALL_CHAT_EXTENSIONS,
             FeatureOption.LINKED_DEVICES,
             FeatureOption.PRODUCT_SETTINGS,
@@ -42,6 +43,10 @@ enum class FeatureOption {
     PEER_BOT_BY_DEFAULT,
     DEBUG_MENU,
     BROWSE_TAB,
+
+    // The rank label and value under the username on the identity card. Off, the card carries the
+    // username alone, aligned with the avatar.
+    ID_CARD_RANK,
     ALL_CHAT_EXTENSIONS,
     LINKED_DEVICES,
     PRODUCT_SETTINGS,
