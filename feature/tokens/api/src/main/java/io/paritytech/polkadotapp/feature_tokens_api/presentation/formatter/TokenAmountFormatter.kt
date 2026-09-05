@@ -5,7 +5,6 @@ import io.paritytech.polkadotapp.common.utils.Fraction
 import io.paritytech.polkadotapp.design.utils.noLocalProvidedFor
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
-import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenSymbolAppearance
 import java.math.BigDecimal
 
 val LocalTokenAmountFormatter = staticCompositionLocalOf<TokenAmountFormatter> {
@@ -57,10 +56,7 @@ private class MockedAmountFormatter : TokenAmountFormatter {
     override fun formatToSymbol(
         tokenAmount: TokenAmountModel,
     ): String {
-        return when (val appearance = tokenAmount.appearance) {
-            is TokenSymbolAppearance.Symbol -> appearance.symbol
-            is TokenSymbolAppearance.DigitalDollar -> TokenSymbolAppearance.DigitalDollar.SYMBOL
-        }
+        return tokenAmount.appearance.symbol
     }
 
     override fun formatAmount(amount: BigDecimal, precision: RoundPrecision): String {
