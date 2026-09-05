@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.QrCode
@@ -70,17 +72,19 @@ internal fun IdCardContent(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Column {
-                    NovaText(
-                        text = stringResource(RCommon.string.identity_card_rank_label),
-                        style = PolkadotTheme.typography.body.small,
-                        color = secondaryTextColor
-                    )
-                    NovaText(
-                        text = rankValue,
-                        style = PolkadotTheme.typography.title.small,
-                        color = primaryTextColor
-                    )
+                if (FeatureOption.ID_CARD_RANK.isEnabled) {
+                    Column {
+                        NovaText(
+                            text = stringResource(RCommon.string.identity_card_rank_label),
+                            style = PolkadotTheme.typography.body.small,
+                            color = secondaryTextColor
+                        )
+                        NovaText(
+                            text = rankValue,
+                            style = PolkadotTheme.typography.title.small,
+                            color = primaryTextColor
+                        )
+                    }
                 }
             }
         }
