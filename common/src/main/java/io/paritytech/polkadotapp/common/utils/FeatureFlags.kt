@@ -15,6 +15,7 @@ object FeatureFlags {
 
             FeatureOption.ARBITRARY_PRODUCTS,
             FeatureOption.BROWSE_TAB,
+            FeatureOption.FULL_TAB_BAR,
             FeatureOption.ALL_CHAT_EXTENSIONS,
             FeatureOption.LINKED_DEVICES,
             FeatureOption.PRODUCT_SETTINGS,
@@ -42,6 +43,10 @@ enum class FeatureOption {
     PEER_BOT_BY_DEFAULT,
     DEBUG_MENU,
     BROWSE_TAB,
+
+    // The tab bar in its full form: item labels, and the scanner wrapped in the center pill next to the
+    // open-tabs button. Off, the bar is icons only and the scanner is a bare icon.
+    FULL_TAB_BAR,
     ALL_CHAT_EXTENSIONS,
     LINKED_DEVICES,
     PRODUCT_SETTINGS,

@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -94,6 +96,9 @@ private val AppMenuShadowElevation = 8.dp
  * beside it, the open-tabs button (a stacked-cards icon with the tab count — white while the apps grid is
  * expanded, otherwise the same muted colour as the scanner). Without the Browse tab there are no product
  * tabs to manage, so the pill keeps the scanner alone.
+ *
+ * With [FeatureOption.FULL_TAB_BAR] off the bar is reduced to icons: no item labels, and the scanner drops
+ * the pill to sit as a bare icon.
  */
 @Composable
 fun RootNavBar(
@@ -111,6 +116,7 @@ fun RootNavBar(
     onScannerTooltipDismiss: () -> Unit,
 ) {
     val availableTabs = BottomTab.availableEntries
+    val fullTabBar = FeatureOption.FULL_TAB_BAR.isEnabled
 
     Column(
         modifier = modifier
@@ -141,16 +147,26 @@ fun RootNavBar(
             selectedIndex = availableTabs.indexOf(currentTab).coerceAtLeast(0),
             itemCount = availableTabs.size,
             shape = RoundedCornerShape(NavBarCornerRadius),
+            fillWidth = fullTabBar,
             centerContent = {
-                CenterPill(
-                    scannerTooltipVisible = scannerTooltipVisible,
-                    onScanClicked = onScanClicked,
-                    onScannerTooltipDismiss = onScannerTooltipDismiss,
-                    tabsVisible = FeatureOption.BROWSE_TAB.isEnabled,
-                    tabsCount = apps.size,
-                    appsExpanded = appsExpanded,
-                    onTabsClicked = onCountClicked,
-                )
+                if (fullTabBar) {
+                    CenterPill(
+                        scannerTooltipVisible = scannerTooltipVisible,
+                        onScanClicked = onScanClicked,
+                        onScannerTooltipDismiss = onScannerTooltipDismiss,
+                        tabsVisible = FeatureOption.BROWSE_TAB.isEnabled,
+                        tabsCount = apps.size,
+                        appsExpanded = appsExpanded,
+                        onTabsClicked = onCountClicked,
+                    )
+                } else {
+                    ScannerButton(
+                        scannerTooltipVisible = scannerTooltipVisible,
+                        onScanClicked = onScanClicked,
+                        onScannerTooltipDismiss = onScannerTooltipDismiss,
+                        shape = PolkadotTheme.shapes.full,
+                    )
+                }
             },
         ) {
             availableTabs.fastForEach { tab ->
@@ -158,7 +174,7 @@ fun RootNavBar(
                     selected = tab == currentTab,
                     onClick = { onTabSelected(tab) },
                     icon = tab.icon(),
-                    label = tab.title(),
+                    label = if (fullTabBar) tab.title() else null,
                     hasNotification = tabWarnings[tab] == true,
                 )
             }
@@ -187,18 +203,12 @@ private fun CenterPill(
             modifier = Modifier.fillMaxHeight(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(onClick = onScanClicked)
-                    .padding(horizontal = PolkadotTheme.spacings.medium),
-                contentAlignment = Alignment.Center,
-            ) {
-                ScannerIconWithTooltip(
-                    tooltipVisible = scannerTooltipVisible,
-                    onTooltipDismiss = onScannerTooltipDismiss,
-                )
-            }
+            ScannerButton(
+                scannerTooltipVisible = scannerTooltipVisible,
+                onScanClicked = onScanClicked,
+                onScannerTooltipDismiss = onScannerTooltipDismiss,
+                shape = RectangleShape,
+            )
 
             if (tabsVisible) {
                 Box(
@@ -220,6 +230,31 @@ private fun CenterPill(
                 }
             }
         }
+    }
+}
+
+// The scanner tap target, sized to the center pill so the bar keeps its height whether the pill is drawn
+// around it or the icon stands alone. [shape] bounds the press ripple: inside the pill the surface already
+// clips it, but standing alone the button has to round it off itself or the ripple comes out square.
+@Composable
+private fun ScannerButton(
+    scannerTooltipVisible: Boolean,
+    onScanClicked: () -> Unit,
+    onScannerTooltipDismiss: () -> Unit,
+    shape: Shape,
+) {
+    Box(
+        modifier = Modifier
+            .height(CenterPillHeight)
+            .clip(shape)
+            .clickable(onClick = onScanClicked)
+            .padding(horizontal = PolkadotTheme.spacings.medium),
+        contentAlignment = Alignment.Center,
+    ) {
+        ScannerIconWithTooltip(
+            tooltipVisible = scannerTooltipVisible,
+            onTooltipDismiss = onScannerTooltipDismiss,
+        )
     }
 }
 
