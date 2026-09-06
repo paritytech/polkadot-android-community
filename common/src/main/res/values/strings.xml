@@ -8,8 +8,6 @@
     <string name="common_intent_failed">Failed to find application to perform specified action</string>
     <string name="add_contact_already_exists_error">You have already added this contact</string>
 
-    <string name="contact_us_email" translatable="false">contact@example.com</string>
-
     <string name="video_game_deposit_lost_title">Deposit lost: You didn’t participate in the weekly game</string>
     <string name="video_game_deposit_lost_message">If you still want to play the weekly games, please add a new deposit.</string>
 
