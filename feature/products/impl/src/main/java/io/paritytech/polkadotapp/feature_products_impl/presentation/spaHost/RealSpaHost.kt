@@ -24,6 +24,9 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.navigation
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsRuntime.WebViewRuntime
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.ProductRegistrar
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.BrowserWebViewProvider
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorkerRefCounter
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.withWorkerAcquired
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +45,7 @@ class RealSpaHost @Inject constructor(
     private val productRegistrar: ProductRegistrar,
     private val deepLinkHandler: DeepLinkHandler,
     private val dotNsTldProvider: DotNsTldProvider,
+    private val workerRefCounter: ProductWorkerRefCounter,
     @param:ApplicationContext private val context: Context,
 ) : SpaHost {
     context(scope: ComputationalScope, messageDisplay: MessageDisplay)
@@ -81,6 +85,16 @@ class RealSpaHost @Inject constructor(
             ),
             handlerGroups = handlerGroups,
         )
+
+        // Keep the product's worker alive for as long as the session is hosted. A product that
+        // publishes no worker is a no-op; the reference releases when the session scope ends.
+        scope.launch {
+            val tld = dotNsTldProvider.getTld().getOrNull() ?: return@launch
+            val productId = ProductId.fromUrl(initialUrl.toUri(), tld).getOrNull() ?: return@launch
+            workerRefCounter.withWorkerAcquired(productId, "spa:${productId.value}") {
+                awaitCancellation()
+            }
+        }
 
         val session = sessionFactory.create(environment, runtime, transport, scope)
         scope.launch {
