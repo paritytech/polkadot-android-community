@@ -78,6 +78,17 @@ interface CoinageTransactionService {
     /** In registration order. */
     fun subscribeOperationGroupStatuses(groupId: CoinageOperationGroupId): Flow<List<CoinageTransactionState>>
 
+    /**
+     * Every group whose id starts with [prefix], each in registration order.
+     *
+     * A group id is caller-chosen and opaque, so a caller that gives its groups a shared prefix can find
+     * them all again — and read back whatever it encoded in the rest of the id — without keeping a list of
+     * its own anywhere.
+     */
+    suspend fun getOperationGroupsMatching(
+        prefix: String,
+    ): Result<Map<CoinageOperationGroupId, List<CoinageTransactionState>>>
+
     suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState>
 
     /** The state of each of [assets]; ones the ledger has never heard of come back untracked. */

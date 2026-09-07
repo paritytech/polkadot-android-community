@@ -1,6 +1,6 @@
 import { createContainer } from '@novasamatech/host-container';
 import type { Provider, Subscription } from '@novasamatech/host-api';
-import { RequestCredentialsErr, CreateProofErr, GetAliasErr, SignVrfErr, RegisterRingVrfKeyErr, ListRingVrfKeysErr, RingVrfSignErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, WorkerErr, toHex, fromHex } from '@novasamatech/host-api';
+import { RequestCredentialsErr, CreateProofErr, GetAliasErr, SignVrfErr, RegisterRingVrfKeyErr, ListRingVrfKeysErr, RingVrfSignErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, PaymentTopUpStatusErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, WorkerErr, toHex, fromHex } from '@novasamatech/host-api';
 import { createWsJsonRpcProvider } from '@novasamatech/host-substrate-chain-connection';
 
 type PausableJsonRpcProvider = ReturnType<typeof createWsJsonRpcProvider>;
@@ -964,6 +964,7 @@ container.handlePaymentRequest(async (params, { ok, err }) => {
 container.handlePaymentTopUp(async (params, { ok, err }) => {
   try {
     const nativeParams: Record<string, unknown> = {
+      id: params.id,
       amount: params.amount.toString(),
       sourceTag: params.source.tag,
     };
@@ -977,13 +978,51 @@ container.handlePaymentTopUp(async (params, { ok, err }) => {
     await callNative('paymentTopUp', nativeParams);
     return ok();
   } catch (e) {
-    const msg = String(e instanceof Error ? e.message : e);
-    const partial = msg.match(/PartialPayment:(\d+)/);
-    if (partial) {
-      return err(new PaymentTopUpErr.PartialPayment({ credited: BigInt(partial[1]) }));
+    switch ((e as { code?: string })?.code) {
+      case 'InvalidSource':
+        return err(new PaymentTopUpErr.InvalidSource());
+      case 'AlreadyExists':
+        return err(new PaymentTopUpErr.AlreadyExists());
+      case 'SourceBusy':
+        return err(new PaymentTopUpErr.SourceBusy());
+      default:
+        return err(new PaymentTopUpErr.Unknown({ reason: String((e as Error)?.message ?? e) }));
     }
-    return err(new PaymentTopUpErr.Unknown({ reason: msg }));
   }
+});
+
+container.handlePaymentTopUpStatusSubscribe((id, send, interrupt) => {
+  return subscribeNative(
+    'paymentTopUpStatusSubscribe',
+    { id },
+    (payload: { tag: string; finalized?: boolean; actualClaimed?: string }) => {
+      switch (payload.tag) {
+        case 'Claimed':
+          return send({ tag: 'Claimed', value: { finalized: payload.finalized ?? false } });
+        case 'ClaimedPartially':
+          return send({
+            tag: 'ClaimedPartially',
+            value: { actualClaimed: BigInt(payload.actualClaimed ?? '0') },
+          });
+        case 'Claiming':
+          return send({ tag: 'Claiming', value: undefined });
+        case 'NotClaimed':
+          return send({ tag: 'NotClaimed', value: undefined });
+        default:
+          return send({ tag: 'Detecting', value: undefined });
+      }
+    },
+    (e) => {
+      // Deferred: an interrupt raised synchronously from this body outruns the product-side
+      // subscription bookkeeping and is dropped, so an unknown id would look like silence.
+      const failure =
+        (e as { code?: string })?.code === 'NotFound'
+          ? new PaymentTopUpStatusErr.NotFound()
+          : new PaymentTopUpStatusErr.Unknown({ reason: String((e as Error)?.message ?? e) });
+
+      queueMicrotask(() => interrupt(failure));
+    },
+  );
 });
 
 container.handlePaymentStatusSubscribe((paymentId, send, interrupt) => {

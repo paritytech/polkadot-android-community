@@ -154,6 +154,14 @@ class RealCoinageEntryRepository @Inject constructor(
         return dao.subscribeGroupEntries(groupId.value).map { it.toTransactionStates() }
     }
 
+    override suspend fun getGroupsMatching(
+        prefix: String,
+    ): Result<Map<CoinageOperationGroupId, List<CoinageTransactionState>>> = runCatching {
+        dao.getEntriesOfGroupsMatching(prefix)
+            .groupBy { CoinageOperationGroupId(requireNotNull(it.entry.operationGroupId)) }
+            .mapValues { (_, entries) -> entries.toTransactionStates() }
+    }
+
     override fun subscribeAssetStates(): Flow<Map<OwnAsset, CoinageAssetState>> {
         return dao.subscribeAssetStates().map { projections -> projections.associate { it.toDomain() } }
     }

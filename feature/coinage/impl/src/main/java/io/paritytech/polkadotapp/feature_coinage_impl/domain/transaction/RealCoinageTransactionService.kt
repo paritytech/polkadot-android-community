@@ -109,6 +109,10 @@ class RealCoinageTransactionService @Inject constructor(
         groupId: CoinageOperationGroupId,
     ): Flow<List<CoinageTransactionState>> = repository.subscribeGroupStatuses(groupId)
 
+    override suspend fun getOperationGroupsMatching(
+        prefix: String,
+    ): Result<Map<CoinageOperationGroupId, List<CoinageTransactionState>>> = repository.getGroupsMatching(prefix)
+
     override suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState> =
         repository.getAssetState(asset)
 

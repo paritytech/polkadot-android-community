@@ -40,6 +40,8 @@ import io.paritytech.polkadotapp.feature_products_impl.data.storage.AssetContain
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ContainerScriptProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ProductLocalStorage
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.RealProductLocalStorage
+import io.paritytech.polkadotapp.feature_products_impl.data.storage.RealTopUpSourceStorage
+import io.paritytech.polkadotapp.feature_products_impl.data.storage.TopUpSourceStorage
 import io.paritytech.polkadotapp.feature_products_impl.domain.ProductAccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.RealProductRequestAccountResolver
 import io.paritytech.polkadotapp.feature_products_impl.domain.accountsProtocol.RealAccountsProtocol
@@ -95,6 +97,8 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.spaBrowser.RealSpa
 import io.paritytech.polkadotapp.feature_products_impl.domain.spaBrowser.SpaBrowserInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.ExecuteTopUpUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.RealExecuteTopUpUseCase
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.RealTopUpService
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpService
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.RealResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.ProductServingHostResolver
@@ -103,6 +107,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.worker.RealProduct
 import io.paritytech.polkadotapp.feature_products_impl.domain.worker.RealWorkerBootFactory
 import io.paritytech.polkadotapp.feature_products_impl.domain.worker.WorkerBootFactory
 import io.paritytech.polkadotapp.feature_products_impl.presentation.initialization.ProductWorkerInitializer
+import io.paritytech.polkadotapp.feature_products_impl.presentation.initialization.TopUpResumeInitializer
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaHost.RealSpaHost
 import javax.inject.Singleton
@@ -158,6 +163,9 @@ internal interface ProductsModule {
     fun bindProductLocalStorage(impl: RealProductLocalStorage): ProductLocalStorage
 
     @Binds
+    fun bindTopUpSourceStorage(impl: RealTopUpSourceStorage): TopUpSourceStorage
+
+    @Binds
     @Singleton
     fun bindProductWorkerRefCounter(impl: RealProductWorkerRefCounter): ProductWorkerRefCounter
 
@@ -174,6 +182,10 @@ internal interface ProductsModule {
     @Binds
     @IntoSet
     fun bindProductWorkerInitializer(impl: ProductWorkerInitializer): AppInitializer
+
+    @Binds
+    @IntoSet
+    fun bindTopUpResumeInitializer(impl: TopUpResumeInitializer): AppInitializer
 
     @Binds
     fun bindProductAccountOrigins(impl: RealProductAccountOrigins): ProductAccountOrigins
@@ -287,6 +299,10 @@ internal interface ProductsModule {
 
     @Binds
     fun bindExecuteTopUpUseCase(impl: RealExecuteTopUpUseCase): ExecuteTopUpUseCase
+
+    @Binds
+    @Singleton
+    fun bindTopUpService(impl: RealTopUpService): TopUpService
 
     companion object {
         @Provides

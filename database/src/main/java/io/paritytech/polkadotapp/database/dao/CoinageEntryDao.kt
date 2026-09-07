@@ -175,6 +175,11 @@ abstract class CoinageEntryDao {
     @Query("SELECT * FROM coinage_entry WHERE operationGroupId = :groupId ORDER BY id ASC")
     abstract fun subscribeGroupEntries(groupId: String): Flow<List<CoinageEntryWithAssets>>
 
+    /** Every group whose id starts with [prefix], in registration order within each group. */
+    @Transaction
+    @Query("SELECT * FROM coinage_entry WHERE operationGroupId LIKE :prefix || '%' ORDER BY id ASC")
+    abstract suspend fun getEntriesOfGroupsMatching(prefix: String): List<CoinageEntryWithAssets>
+
     @Query(ASSET_STATE_QUERY)
     abstract fun subscribeAssetStates(): Flow<List<CoinageAssetStateProjection>>
 

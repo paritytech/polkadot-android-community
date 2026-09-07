@@ -1,132 +1,158 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest
 
-import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.util.amountFromPlanks
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
-import io.paritytech.polkadotapp.common.utils.blake2b256
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
+import io.paritytech.polkadotapp.common.utils.getOrEmpty
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.OnboardingUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
-import kotlinx.coroutines.flow.first
+import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 private const val COINAGE_LOG_TAG = "CoinageTransfer"
 
-/** Outcome of a successful top-up claim. */
-sealed interface TopUpClaimResult {
-    /** The claimed funds matched the amount the product stated. */
-    data object Exact : TopUpClaimResult
-
-    /** A Coins top-up whose detected on-chain total [credited] differs from the stated amount. */
-    data class Partial(val credited: Balance) : TopUpClaimResult
-}
-
-/** How long a product is kept waiting for its coins, and how long claiming may retry within that. */
-private val CLAIM_TIMEOUT = 60.seconds
+/**
+ * How long a top-up keeps trying before whatever it has is all it will ever have.
+ *
+ * The same span for both sources, and measured from when the operation opened rather than from this
+ * attempt — see [TopUpOperation].
+ */
+private val TOP_UP_RETRY_WINDOW = 1.hours
 
 interface ExecuteTopUpUseCase {
     /**
-     * Performs the top-up: onboards via the signer, or moves the coins into the user's coin set.
-     * For a [TopUpSource.Coins] top-up, reports [TopUpClaimResult.Partial] when the
-     * detected on-chain total differs from [amount]; otherwise [TopUpClaimResult.Exact].
+     * Runs the top-up and reports it, ending when nothing further will be attempted.
+     *
+     * Completion is what says the top-up is over; the last status is its verdict. Calling this twice for the
+     * same operation rejoins the transactions the first run registered rather than paying twice, which is
+     * what makes picking an interrupted top-up back up safe.
      */
-    suspend fun claim(source: TopUpSource, amount: Balance): Result<TopUpClaimResult>
+    fun execute(operation: TopUpOperation, source: TopUpSource): Flow<TopUpStatus>
+
+    /**
+     * How a top-up ended, read off the ledger alone.
+     *
+     * For a top-up whose source has been dropped, which is every one that reached a verdict. What the group
+     * minted is what the user got, and the amount the product asked for is in the group's own id — so the
+     * answer needs nothing that was thrown away.
+     */
+    suspend fun verdictOf(operation: TopUpOperation): TopUpStatus
 }
 
 @OptIn(ExperimentalTime::class)
 class RealExecuteTopUpUseCase @Inject constructor(
     private val claimReceivedCoinsUseCase: ClaimReceivedCoinsUseCase,
     private val onboardingUseCase: OnboardingUseCase,
+    private val transactionService: CoinageTransactionService,
+    private val assetValueUseCase: CoinageAssetValueUseCase,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
-    private val timeProvider: TimeProvider,
 ) : ExecuteTopUpUseCase {
-    override suspend fun claim(source: TopUpSource, amount: Balance): Result<TopUpClaimResult> =
-        when (source) {
-            is TopUpSource.Onboard -> {
-                val decimalAmount = chainAssetProvider.asset().amountFromPlanks(amount)
-
-                Timber.tag(COINAGE_LOG_TAG).i("Top-up starting source=onboard amount=$amount")
-
-                onboardingUseCase.onboard(decimalAmount, source.signerSource)
-                    .onSuccess { Timber.tag(COINAGE_LOG_TAG).i("Top-up succeeded source=onboard amount=$amount") }
-                    .onFailure { Timber.tag(COINAGE_LOG_TAG).e(it, "Top-up failed source=onboard amount=$amount") }
-                    .map { TopUpClaimResult.Exact }
-            }
-
-            is TopUpSource.Coins -> claimCoins(source.coinKeys, amount)
-        }
-
-    private suspend fun claimCoins(coinKeys: List<CoinPrivateKey>, expectedAmount: Balance): Result<TopUpClaimResult> {
-        val groupId = claimGroupOf(coinKeys)
+    override fun execute(operation: TopUpOperation, source: TopUpSource): Flow<TopUpStatus> {
+        val amount = operation.amount
+        val groupId = groupOf(operation)
+        val retryUntil = operation.startedAt + TOP_UP_RETRY_WINDOW
 
         Timber.tag(COINAGE_LOG_TAG)
-            .i("Top-up starting source=coins group=${groupId.value} coins=${coinKeys.size} expected=$expectedAmount")
+            .i("Top-up running group=${groupId.value} amount=$amount until=$retryUntil")
 
-        return runCatching {
-            var latest: CoinageTransferDetection = CoinageTransferDetection.Detecting
+        val detections = when (source) {
+            is TopUpSource.Onboard -> onboard(source.signerSource, amount, groupId, retryUntil)
 
-            // Claiming keeps going for as long as a coin is visible on chain, which is right for money left
-            // in a chat and wrong here: a product is blocked on this call. So the wait is bounded on this
-            // side, and claiming is given that same span to retry within.
-            val settled = withTimeoutOrNull(CLAIM_TIMEOUT) {
-                claimReceivedCoinsUseCase.claim(coinKeys, groupId, timeProvider.now() + CLAIM_TIMEOUT)
-                    .onEach { latest = it }
-                    // The first arrival, not the last word: the coins are ours once a claim is in a block,
-                    // and waiting for finality would hold the top-up open for tens of seconds after the
-                    // money landed.
-                    .first { it.isSettled() }
-            }
-
-            when (val outcome = settled ?: latest) {
-                is CoinageTransferDetection.Claimed -> outcome.amount.asClaimResult(expectedAmount, groupId)
-
-                // Whatever landed is the user's, whether claiming finished or we merely stopped waiting on
-                // it. Calling a top-up that moved most of the money an outright failure would be worse.
-                is CoinageTransferDetection.ClaimedPartially -> outcome.claimed.asClaimResult(expectedAmount, groupId)
-                is CoinageTransferDetection.ClaimingRest -> outcome.claimed.asClaimResult(expectedAmount, groupId)
-
-                else -> error("Failed to move coins into the user's coin set: $outcome")
-            }
-        }.onFailure {
-            Timber.tag(COINAGE_LOG_TAG).e(it, "Top-up failed source=coins group=${groupId.value}")
+            // Claiming already ends on its own window, so it needs no bound of its own here. Nothing is
+            // blocked on this call any more — the product follows the status instead of waiting on a reply.
+            is TopUpSource.Coins -> claimReceivedCoinsUseCase.claim(source.coinKeys, groupId, retryUntil)
         }
+
+        return detections
+            .map { it.toStatus(amount) }
+            .distinctUntilChanged()
+            .onEach { Timber.tag(COINAGE_LOG_TAG).i("Top-up status group=${groupId.value} status=$it") }
+    }
+
+    override suspend fun verdictOf(operation: TopUpOperation): TopUpStatus {
+        val groupId = groupOf(operation)
+
+        val entries = transactionService.getOperationGroupStatuses(groupId)
+            .logFailure("Failed to read the top-up group ${groupId.value}")
+            .getOrEmpty()
+
+        val arrived = entries.filter { it.status.isArrived }
+        val credited = assetValueUseCase.valueOf(arrived.flatMap { it.outputs })
+            .logFailure("Failed to value what the top-up minted")
+            .getOrDefault(Balance.ZERO)
+
+        return when {
+            credited >= operation.amount ->
+                TopUpStatus.Claimed(finalized = entries.all { it.status == CoinageTransactionStatus.FINALIZED_SUCCESS })
+
+            credited.isPositive() -> TopUpStatus.ClaimedPartially(credited)
+
+            else -> TopUpStatus.NotClaimed
+        }
+    }
+
+    private fun onboard(
+        signerSource: TransactionSignerSource.Signed,
+        amount: Balance,
+        groupId: CoinageOperationGroupId,
+        retryUntil: Instant,
+    ): Flow<CoinageTransferDetection> = flow {
+        val decimalAmount = chainAssetProvider.asset().amountFromPlanks(amount)
+
+        emitAll(onboardingUseCase.onboardDurably(decimalAmount, signerSource, groupId, retryUntil))
     }
 }
 
 /**
- * Content-addressed, because a top-up carries no identity of its own that survives a retry. The same set of
- * keys always names the same group, so a second attempt rejoins the claims the first one registered.
+ * How much of what was asked for is the user's, in the vocabulary RFC-0006 gives products.
+ *
+ * The detection's own amount is what actually landed, which can fall short of what the product asked for —
+ * an underfunded account, coins worth less than the sender claimed. Only a verdict may call that partial:
+ * while claiming is still going the rest can still arrive, so a shortfall reports as progress.
  */
-private fun CoinageTransferDetection.isSettled(): Boolean =
-    this is CoinageTransferDetection.Claimed ||
-        this is CoinageTransferDetection.ClaimedPartially ||
-        this is CoinageTransferDetection.NotClaimed
+private fun CoinageTransferDetection.toStatus(expected: Balance): TopUpStatus = when (this) {
+    is CoinageTransferDetection.Detecting -> TopUpStatus.Detecting
 
-private fun Balance.asClaimResult(expectedAmount: Balance, groupId: CoinageOperationGroupId): TopUpClaimResult {
-    return if (this < expectedAmount) {
-        Timber.tag(COINAGE_LOG_TAG)
-            .w("Top-up credited less than expected group=${groupId.value} credited=$this expected=$expectedAmount")
+    is CoinageTransferDetection.Claiming -> TopUpStatus.Claiming
 
-        TopUpClaimResult.Partial(this)
-    } else {
-        Timber.tag(COINAGE_LOG_TAG).i("Top-up succeeded source=coins group=${groupId.value} credited=$this")
+    // Part landed and the rest is retrying. Products are given no variant for that, and it is a claim in
+    // progress either way — the amount it carries is not the last word.
+    is CoinageTransferDetection.ClaimingRest -> TopUpStatus.Claiming
 
-        TopUpClaimResult.Exact
+    is CoinageTransferDetection.Claimed -> when {
+        amount >= expected -> TopUpStatus.Claimed(finalized)
+        finalized -> TopUpStatus.ClaimedPartially(amount)
+        else -> TopUpStatus.Claiming
     }
+
+    is CoinageTransferDetection.ClaimedPartially -> TopUpStatus.ClaimedPartially(claimed)
+
+    is CoinageTransferDetection.NotClaimed -> TopUpStatus.NotClaimed
 }
 
-private fun claimGroupOf(coinKeys: List<CoinPrivateKey>): CoinageOperationGroupId {
-    val keys = coinKeys.map { it.value.toHexString() }.sorted().joinToString(separator = "")
-
-    return CoinageOperationGroupId("top-up:${keys.encodeToByteArray().blake2b256().toHexString()}")
-}
+/**
+ * The product's own id names the coinage group, so a top-up picked back up rejoins the transactions its
+ * first run registered instead of submitting them again.
+ *
+ * Qualified by the product, because the id is a string the product chose: two products both calling theirs
+ * "topup-1" must not end up sharing one group of transactions.
+ */
+private fun groupOf(operation: TopUpOperation) =
+    CoinageOperationGroupId("top-up:${operation.productId.value}:${operation.id.value}")
