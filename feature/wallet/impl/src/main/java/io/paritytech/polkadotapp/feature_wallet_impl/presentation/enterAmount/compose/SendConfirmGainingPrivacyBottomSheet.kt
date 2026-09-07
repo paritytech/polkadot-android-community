@@ -59,7 +59,9 @@ private fun SendConfirmGainingPrivacyContent(
     onSendAnyway: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    val totalAmountText = LocalTokenAmountFormatter.current.formatFiat(action.totalTransfer)
+    val formatter = LocalTokenAmountFormatter.current
+    val totalAmountText = formatter.formatFiat(action.totalTransfer)
+    val gainingPrivacyAmountText = formatter.formatFiat(action.fromGainingPrivacy)
 
     Column(
         modifier = Modifier
@@ -87,9 +89,18 @@ private fun SendConfirmGainingPrivacyContent(
         VerticalSpacer { small }
 
         NovaText(
-            text = stringResource(RCommon.string.send_gaining_privacy_full_amount),
+            text = stringResource(RCommon.string.send_gaining_privacy_description, gainingPrivacyAmountText),
             style = PolkadotTheme.typography.body.large,
             color = PolkadotTheme.colors.fg.secondary,
+            textAlign = TextAlign.Center,
+        )
+
+        VerticalSpacer { small }
+
+        NovaText(
+            text = stringResource(RCommon.string.send_gaining_privacy_wait_hint),
+            style = PolkadotTheme.typography.body.small,
+            color = PolkadotTheme.colors.fg.tertiary,
             textAlign = TextAlign.Center,
         )
 
@@ -132,6 +143,7 @@ private fun SendConfirmGainingPrivacyPreview() {
                 SendConfirmGainingPrivacyContent(
                     action = ConfirmGainingPrivacySpendUserAction(
                         totalTransfer = createTokenAmountModel(100.toBigDecimal()),
+                        fromGainingPrivacy = createTokenAmountModel(40.toBigDecimal()),
                     ),
                     onSendAnyway = {},
                     onCancel = {},

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="send_gaining_privacy_title">This payment might reduce your privacy</string>
-    <string name="send_gaining_privacy_full_amount">In this payment you are using funds that have not yet been fully processed by the privacy system.</string>
-    <string name="send_gaining_privacy_send_anyway_button">Send %1$s anyway</string>
+    <string name="send_gaining_privacy_title">Part of this payment is not private yet</string>
+    <string name="send_gaining_privacy_description">%1$s of this payment comes from funds that are still blending in with other payments. Sending them now makes this payment easier to link back to where the funds came from.</string>
+    <string name="send_gaining_privacy_wait_hint">Left alone, these funds become fully private on their own. How long that takes depends on the payments privacy mode you chose in Settings.</string>
+    <string name="send_gaining_privacy_send_anyway_button">Send %1$s now</string>
 
     <string name="send_payment_failed">Failed to submit transaction</string>
     <string name="common_intent_failed">Failed to find application to perform specified action</string>
@@ -729,7 +730,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_enter_amount_title">Enter amount</string>
     <string name="send_enter_amount_placeholder">Enter Amount</string>
     <string name="send_enter_amount_max_balance_prefix">Max:</string>
-    <string name="send_enter_amount_privacy_cost_hint">Extra %1$s is spendable, but at the risk of reducing your privacy</string>
+    <string name="send_enter_amount_privacy_cost_hint">Plus %1$s that is not private yet</string>
     <string name="send_enter_amount_not_enough_funds_error">You don’t have enough funds</string>
     <string name="send_enter_amount_cash_title">%1$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>
