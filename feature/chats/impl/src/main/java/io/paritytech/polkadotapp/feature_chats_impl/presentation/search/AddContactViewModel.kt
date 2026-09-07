@@ -8,6 +8,8 @@ import io.paritytech.polkadotapp.common.presentation.search.withQuerySearching
 import io.paritytech.polkadotapp.common.utils.SizedList
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.common.utils.shareInBackground
+import io.paritytech.polkadotapp.feature_chats_api.domain.error.asStartChatError
+import io.paritytech.polkadotapp.feature_chats_api.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.AddContactInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatAvatar
@@ -71,7 +73,7 @@ internal class AddContactViewModel @Inject constructor(
 
             interactor.getStartChatData(result.contactAccountId)
                 .onSuccess(::openChatFeed)
-                .onFailure(::showError)
+                .onFailure { showError(it, it.asStartChatError().toPresentationError()) }
 
             loadingContactId.value = null
         }

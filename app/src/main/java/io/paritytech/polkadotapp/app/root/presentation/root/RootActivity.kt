@@ -33,6 +33,7 @@ import io.paritytech.polkadotapp.common.presentation.notification.AppNotificatio
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotifier
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.BaseScreenDelegate
+import io.paritytech.polkadotapp.common.presentation.screens.ObserveViewModelEvents
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
@@ -56,10 +57,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
 
     private val viewModel by viewModels<RootViewModel>()
 
-    private val delegate = BaseScreenDelegate(
-        context = { this },
-        viewModel = ::viewModel
-    )
+    private val delegate = BaseScreenDelegate(context = { this })
 
     private val navHostFragment: NavHostFragment by lazy(LazyThreadSafetyMode.NONE) {
         supportFragmentManager.findFragmentById(R.id.rootNavHost) as NavHostFragment
@@ -91,8 +89,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
 
         setupChatExtensionOverlay()
         setupChainHealthBar()
-
-        delegate.subscribeViewModelEvents()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -142,6 +138,8 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 PolkadotTheme {
+                    ObserveViewModelEvents(viewModel, appNotifier)
+
                     AppNotificationHost(notifier = appNotifier)
                 }
             }

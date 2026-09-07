@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -55,6 +56,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatActiveTrackerInte
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatDisplay.ChatDisplayGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingChatRequestProcessor
+import io.paritytech.polkadotapp.feature_chats_impl.domain.error.ChatRequestError
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatDisplay
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatUserInputState
@@ -334,6 +336,7 @@ class ChatFeedInteractor @Inject internal constructor(
     suspend fun acceptIncomingRequest(contactAccountId: AccountId): Result<Unit> {
         return withContext(coroutineDispatchers.io) {
             contactsRepository.getContactResult(contactAccountId)
+                .mapError { ChatRequestError.ContactNotFound }
                 .flatMap { incomingChatRequestProcessor.acceptIncomingRequest(it) }
         }
     }
@@ -341,6 +344,7 @@ class ChatFeedInteractor @Inject internal constructor(
     suspend fun declineIncomingRequest(contactAccountId: AccountId): Result<Unit> {
         return withContext(coroutineDispatchers.io) {
             contactsRepository.getContactResult(contactAccountId)
+                .mapError { ChatRequestError.ContactNotFound }
                 .flatMap { incomingChatRequestProcessor.declineIncomingRequest(it) }
         }
     }

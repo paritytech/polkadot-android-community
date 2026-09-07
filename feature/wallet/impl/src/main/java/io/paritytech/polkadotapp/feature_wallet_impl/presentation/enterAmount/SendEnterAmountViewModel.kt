@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.chains.util.amountFromPlanks
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.validation.onError
 import io.paritytech.polkadotapp.common.domain.validation.onSuccess
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
@@ -40,6 +41,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.Se
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendEnterAmountInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.asSendError
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -175,8 +177,9 @@ class SendEnterAmountViewModel @Inject constructor(
 
             val payload = SendValidationPayload(amount.amount, transferMethod)
 
-            sendValidationMixin.runValidation(interactor.sendValidation, payload)
-                .onSuccess { sendValidatedTransfer(it) }
+            val validationResult = sendValidationMixin.runValidation(interactor.sendValidation, payload)
+            validationResult.onSuccess { sendValidatedTransfer(it) }
+            validationResult.onError { showError(it, it.asSendError().toPresentationError()) }
 
             sendProgress.value = SendProgress.Idle
         }
@@ -201,7 +204,7 @@ class SendEnterAmountViewModel @Inject constructor(
             payload.showTransactionResult && error != null -> walletRouter.openFailure()
 
             !payload.showTransactionResult && error != null -> {
-                showError(error)
+                showError(error, error.asSendError().toPresentationError())
                 walletRouter.back()
             }
 

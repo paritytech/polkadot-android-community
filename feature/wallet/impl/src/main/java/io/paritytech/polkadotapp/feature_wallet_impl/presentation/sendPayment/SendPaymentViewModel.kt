@@ -13,10 +13,12 @@ import io.paritytech.polkadotapp.common.utils.toSizedList
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.converter.ParseAddressConverterFactory
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.mixin.AddressInputMixin
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.toParcel
+import io.paritytech.polkadotapp.feature_chats_api.domain.error.asStartChatError
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasEstablishedChat
 import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.GetContactsUseCase
 import io.paritytech.polkadotapp.feature_chats_api.presentation.ChatStarter
 import io.paritytech.polkadotapp.feature_chats_api.presentation.address.ContactsAddressConverterFactory
+import io.paritytech.polkadotapp.feature_chats_api.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_transfers_api.presentation.PreviousPaymentsAddressConverterFactory
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.ParseAddressUsernameConverterFactory
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.UsernameAddressConverterFactory
@@ -109,7 +111,7 @@ class SendPaymentViewModel @Inject constructor(
             _messageEvents.trySend(RCommon.string.send_payment_open_chat_message)
 
             chatStarter.openChatWith(accountId)
-                .onFailure(::showError)
+                .onFailure { showError(it, it.asStartChatError().toPresentationError()) }
         }
     }
 

@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.conf
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictPayload
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
@@ -35,7 +36,7 @@ class BackupConflictViewModel @Inject constructor(
             }
             .onFailure {
                 step.value = BackupConflictStep.Override(inProgress = false)
-                showError(it)
+                showError(it, UnexpectedPresentationError())
             }
     }
 

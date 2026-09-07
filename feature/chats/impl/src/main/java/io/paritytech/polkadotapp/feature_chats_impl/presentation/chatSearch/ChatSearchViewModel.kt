@@ -8,9 +8,11 @@ import io.paritytech.polkadotapp.common.utils.combineToPair
 import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.stateInBackground
+import io.paritytech.polkadotapp.feature_chats_api.domain.error.asStartChatError
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatVariant
+import io.paritytech.polkadotapp.feature_chats_api.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatFeedPayload
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatSearch.ChatSearchInteractor
@@ -107,7 +109,7 @@ class ChatSearchViewModel @Inject constructor(
                     .onSuccess { startChatData ->
                         router.openChatFeed(startChatData.toChatFeedPayload())
                     }
-                    .onFailure(::showError)
+                    .onFailure { showError(it, it.asStartChatError().toPresentationError()) }
             }
 
             is ChatVariant.Extension -> {

@@ -267,8 +267,7 @@ class ClaimUsernameViewModel @Inject constructor(
     private fun applyFieldError(error: Throwable) {
         val flowError = error.asUsernameFlowError()
 
-        // Backing out is not a failure to display, mirroring
-        // BaseViewModel.shouldIgnore(SigningCancelledException).
+        // Backing out is not a failure to display, mirroring BaseViewModel.shouldIgnore.
         if (flowError == UsernameFlowError.Cancelled) {
             state.update { it.copy(progress = ClaimUsernameProgress.NONE) }
             return

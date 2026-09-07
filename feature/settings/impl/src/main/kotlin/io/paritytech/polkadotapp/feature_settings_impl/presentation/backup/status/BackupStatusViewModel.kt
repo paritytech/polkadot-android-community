@@ -2,13 +2,14 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.stat
 
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictPayload
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.BackupState
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.BackupStatusInteractor
+import io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.error.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.status.models.BackupStatusUiState
-import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
 
@@ -32,11 +33,7 @@ class BackupStatusViewModel @Inject constructor(
             .onSuccess {
                 router.openMnemonic()
             }
-            .onFailure {
-                if (it !is AuthenticationCancelledException) {
-                    showError(it)
-                }
-            }
+            .onFailure { showError(it, AuthenticationFailedPresentationError()) }
     }
 
     override fun onCreateBackup() = launchUnit {
@@ -47,7 +44,7 @@ class BackupStatusViewModel @Inject constructor(
                 state.value = BackupStatusUiState.BackupExists
             }
             .onFailure {
-                showError(it)
+                showError(it, UnexpectedPresentationError())
                 state.value = BackupStatusUiState.NoBackup
             }
     }

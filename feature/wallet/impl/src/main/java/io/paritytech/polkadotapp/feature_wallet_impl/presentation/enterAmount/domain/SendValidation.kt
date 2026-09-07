@@ -21,7 +21,7 @@ class SendValidation @Inject constructor(
     context(validationProcess: ValidationProcess)
     override suspend fun validate(payload: SendValidationPayload): ValidationResult<SendValidationPayload> {
         val balance = totalBalanceUseCase.getBalance()
-            .getOrElse { return ValidationResult.Error(Throwable("Can't fetch balance")) }
+            .getOrElse { return ValidationResult.Error(SendError.BalanceUnavailable) }
 
         val asset = chainAssetProvider.asset()
         val transferAmountPlanks = payload.value.planksFromAmount(asset.precision)
@@ -34,7 +34,7 @@ class SendValidation @Inject constructor(
         // Either the strategy will not part with what it is holding, or even that would not cover the
         // amount. Both are the same answer to the user: this cannot be sent.
         if (!gainingPrivacy.canSpendWithConfirmation || transferAmountPlanks > reachable) {
-            return ValidationResult.Error(Throwable("Amount exceeds available balance"))
+            return ValidationResult.Error(SendError.NotEnoughFunds)
         }
 
         val action = ConfirmGainingPrivacySpendUserAction(

@@ -80,9 +80,8 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
 
     fun onGetCashClick() = launchUnit {
         interactor.getCashProductId()
-            .logFailure("Failed to resolve Get CASH product id")
             .onSuccess { router.openProduct(it) }
-            .onFailure { showMessage("Failed to open Get CASH") }
+            .onFailure { showError(it, GetCashUnavailablePresentationError()) }
     }
 
     fun onSendClick() {

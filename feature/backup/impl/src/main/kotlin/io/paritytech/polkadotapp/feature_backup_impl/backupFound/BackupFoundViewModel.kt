@@ -5,12 +5,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupFoundPayload
 import io.paritytech.polkadotapp.feature_backup_impl.BackupRouter
 import io.paritytech.polkadotapp.feature_backup_impl.backupFound.domain.BackupFoundInteractor
 import io.paritytech.polkadotapp.feature_backup_impl.backupFound.models.BackupFoundProgressState
 import io.paritytech.polkadotapp.feature_backup_impl.backupFound.models.BackupFoundStep
+import io.paritytech.polkadotapp.feature_backup_impl.presentation.error.toImportFromBackupPresentationError
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
 
@@ -53,7 +55,7 @@ class BackupFoundViewModel @Inject constructor(
             }
             .onFailure {
                 progressState.value = BackupFoundProgressState.IDLE
-                showError(it)
+                showError(it, UnexpectedPresentationError())
             }
     }
 
@@ -70,7 +72,7 @@ class BackupFoundViewModel @Inject constructor(
             }
             .onFailure {
                 progressState.value = BackupFoundProgressState.IDLE
-                showError(it)
+                showError(it, it.toImportFromBackupPresentationError())
             }
     }
 }
