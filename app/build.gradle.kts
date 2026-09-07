@@ -22,7 +22,7 @@ android {
 
         testInstrumentationRunner = "io.paritytech.polkadotapp.app.HiltTestRunner"
 
-        manifestPlaceholders["appName"] = localProperties.readSecretOrThrow("APP_NAME")
+        manifestPlaceholders["appName"] = localProperties.readSecretOrThrow("APPLICATION_NAME")
         manifestPlaceholders["sentryDsn"] = localProperties.readSecretOrNull("SENTRY_DSN") ?: ""
 
         buildConfigString(
@@ -64,8 +64,8 @@ android {
         getByName("debug") {
             signingConfig = signingConfigs.getByName("dev")
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("DEBUG_APP_NAME")
-                ?: "[Debug] ${localProperties.readSecretOrThrow("APP_NAME")}"
+            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("DEBUG_APPLICATION_NAME")
+                ?: "[Debug] ${localProperties.readSecretOrThrow("APPLICATION_NAME")}"
 
             buildConfigField("String", "BuildType", "\"debug\"")
         }
@@ -74,16 +74,16 @@ android {
 
             signingConfig = signingConfigs.getByName("dev")
             applicationIdSuffix = ".nightly"
-            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("NIGHTLY_APP_NAME")
-                ?: localProperties.readSecretOrThrow("APP_NAME")
+            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("NIGHTLY_APPLICATION_NAME")
+                ?: localProperties.readSecretOrThrow("APPLICATION_NAME")
         }
         getByName("safetynet") {
             matchingFallbacks.addAll(listOf("nightly", "debug"))
 
             signingConfig = signingConfigs.getByName("dev")
             applicationIdSuffix = ".safetynet"
-            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("SAFETYNET_APP_NAME")
-                ?: "[Safetynet] ${localProperties.readSecretOrThrow("APP_NAME")}"
+            manifestPlaceholders["appName"] = localProperties.readSecretOrNull("SAFETYNET_APPLICATION_NAME")
+                ?: "[Safetynet] ${localProperties.readSecretOrThrow("APPLICATION_NAME")}"
         }
     }
 

@@ -40,7 +40,7 @@ fallback — the features they configure are not part of the current production 
 | Variable | Purpose |
 |----------|---------|
 | `APPLICATION_ID` | Base Android application ID. The build adds `.debug`, `.nightly` or `.safetynet` for those build types. Every resulting id must match a client in `google-services.json`. |
-| `APP_NAME` | Launcher name of the application. `DEBUG_APP_NAME`, `NIGHTLY_APP_NAME` and `SAFETYNET_APP_NAME` optionally override it per build type; when unset they are derived from this value. |
+| `APPLICATION_NAME` | Launcher name of the application. `DEBUG_APPLICATION_NAME`, `NIGHTLY_APPLICATION_NAME` and `SAFETYNET_APPLICATION_NAME` optionally override it per build type; when unset they are derived from this value. |
 | `PRIVACY_POLICY_URL` | Privacy-policy destination shown by the application. |
 | `CURRENCY_SYMBOL` | Symbol of the in-app digital currency shown in the UI (card title, send/get actions). |
 | `TERMS_OF_USE_URL` | Terms-of-use destination shown by the application. |

@@ -221,9 +221,9 @@ field. Set them in `local.properties` / CI to point at your own infrastructure.
 | Variable                    | Used by (module)              | Required | Default (placeholder)          | Description                                                                 |
 |-----------------------------|-------------------------------|----------|--------------------------------|-----------------------------------------------------------------------------|
 | `APPLICATION_ID`            | `app`                         | no       | `io.paritytech.polkadotapp`    | Installed application ID; changing it creates a different app identity      |
-| `APP_NAME`                  | `app`                         | no       | `Polkadot`                     | Base/release launcher name                                                   |
-| `DEBUG_APP_NAME`            | `app` debug build             | no       | `[Debug] <APP_NAME>`           | Debug launcher name                                                          |
-| `NIGHTLY_APP_NAME`          | `app` nightly build           | no       | `<APP_NAME>`                   | Nightly launcher name                                                        |
+| `APPLICATION_NAME`          | `app`                         | no       | `Polkadot`                     | Base/release launcher name                                                   |
+| `DEBUG_APPLICATION_NAME`    | `app` debug build             | no       | `[Debug] <APPLICATION_NAME>`   | Debug launcher name                                                          |
+| `NIGHTLY_APPLICATION_NAME`  | `app` nightly build           | no       | `<APPLICATION_NAME>`           | Nightly launcher name                                                        |
 | `PRIVACY_POLICY_URL`        | `app`                         | no       | `https://example.com/privacy`  | Privacy-policy destination                                                   |
 | `TERMS_OF_USE_URL`          | `app`                         | no       | `https://example.com/terms`    | Terms-of-use destination                                                     |
 | `REFERRAL_WEB_HOST`         | `feature/become-citizen/impl` | no       | `referral.example.com`         | Host of the web app that backs referral (`https`) deeplinks                 |
@@ -425,9 +425,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APPLICATION_ID: ${{ vars.APPLICATION_ID }}
-      APP_NAME: ${{ vars.APP_NAME }}
-      DEBUG_APP_NAME: ${{ vars.DEBUG_APP_NAME }}
-      NIGHTLY_APP_NAME: ${{ vars.NIGHTLY_APP_NAME }}
+      APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
+      DEBUG_APPLICATION_NAME: ${{ vars.DEBUG_APPLICATION_NAME }}
+      NIGHTLY_APPLICATION_NAME: ${{ vars.NIGHTLY_APPLICATION_NAME }}
       PRIVACY_POLICY_URL: ${{ vars.PRIVACY_POLICY_URL }}
       TERMS_OF_USE_URL: ${{ vars.TERMS_OF_USE_URL }}
       LOG_COLLECTION_EMAIL: ${{ vars.LOG_COLLECTION_EMAIL }}
