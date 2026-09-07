@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.launchUnit
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
@@ -81,7 +80,7 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     fun onGetCashClick() = launchUnit {
         interactor.getCashProductId()
             .onSuccess { router.openProduct(it) }
-            .onFailure { showError(it, GetCashUnavailablePresentationError()) }
+            .onFailure { showPresentationError(GetCashUnavailablePresentationError(it)) }
     }
 
     fun onSendClick() {
@@ -92,19 +91,18 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         if (fundInProgress.value) return@launchUnit
         fundInProgress.enable()
         interactor.testnetFund()
-            .logFailure("Failed to perform testnet fund")
-            .onFailure { showMessage("Failed to fund account") }
+            .onFailure { showPresentationError(AutoFundFailedPresentationError(it)) }
         fundInProgress.disable()
     }
 
     fun onShareLogsClick() = launchUnit {
         interactor.shareCoinageLogs()
-            .onFailure { showMessage("Failed to share coinage logs") }
+            .onFailure { showPresentationError(ShareCoinageLogsFailedPresentationError(it)) }
     }
 
     fun onForceRecycleClick(coin: Coin) = launchUnit {
         interactor.forceRecycle(coin)
-            .onFailure { showMessage("Failed to recycle coin") }
+            .onFailure { showPresentationError(ForceRecycleFailedPresentationError(it)) }
     }
 
     fun onBackupUpdateClick() {

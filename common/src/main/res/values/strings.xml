@@ -1487,7 +1487,10 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
     <string name="pocket_digital_dollar_advanced">Advanced</string>
-    <string name="pocket_error_get_cash_unavailable">Get CASH isn\'t available right now. Try again later.</string>
+    <string name="pocket_error_get_cash_unavailable">Get %1$s isn\'t available right now. Try again later.</string>
+    <string name="pocket_error_auto_fund_failed">Couldn\'t add test funds to this account. Try again.</string>
+    <string name="pocket_error_share_coinage_logs_failed">Couldn\'t share the coinage logs. Try again.</string>
+    <string name="pocket_error_force_recycle_failed">Couldn\'t recycle this coin. Try again.</string>
 
     <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
     <string name="payment_privacy_mode_fastest_label">Fastest</string>

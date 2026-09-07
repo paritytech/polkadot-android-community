@@ -65,7 +65,7 @@ class ConfirmMnemonicViewModel @Inject constructor(
         val enteredCorrectly = confirmationState.value.addedWords == generatedMnemonic.wordList
 
         if (enteredCorrectly.not()) {
-            showError(WrongMnemonicPresentationError())
+            showPresentationError(WrongMnemonicPresentationError())
             return
         }
 
@@ -78,7 +78,7 @@ class ConfirmMnemonicViewModel @Inject constructor(
                 }
                 .onFailure {
                     inProgress.disable()
-                    showError(it, UnexpectedPresentationError())
+                    showPresentationError(UnexpectedPresentationError(it))
                 }
         }
     }

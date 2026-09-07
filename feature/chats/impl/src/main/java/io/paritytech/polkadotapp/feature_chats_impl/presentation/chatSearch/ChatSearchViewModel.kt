@@ -109,7 +109,7 @@ class ChatSearchViewModel @Inject constructor(
                     .onSuccess { startChatData ->
                         router.openChatFeed(startChatData.toChatFeedPayload())
                     }
-                    .onFailure { showError(it, it.asStartChatError().toPresentationError()) }
+                    .onFailure { showPresentationError(it.asStartChatError().toPresentationError()) }
             }
 
             is ChatVariant.Extension -> {

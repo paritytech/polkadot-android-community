@@ -179,7 +179,7 @@ class SendEnterAmountViewModel @Inject constructor(
 
             val validationResult = sendValidationMixin.runValidation(interactor.sendValidation, payload)
             validationResult.onSuccess { sendValidatedTransfer(it) }
-            validationResult.onError { showError(it, it.asSendError().toPresentationError()) }
+            validationResult.onError { showPresentationError(it.asSendError().toPresentationError()) }
 
             sendProgress.value = SendProgress.Idle
         }
@@ -204,7 +204,7 @@ class SendEnterAmountViewModel @Inject constructor(
             payload.showTransactionResult && error != null -> walletRouter.openFailure()
 
             !payload.showTransactionResult && error != null -> {
-                showError(error, error.asSendError().toPresentationError())
+                showPresentationError(error.asSendError().toPresentationError())
                 walletRouter.back()
             }
 

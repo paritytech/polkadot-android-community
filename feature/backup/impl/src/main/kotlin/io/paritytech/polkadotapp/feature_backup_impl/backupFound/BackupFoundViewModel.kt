@@ -55,7 +55,7 @@ class BackupFoundViewModel @Inject constructor(
             }
             .onFailure {
                 progressState.value = BackupFoundProgressState.IDLE
-                showError(it, UnexpectedPresentationError())
+                showPresentationError(UnexpectedPresentationError(it))
             }
     }
 
@@ -72,7 +72,7 @@ class BackupFoundViewModel @Inject constructor(
             }
             .onFailure {
                 progressState.value = BackupFoundProgressState.IDLE
-                showError(it, it.toImportFromBackupPresentationError())
+                showPresentationError(it.toImportFromBackupPresentationError())
             }
     }
 }

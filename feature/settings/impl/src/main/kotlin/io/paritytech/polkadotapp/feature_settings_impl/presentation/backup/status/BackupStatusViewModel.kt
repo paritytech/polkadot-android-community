@@ -33,7 +33,7 @@ class BackupStatusViewModel @Inject constructor(
             .onSuccess {
                 router.openMnemonic()
             }
-            .onFailure { showError(it, AuthenticationFailedPresentationError()) }
+            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
     }
 
     override fun onCreateBackup() = launchUnit {
@@ -44,7 +44,7 @@ class BackupStatusViewModel @Inject constructor(
                 state.value = BackupStatusUiState.BackupExists
             }
             .onFailure {
-                showError(it, UnexpectedPresentationError())
+                showPresentationError(UnexpectedPresentationError(it))
                 state.value = BackupStatusUiState.NoBackup
             }
     }

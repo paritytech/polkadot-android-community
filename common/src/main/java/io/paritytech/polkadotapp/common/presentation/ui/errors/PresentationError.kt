@@ -9,7 +9,10 @@ interface PresentationError {
     fun message(): String
 }
 
-// To be used via delegation: class XError : PresentationError by StringResPresentationError(R.string.x_error)
+// Kotlin has no intersection types, so anything returning "a Throwable that is also a PresentationError" names this instead.
+abstract class PresentationThrowable(cause: Throwable?) : Throwable(cause), PresentationError
+
+// To be used via delegation: class XError(cause: Throwable) : PresentationThrowable(cause), PresentationError by StringResPresentationError(R.string.x_error)
 class StringResPresentationError(
     @param:StringRes private val messageRes: Int
 ) : PresentationError {

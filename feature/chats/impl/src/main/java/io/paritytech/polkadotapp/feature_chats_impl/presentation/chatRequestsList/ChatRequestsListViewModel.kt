@@ -60,7 +60,7 @@ class ChatRequestsListViewModel @Inject constructor(
     override fun onConfirmDeclineClick() = launchUnit {
         declineConfirmationState.value.requestItem?.let { request ->
             interactor.declineRequest(request.accountId)
-                .onFailure { showError(it, it.asChatRequestError().toPresentationError()) }
+                .onFailure { showPresentationError(it.asChatRequestError().toPresentationError()) }
         }
 
         declineConfirmationState.update { ChatRequestDeclineConfirmationState.Hidden }

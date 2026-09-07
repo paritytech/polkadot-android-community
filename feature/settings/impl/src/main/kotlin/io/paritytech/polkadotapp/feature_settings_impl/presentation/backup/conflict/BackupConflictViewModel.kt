@@ -36,7 +36,7 @@ class BackupConflictViewModel @Inject constructor(
             }
             .onFailure {
                 step.value = BackupConflictStep.Override(inProgress = false)
-                showError(it, UnexpectedPresentationError())
+                showPresentationError(UnexpectedPresentationError(it))
             }
     }
 

@@ -27,18 +27,11 @@ open class BaseViewModel : ViewModel(), ComputationalScope, MessageDisplay {
     }
 
     // The single seam for a caught failure: user cancellations never reach the user and everything else is always logged.
-    protected fun showError(
-        cause: Throwable,
-        error: PresentationErrorModel,
-    ) {
-        if (shouldIgnore(cause)) return
+    protected fun <T> showPresentationError(error: T) where T : Throwable, T : PresentationErrorModel {
+        if (shouldIgnore(error)) return
 
-        Timber.e(cause)
+        Timber.e(error)
 
-        showError(error)
-    }
-
-    protected fun showError(error: PresentationErrorModel) {
         _events.trySend(BaseViewModelEvent.PresentationError(error))
     }
 
@@ -57,8 +50,9 @@ open class BaseViewModel : ViewModel(), ComputationalScope, MessageDisplay {
     override val coroutineContext: CoroutineContext
         get() = viewModelScope.coroutineContext
 
+    // A presentation error carries the cancellation marker on its cause rather than on itself.
     private fun shouldIgnore(throwable: Throwable): Boolean {
-        return throwable is UserCancellation
+        return generateSequence(throwable, Throwable::cause).any { it is UserCancellation }
     }
 
     protected inline fun <reified T> SavedStateHandle.getPayload(

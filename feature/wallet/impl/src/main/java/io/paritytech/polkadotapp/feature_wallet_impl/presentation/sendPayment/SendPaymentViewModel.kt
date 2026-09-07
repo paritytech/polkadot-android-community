@@ -111,7 +111,7 @@ class SendPaymentViewModel @Inject constructor(
             _messageEvents.trySend(RCommon.string.send_payment_open_chat_message)
 
             chatStarter.openChatWith(accountId)
-                .onFailure { showError(it, it.asStartChatError().toPresentationError()) }
+                .onFailure { showPresentationError(it.asStartChatError().toPresentationError()) }
         }
     }
 

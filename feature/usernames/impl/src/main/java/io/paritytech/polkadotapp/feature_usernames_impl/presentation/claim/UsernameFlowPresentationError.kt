@@ -8,7 +8,7 @@ import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.UsernameFlo
 import io.paritytech.polkadotapp.common.R as RCommon
 
 fun UsernameFlowError.toPresentationError(): PresentationError = when (this) {
-    UsernameFlowError.NoConnection -> NoConnectionPresentationError()
+    UsernameFlowError.NoConnection -> NoConnectionPresentationError(this)
 
     UsernameFlowError.VerificationUnavailable ->
         StringResPresentationError(RCommon.string.username_error_verification_unavailable)
@@ -18,7 +18,7 @@ fun UsernameFlowError.toPresentationError(): PresentationError = when (this) {
 
     UsernameFlowError.VerificationBusy -> StringResPresentationError(RCommon.string.username_error_verification_busy)
 
-    UsernameFlowError.Server -> ServerPresentationError()
+    UsernameFlowError.Server -> ServerPresentationError(this)
 
     UsernameFlowError.Cancelled,
     UsernameFlowError.Unknown -> StringResPresentationError(RCommon.string.username_error_unknown)

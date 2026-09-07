@@ -80,7 +80,7 @@ class TransactionSignViewModel @Inject constructor(
 
                 router.back()
             }
-            .onFailure { showError(it, SigningFailedPresentationError()) }
+            .onFailure { showPresentationError(SigningFailedPresentationError(it)) }
 
         signing.value = false
     }
@@ -91,7 +91,7 @@ class TransactionSignViewModel @Inject constructor(
         Timber.d("Reject clicked for ${signingContext.requesterName}")
 
         signingContext.deliverRejection()
-            .onFailure { showError(it, UnexpectedPresentationError()) }
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
 
         router.back()
 

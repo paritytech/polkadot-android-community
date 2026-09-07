@@ -401,7 +401,7 @@ class ChatFeedViewModel @Inject constructor(
     override fun onLeaveChatConfirm() = launchUnit {
         interactor.leaveChat(chatId)
             .onSuccess { router.back() }
-            .onFailure { showError(it, UnexpectedPresentationError()) }
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     override fun onBlockUserRequest() = launchUnit {
@@ -412,12 +412,12 @@ class ChatFeedViewModel @Inject constructor(
     override fun onBlockUserConfirm() = launchUnit {
         interactor.blockUser(chatId)
             .onSuccess { router.back() }
-            .onFailure { showError(it, UnexpectedPresentationError()) }
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     override fun onUnblockUserClick() = launchUnit {
         interactor.unblockUser(chatId)
-            .onFailure { showError(it, UnexpectedPresentationError()) }
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     override fun onStartCallClick(withVideo: Boolean) = launchUnit {
@@ -520,7 +520,7 @@ class ChatFeedViewModel @Inject constructor(
         interactor.acceptIncomingRequest(contactAccountId)
             .onFailure {
                 chatRequestAnswerProgress.value = ChatRequestAnswerProgress.None
-                showError(it, it.asChatRequestError().toPresentationError())
+                showPresentationError(it.asChatRequestError().toPresentationError())
             }
     }
 
@@ -533,7 +533,7 @@ class ChatFeedViewModel @Inject constructor(
             .onSuccess { router.back() }
             .onFailure {
                 chatRequestAnswerProgress.value = ChatRequestAnswerProgress.None
-                showError(it, it.asChatRequestError().toPresentationError())
+                showPresentationError(it.asChatRequestError().toPresentationError())
             }
     }
 
@@ -554,7 +554,7 @@ class ChatFeedViewModel @Inject constructor(
                 sendAttachmentMessage(attachmentResult, text, replyToMessageId)
             }
             .onFailure {
-                showError(it, it.asAttachmentError().toPresentationError())
+                showPresentationError(it.asAttachmentError().toPresentationError())
             }
     }
 
@@ -571,7 +571,7 @@ class ChatFeedViewModel @Inject constructor(
             text = text,
             replyToMessageId = replyToMessageId
         ).onFailure {
-            showError(it, it.asAttachmentError().toPresentationError())
+            showPresentationError(it.asAttachmentError().toPresentationError())
         }
     }
 
@@ -584,7 +584,7 @@ class ChatFeedViewModel @Inject constructor(
 
         interactor.sendContactRequest(openChatRequest, welcomeText)
             .logFailure("Failed to send contact request")
-            .onFailure { showError(it, UnexpectedPresentationError()) }
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     private suspend fun sendMessageToActiveChat(messageText: String, relation: InputMessageRelation) {

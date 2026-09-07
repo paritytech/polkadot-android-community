@@ -73,7 +73,7 @@ internal class AddContactViewModel @Inject constructor(
 
             interactor.getStartChatData(result.contactAccountId)
                 .onSuccess(::openChatFeed)
-                .onFailure { showError(it, it.asStartChatError().toPresentationError()) }
+                .onFailure { showPresentationError(it.asStartChatError().toPresentationError()) }
 
             loadingContactId.value = null
         }

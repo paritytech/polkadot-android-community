@@ -31,7 +31,7 @@ class RecoverOptionsViewModel @Inject constructor(
             .onFailure { t ->
                 isRecovering.disable()
 
-                showError(t, t.toImportFromBackupPresentationError())
+                showPresentationError(t.toImportFromBackupPresentationError())
             }
     }
 
