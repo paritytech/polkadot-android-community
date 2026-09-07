@@ -9,7 +9,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.paramsFor
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -130,7 +130,7 @@ class ParametricRecyclingStrategyTest {
         total: Balance,
         unavailable: Balance = Balance.ZERO,
     ): RecyclingVerdicts = runBlocking {
-        val strategy = ParametricRecyclingStrategy(type.paramsFor(FORCED_AGE))
+        val strategy = ParametricRecyclingStrategy(type.params, forcedAgeOf(FORCED_AGE))
 
         with(testConversionContext) {
             strategy.evaluate(

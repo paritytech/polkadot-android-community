@@ -54,7 +54,7 @@ class RealCoinageRecyclingUseCaseTest {
 
     init {
 
-        every { coinRepository.getCoinRecyclingAge() } returns recyclingAge
+        coEvery { coinRepository.getCoinRecyclingAge() } returns Result.success(recyclingAge)
         every { chainAssetProvider.chainId() } returns chainId
         coEvery { chainConnectionRefCounter.requestConnectionEnabled(any(), any()) } returns mockk(relaxed = true)
         coEvery { chainRegistry.getChain(any()) } returns mockk(relaxed = true)

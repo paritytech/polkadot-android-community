@@ -3,7 +3,9 @@ package io.paritytech.polkadotapp.feature_products_api.presentation.spaHost
 import android.webkit.WebView
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.screens.MessageDisplay
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -24,6 +26,9 @@ interface SpaHost {
 
 interface SpaHostSession {
     val webView: StateFlow<WebView?>
+
+    /** Download/unpack progress of the `.dot` content the session is currently serving. */
+    val loadProgress: Flow<DotNsLoadProgress>
 
     fun pauseConnections()
 

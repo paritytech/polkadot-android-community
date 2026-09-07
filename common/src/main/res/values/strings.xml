@@ -8,8 +8,6 @@
     <string name="common_intent_failed">Failed to find application to perform specified action</string>
     <string name="add_contact_already_exists_error">You have already added this contact</string>
 
-    <string name="contact_us_email" translatable="false">contact@example.com</string>
-
     <string name="video_game_deposit_lost_title">Deposit lost: You didn’t participate in the weekly game</string>
     <string name="video_game_deposit_lost_message">If you still want to play the weekly games, please add a new deposit.</string>
 
@@ -778,6 +776,13 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pgas_stall_claiming">Allocating smart contract allowance</string>
     <string name="pgas_stall_picking_slot">Looking for a free gas claim</string>
     <string name="chats_stall_broadcasting_device">Broadcasting to network</string>
+    <string name="coinage_stall_preparing_transfer">Preparing payment</string>
+    <string name="coinage_stall_picking_unload_token">Looking for a free transfer allowance</string>
+    <string name="coinage_stall_reading_anonymity_set">Reading the anonymity set</string>
+    <string name="coinage_stall_generating_proofs">Generating privacy proofs</string>
+    <string name="wallet_stall_sending">Sending your payment</string>
+    <string name="wallet_stall_delivering">Delivering payment to recipient</string>
+    <string name="wallet_stall_awaiting_claim">Waiting for the recipient to receive the payment</string>
     <string name="pair_request_link_action">Link</string>
     <string name="pair_request_cancel_action">Cancel</string>
     <string name="pair_request_close_action">Close</string>
@@ -896,6 +901,11 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_reply_to">Reply to %1$s</string>
 
     <string name="chat_reactions_expand">Show more reactions</string>
+    <string name="chat_reactions_details_title">Reactions</string>
+    <plurals name="chat_reactions_details_total">
+        <item quantity="one">%1$d total</item>
+        <item quantity="other">%1$d total</item>
+    </plurals>
     <string name="chat_emoji_category_smileys">Smileys</string>
     <string name="chat_emoji_category_people">People</string>
     <string name="chat_emoji_category_animals">Animals &amp; Nature</string>
@@ -1284,6 +1294,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
 
     <string name="products_toolbar_title">Apps</string>
     <string name="products_empty_state_message">No products found</string>
+    <string name="products_message_custom_preview">Custom message</string>
+    <string name="products_message_load_failed">Couldn\'t load this message.</string>
+    <string name="products_message_render_failed">Couldn\'t display this message.</string>
     <string name="product_settings_version">version %1$s</string>
     <string name="product_settings_created_by">created by %1$s</string>
     <string name="product_settings_section_privacy">Privacy &amp; Security</string>
@@ -1438,8 +1451,21 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="collectibles_title">Collectibles</string>
     <string name="collectibles_unavailable">Collectibles are temporarily unavailable. Please try again later.</string>
 
-    <string name="connection_status_waiting_for_network">Waiting for network...</string>
-    <string name="connection_status_connecting">Connecting... %1$d/%2$d</string>
+    <string name="chain_health_connection_connected">Connected</string>
+    <string name="chain_health_connection_connecting">Connecting…</string>
+    <string name="chain_health_connection_disconnected">Disconnected</string>
+    <string name="chain_health_metric_block_latency">Block latency</string>
+    <string name="chain_health_metric_finality_gap">Finality gap</string>
+    <string name="chain_health_metric_pending_request">Pending request</string>
+    <string name="chain_health_metric_response">Response time</string>
+    <string name="chain_health_target">target ≤ %1$s</string>
+    <plurals name="chain_health_blocks">
+        <item quantity="one">%1$d block</item>
+        <item quantity="other">%1$d blocks</item>
+    </plurals>
+
+    <string name="splash_waiting_for_network_title">Waiting for network connection…</string>
+    <string name="splash_waiting_for_network_message">Turn off Airplane Mode or check your internet</string>
 
     <string name="pocket_digital_dollar_title">Balance Card</string>
     <string name="pocket_digital_dollar_card_title">%1$s</string>
@@ -1448,17 +1474,17 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_digital_dollar_available">Available</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
+    <string name="pocket_digital_dollar_advanced">Advanced</string>
 
-    <string name="payment_privacy_mode_title">Payment Privacy Mode</string>
-    <string name="payment_privacy_mode_subtitle">This setting controls how your payments are processed</string>
-    <string name="payment_privacy_mode_fastest_label">FASTEST</string>
-    <string name="payment_privacy_mode_fastest_description">Fastest payments\nLower privacy</string>
+    <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
+    <string name="payment_privacy_mode_fastest_label">Fastest</string>
+    <string name="payment_privacy_mode_fastest_description">Fastest payments, lower privacy</string>
     <string name="payment_privacy_mode_fastest_accessibility">Fastest. Fastest payments, lower privacy.</string>
-    <string name="payment_privacy_mode_balanced_label">BALANCED</string>
-    <string name="payment_privacy_mode_balanced_description">Stronger privacy\nModerate speed</string>
+    <string name="payment_privacy_mode_balanced_label">Balanced</string>
+    <string name="payment_privacy_mode_balanced_description">Stronger privacy, moderate speed</string>
     <string name="payment_privacy_mode_balanced_accessibility">Balanced. Stronger privacy, moderate speed.</string>
-    <string name="payment_privacy_mode_most_private_label">MOST PRIVATE</string>
-    <string name="payment_privacy_mode_most_private_description">Maximum privacy\nLowest speed</string>
+    <string name="payment_privacy_mode_most_private_label">Most Private</string>
+    <string name="payment_privacy_mode_most_private_description">Maximum privacy, lowest speed</string>
     <string name="payment_privacy_mode_most_private_accessibility">Most private. Maximum privacy, lowest speed.</string>
     <string name="payment_privacy_mode_state_selected">Selected</string>
     <string name="payment_privacy_mode_state_not_selected">Not selected</string>

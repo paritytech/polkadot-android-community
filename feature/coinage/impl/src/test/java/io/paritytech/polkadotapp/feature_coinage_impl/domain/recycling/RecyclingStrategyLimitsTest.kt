@@ -9,26 +9,22 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEva
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecyclingStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.paramsFor
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
-import org.mockito.Mockito.`when`
 
 private const val FORCED_AGE = 14
 
 /** The two limits that wrap every policy: what the chain will still accept, and what allowance is left. */
 class RecyclingStrategyLimitsTest {
-    private val coinRepository: CoinRepository = mock<CoinRepository>().apply {
-        `when`(getCoinRecyclingAge()).thenReturn(FORCED_AGE)
-    }
-
     private val quotaTracker: UnloadQuotaTracker = mock()
+
+    private val forcedRecyclingAgeProvider = forcedAgeOf(FORCED_AGE)
 
     @Test
     fun `a coin at the forced age must recycle, whatever the policy said`() {
@@ -137,16 +133,16 @@ class RecyclingStrategyLimitsTest {
     }
 
     private fun chainLimited(type: RecyclingStrategyType) = EnsureChainLimitsStrategy(
-        inner = ParametricRecyclingStrategy(type.paramsFor(FORCED_AGE)),
-        coinRepository = coinRepository,
+        inner = ParametricRecyclingStrategy(type.params, forcedRecyclingAgeProvider),
+        forcedRecyclingAgeProvider = forcedRecyclingAgeProvider,
     )
 
     private fun fullChain(type: RecyclingStrategyType) = EnsureChainLimitsStrategy(
         inner = EnsureQuotaLimitsStrategy(
-            inner = ParametricRecyclingStrategy(type.paramsFor(FORCED_AGE)),
+            inner = ParametricRecyclingStrategy(type.params, forcedRecyclingAgeProvider),
             quotaTracker = quotaTracker,
         ),
-        coinRepository = coinRepository,
+        forcedRecyclingAgeProvider = forcedRecyclingAgeProvider,
     )
 
     private fun evaluate(

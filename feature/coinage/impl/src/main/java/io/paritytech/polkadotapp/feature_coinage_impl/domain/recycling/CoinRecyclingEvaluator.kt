@@ -55,7 +55,10 @@ class CoinRecyclingEvaluator @Inject constructor(
     private class Assets(
         val coins: List<TrackedCoin>,
         val vouchers: List<TrackedVoucher>,
-    )
+    ) {
+        val isEmpty: Boolean
+            get() = coins.isEmpty() && vouchers.isEmpty()
+    }
 
     private class Input(
         val assets: Assets,
@@ -110,6 +113,11 @@ class CoinRecyclingEvaluator @Inject constructor(
     }
 
     private suspend fun evaluate(input: Input, mode: BalanceEvaluationMode): Result<RecyclingVerdicts> {
+        if (input.assets.isEmpty) {
+            coinageLogD("Recycling evaluation empty-assets")
+            return Result.success(emptyMap())
+        }
+
         val strategy = strategyProvider.strategyFor(input.strategyType)
         val conversion = balanceConverter.create().getOrElse { return Result.failure(it) }
 

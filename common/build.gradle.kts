@@ -12,7 +12,7 @@ android {
     namespace = "io.paritytech.polkadotapp.common"
 
     defaultConfig {
-        buildConfigString("CURRENCY_SYMBOL", localProperties.readSecretOrDefault("CURRENCY_SYMBOL", "CASH"))
+        buildConfigString("CURRENCY_SYMBOL", localProperties.readSecretOrThrow("CURRENCY_SYMBOL"))
 
         buildConfigField("String", "TESTNET_ENVIRONMENT", "\"TESTNET\"")
         buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "true")

@@ -134,9 +134,9 @@ class RealCoinageAssetsUseCaseTest {
         assertEquals(1, emissions.size)
     }
 
-    private fun givenCoins(vararg coins: Coin) {
+    private suspend fun givenCoins(vararg coins: Coin) {
         whenever(coinRepository.subscribeAllCoins()).thenReturn(flowOf(coins.toList()))
-        whenever(coinRepository.getCoinRecyclingAge()).thenReturn(RECYCLING_AGE)
+        whenever(coinRepository.getCoinRecyclingAge()).thenReturn(Result.success(RECYCLING_AGE))
     }
 
     private fun givenVouchers(vararg vouchers: RecyclerVoucher) {

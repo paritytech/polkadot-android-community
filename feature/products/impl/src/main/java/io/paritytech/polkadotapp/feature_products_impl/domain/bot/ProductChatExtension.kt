@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.bot
 
+import android.content.Context
 import io.paritytech.polkadotapp.common.utils.childScope
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ChatExtensionContext
@@ -50,6 +51,7 @@ import timber.log.Timber
  * Each instance is created by [ProductBotFactory] for a specific [Product].
  */
 class ProductChatExtension(
+    appContext: Context,
     val product: Product,
     private val workerRefCounter: ProductWorkerRefCounter,
 ) : ExternalExtension() {
@@ -60,7 +62,7 @@ class ProductChatExtension(
     override val defaultRoomMetadata: DefaultRoomMetadata = DefaultRoomMetadata(product.name, icon = null)
 
     private val runningWorker = DeferredProductWorker()
-    private val messageRenderer = ProductsMessageRenderer(product, runningWorker)
+    private val messageRenderer = ProductsMessageRenderer(appContext, product, runningWorker)
 
     private var botScope: CoroutineScope? = null
 

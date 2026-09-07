@@ -17,7 +17,7 @@ android {
             buildConfigField(
                 "long",
                 "GOOGLE_PROJECT_ID",
-                localProperties.readSecretOrDefault("GOOGLE_PROJECT_ID", "0")
+                localProperties.readSecretOrThrow("GOOGLE_PROJECT_ID")
             )
         }
         create("vanilla") {

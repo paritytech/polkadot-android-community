@@ -19,7 +19,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBot
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentWorkerStarter
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServiceStarter
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ConnectionStatusMixin
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.SyncPriceCurrencyChange
@@ -64,12 +64,12 @@ class RootViewModel @Inject constructor(
     chatEngine: ChatEngine,
     observeAccountOnboardingStatus: ObserveAccountOnboardingStatusUseCase,
     bottomNavHeightProvider: BottomNavHeightProvider,
-    connectionStatusMixinFactory: ConnectionStatusMixin.Factory,
+    chainHealthMixinFactory: ChainHealthMixin.Factory,
 ) : BaseViewModel(), RootContract {
     override val chatOverlays = chatEngine.observeActiveOverlays()
     override val isOnboarded = observeAccountOnboardingStatus().map { it.isOnboarded }
     override val bottomNavHeight = bottomNavHeightProvider.heightDp
-    override val connectionStatusBanner = connectionStatusMixinFactory.create(this).bannerModel
+    override val chainsHealth = chainHealthMixinFactory.create(this).model
 
     init {
         launch {

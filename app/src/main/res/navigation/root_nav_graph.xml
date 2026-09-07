@@ -76,6 +76,11 @@
         android:label="SpaBrowserFragment" />
 
     <dialog
+        android:id="@+id/spaSheetBottomSheet"
+        android:name="io.paritytech.polkadotapp.feature_products_impl.presentation.spaSheet.SpaSheetBottomSheet"
+        android:label="SpaSheetBottomSheet" />
+
+    <dialog
         android:id="@+id/pairRequestBottomSheet"
         android:name="io.paritytech.polkadotapp.feature_sso_impl.presentation.pairRequest.PairRequestBottomSheet"
         android:label="PairRequestBottomSheet" />
@@ -312,6 +317,10 @@
     <action
         android:id="@+id/action_global_to_scan_graph"
         app:destination="@id/scan_graph" />
+
+    <action
+        android:id="@+id/action_global_to_spaSheetBottomSheet"
+        app:destination="@id/spaSheetBottomSheet" />
 
     <action
         android:id="@+id/action_global_to_pairRequestBottomSheet"

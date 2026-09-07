@@ -3,10 +3,10 @@ package io.paritytech.polkadotapp.feature_connection_status_api.presentation.mix
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import kotlinx.coroutines.flow.StateFlow
 
-interface ConnectionStatusMixin {
-    val bannerModel: StateFlow<ConnectionStatusBannerModel>
+interface ChainHealthMixin {
+    val model: StateFlow<ChainHealthBarModel>
 
     interface Factory {
-        fun create(scope: ComputationalScope): ConnectionStatusMixin
+        fun create(scope: ComputationalScope): ChainHealthMixin
     }
 }

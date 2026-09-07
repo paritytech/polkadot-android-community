@@ -12,7 +12,7 @@ android {
     defaultConfig {
         buildConfigString(
             "FIRESTORE_DATABASE_ID",
-            localProperties.readSecretOrDefault("FIRESTORE_DATABASE_ID", "(default)")
+            localProperties.readSecretOrThrow("FIRESTORE_DATABASE_ID")
         )
     }
 

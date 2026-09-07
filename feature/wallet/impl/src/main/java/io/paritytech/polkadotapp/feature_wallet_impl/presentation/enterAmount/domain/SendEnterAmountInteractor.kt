@@ -12,6 +12,8 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapResult
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatMessageSender
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
@@ -54,6 +56,7 @@ import java.math.BigDecimal
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
+import io.paritytech.polkadotapp.common.R as RCommon
 
 interface SendEnterAmountInteractor {
     val sendValidation: Validation<SendValidationPayload>
@@ -64,6 +67,11 @@ interface SendEnterAmountInteractor {
 
     suspend fun estimateFee(recipient: AccountId, value: BigDecimal): Result<Fee>
 
+    /**
+     * Reports its progress into [diagnostics]; callers with no UI attached pass
+     * [StalenessReportCollector.NoOp].
+     */
+    context(diagnostics: StalenessReportCollector)
     fun send(value: BigDecimal, transferMethod: TransferMethod): Flow<SendState>
 
     suspend fun plan(value: BigDecimal, transferMethod: TransferMethod): SendPlan?
@@ -120,6 +128,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
             )
     }
 
+    context(diagnostics: StalenessReportCollector)
     override fun send(value: BigDecimal, transferMethod: TransferMethod): Flow<SendState> = when (transferMethod) {
         is TransferMethod.CoinsViaChat -> flowOf {
             sendCoinage(transferMethod.recipient, value)
@@ -151,12 +160,14 @@ class RealSendEnterAmountInteractor @Inject constructor(
 
     override fun observeDebugWidgetsEnabled(): Flow<Boolean> = coinageDebugSettings.widgetsEnabledFlow()
 
-    private suspend fun sendCoinage(recipient: AccountId, value: BigDecimal): Result<Unit> {
-        return prepareCoinageTransferUseCase.prepareMemo(value)
-            .map { prepared -> sendChatMessage(recipient, prepared) }
-            .onSuccess { Timber.d("CoinageTransfer: Successful") }
-            .logFailure("Coinage transfer failed")
-    }
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun sendCoinage(recipient: AccountId, value: BigDecimal): Result<Unit> =
+        diagnostics.markRegion(RCommon.string.wallet_stall_sending) {
+            prepareCoinageTransferUseCase.prepareMemo(value)
+                .map { prepared -> sendChatMessage(recipient, prepared) }
+                .onSuccess { Timber.d("CoinageTransfer: Successful") }
+                .logFailure("Coinage transfer failed")
+        }
 
     private suspend fun rememberRecipient(recipient: AccountId) {
         sendRecipientRepository.addSendRecipient(SendRecipient(accountId = recipient, fullChainAssetId = asset().fullId))
@@ -175,6 +186,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
             .logFailure("External payment failed")
     }
 
+    context(diagnostics: StalenessReportCollector)
     private fun sendViaSubmitterFlow(
         method: TransferMethod.CoinsViaSubmitter,
         value: BigDecimal,
@@ -185,17 +197,27 @@ class RealSendEnterAmountInteractor @Inject constructor(
             return@flow
         }
 
-        prepareCoinageTransferUseCase.prepareMemo(value)
-            .flatMap { prepared ->
-                submitter.submit(prepared.memo, value, method.submitterPayload)
-                    // The submitter took the keys, so the handoff is real from here. There is no local
-                    // transaction to tie this to, unlike the chat path, so the commit is its own step.
-                    .flatMap { prepared.handoffCommit.commit() }
-                    .map { prepared.memo }
-            }
-            .logFailure("Coins submission via '${method.submitterId}' failed")
-            .onSuccess { memo -> emitAll(settlementStates(memo)) }
-            .onFailure { emit(SendState.Failed(it)) }
+        diagnostics.markRegion(RCommon.string.wallet_stall_sending) {
+            prepareCoinageTransferUseCase.prepareMemo(value)
+                .flatMap { prepared -> handOverToSubmitter(submitter, prepared, value, method) }
+                .logFailure("Coins submission via '${method.submitterId}' failed")
+                .onSuccess { memo -> emitAll(settlementStates(memo)) }
+                .onFailure { emit(SendState.Failed(it)) }
+        }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun handOverToSubmitter(
+        submitter: CoinsSubmitter,
+        prepared: PreparedTransferMemo,
+        value: BigDecimal,
+        method: TransferMethod.CoinsViaSubmitter,
+    ): Result<TransferMemo> = diagnostics.markRegion(RCommon.string.wallet_stall_delivering) {
+        submitter.submit(prepared.memo, value, method.submitterPayload)
+            // The submitter took the keys, so the handoff is real from here. There is no local
+            // transaction to tie this to, unlike the chat path, so the commit is its own step.
+            .flatMap { prepared.handoffCommit.commit() }
+            .map { prepared.memo }
     }
 
     /**
@@ -204,20 +226,23 @@ class RealSendEnterAmountInteractor @Inject constructor(
      * The timeout bounds how long the *screen* waits, not the payment: the coins stay ours and stay
      * recoverable however long the recipient takes, so giving up here only stops watching.
      */
+    context(diagnostics: StalenessReportCollector)
     private fun settlementStates(memo: TransferMemo): Flow<SendState> = flow {
         val accountIds = memo.coins.map { it.privateKey.deriveKeypair().publicKey.intoAccountId() }
 
-        val completed = withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
-            coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
-                .transformWhile { states ->
-                    emit(states.toSendState())
-                    states.values.any { it.status.isPending }
-                }
-                .catch { error ->
-                    if (error is CancellationException) throw error
-                    emit(SendState.Failed(error))
-                }
-                .collect { emit(it) }
+        val completed = diagnostics.markRegion(RCommon.string.wallet_stall_awaiting_claim) {
+            withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
+                coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
+                    .transformWhile { states ->
+                        emit(states.toSendState())
+                        states.values.any { it.status.isPending }
+                    }
+                    .catch { error ->
+                        if (error is CancellationException) throw error
+                        emit(SendState.Failed(error))
+                    }
+                    .collect { emit(it) }
+            }
         }
 
         if (completed == null) {

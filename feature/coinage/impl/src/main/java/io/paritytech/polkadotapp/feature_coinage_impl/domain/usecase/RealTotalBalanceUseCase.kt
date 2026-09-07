@@ -67,32 +67,36 @@ class RealTotalBalanceUseCase @Inject constructor(
         vouchers: List<TrackedVoucher>,
         strategyType: RecyclingStrategyType,
         verdicts: RecyclingVerdicts,
-    ): Result<CoinageBalance> = coinageBalanceConverterUseCase.create().map { conversionContext ->
-        val strategy = strategyProvider.voucherStrategyFor(strategyType)
-        val denominations = vouchers.mapToSet { it.voucher.recyclerValue }
+    ): Result<CoinageBalance> {
+        if (coins.isEmpty() && vouchers.isEmpty()) return Result.success(CoinageBalance.EMPTY)
 
-        // We use IMMEDIATE since we don't want to delay balance computation
-        val usability = usabilityContextFactory.create(BalanceEvaluationMode.IMMEDIATE, denominations)
+        return coinageBalanceConverterUseCase.create().map { conversionContext ->
+            val strategy = strategyProvider.voucherStrategyFor(strategyType)
+            val denominations = vouchers.mapToSet { it.voucher.recyclerValue }
 
-        val coinBuckets = coins.preClassifyCoins()
-        val voucherBuckets = vouchers.preClassifyVouchers(strategy, usability)
+            // We use IMMEDIATE since we don't want to delay balance computation
+            val usability = usabilityContextFactory.create(BalanceEvaluationMode.IMMEDIATE, denominations)
 
-        val byVerdict = coinBuckets.minted.groupBy { verdicts[it.derivationIndex] }
+            val coinBuckets = coins.preClassifyCoins()
+            val voucherBuckets = vouchers.preClassifyVouchers(strategy, usability)
 
-        with(conversionContext) {
-            CoinageBalance(
-                availablePrivate = byVerdict.balanceOf(CoinRecyclingState.ALLOW_USE) +
-                    voucherBuckets.usable.totalBalance(),
-                gainingPrivacy = CoinageBalance.GainingPrivacyBalance(
-                    amount = byVerdict.balanceOf(CoinRecyclingState.TO_RECYCLE) +
-                        voucherBuckets.gainingPrivacy.totalBalance(),
-                    canSpendWithConfirmation = strategy.allowsConfirmedSpend(),
-                ),
-                pending = byVerdict.balanceOf(CoinRecyclingState.MUST_RECYCLE) +
-                    byVerdict.balanceWithoutVerdict() +
-                    coinBuckets.minting.totalBalance() +
-                    voucherBuckets.minting.totalBalance(),
-            )
+            val byVerdict = coinBuckets.minted.groupBy { verdicts[it.derivationIndex] }
+
+            with(conversionContext) {
+                CoinageBalance(
+                    availablePrivate = byVerdict.balanceOf(CoinRecyclingState.ALLOW_USE) +
+                        voucherBuckets.usable.totalBalance(),
+                    gainingPrivacy = CoinageBalance.GainingPrivacyBalance(
+                        amount = byVerdict.balanceOf(CoinRecyclingState.TO_RECYCLE) +
+                            voucherBuckets.gainingPrivacy.totalBalance(),
+                        canSpendWithConfirmation = strategy.allowsConfirmedSpend(),
+                    ),
+                    pending = byVerdict.balanceOf(CoinRecyclingState.MUST_RECYCLE) +
+                        byVerdict.balanceWithoutVerdict() +
+                        coinBuckets.minting.totalBalance() +
+                        voucherBuckets.minting.totalBalance(),
+                )
+            }
         }
     }
 }

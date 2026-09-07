@@ -44,7 +44,10 @@ class ProductWebChromeClient @AssistedInject constructor(
 
     override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
         consoleMessage?.let {
-            val message = "$logPrefix: ${it.message()}"
+            // sourceId names the frame the message came from. Without it a violation raised inside an
+            // embedded third-party iframe is indistinguishable from one in the product's own document.
+            val source = it.sourceId().orEmpty().ifEmpty { UNKNOWN_CONSOLE_SOURCE }
+            val message = "$logPrefix: ${it.message()} [$source:${it.lineNumber()}]"
             it.messageLevel().timberLog(message)
         }
         return true
@@ -107,6 +110,10 @@ class ProductWebChromeClient @AssistedInject constructor(
     private suspend fun consumeCapability(productId: ProductId, capability: DeviceCapabilityType): Boolean {
         val permission = ProductPermission.DeviceCapability(capability)
         return permissionGuard.consumePermission(productId, permission)
+    }
+
+    private companion object {
+        const val UNKNOWN_CONSOLE_SOURCE = "unknown"
     }
 }
 

@@ -32,7 +32,7 @@ fun MnemonicConfirmationContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         NovaText(
-            text = "View Private Key",
+            text = stringResource(RCommon.string.settings_backup_recovery_phrase_warning_title),
             style = PolkadotTheme.typography.headline.small,
             color = PolkadotTheme.colors.fg.primary
         )

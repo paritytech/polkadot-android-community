@@ -210,7 +210,7 @@ private fun ColumnScope.Coinage(
 
                     HorizontalSpacer { small }
 
-                    NovaText("Coinage details")
+                    NovaText(stringResource(RCommon.string.pocket_digital_dollar_advanced))
                 }
 
                 AnimatedVisibility(

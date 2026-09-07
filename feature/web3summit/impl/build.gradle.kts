@@ -14,7 +14,7 @@ android {
         val localProperties = gradleLocalProperties(rootDir, providers)
         buildConfigString(
             "W3S_AUTH_KEY",
-            localProperties.readSecretOrDefault("W3S_AUTH_KEY", "")
+            localProperties.readSecretOrThrow("W3S_AUTH_KEY")
         )
     }
 

@@ -21,6 +21,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.validation.compose.rememberValidationActionHandle
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StallReportContent
+import io.paritytech.polkadotapp.common.utils.progressStallReport.previewStallReportOperations
+import io.paritytech.polkadotapp.common.utils.progressStallReport.previewStallReportSteps
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.progress.LoadingScreenState
@@ -54,6 +57,7 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
         when (state) {
             is LoadingState.Loaded -> SendEnterAmountScreenInternal(
                 state = state.data,
+                stallReport = { contract.stalenessReport.DisplayReport() },
                 onAmountChange = contract::onNewInput,
                 onConfirmClick = contract::onConfirmClick,
                 onBackClick = contract::onBackClick
@@ -86,6 +90,7 @@ private fun GainingPrivacyConfirmationHost(contract: SendEnterAmountContract) {
 @Composable
 private fun SendEnterAmountScreenInternal(
     state: SendEnterAmountUiState,
+    stallReport: @Composable () -> Unit,
     onAmountChange: (String) -> Unit,
     onConfirmClick: () -> Unit,
     onBackClick: () -> Unit,
@@ -157,6 +162,14 @@ private fun SendEnterAmountScreenInternal(
 
         state.debugPlanInfo?.let { DebugPlanInfo(it) }
 
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PolkadotTheme.spacings.large)
+        ) {
+            stallReport()
+        }
+
         val progress = state.sendProgress
         PolkadotTextButton(
             modifier = Modifier
@@ -202,6 +215,18 @@ private fun DebugPlanInfo(info: SendPlanDebugInfo) {
     }
 }
 
+/**
+ * Stands in for the real [io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport], which
+ * only renders once the operation overruns its budget - something a preview never waits for.
+ */
+@Composable
+private fun PreviewStallReport() {
+    StallReportContent(
+        runningOperations = previewStallReportOperations(),
+        steps = previewStallReportSteps(),
+    )
+}
+
 @Preview
 @Composable
 private fun SendEnterAmountScreenAllWidgetPreview() {
@@ -223,6 +248,7 @@ private fun SendEnterAmountScreenAllWidgetPreview() {
                     isAmountLocked = false,
                     recipientAvatarColor = AvatarColorScheme.Garnet
                 ),
+                stallReport = { PreviewStallReport() },
                 onAmountChange = {},
                 onConfirmClick = {},
                 onBackClick = {}

@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.data.repository
 
+import io.paritytech.polkadotapp.chains.call.MultiChainViewFunctionsApi
 import io.paritytech.polkadotapp.chains.di.RemoteSourceQualifier
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
@@ -8,6 +9,8 @@ import io.paritytech.polkadotapp.chains.storage.source.StorageDataSource
 import io.paritytech.polkadotapp.chains.storage.source.query.metadata
 import io.paritytech.polkadotapp.chains.storage.source.queryCatching
 import io.paritytech.polkadotapp.chains.storage.source.subscribeCatching
+import io.paritytech.polkadotapp.common.data.memory.SingleValueCache
+import io.paritytech.polkadotapp.common.data.memory.getCatching
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.utils.mapList
@@ -20,14 +23,16 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationInde
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinsByOwner
+import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.getMaximumAge
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.maxConsolidation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.getNextIndex
+import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
+import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject
 
-private const val MAX_AGE = 16
 private const val RECYCLING_AGE_OFFSET = 2
 
 interface CoinRepository {
@@ -47,7 +52,7 @@ interface CoinRepository {
 
     suspend fun getCoinsBy(derivationIndices: List<DerivationIndex>): List<Coin>
 
-    fun getCoinRecyclingAge(): Int
+    suspend fun getCoinRecyclingAge(): Result<Int>
 
     suspend fun getNextDerivationIndex(): Int
 
@@ -70,8 +75,16 @@ interface CoinRepository {
 class RealCoinRepository @Inject constructor(
     private val coinDao: CoinDao,
     private val chainRegistry: ChainRegistry,
-    @param:RemoteSourceQualifier private val remoteStorageSource: StorageDataSource
+    @param:RemoteSourceQualifier private val remoteStorageSource: StorageDataSource,
+    private val viewFunctionsApi: MultiChainViewFunctionsApi,
+    @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
 ) : CoinRepository {
+    // The runtime exposes the maximum age as a view function, so it is read once per session rather than
+    // per verdict. Unwrapping inside the compute keeps a failed read out of the cache; getCatching re-wraps.
+    private val maximumAgeCache = SingleValueCache {
+        viewFunctionsApi.forChain(chainAssetProvider.chainId()).getMaximumAge().getOrThrow().toInt()
+    }
+
     override suspend fun save(coin: Coin) {
         coinDao.insert(coin.toLocal())
     }
@@ -84,8 +97,8 @@ class RealCoinRepository @Inject constructor(
         return coinDao.subscribeAll().mapList { it.toDomain() }
     }
 
-    override fun getCoinRecyclingAge(): Int {
-        return getMaxCoinAge() - RECYCLING_AGE_OFFSET
+    override suspend fun getCoinRecyclingAge(): Result<Int> {
+        return maximumAgeCache.getCatching().map { it - RECYCLING_AGE_OFFSET }
     }
 
     override fun subscribeAllCoinsWithUnknownAge(): Flow<List<Coin>> {
@@ -170,8 +183,4 @@ class RealCoinRepository @Inject constructor(
     }
 
     private fun CoinUpdate.toLocal() = CoinUpdateLocal(accountId = accountId, onChain = onChain, age = age)
-
-    private fun getMaxCoinAge(): Int {
-        return MAX_AGE
-    }
 }
