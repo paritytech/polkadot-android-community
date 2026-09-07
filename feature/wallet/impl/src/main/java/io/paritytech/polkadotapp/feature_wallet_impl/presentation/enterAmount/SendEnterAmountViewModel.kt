@@ -269,7 +269,9 @@ private fun TransferPlan.toDebugInfo(): SendPlanDebugInfo.Coinage {
 
             is StrategyType.Split -> {
                 add("Coins for split:")
-                add("  idx=${st.splitFrom.derivationIndex}  exp=2^${st.splitFrom.valueExponent.value}")
+                st.splits.forEach { split ->
+                    add("  idx=${split.splitFrom.derivationIndex}  exp=2^${split.splitFrom.valueExponent.value}")
+                }
             }
 
             is StrategyType.ExactCoins -> Unit

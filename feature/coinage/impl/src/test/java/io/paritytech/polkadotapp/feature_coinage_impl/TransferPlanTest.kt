@@ -1,7 +1,5 @@
 package io.paritytech.polkadotapp.feature_coinage_impl
 
-import android.text.TextUtils.split
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.common.utils.emptySubstrateAccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAmountBreakdown
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
@@ -31,8 +29,6 @@ class TransferPlannerTest {
     private val realBreakdown: CoinAmountBreakdown = RealCoinAmountBreakdownContext(coinageTestPrecision, testConversionContext, allowedExponents)
     private val planner = TransferPlanner(testConversionContext, realBreakdown, 16)
 
-    private val currentTimestamp: Timestamp = 1000L
-
     @Test
     fun `Strategy 1 - ExactMatch - should return exact match when coins sum matches perfectly`() = runBlocking {
         val coins = listOf(createCoin(exponent = 2), createCoin(exponent = 0))
@@ -44,32 +40,28 @@ class TransferPlannerTest {
     }
 
     @Test
-    fun `Strategy 2 - SingleSplit - should split a single larger coin when no partial coverage possible`() = runBlocking {
+    fun `Strategy 2 - Split - should split a single larger coin when no partial coverage possible`() = runBlocking {
         val coins = listOf(createCoin(exponent = 3)) // 8 > 5, doesn't fit as coverage → split entirely
 
         val plan = planner.plan(5.0.centsToDollar(), coins, emptyList()).getOrThrow()
 
         val split = plan.strategyType as StrategyType.Split
-        assertEquals(ValueExponent(3), split.splitFrom.valueExponent)
-        assertExponents(listOf(2, 0), split.recipientDenominations)
-        assertExponents(listOf(1, 0), split.changeDenominations)
+        assertSplits(listOf(split(from = 3, recipient = listOf(2, 0), change = listOf(1, 0))), split)
         assertCoinExponents(emptyList(), split.exactCoins)
     }
 
     @Test
-    fun `Strategy 2 - SingleSplit - should use existing coins to partially cover amount and split remainder`() = runBlocking {
+    fun `Strategy 2 - Split - should use existing coins to partially cover amount and split remainder`() = runBlocking {
         val coins = listOf(
             createCoin(exponent = 3), // 8 — fits as coverage
-            createCoin(exponent = 2), // 4 — split candidate
-            createCoin(exponent = 2) // 4 — extra, not used
+            createCoin(exponent = 2), // 4 — stays whole with the sender
+            createCoin(exponent = 2) // 4 — split candidate
         )
 
         val plan = planner.plan(9.0.centsToDollar(), coins, emptyList()).getOrThrow()
 
         val split = plan.strategyType as StrategyType.Split
-        assertEquals(ValueExponent(2), split.splitFrom.valueExponent)
-        assertExponents(listOf(0), split.recipientDenominations)
-        assertExponents(listOf(1, 0), split.changeDenominations)
+        assertSplits(listOf(split(from = 2, recipient = listOf(0), change = listOf(1, 0))), split)
         assertCoinExponents(listOf(3), split.exactCoins)
     }
 
@@ -80,9 +72,50 @@ class TransferPlannerTest {
         val plan = planner.plan(3.0.centsToDollar(), coins, emptyList()).getOrThrow()
 
         val split = plan.strategyType as StrategyType.Split
-        assertEquals(ValueExponent(2), split.splitFrom.valueExponent)
-        assertExponents(listOf(1, 0), split.recipientDenominations)
-        assertExponents(listOf(0), split.changeDenominations)
+        assertSplits(listOf(split(from = 2, recipient = listOf(1, 0), change = listOf(0))), split)
+    }
+
+    @Test
+    fun `Strategy 2 - Split - creates one coin where dividing the big coin would create seven`() = runBlocking {
+        // 65 = 64 + 1 against coins 1 and 128: only index 7 is forced, so the 128 halves and the 1c coin goes as is.
+        val coins = listOf(createCoin(exponent = 0), createCoin(exponent = 7))
+
+        val plan = planner.plan(65.0.centsToDollar(), coins, emptyList()).getOrThrow()
+
+        val split = plan.strategyType as StrategyType.Split
+        assertSplits(listOf(split(from = 7, recipient = listOf(6), change = listOf(6))), split)
+        assertCoinExponents(listOf(0), split.exactCoins)
+    }
+
+    @Test
+    fun `Strategy 2 - Split - makes one split per run of forced indices`() = runBlocking {
+        // 19 = 16 + 2 + 1 against coins 4, 64, 128: forced indices are {1, 2} and {5, 6}; the 128 is not needed.
+        val coins = listOf(createCoin(exponent = 2), createCoin(exponent = 6), createCoin(exponent = 7))
+
+        val plan = planner.plan(19.0.centsToDollar(), coins, emptyList()).getOrThrow()
+
+        val split = plan.strategyType as StrategyType.Split
+        assertSplits(
+            listOf(
+                split(from = 2, recipient = listOf(1, 0), change = listOf(0)),
+                split(from = 6, recipient = listOf(4), change = listOf(5, 4))
+            ),
+            split
+        )
+        assertCoinExponents(emptyList(), split.exactCoins)
+    }
+
+    @Test
+    fun `Strategy 2 - Split - neither splits nor hands off a coin past recycling age`() = runBlocking {
+        val agedCoin = createCoin(exponent = 2, ageKnown = 20) // 4c, would cover the amount exactly
+        val youngCoin = createCoin(exponent = 3)
+
+        val plan = planner.plan(4.0.centsToDollar(), listOf(agedCoin, youngCoin), emptyList()).getOrThrow()
+
+        val split = plan.strategyType as StrategyType.Split
+        assertEquals(listOf(youngCoin), split.splits.map { it.splitFrom })
+        assertSplits(listOf(split(from = 3, recipient = listOf(2), change = listOf(2))), split)
+        assertCoinExponents(emptyList(), split.exactCoins)
     }
 
     @Test
@@ -115,6 +148,46 @@ class TransferPlannerTest {
         // Single voucher (=2) covers the 1.5 remainder; the second voucher in the same ring stays.
         assertVoucherExponents(listOf(1), strategy.vouchersToUnload)
         assertAmountEquals(1.5.centsToDollar(), strategy.recipientAmount)
+    }
+
+    @Test
+    fun `Strategy 3 - CoinsAndUnload - hands off no coins when the vouchers alone match the amount`() = runBlocking {
+        // Maximal coverage would hand off the 1c coin and break the 8c voucher into 4 + 2 + 1 plus 1 change.
+        val coins = listOf(createCoin(exponent = 0))
+        val voucher = createVoucher(exponent = 3, isReady = true)
+
+        val plan = planner.plan(8.0.centsToDollar(), coins, listOf(voucher)).getOrThrow()
+
+        val strategy = plan.strategyType as StrategyType.UnloadAndSplit
+        assertVoucherExponents(listOf(3), strategy.vouchersToUnload)
+        assertAmountEquals(8.0.centsToDollar(), strategy.recipientAmount)
+        assertCoinExponents(emptyList(), strategy.exactCoins)
+    }
+
+    @Test
+    fun `Strategy 3 - CoinsAndUnload - hands off the coins that spare the unloaded value a split`() = runBlocking {
+        // 5 = 4 + 1: the 1c coin covers the low bit, so the 8c voucher only halves.
+        val coins = listOf(createCoin(exponent = 0))
+        val voucher = createVoucher(exponent = 3, isReady = true)
+
+        val plan = planner.plan(5.0.centsToDollar(), coins, listOf(voucher)).getOrThrow()
+
+        val strategy = plan.strategyType as StrategyType.UnloadAndSplit
+        assertAmountEquals(4.0.centsToDollar(), strategy.recipientAmount)
+        assertCoinExponents(listOf(0), strategy.exactCoins)
+    }
+
+    @Test
+    fun `Strategy 3 - CoinsAndUnload - falls back to maximal coverage when the best plan would split an own coin`() = runBlocking {
+        // 9 = 8 + 1 against a 4c coin and an 8c voucher: the optimal plan splits the 4c coin, which an unload cannot do.
+        val coins = listOf(createCoin(exponent = 2))
+        val voucher = createVoucher(exponent = 3, isReady = true)
+
+        val plan = planner.plan(9.0.centsToDollar(), coins, listOf(voucher)).getOrThrow()
+
+        val strategy = plan.strategyType as StrategyType.UnloadAndSplit
+        assertAmountEquals(5.0.centsToDollar(), strategy.recipientAmount)
+        assertCoinExponents(listOf(2), strategy.exactCoins)
     }
 
     @Test(expected = InsufficientBalanceException::class)
@@ -217,8 +290,16 @@ class TransferPlannerTest {
     private fun assertCoinExponents(expected: List<Int>, coins: List<Coin>) =
         assertEquals(expected, coins.map { it.valueExponent.value })
 
-    private fun assertExponents(expected: List<Int>, exponents: List<ValueExponent>) =
-        assertEquals(expected, exponents.map { it.value })
+    private fun split(from: Int, recipient: List<Int>, change: List<Int>) = Triple(from, recipient, change)
+
+    private fun assertSplits(expected: List<Triple<Int, List<Int>, List<Int>>>, strategy: StrategyType.Split) {
+        val actual = strategy.splits.map { split ->
+            Triple(split.splitFrom.valueExponent.value, split.recipientDenominations.values(), split.changeDenominations.values())
+        }
+        assertEquals(expected, actual)
+    }
+
+    private fun List<ValueExponent>.values(): List<Int> = map { it.value }
 
     private fun assertVoucherExponents(expected: List<Int>, vouchers: List<RecyclerVoucher>) =
         assertEquals(expected, vouchers.map { it.recyclerValue.value })
@@ -245,8 +326,6 @@ class TransferPlannerTest {
         isReady: Boolean,
         index: RecyclerIndex = RecyclerIndex(BigInteger.ONE)
     ): RecyclerVoucher {
-        val delayUnloadUntil = if (isReady) currentTimestamp - 100L else currentTimestamp + 1000L
-
         return RecyclerVoucher(
             ringVrfKeyIndex = voucherIndexCounter++,
             ringVrfPublicKey = mock(),

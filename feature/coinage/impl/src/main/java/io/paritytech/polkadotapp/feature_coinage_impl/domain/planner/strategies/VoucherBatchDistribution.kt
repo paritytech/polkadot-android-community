@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerLocationOrThrow
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.splitting.OptimalSplitting
 import java.math.BigDecimal
 
 data class VoucherBatch(
@@ -21,13 +22,10 @@ data class VoucherBatch(
  * Vouchers are unloaded in batches; each batch redeems vouchers of one size (`2^exponent`), so a batch can only
  * produce coins whose total is at most `voucherCount * 2^exponent`, and every coin must come whole out of one batch.
  *
- * The problem this avoids: breaking the *whole* recipient amount into coins first can yield a coin larger than any
- * single batch (e.g. a $10.24 coin when the biggest batch is one $5.12 voucher), which is impossible to unload even
- * though the balance is sufficient. Instead we decide each batch's value first, then break that value into coins — so
- * every coin is, by construction, no larger than the batch it comes from and always fits.
- *
- * Recipient value is filled batch by batch; whatever a batch has left over after the recipient is covered becomes
- * change. The total of all batch values equals recipient + change, so the recipient is always fully covered.
+ * Each batch enters as the coins of its value's binary breakdown — the fewest coins an unload of it can produce.
+ * From there the recipient value is served by [OptimalSplitting]: a coin of one batch is split only where the
+ * recipient value has no other way to be paid, so the number of minted coins is the smallest possible for these
+ * batches. Splits stay inside the coin they start from, which keeps every output within its batch.
  */
 object VoucherBatchDistribution {
     fun distribute(
@@ -41,21 +39,35 @@ object VoucherBatchDistribution {
             .groupBy { RecyclerKey(it.recyclerValue, it.recyclerLocationOrThrow().recyclerIndex) }
             .flatMap { (key, group) -> group.chunked(maxConsolidation).map { chunk -> key to chunk } }
 
-        var recipientRemaining = recipientAmount
-
-        return batches.map { (key, batchVouchers) ->
+        val batchCoins = batches.flatMapIndexed { batchIndex, (key, batchVouchers) ->
             val batchValue = conversionContext.formatExponentToAmount(key.exponent) * batchVouchers.size.toBigDecimal()
+            breakdown.breakdown(batchValue).map { BatchCoin(batchIndex, it) }
+        }
 
-            val recipientPart = batchValue.min(recipientRemaining)
-            recipientRemaining -= recipientPart
-            val changePart = batchValue - recipientPart
+        val plan = OptimalSplitting.plan(breakdown.breakdown(recipientAmount), batchCoins, BatchCoin::exponent) { true }
+            ?: throw IllegalStateException("Recipient amount $recipientAmount exceeds the value of the vouchers to unload")
 
+        val recipient = batches.map { mutableListOf<ValueExponent>() }
+        val change = batches.map { mutableListOf<ValueExponent>() }
+        val splitCoins = plan.splits.map { it.coin }
+
+        plan.exactCoins.forEach { recipient[it.batchIndex] += it.exponent }
+        (batchCoins - plan.exactCoins.toSet() - splitCoins.toSet()).forEach { change[it.batchIndex] += it.exponent }
+        plan.splits.forEach { split ->
+            recipient[split.coin.batchIndex] += split.recipientDenominations
+            change[split.coin.batchIndex] += split.changeDenominations
+        }
+
+        return batches.mapIndexed { batchIndex, (key, batchVouchers) ->
             VoucherBatch(
                 recyclerKey = key,
                 vouchers = batchVouchers,
-                recipientDenominations = breakdown.breakdown(recipientPart),
-                changeDenominations = breakdown.breakdown(changePart)
+                recipientDenominations = recipient[batchIndex].sortedDescending(),
+                changeDenominations = change[batchIndex].sortedDescending()
             )
         }
     }
+
+    /** Identity matters: one batch may hold several coins of one denomination. */
+    private class BatchCoin(val batchIndex: Int, val exponent: ValueExponent)
 }

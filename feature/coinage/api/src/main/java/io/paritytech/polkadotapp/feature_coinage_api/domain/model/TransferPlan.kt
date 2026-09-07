@@ -11,15 +11,21 @@ data class PlannedMemoEntry(
     val valueExponent: ValueExponent
 )
 
+/** One coin split into [recipientDenominations] handed to the recipient and [changeDenominations] kept. */
+data class CoinSplit(
+    val splitFrom: Coin,
+    val recipientDenominations: List<ValueExponent>,
+    val changeDenominations: List<ValueExponent>
+)
+
 sealed interface StrategyType {
     data class ExactCoins(
         val coins: List<Coin>
     ) : StrategyType
 
+    /** Independent splits of distinct coins, plus [exactCoins] handed over as they are. */
     data class Split(
-        val splitFrom: Coin,
-        val recipientDenominations: List<ValueExponent>,
-        val changeDenominations: List<ValueExponent>,
+        val splits: List<CoinSplit>,
         val exactCoins: List<Coin>
     ) : StrategyType
 

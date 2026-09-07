@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAmountBreakdown
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinSplit
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
@@ -13,6 +14,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isAgeValidToSp
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerLocationOrThrow
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.splitting.OptimalSplitting
 import java.math.BigDecimal
 
 class TransferPlanner(
@@ -26,11 +28,12 @@ class TransferPlanner(
         vouchers: List<RecyclerVoucher>
     ): Result<TransferPlan> {
         return runCatching {
-            breakdownAmount.breakdown(amount)
+            val amountDenominations = breakdownAmount.breakdown(amount)
+            val spendableCoins = coins.orderForSpending()
 
-            val strategyType = tryGetExactMatchPlan(amount, coins)
-                ?: tryGetSingleSplitPlan(amount, coins)
-                ?: tryGetCoinsAndUnloadPlan(amount, coins, vouchers)
+            val strategyType = tryGetExactMatchPlan(amount, spendableCoins)
+                ?: tryGetSplitPlan(amountDenominations, spendableCoins)
+                ?: tryGetCoinsAndUnloadPlan(amount, amountDenominations, spendableCoins, vouchers)
                 ?: throw InsufficientBalanceException()
 
             TransferPlan(strategyType)
@@ -46,39 +49,26 @@ class TransferPlanner(
         return StrategyType.ExactCoins(coins = selectedCoins)
     }
 
-    private fun tryGetSingleSplitPlan(
-        amount: BigDecimal,
+    /** Fewest new coins over any sequence of splits; null when the coins fall short of the amount. */
+    private fun tryGetSplitPlan(
+        amountDenominations: List<ValueExponent>,
         coins: List<Coin>
     ): StrategyType? {
-        val (selectedCoins, coveredAmount) = findMaxCoinCoverage(coins, amount)
-        val notSelectedCoins = coins.filter { it !in selectedCoins }
-
-        val restAmount = amount - coveredAmount
-
-        if (restAmount <= BigDecimal.ZERO) throw IllegalStateException("Not needed to split coins: transfer amount may be covered by exact coins.")
-
-        val coinToSplit = notSelectedCoins
-            .filter { it.isAgeValidToSpend(coinMaxRecyclingAge) && it.valueExponent.toAmount() > restAmount }
-            .minByOrNull { it.valueExponent }
-            ?: return null
-
-        val recipientDenominations = breakdownAmount.breakdown(restAmount)
-        val changeDenominations = breakdownAmount.breakdown(coinToSplit.valueExponent.toAmount() - restAmount)
+        val plan = OptimalSplitting.plan(amountDenominations, coins, Coin::valueExponent) { true } ?: return null
 
         return StrategyType.Split(
-            splitFrom = coinToSplit,
-            recipientDenominations = recipientDenominations,
-            changeDenominations = changeDenominations,
-            exactCoins = selectedCoins
+            splits = plan.splits.map { CoinSplit(it.coin, it.recipientDenominations, it.changeDenominations) },
+            exactCoins = plan.exactCoins
         )
     }
 
     private fun tryGetCoinsAndUnloadPlan(
         amount: BigDecimal,
+        amountDenominations: List<ValueExponent>,
         coins: List<Coin>,
         vouchers: List<RecyclerVoucher>
     ): StrategyType? {
-        val (selectedCoins, coveredCoinAmount) = findMaxCoinCoverage(coins, amount)
+        val (coveringCoins, coveredCoinAmount) = findMaxCoinCoverage(coins, amount)
 
         val remainingAmount = amount - coveredCoinAmount
 
@@ -88,27 +78,56 @@ class TransferPlanner(
 
         val (selectedVouchers, _) = findMinimalVoucherCover(readyVouchers, remainingAmount) ?: return null
 
+        val exactCoins = findCoinsSparingUnloadSplits(amountDenominations, coins, selectedVouchers) ?: coveringCoins
+
         return StrategyType.UnloadAndSplit(
             vouchersToUnload = selectedVouchers,
-            recipientAmount = remainingAmount,
-            exactCoins = selectedCoins
+            recipientAmount = amount - exactCoins.sumOf { it.valueExponent.toAmount() },
+            exactCoins = exactCoins
         )
+    }
+
+    /**
+     * Own coins to hand off so that unloading [vouchers] mints the fewest coins. Each unloaded group enters as
+     * the coins of its value's breakdown, which the unload may split freely, while own coins are not split
+     * here. Null when the best plan would split an own coin; the caller then falls back to maximal coverage.
+     */
+    private fun findCoinsSparingUnloadSplits(
+        amountDenominations: List<ValueExponent>,
+        coins: List<Coin>,
+        vouchers: List<RecyclerVoucher>
+    ): List<Coin>? {
+        val unloadedDenominations = vouchers
+            .groupBy { VoucherUnloadGroupKey(it.recyclerValue, it.recyclerLocationOrThrow().recyclerIndex) }
+            .values
+            .flatMap { group -> breakdownAmount.breakdown(group.sumOf { it.recyclerValue.toAmount() }) }
+
+        val sources = coins.map { UnloadSource.Own(it) } + unloadedDenominations.map { UnloadSource.Unloaded(it) }
+
+        return OptimalSplitting.plan(amountDenominations, sources, UnloadSource::exponent) { it is UnloadSource.Unloaded }
+            ?.exactCoins
+            ?.filterIsInstance<UnloadSource.Own>()
+            ?.map { it.coin }
+    }
+
+    private sealed interface UnloadSource {
+        val exponent: ValueExponent
+
+        class Own(val coin: Coin) : UnloadSource {
+            override val exponent get() = coin.valueExponent
+        }
+
+        class Unloaded(override val exponent: ValueExponent) : UnloadSource
     }
 
     private fun findSubsetSum(coins: List<Coin>, target: BigDecimal): List<Coin>? {
         if (target.compareTo(BigDecimal.ZERO) == 0) return emptyList()
         if (target < BigDecimal.ZERO) return null
 
-        val sortedCoins = coins
-            .filter { it.isAgeValidToSpend(coinMaxRecyclingAge) }
-            .sortedWith(
-                compareByDescending<Coin> { it.valueExponent }.thenByDescending { it.ageOrDefault() }
-            )
-
         var remaining = target
         val result = mutableListOf<Coin>()
 
-        for (coin in sortedCoins) {
+        for (coin in coins) {
             if (remaining <= BigDecimal.ZERO) break
             val value = coin.valueExponent.toAmount()
             if (value <= remaining) {
@@ -121,19 +140,10 @@ class TransferPlanner(
     }
 
     private fun findMaxCoinCoverage(coins: List<Coin>, targetAmount: BigDecimal): Pair<List<Coin>, BigDecimal> {
-        // Must apply the same spendability filter as findSubsetSum (exact match). Otherwise a
-        // A past-recycling-age coin is excluded from exact match
-        // gets included here, can cover the amount exactly, and trips the "restAmount == 0"
-        // invariant in tryGetSingleSplitPlan/tryGetCoinsAndUnloadPlan.
-        val sortedCoins = coins
-            .filter { it.isAgeValidToSpend(coinMaxRecyclingAge) }
-            .sortedWith(
-                compareByDescending<Coin> { it.valueExponent }.thenByDescending { it.ageOrDefault() }
-            )
         val selected = mutableListOf<Coin>()
         var covered = BigDecimal.ZERO
 
-        for (coin in sortedCoins) {
+        for (coin in coins) {
             val newAmount = covered + coin.valueExponent.toAmount()
             if (newAmount <= targetAmount) {
                 selected.add(coin)
@@ -144,6 +154,15 @@ class TransferPlanner(
         }
 
         return selected to covered
+    }
+
+    /**
+     * Spendable coins, largest first and within a denomination oldest first: the oldest are handed off whole
+     * while they still can be, and the youngest is the one to split.
+     */
+    private fun List<Coin>.orderForSpending(): List<Coin> {
+        return filter { it.isAgeValidToSpend(coinMaxRecyclingAge) }
+            .sortedWith(compareByDescending<Coin> { it.valueExponent }.thenByDescending { it.ageOrDefault() })
     }
 
     private fun findMinimalVoucherCover(

@@ -90,6 +90,80 @@ class VoucherBatchDistributionTest {
         )
     }
 
+    @Test
+    fun `hands off a whole batch instead of breaking a bigger one`() {
+        // Batches of 64c and 32c, recipient 32c. Filling in order would halve the 64c and keep the 32c as change;
+        // the 32c batch goes over whole instead and the 64c stays a single coin of change.
+        val batches = distribute(
+            vouchers = listOf(voucher(exponent = 6, ring = 1), voucher(exponent = 5, ring = 2)),
+            recipientCents = 32.0
+        )
+
+        assertEquals(
+            listOf(
+                batch(recipient = emptyList(), change = listOf(6)),
+                batch(recipient = listOf(5), change = emptyList())
+            ),
+            batches.recipientAndChangeExponents()
+        )
+    }
+
+    @Test
+    fun `takes the recipient value from the batch whose bits already match it`() {
+        // Two 8c vouchers in one ring (16c) and three 4c vouchers in another (12c = 8 + 4), recipient 12c.
+        // Filling in order breaks the 16c batch into 8 + 4 + 4 and mints 8 + 4 change from the other: five coins.
+        // The 12c batch supplies 8 + 4 as is and the 16c batch stays one coin: three coins.
+        val batches = distribute(
+            vouchers = listOf(
+                voucher(exponent = 3, ring = 1),
+                voucher(exponent = 3, ring = 1),
+                voucher(exponent = 2, ring = 2),
+                voucher(exponent = 2, ring = 2),
+                voucher(exponent = 2, ring = 2)
+            ),
+            recipientCents = 12.0
+        )
+
+        assertEquals(
+            listOf(
+                batch(recipient = emptyList(), change = listOf(4)),
+                batch(recipient = listOf(3, 2), change = emptyList())
+            ),
+            batches.recipientAndChangeExponents()
+        )
+    }
+
+    @Test
+    fun `splits one bit of a batch as a comb when the recipient value needs lower denominations`() {
+        // One 3 x 32c batch (96c = 64 + 32), recipient 40c = 32 + 8. The 32c bit goes over whole; the 64c bit
+        // becomes 32 + 16 + 8 + 8 of which one 8c goes to the recipient.
+        val batches = distribute(
+            vouchers = listOf(voucher(exponent = 5, ring = 1), voucher(exponent = 5, ring = 1), voucher(exponent = 5, ring = 1)),
+            recipientCents = 40.0
+        )
+
+        assertEquals(
+            listOf(batch(recipient = listOf(5, 3), change = listOf(5, 4, 3))),
+            batches.recipientAndChangeExponents()
+        )
+    }
+
+    @Test
+    fun `never breaks a batch when the recipient takes every batch whole`() {
+        val batches = distribute(
+            vouchers = listOf(voucher(exponent = 4, ring = 1), voucher(exponent = 2, ring = 2)),
+            recipientCents = 20.0
+        )
+
+        assertEquals(
+            listOf(
+                batch(recipient = listOf(4), change = emptyList()),
+                batch(recipient = listOf(2), change = emptyList())
+            ),
+            batches.recipientAndChangeExponents()
+        )
+    }
+
     private fun distribute(
         vouchers: List<RecyclerVoucher>,
         recipientCents: Double,
