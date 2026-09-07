@@ -37,3 +37,8 @@ class FileTooLargePresentationError(
         return stringResource(RCommon.string.chat_error_attachment_too_large, maxSize.inWholeMegabytes)
     }
 }
+
+// The call could not start rather than failed, so there is no cause to carry.
+class BusyInAnotherChatPresentationError :
+    PresentationThrowable(cause = null),
+    PresentationError by StringResPresentationError(RCommon.string.chat_call_busy_in_another_chat)

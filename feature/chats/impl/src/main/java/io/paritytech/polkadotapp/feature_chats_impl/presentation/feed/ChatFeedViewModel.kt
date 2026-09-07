@@ -50,6 +50,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.error.asChatRequestEr
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatFeedInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatUserInputState
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.InitiateCallResult
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.BusyInAnotherChatPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.draft.ChatDraftController
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.mappers.ChatMessageUiMapper
@@ -92,7 +93,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.time.Duration.Companion.milliseconds
-import io.paritytech.polkadotapp.common.R as RCommon
 
 private const val MAX_CHAT_MESSAGE_LENGTH = 500
 private const val NEWEST_MESSAGE_POSITION = 0
@@ -432,7 +432,7 @@ class ChatFeedViewModel @Inject constructor(
             when (interactor.initiateCall(chatId, username, withVideo)) {
                 InitiateCallResult.DONE -> Unit
                 InitiateCallResult.BUSY_IN_ANOTHER_CHAT ->
-                    showMessage(RCommon.string.chat_call_busy_in_another_chat)
+                    showPresentationError(BusyInAnotherChatPresentationError())
             }
         }
 
