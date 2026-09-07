@@ -36,9 +36,9 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.formatAsDollars
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerMembersOrZero
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.tokenAmount
 import kotlinx.collections.immutable.ImmutableList
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -340,8 +340,7 @@ private fun CoinItemCard(
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
-                val dollars = "$" + String.format(Locale.US, "%.2f", coin.valueExponent.tokenAmount().toDouble() / 100.0)
-                NovaText(text = "2^${coin.valueExponent.value} | $dollars")
+                NovaText(text = "2^${coin.valueExponent.value} | ${coin.valueExponent.formatAsDollars()}")
             }
 
             VerticalSpacer { 4.dp }
@@ -448,7 +447,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
-                val dollars = "$" + String.format(Locale.US, "%.2f", voucher.recyclerValue.tokenAmount().toDouble() / 100.0)
+                val dollars = voucher.recyclerValue.formatAsDollars()
                 NovaText(text = "2^${voucher.recyclerValue.value} | $dollars")
             }
 
