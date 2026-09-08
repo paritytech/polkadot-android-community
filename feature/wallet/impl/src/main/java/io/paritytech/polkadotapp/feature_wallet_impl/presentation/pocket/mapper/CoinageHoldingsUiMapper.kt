@@ -44,7 +44,7 @@ fun CoinageBalance.toCompositionUiModel(): CoinageCompositionUiModel {
 
     return CoinageCompositionUiModel(
         spendableFraction = availablePrivate.fractionOf(total),
-        maturingFraction = gainingPrivacy.amount.fractionOf(total),
+        gainingPrivacyFraction = gainingPrivacy.amount.fractionOf(total),
         unavailableFraction = pending.fractionOf(total),
     )
 }

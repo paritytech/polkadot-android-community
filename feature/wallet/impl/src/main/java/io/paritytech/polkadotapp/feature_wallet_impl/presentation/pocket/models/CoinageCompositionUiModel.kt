@@ -11,11 +11,11 @@ import androidx.compose.runtime.Immutable
 @Immutable
 data class CoinageCompositionUiModel(
     val spendableFraction: Float,
-    val maturingFraction: Float,
+    val gainingPrivacyFraction: Float,
     val unavailableFraction: Float,
 ) {
     /** Nothing held: the bar renders as a bare capsule frame. */
-    val isEmpty: Boolean = spendableFraction == 0f && maturingFraction == 0f && unavailableFraction == 0f
+    val isEmpty: Boolean = spendableFraction == 0f && gainingPrivacyFraction == 0f && unavailableFraction == 0f
 
     companion object {
         val EMPTY = CoinageCompositionUiModel(0f, 0f, 0f)

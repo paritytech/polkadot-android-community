@@ -143,7 +143,7 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     private fun CoinageHoldingsInfo.toTokensState(asset: Chain.Asset) = CoinageUiState.TokensState(
         totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.total)),
         spendableBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.availablePrivate)),
-        maturingBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.gainingPrivacy.amount)),
+        gainingPrivacyBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.gainingPrivacy.amount)),
         unavailableBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.pending)),
         composition = balance.toCompositionUiModel(),
         holdings = holdings.toUiModels(asset, tokenAmountMapper)

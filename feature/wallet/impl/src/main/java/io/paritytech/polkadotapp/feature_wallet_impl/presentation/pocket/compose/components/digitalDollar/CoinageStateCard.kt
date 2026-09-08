@@ -51,7 +51,7 @@ import io.paritytech.polkadotapp.common.R as RCommon
  * three buckets in the same order — both are read off one classification, so they cannot contradict each
  * other. Summing the details rows by availability reproduces the figures for the same reason.
  *
- * "Spendable", "Maturing" and "Unavailable" are deliberately not the pallet's words: "recycler" and its
+ * "Spendable", "Gaining privacy" and "Unavailable" are deliberately not the pallet's words: "recycler" and its
  * relatives stay in code identifiers and never reach the screen, and "Unavailable" avoids promising a remedy
  * for money that is simply in flight or past the age the chain accepts.
  */
@@ -189,15 +189,15 @@ private fun CategoryLegend(
                 modifier = Modifier.weight(1f),
                 label = stringResource(RCommon.string.pocket_coinage_spendable),
                 fill = colors.spendable,
-                maturing = false,
+                gainingPrivacy = false,
                 stripePhase = stripePhase,
                 colors = colors
             )
             LegendLabel(
                 modifier = Modifier.weight(1f),
-                label = stringResource(RCommon.string.pocket_coinage_maturing),
+                label = stringResource(RCommon.string.pocket_coinage_gaining_privacy),
                 fill = null,
-                maturing = true,
+                gainingPrivacy = true,
                 stripePhase = stripePhase,
                 colors = colors
             )
@@ -205,14 +205,14 @@ private fun CategoryLegend(
                 modifier = Modifier.weight(1f),
                 label = stringResource(RCommon.string.pocket_coinage_unavailable),
                 fill = colors.notSpendable,
-                maturing = false,
+                gainingPrivacy = false,
                 stripePhase = stripePhase,
                 colors = colors
             )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(HoldingGeometry.legendColumnSpacing)) {
-            listOf(state.spendableBalance, state.maturingBalance, state.unavailableBalance).forEach { amount ->
+            listOf(state.spendableBalance, state.gainingPrivacyBalance, state.unavailableBalance).forEach { amount ->
                 NovaText(
                     modifier = Modifier.weight(1f),
                     text = formatter.formatTokenAmount(amount, RoundPrecision.FIAT, withSymbol = false),
@@ -230,12 +230,12 @@ private fun LegendLabel(
     modifier: Modifier = Modifier,
     label: String,
     fill: Color?,
-    maturing: Boolean,
+    gainingPrivacy: Boolean,
     stripePhase: androidx.compose.runtime.State<Float>,
     colors: HoldingColors
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        CoinageLegendSwatch(fill = fill, maturing = maturing, stripePhase = stripePhase, colors = colors)
+        CoinageLegendSwatch(fill = fill, gainingPrivacy = gainingPrivacy, stripePhase = stripePhase, colors = colors)
 
         HorizontalSpacer { HoldingGeometry.legendSwatchLabelSpacing }
 
@@ -283,7 +283,7 @@ private fun CoinageStateCardPreview() {
                 state = CoinageUiState.TokensState(
                     totalBalance = TokenAmountModel.mock,
                     spendableBalance = TokenAmountModel.mock,
-                    maturingBalance = TokenAmountModel.mock,
+                    gainingPrivacyBalance = TokenAmountModel.mock,
                     unavailableBalance = TokenAmountModel.mock,
                     composition = CoinageCompositionUiModel(0.5f, 0.3f, 0.2f),
                     holdings = persistentListOf()

@@ -31,7 +31,7 @@ data class CoinageUiState(
         /** Free to spend without giving up any privacy. */
         val spendableBalance: TokenAmountModel,
         /** Gaining privacy. Spending it costs that privacy back. */
-        val maturingBalance: TokenAmountModel,
+        val gainingPrivacyBalance: TokenAmountModel,
         /**
          * In flight, or past the age the chain accepts. Nothing the user does or waits for releases it,
          * which is why it is not named for a remedy.

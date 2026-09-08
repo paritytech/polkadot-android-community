@@ -20,7 +20,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageCompositionUiModel
 
 /**
- * The balance partition drawn to scale: Spendable, Maturing, Unavailable, left to right.
+ * The balance partition drawn to scale: Spendable, Gaining privacy, Unavailable, left to right.
  *
  * The three segments are the same three buckets as the figures above, in the same order and with the same
  * three fills as the legend swatches — which is why the bar carries no labels of its own. Widths are
@@ -52,7 +52,7 @@ internal fun CoinageCompositionBar(
                     .fillMaxSize()
                     .drawWithCache {
                         val spendableRight = composition.spendableFraction * size.width
-                        val maturingRight = spendableRight + composition.maturingFraction * size.width
+                        val gainingPrivacyRight = spendableRight + composition.gainingPrivacyFraction * size.width
                         val period = HoldingGeometry.stripeWidth.toPx() * STRIPE_PERIODS_PER_WIDTH
 
                         onDrawBehind {
@@ -67,7 +67,7 @@ internal fun CoinageCompositionBar(
                             drawBarberPole(
                                 left = spendableRight,
                                 top = 0f,
-                                width = maturingRight - spendableRight,
+                                width = gainingPrivacyRight - spendableRight,
                                 height = size.height,
                                 cornerRadius = 0f,
                                 stripePeriod = period,
@@ -80,8 +80,8 @@ internal fun CoinageCompositionBar(
                             // read as a fourth segment.
                             drawRect(
                                 color = colors.notSpendable,
-                                topLeft = Offset(maturingRight, 0f),
-                                size = Size(size.width - maturingRight, size.height)
+                                topLeft = Offset(gainingPrivacyRight, 0f),
+                                size = Size(size.width - gainingPrivacyRight, size.height)
                             )
                         }
                     }
@@ -93,12 +93,12 @@ internal fun CoinageCompositionBar(
 /**
  * One legend swatch, drawn with the same three fills as the bar's segments so the two cannot drift.
  *
- * [maturing] gets the live barber pole rather than a still of it, for the same reason.
+ * [gainingPrivacy] gets the live barber pole rather than a still of it, for the same reason.
  */
 @Composable
 internal fun CoinageLegendSwatch(
     fill: Color?,
-    maturing: Boolean,
+    gainingPrivacy: Boolean,
     stripePhase: State<Float>,
     colors: HoldingColors,
 ) {
@@ -111,7 +111,7 @@ internal fun CoinageLegendSwatch(
                 val period = HoldingGeometry.stripeWidth.toPx() * STRIPE_PERIODS_PER_WIDTH
 
                 onDrawBehind {
-                    if (maturing) {
+                    if (gainingPrivacy) {
                         drawBarberPole(
                             left = 0f,
                             top = 0f,
@@ -129,7 +129,7 @@ internal fun CoinageLegendSwatch(
                         top = 0f,
                         width = size.width,
                         height = size.height,
-                        fill = if (maturing) Color.Transparent else fill ?: Color.Transparent,
+                        fill = if (gainingPrivacy) Color.Transparent else fill ?: Color.Transparent,
                         frame = colors.frame,
                         frameWidth = frame,
                         cornerRadius = corner
@@ -147,7 +147,7 @@ private fun CoinageCompositionBarPreview() {
             modifier = Modifier.height(HoldingGeometry.summaryBarHeight),
             composition = CoinageCompositionUiModel(
                 spendableFraction = 0.5f,
-                maturingFraction = 0.3f,
+                gainingPrivacyFraction = 0.3f,
                 unavailableFraction = 0.2f
             ),
             stripePhase = rememberBarberPolePhase(),

@@ -1477,7 +1477,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_coinage_balance_title">Coinage Balance</string>
     <string name="pocket_coinage_total_balance">Total balance</string>
     <string name="pocket_coinage_spendable">Spendable</string>
-    <string name="pocket_coinage_maturing">Maturing</string>
+    <string name="pocket_coinage_gaining_privacy">Gaining privacy</string>
     <string name="pocket_coinage_unavailable">Unavailable</string>
     <string name="pocket_coinage_make_vouchers_ready">Make all vouchers ready</string>
     <string name="pocket_coinage_share_logs">Share Coinage Logs</string>

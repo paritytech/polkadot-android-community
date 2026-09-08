@@ -19,7 +19,7 @@ data class CoinageHoldingsInfo(
 )
 
 /**
- * Moves every maturing voucher into the usable bucket.
+ * Moves every voucher that is gaining privacy into the usable bucket.
  *
  * Applied before the balance is computed rather than to the rows afterwards, so the figures, the bar and the
  * row colours all move together — a debug switch that made the list disagree with the total above it would
