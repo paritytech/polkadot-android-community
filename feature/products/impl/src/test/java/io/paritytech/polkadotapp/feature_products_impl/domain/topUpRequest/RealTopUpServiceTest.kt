@@ -249,6 +249,24 @@ class RealTopUpServiceTest {
     }
 
     /**
+     * A verdict reached by a previous process, asked after by this one.
+     *
+     * Nothing is running, so the answer can only come from the record — and it must come from there rather
+     * than be worked out again from transactions a fork can still move, which is what makes a terminal
+     * status terminal.
+     */
+    @Test
+    fun `a verdict from a previous run is reported without re-deriving it`() = runTest {
+        givenSettled(TopUpStatus.ClaimedPartially(80.intoBalance()))
+        executeTopUpUseCase.reportsFromLedger(TopUpStatus.NotClaimed)
+
+        val status = service().status(PRODUCT, ID).first()
+
+        assertEquals(TopUpStatus.ClaimedPartially(80.intoBalance()), status)
+        assertEquals(0, executeTopUpUseCase.runs)
+    }
+
+    /**
      * An unfinished top-up whose source is gone cannot be attempted again — that is the one thing a retry
      * needs. What its transactions came to is still on the ledger, and is the honest answer.
      */

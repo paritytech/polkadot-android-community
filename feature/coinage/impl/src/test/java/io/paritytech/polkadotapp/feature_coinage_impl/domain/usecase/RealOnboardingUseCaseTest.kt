@@ -216,6 +216,34 @@ class RealOnboardingUseCaseTest {
     }
 
     /**
+     * An amount that breaks into two vouchers of the same denomination, one of which has already finalized.
+     *
+     * What is still owed is the other one. Subtracting denominations as a set would cancel both against the
+     * one that landed and call a half-onboarded amount finished — and the shortfall would never be
+     * submitted, because nothing would think anything was outstanding.
+     */
+    @Test
+    fun `a denomination owed twice is only struck off once per voucher that minted it`() = runTest {
+        givenAmountBreaksInto(listOf(SMALL, SMALL))
+        givenGroupReports(listOf(entry(FINALIZED_SUCCESS, SMALL)))
+        givenAccountHolds(listOf(price(listOf(SMALL))))
+
+        reportsOf()
+
+        assertOnboardedOnce(listOf(SMALL))
+    }
+
+    /** And it stays open, because half of what was asked for has not been onboarded. */
+    @Test
+    fun `an amount owed twice over is not finished by one of the two landing`() = runTest {
+        givenAmountBreaksInto(listOf(SMALL, SMALL))
+        givenGroupReports(listOf(entry(FINALIZED_SUCCESS, SMALL)))
+        givenAccountHolds(listOf(Balance.ZERO))
+
+        assertDoesNotComplete()
+    }
+
+    /**
      * The account was underfunded from the start and stays that way. What it can cover is onboarded rather
      * than held hostage to the part that never arrives — and the largest denomination goes first, so the
      * most value moves.
