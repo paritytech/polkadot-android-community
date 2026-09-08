@@ -282,36 +282,73 @@ private object AmountShimmerSizes {
 @Preview
 @Composable
 private fun DigitalDollarCardPreview() {
-    PolkadotTheme {
-        CompositionLocalProvider(
-            LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
-        ) {
-            DigitalDollarCard(
-                card = PocketCardUiModel.DigitalDollar(
-                    amounts = LoadingState.Loaded(
-                        PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
-                    ),
-                    syncInProgress = true
-                ),
-                isExpanded = true
-            )
-        }
-    }
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loaded(
+            PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
+        ),
+        syncInProgress = true,
+        isExpanded = true
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardCollapsedPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loaded(
+            PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
+        ),
+        syncInProgress = false,
+        isExpanded = false
+    )
 }
 
 @Preview
 @Composable
 private fun DigitalDollarCardLoadingPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loading,
+        syncInProgress = false,
+        isExpanded = true
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardCollapsedLoadingPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loading,
+        syncInProgress = false,
+        isExpanded = false
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardSyncingWhileLoadingPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loading,
+        syncInProgress = true,
+        isExpanded = true
+    )
+}
+
+@Composable
+private fun DigitalDollarCardPreviewContainer(
+    amounts: LoadingState<PocketCardUiModel.DigitalDollar.Amounts>,
+    syncInProgress: Boolean,
+    isExpanded: Boolean
+) {
     PolkadotTheme {
         CompositionLocalProvider(
             LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
         ) {
             DigitalDollarCard(
                 card = PocketCardUiModel.DigitalDollar(
-                    amounts = LoadingState.Loading,
-                    syncInProgress = false
+                    amounts = amounts,
+                    syncInProgress = syncInProgress
                 ),
-                isExpanded = true
+                isExpanded = isExpanded
             )
         }
     }
