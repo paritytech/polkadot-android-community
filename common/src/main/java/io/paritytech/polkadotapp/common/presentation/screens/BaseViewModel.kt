@@ -35,10 +35,12 @@ open class BaseViewModel : ViewModel(), ComputationalScope, MessageDisplay {
         _events.trySend(BaseViewModelEvent.PresentationError(error))
     }
 
+    @Deprecated("Use showPresentationError instead")
     protected fun showError(text: String) {
         _events.trySend(BaseViewModelEvent.Error(text))
     }
 
+    @Deprecated("Use showPresentationError instead")
     protected fun showError(throwable: Throwable) {
         if (!shouldIgnore(throwable)) {
             Timber.e(throwable)
