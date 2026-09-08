@@ -93,6 +93,9 @@ class CoinDaoTest {
                 valueExponent = 3,
                 ageValue = ageValue,
                 onChain = onChain,
+                recyclerFungibility = null,
+                hops = null,
+                incomingBundleSize = null,
             )
         )
     }

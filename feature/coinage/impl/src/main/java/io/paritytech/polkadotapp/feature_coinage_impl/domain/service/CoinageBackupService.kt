@@ -14,6 +14,8 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.newaccount.New
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin.Age
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -205,7 +207,10 @@ class RealCoinageBackupService @Inject constructor(
             accountId = accountId,
             // Recovered from a read that found it, so it is on chain by construction.
             age = Age.Known(onChainInfo.age),
-            isOnChain = true
+            isOnChain = true,
+            // Recovery reads value and age, never where the coin has been. Left unobserved so the presence
+            // sync fills the history in from the age, the same way it does for a claimed coin.
+            provenance = CoinProvenance.UNKNOWN
         )
     }
 
@@ -335,6 +340,11 @@ class RealCoinageBackupService @Inject constructor(
             ringVrfPublicKey = publicKey,
             recyclerValue = values[publicKey] ?: return@mapNotNull null,
             location = onChainInfo.getVoucherLocation(),
+            // Recovery knows where the voucher sits, not how drained its ring is. Zero until the location
+            // service reads it, which is the same stand-in `recyclerMembers` gets just above; the max is
+            // left unfrozen so that service writes a real one rather than inheriting this placeholder.
+            recyclerFungibility = RecyclerFungibility.NONE,
+            maxRecyclerFungibility = null,
         )
     }
 

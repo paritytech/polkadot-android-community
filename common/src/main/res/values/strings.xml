@@ -1474,7 +1474,19 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_digital_dollar_available">Available</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
-    <string name="pocket_digital_dollar_advanced">Advanced</string>
+    <string name="pocket_coinage_balance_title">Coinage Balance</string>
+    <string name="pocket_coinage_total_balance">Total balance</string>
+    <string name="pocket_coinage_spendable">Spendable</string>
+    <string name="pocket_coinage_maturing">Maturing</string>
+    <string name="pocket_coinage_unavailable">Unavailable</string>
+    <string name="pocket_coinage_make_vouchers_ready">Make all vouchers ready</string>
+    <string name="pocket_coinage_share_logs">Share Coinage Logs</string>
+    <string name="pocket_coinage_show_details">Show Details</string>
+    <string name="pocket_coinage_key_title">How to read this</string>
+    <string name="pocket_coinage_key_hops">Coins show one circle per past payment, oldest first. Dots are the other coins that moved with it: more dots, easier to trace.</string>
+    <string name="pocket_coinage_key_unknown">A thin red and orange line means we have no record for that part of the coin\'s past.</string>
+    <string name="pocket_coinage_key_block">A single block means no past payments at all. The longer it is, the easier the coin is to trace.</string>
+    <string name="pocket_coinage_key_voucher">Vouchers are coins gaining privacy. The block is how traceable they will still be at best; the striped part is the privacy still to be earned.</string>
 
     <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
     <string name="payment_privacy_mode_fastest_label">Fastest</string>

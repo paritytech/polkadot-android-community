@@ -1,15 +1,12 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.utils.mapToSet
-import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
-import io.paritytech.polkadotapp.feature_coinage_api.domain.common.totalBalance
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.coinageBalanceOf
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
@@ -77,34 +74,14 @@ class RealTotalBalanceUseCase @Inject constructor(
             // We use IMMEDIATE since we don't want to delay balance computation
             val usability = usabilityContextFactory.create(BalanceEvaluationMode.IMMEDIATE, denominations)
 
-            val coinBuckets = coins.preClassifyCoins()
-            val voucherBuckets = vouchers.preClassifyVouchers(strategy, usability)
-
-            val byVerdict = coinBuckets.minted.groupBy { verdicts[it.derivationIndex] }
-
             with(conversionContext) {
-                CoinageBalance(
-                    availablePrivate = byVerdict.balanceOf(CoinRecyclingState.ALLOW_USE) +
-                        voucherBuckets.usable.totalBalance(),
-                    gainingPrivacy = CoinageBalance.GainingPrivacyBalance(
-                        amount = byVerdict.balanceOf(CoinRecyclingState.TO_RECYCLE) +
-                            voucherBuckets.gainingPrivacy.totalBalance(),
-                        canSpendWithConfirmation = strategy.allowsConfirmedSpend(),
-                    ),
-                    pending = byVerdict.balanceOf(CoinRecyclingState.MUST_RECYCLE) +
-                        byVerdict.balanceWithoutVerdict() +
-                        coinBuckets.minting.totalBalance() +
-                        voucherBuckets.minting.totalBalance(),
+                coinageBalanceOf(
+                    coins = coins.preClassifyCoins(),
+                    verdicts = verdicts,
+                    vouchers = vouchers.preClassifyVouchers(strategy, usability),
+                    canSpendWithConfirmation = strategy.allowsConfirmedSpend(),
                 )
             }
         }
     }
 }
-
-/** A coin the evaluator has not judged yet keys to null, which is what puts it with the arriving money. */
-context(conversion: CoinageBalanceConversionContext)
-private fun Map<CoinRecyclingState?, List<Coin>>.balanceOf(state: CoinRecyclingState?) =
-    this[state].orEmpty().totalBalance()
-
-context(conversion: CoinageBalanceConversionContext)
-private fun Map<CoinRecyclingState?, List<Coin>>.balanceWithoutVerdict() = balanceOf(state = null)

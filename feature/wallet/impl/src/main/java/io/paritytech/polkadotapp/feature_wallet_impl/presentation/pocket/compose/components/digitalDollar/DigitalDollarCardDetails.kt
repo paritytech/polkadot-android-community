@@ -4,8 +4,6 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compos
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -35,17 +33,14 @@ import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButto
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Add
-import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowDownward
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpwards
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
-import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
@@ -53,6 +48,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.Digital
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketCardSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketContentSlide
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageCompositionUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.DigitalDollarCardDetailsUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
@@ -80,8 +76,10 @@ fun DigitalDollarCardDetails(
         onSendClick = viewModel::onSendClick,
         onGetCashClick = viewModel::onGetCashClick,
         onAutoFundClick = viewModel::onAutoFundClick,
+        onDetailsToggled = viewModel::onDetailsToggled,
+        onKeyToggled = viewModel::onKeyToggled,
+        onMakeVouchersReadyClick = viewModel::onMakeVouchersReadyClick,
         onShareLogsClick = viewModel::onShareLogsClick,
-        onForceRecycleClick = viewModel::onForceRecycleClick,
         onBackupUpdateClick = viewModel::onBackupUpdateClick,
         onBackupCloseClick = viewModel::onBackupCloseClick
     )
@@ -97,8 +95,10 @@ private fun DigitalDollarCardDetailsContent(
     onSendClick: () -> Unit,
     onGetCashClick: () -> Unit,
     onAutoFundClick: () -> Unit,
+    onDetailsToggled: () -> Unit,
+    onKeyToggled: () -> Unit,
+    onMakeVouchersReadyClick: () -> Unit,
     onShareLogsClick: () -> Unit,
-    onForceRecycleClick: (Coin) -> Unit,
     onBackupUpdateClick: () -> Unit,
     onBackupCloseClick: () -> Unit
 ) {
@@ -170,61 +170,21 @@ private fun DigitalDollarCardDetailsContent(
                     }
                 }
 
-                Coinage(
-                    loadingState = coinageLoadingState,
-                    onAutoFundClick = onAutoFundClick,
-                    onShareLogsClick = onShareLogsClick,
-                    onForceRecycleClick = onForceRecycleClick
-                )
+                coinageLoadingState.onLoaded { coinageState ->
+                    VerticalSpacer { mediumIncreased }
+
+                    CoinageCardContent(
+                        state = coinageState,
+                        onAutoFundClick = onAutoFundClick,
+                        onDetailsToggled = onDetailsToggled,
+                        onKeyToggled = onKeyToggled,
+                        onMakeVouchersReadyClick = onMakeVouchersReadyClick,
+                        onShareLogsClick = onShareLogsClick
+                    )
+                }
             }
         }
     }
-}
-
-@Composable
-private fun ColumnScope.Coinage(
-    loadingState: LoadingState<CoinageUiState>,
-    onAutoFundClick: () -> Unit,
-    onShareLogsClick: () -> Unit,
-    onForceRecycleClick: (Coin) -> Unit
-) {
-    loadingState
-        .onLoaded { state ->
-            if (state.testnetFundEnabled) {
-                var coinageInfoVisible by remember { mutableStateOf(false) }
-
-                VerticalSpacer { mediumIncreased }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = { coinageInfoVisible = !coinageInfoVisible })
-                        .padding(PolkadotTheme.spacings.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    NovaIcon(
-                        modifier = Modifier.size(16.dp),
-                        imageVector = if (coinageInfoVisible) NovaIcons.ArrowUpwards else NovaIcons.ArrowDownward,
-                    )
-
-                    HorizontalSpacer { small }
-
-                    NovaText(stringResource(RCommon.string.pocket_digital_dollar_advanced))
-                }
-
-                AnimatedVisibility(
-                    visible = coinageInfoVisible
-                ) {
-                    CoinageCardContent(
-                        state = state,
-                        onAutoFundClick = onAutoFundClick,
-                        onShareLogsClick = onShareLogsClick,
-                        onForceRecycleClick = onForceRecycleClick
-                    )
-                }
-            }
-        }
 }
 
 @Composable
@@ -296,16 +256,18 @@ private fun DigitalDollarCardDetailsPreview() {
                         tokensState = CoinageUiState.TokensState(
                             totalBalance = TokenAmountModel.mock,
                             spendableBalance = TokenAmountModel.mock,
-                            gainingPrivacyBalance = TokenAmountModel.mock,
-                            pendingBalance = TokenAmountModel.mock,
-                            coinList = persistentListOf(),
-                            voucherList = persistentListOf()
+                            maturingBalance = TokenAmountModel.mock,
+                            unavailableBalance = TokenAmountModel.mock,
+                            composition = CoinageCompositionUiModel.EMPTY,
+                            holdings = persistentListOf()
                         ),
                         autoFundAvailable = true,
                         fundInProgress = false,
                         actionsEnabled = true,
                         coinageWidgetsEnabled = true,
-                        testnetFundEnabled = true
+                        shareLogsEnabled = true,
+                        detailsVisible = false,
+                        keyVisible = false
                     )
                 ),
                 state = DigitalDollarCardDetailsUiState(
@@ -314,8 +276,10 @@ private fun DigitalDollarCardDetailsPreview() {
                 onSendClick = {},
                 onGetCashClick = {},
                 onAutoFundClick = {},
+                onDetailsToggled = {},
+                onKeyToggled = {},
+                onMakeVouchersReadyClick = {},
                 onShareLogsClick = {},
-                onForceRecycleClick = {},
                 onBackupUpdateClick = {},
                 onBackupCloseClick = {}
             )

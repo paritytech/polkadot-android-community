@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.common.utils.mapIndexedAsync
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
@@ -261,9 +262,25 @@ class UnloadAndSplitVouchersStrategy(
 
     private suspend fun CoinageTransaction.mintGroupOutputs(batch: VoucherBatch): TransferOutputs {
         useVouchers(batch.vouchers)
-        val recipientCoins = mintAndHandOffCoins(batch.recipientDenominations).getOrThrow()
-        val changeCoins = mintCoins(batch.changeDenominations).getOrThrow()
+
+        val provenance = batch.unloadProvenance()
+        val recipientCoins = mintAndHandOffCoins(batch.recipientDenominations, provenance).getOrThrow()
+        val changeCoins = mintCoins(batch.changeDenominations, provenance).getOrThrow()
+
         return TransferOutputs(recipientCoins, changeCoins)
+    }
+
+    /**
+     * Coins leaving a recycler come out with that recycler's anonymity and no history yet.
+     *
+     * A batch is one recycler by construction, so every voucher in it carries the same fungibility and the
+     * first one answers for all of them. Batches are deliberately not reconciled against each other: a coin
+     * from a fuller ring is genuinely more private than one from an emptier ring in the same transfer.
+     */
+    private fun VoucherBatch.unloadProvenance(): CoinProvenance {
+        val fungibility = vouchers.first().recyclerFungibility
+
+        return CoinProvenance.fromRecycler(fungibility)
     }
 
     private suspend fun buildExtrinsic(

@@ -1,7 +1,9 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
@@ -166,6 +168,7 @@ class CoinageAssetSelectorTest {
         age = Coin.Age.Known(3),
         isOnChain = true,
         accountId = mock(),
+        provenance = CoinProvenance.UNKNOWN,
     )
 
     private fun voucherOf(ringVrfKeyIndex: Int, members: Int) = RecyclerVoucher(
@@ -173,5 +176,7 @@ class CoinageAssetSelectorTest {
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = members),
+        recyclerFungibility = RecyclerFungibility.NONE,
+        maxRecyclerFungibility = RecyclerFungibility.NONE,
     )
 }

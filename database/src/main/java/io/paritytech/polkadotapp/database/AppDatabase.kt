@@ -84,6 +84,7 @@ import io.paritytech.polkadotapp.database.migrations.Migration48To49
 import io.paritytech.polkadotapp.database.migrations.Migration54To55Spec
 import io.paritytech.polkadotapp.database.migrations.Migration55To56
 import io.paritytech.polkadotapp.database.migrations.Migration57To58
+import io.paritytech.polkadotapp.database.migrations.Migration59To60
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
@@ -140,7 +141,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 59,
+    version = 60,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -317,6 +318,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration48To49(),
                 Migration55To56(),
                 Migration57To58(),
+                Migration59To60(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }

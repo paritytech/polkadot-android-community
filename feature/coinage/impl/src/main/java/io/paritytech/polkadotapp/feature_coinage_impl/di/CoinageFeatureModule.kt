@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBr
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageHoldingsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
@@ -98,6 +99,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinAmo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageBalanceConverterUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageHoldingsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageRecyclingUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageTestnetFundUseCase
@@ -193,6 +195,12 @@ interface CoinageFeatureModule {
     fun bindTotalBalanceUseCase(impl: RealTotalBalanceUseCase): TotalBalanceUseCase
 
     @Binds
+    fun bindCoinageHoldingsUseCase(impl: RealCoinageHoldingsUseCase): CoinageHoldingsUseCase
+
+    @Binds
+    fun bindShareCoinageLogsUseCase(impl: RealShareCoinageLogsUseCase): ShareCoinageLogsUseCase
+
+    @Binds
     fun bindExponentBoundsRepository(impl: RealExponentBoundsRepository): ExponentBoundsRepository
 
     @Binds
@@ -241,9 +249,6 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindClaimReceivedCoinsUseCase(impl: RealClaimReceivedCoinsUseCase): ClaimReceivedCoinsUseCase
-
-    @Binds
-    fun bindShareCoinageLogsUseCase(impl: RealShareCoinageLogsUseCase): ShareCoinageLogsUseCase
 
     @Binds
     fun bindCoinageRecyclingUseCase(impl: RealCoinageRecyclingUseCase): CoinageRecyclingUseCase

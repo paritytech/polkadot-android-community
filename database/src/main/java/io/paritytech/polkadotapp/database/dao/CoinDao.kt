@@ -60,7 +60,25 @@ interface CoinDao {
 
     @Query("SELECT * FROM coins WHERE onChain = 1 AND ageValue >= :minAge")
     suspend fun getCoinsWithKnownAgeAtLeast(minAge: Int): List<CoinLocal>
+
+    /**
+     * Kept apart from [updateCoinPresence] because the two run at completely different rates: presence is
+     * rewritten on every chain tick, while hops are filled in once, when a claimed coin's age first arrives.
+     */
+    @Query("UPDATE coins SET hops = :hops WHERE derivationIndex = :derivationIndex")
+    suspend fun updateCoinHops(derivationIndex: Int, hops: ByteArray)
+
+    @Transaction
+    suspend fun updateCoinHops(updates: List<CoinHopsUpdateLocal>) {
+        updates.forEach { updateCoinHops(derivationIndex = it.derivationIndex, hops = it.hops) }
+    }
 }
+
+class CoinHopsUpdateLocal(
+    val derivationIndex: Int,
+    /** SCALE-encoded `Vec<CoinHopLocal>`. */
+    val hops: ByteArray,
+)
 
 class CoinUpdateLocal(
     val accountId: AccountId,
