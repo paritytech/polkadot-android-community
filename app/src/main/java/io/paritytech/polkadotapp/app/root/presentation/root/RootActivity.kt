@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -161,6 +162,21 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         // full-bleed behind it.
         val navHost = findViewById<View>(R.id.rootNavHost)
         val barHeightPx = (ChainHealthBarDefaults.ContentHeight.value * resources.displayMetrics.density).roundToInt()
+
+        // Insets reach the subtree two ways and both have to inflate, or the content moves between them.
+        // Animation frames (the IME sliding in) are dispatched through the animation callback and never
+        // pass through the apply listener, so without the callback below the content springs up by the
+        // bar height for the length of the keyboard animation and drops back once it settles.
+        ViewCompat.setWindowInsetsAnimationCallback(
+            navHost,
+            object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    runningAnimations: MutableList<WindowInsetsAnimationCompat>,
+                ): WindowInsetsCompat = insets.inflateTopInsets(barHeightPx)
+            },
+        )
+
         ViewCompat.setOnApplyWindowInsetsListener(navHost) { _, insets ->
             insets.inflateTopInsets(barHeightPx)
         }
