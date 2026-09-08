@@ -98,8 +98,15 @@ fun RootNavBarOverlay(
     LaunchedEffect(Unit) {
         snapshotFlow { pull.visibleWidthPx }.collect { onOffset(with(density) { it.toDp() }) }
     }
+    // Both intrusions have to be surrendered on hide, not just the horizontal one: the height is only ever
+    // measured while the bar is composed, so without this screens keep reserving the band it used to
+    // occupy — and ChatExtensionOverlayHost reads a non-zero height as "a bar is there" and drops its own
+    // navigation-bar padding.
     LaunchedEffect(hidden) {
-        if (hidden) onOffset(0.dp)
+        if (hidden) {
+            onOffset(0.dp)
+            onBarHeight(0.dp)
+        }
     }
 
     val scrimVisible by remember(hidden, forceShown) {

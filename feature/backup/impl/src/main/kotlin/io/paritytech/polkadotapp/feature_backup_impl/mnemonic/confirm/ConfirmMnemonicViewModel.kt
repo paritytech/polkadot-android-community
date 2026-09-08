@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.design.components.mnemonic.model.Word
@@ -12,6 +13,7 @@ import io.paritytech.polkadotapp.feature_backup_api.mnemonic.model.parcel.fromPa
 import io.paritytech.polkadotapp.feature_backup_impl.BackupRouter
 import io.paritytech.polkadotapp.feature_backup_impl.ManualMnemonicInteractor
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm.models.ConfirmationState
+import io.paritytech.polkadotapp.feature_backup_impl.presentation.error.WrongMnemonicPresentationError
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -63,7 +65,7 @@ class ConfirmMnemonicViewModel @Inject constructor(
         val enteredCorrectly = confirmationState.value.addedWords == generatedMnemonic.wordList
 
         if (enteredCorrectly.not()) {
-            showError("Wrong mnemonic")
+            showPresentationError(WrongMnemonicPresentationError())
             return
         }
 
@@ -76,7 +78,7 @@ class ConfirmMnemonicViewModel @Inject constructor(
                 }
                 .onFailure {
                     inProgress.disable()
-                    showError(it)
+                    showPresentationError(UnexpectedPresentationError(it))
                 }
         }
     }

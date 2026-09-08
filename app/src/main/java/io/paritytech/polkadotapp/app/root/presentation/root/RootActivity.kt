@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -31,8 +32,9 @@ import io.paritytech.polkadotapp.common.presentation.formatters.time.LocalTimeFo
 import io.paritytech.polkadotapp.common.presentation.formatters.time.TimeFormatter
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotificationHost
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotifier
+import io.paritytech.polkadotapp.common.presentation.notification.error
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
-import io.paritytech.polkadotapp.common.presentation.screens.BaseScreenDelegate
+import io.paritytech.polkadotapp.common.presentation.screens.ObserveViewModelEvents
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
@@ -55,11 +57,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
     lateinit var appNotifier: AppNotifier
 
     private val viewModel by viewModels<RootViewModel>()
-
-    private val delegate = BaseScreenDelegate(
-        context = { this },
-        viewModel = ::viewModel
-    )
 
     private val navHostFragment: NavHostFragment by lazy(LazyThreadSafetyMode.NONE) {
         supportFragmentManager.findFragmentById(R.id.rootNavHost) as NavHostFragment
@@ -91,8 +88,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
 
         setupChatExtensionOverlay()
         setupChainHealthBar()
-
-        delegate.subscribeViewModelEvents()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -113,7 +108,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             when (deeplinkProcessingOutcome) {
                 DeeplinkProcessingOutcome.NoOp -> {}
 
-                is DeeplinkProcessingOutcome.ShowMessage -> delegate.showMessage(
+                is DeeplinkProcessingOutcome.ShowMessage -> appNotifier.error(
                     deeplinkProcessingOutcome.message
                 )
 
@@ -142,6 +137,8 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 PolkadotTheme {
+                    ObserveViewModelEvents(viewModel, appNotifier)
+
                     AppNotificationHost(notifier = appNotifier)
                 }
             }
@@ -165,6 +162,21 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         // full-bleed behind it.
         val navHost = findViewById<View>(R.id.rootNavHost)
         val barHeightPx = (ChainHealthBarDefaults.ContentHeight.value * resources.displayMetrics.density).roundToInt()
+
+        // Insets reach the subtree two ways and both have to inflate, or the content moves between them.
+        // Animation frames (the IME sliding in) are dispatched through the animation callback and never
+        // pass through the apply listener, so without the callback below the content springs up by the
+        // bar height for the length of the keyboard animation and drops back once it settles.
+        ViewCompat.setWindowInsetsAnimationCallback(
+            navHost,
+            object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    runningAnimations: MutableList<WindowInsetsAnimationCompat>,
+                ): WindowInsetsCompat = insets.inflateTopInsets(barHeightPx)
+            },
+        )
+
         ViewCompat.setOnApplyWindowInsetsListener(navHost) { _, insets ->
             insets.inflateTopInsets(barHeightPx)
         }

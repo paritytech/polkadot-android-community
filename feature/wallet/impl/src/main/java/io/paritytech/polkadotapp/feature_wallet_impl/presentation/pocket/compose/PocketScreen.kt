@@ -25,6 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
@@ -259,7 +260,12 @@ private fun PocketScreenPreview() {
             PocketScreenInternal(
                 screenState = PocketScreenState.List(collectiblesAvailable = true),
                 cards = persistentListOf(
-                    PocketCardUiModel.DigitalDollar(TokenAmountModel.mock, TokenAmountModel.mock, false),
+                    PocketCardUiModel.DigitalDollar(
+                        amounts = LoadingState.Loaded(
+                            PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
+                        ),
+                        syncInProgress = false
+                    ),
                     PocketCardUiModel.IdCard("username.99", "15oF4u...zaC1Ap", PocketRank.Basic)
                 ),
                 onCardSelected = {},

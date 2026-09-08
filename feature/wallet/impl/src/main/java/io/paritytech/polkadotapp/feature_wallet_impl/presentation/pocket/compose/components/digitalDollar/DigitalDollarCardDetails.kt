@@ -288,7 +288,12 @@ private fun DigitalDollarCardDetailsPreview() {
             LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
         ) {
             DigitalDollarCardDetailsContent(
-                card = PocketCardUiModel.DigitalDollar(TokenAmountModel.mock, TokenAmountModel.mock, false),
+                card = PocketCardUiModel.DigitalDollar(
+                    amounts = LoadingState.Loaded(
+                        PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
+                    ),
+                    syncInProgress = false
+                ),
                 onBack = {},
                 cardIndex = 0,
                 coinageLoadingState = LoadingState.Loaded(
