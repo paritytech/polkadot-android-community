@@ -58,7 +58,7 @@ token*
 # Claude Code: share docs, skills, hooks, and settings; keep local-only state out
 /.claude/*
 !/.claude/docs/
-!/.claude/skills/
+/.claude/skills/
 !/.claude/hooks/
 !/.claude/settings.json
 !/.claude/plugins
