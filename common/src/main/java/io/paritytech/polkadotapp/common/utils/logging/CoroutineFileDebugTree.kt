@@ -2,6 +2,8 @@ package io.paritytech.polkadotapp.common.utils.logging
 
 import android.annotation.SuppressLint
 import android.util.Log
+import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
+import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.megabytes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
@@ -28,7 +30,7 @@ abstract class CoroutineFileDebugTree(
     companion object {
         private val LOG_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
-        private const val MAX_LOG_FILE_SIZE_BYTES = 4L * 1024 * 1024 // 4MB
+        private val MAX_LOG_FILE_SIZE = 4.megabytes
         private const val ROTATED_FILE_SUFFIX = ".1"
         private const val SIZE_CHECK_EVERY_N_MESSAGES = 200
     }
@@ -93,7 +95,7 @@ abstract class CoroutineFileDebugTree(
         if (++messagesSinceSizeCheck < SIZE_CHECK_EVERY_N_MESSAGES) return
         messagesSinceSizeCheck = 0
 
-        if (logFile.length() < MAX_LOG_FILE_SIZE_BYTES) return
+        if (logFile.length().bytes < MAX_LOG_FILE_SIZE) return
 
         val rotatedFile = File(logFile.parentFile, logFile.name + ROTATED_FILE_SUFFIX)
 

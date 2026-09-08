@@ -7,8 +7,9 @@ import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.logging.LoggerConstants
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrNull
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.formatAsDollars
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.tokenAmount
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
@@ -19,6 +20,7 @@ import java.io.FileOutputStream
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.inject.Inject
@@ -37,6 +39,7 @@ class RealShareCoinageLogsUseCase @Inject constructor(
         const val REPORT_ENTRY_NAME = "coinage_report.txt"
         const val LOG_SNAPSHOT_NAME = "coinage_log_snapshot.log"
         const val MAX_LOG_LINES = 5_000
+        const val CENTS_PER_DOLLAR = 100.0
 
         val FILE_NAME_TIMESTAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
         val REPORT_TIMESTAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -128,7 +131,7 @@ class RealShareCoinageLogsUseCase @Inject constructor(
     private fun Coin.describe(): String {
         val age = ageOrNull()?.toString() ?: "unknown"
 
-        return "Coin[idx=$derivationIndex, value=${valueExponent.formatAsDollars()}, " +
+        return "Coin[idx=$derivationIndex, value=${valueExponent.formatValue()}, " +
             "exp=2^${valueExponent.value}, age=$age, onChain=$isOnChain]"
     }
 
@@ -140,7 +143,13 @@ class RealShareCoinageLogsUseCase @Inject constructor(
                 "recycler=${location.recyclerIndex}, anonymitySet=${location.recyclerMembers}"
         }
 
-        return "Voucher[ringIdx=$ringVrfKeyIndex, value=${recyclerValue.formatAsDollars()}, " +
+        return "Voucher[ringIdx=$ringVrfKeyIndex, value=${recyclerValue.formatValue()}, " +
             "exp=2^${recyclerValue.value}, $location]"
+    }
+
+    // Matches what the Coins and Vouchers debug sheets print, so a tester can line the export up against the
+    // screen they read it from. Kept private to the export rather than offered as a coinage-wide formatter.
+    private fun ValueExponent.formatValue(): String {
+        return "$" + String.format(Locale.US, "%.2f", tokenAmount().toDouble() / CENTS_PER_DOLLAR)
     }
 }
