@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="send_gaining_privacy_title">Part of this payment is not private yet</string>
-    <string name="send_gaining_privacy_description">%1$s of this payment comes from funds that are still blending in with other payments. Sending them now makes this payment easier to link back to where the funds came from.</string>
-    <string name="send_gaining_privacy_wait_hint">Left alone, these funds become fully private on their own. How long that takes depends on the payments privacy mode you chose in Settings.</string>
+    <string name="send_gaining_privacy_title">Part of this payment can still be linked to you</string>
+    <string name="send_gaining_privacy_description">%1$s of it comes from funds that are still blending in with others. Sending them now makes it easier for someone to connect this payment to you.</string>
+    <string name="send_gaining_privacy_wait_hint">Left alone, these funds keep blending in, and spending them later costs you nothing. How long that takes depends on the payments privacy mode you chose in Settings.</string>
     <string name="send_gaining_privacy_send_anyway_button">Send %1$s now</string>
 
     <string name="send_payment_failed">Failed to submit transaction</string>
@@ -730,7 +730,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_enter_amount_title">Enter amount</string>
     <string name="send_enter_amount_placeholder">Enter Amount</string>
     <string name="send_enter_amount_max_balance_prefix">Max:</string>
-    <string name="send_enter_amount_privacy_cost_hint">Plus %1$s that is not private yet</string>
+    <string name="send_enter_amount_privacy_cost_hint">Plus %1$s that could still be linked to you</string>
     <string name="send_enter_amount_not_enough_funds_error">You don’t have enough funds</string>
     <string name="send_enter_amount_cash_title">%1$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>
@@ -1479,14 +1479,14 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
 
     <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
     <string name="payment_privacy_mode_fastest_label">Fastest</string>
-    <string name="payment_privacy_mode_fastest_description">Fastest payments, lower privacy</string>
-    <string name="payment_privacy_mode_fastest_accessibility">Fastest. Fastest payments, lower privacy.</string>
+    <string name="payment_privacy_mode_fastest_description">Your money is ready to spend the moment it lands. Nothing waits to blend in with everyone else’s first, so your payments are the easiest to link back to you.</string>
+    <string name="payment_privacy_mode_fastest_accessibility">Fastest. Your money is ready to spend the moment it lands, so your payments are the easiest to link back to you.</string>
     <string name="payment_privacy_mode_balanced_label">Balanced</string>
-    <string name="payment_privacy_mode_balanced_description">Stronger privacy, moderate speed</string>
-    <string name="payment_privacy_mode_balanced_accessibility">Balanced. Stronger privacy, moderate speed.</string>
+    <string name="payment_privacy_mode_balanced_description">Most of your money is ready to spend right away. A small part waits a while first, blending in with everyone else’s. You can spend it sooner if you need to. That just makes the payment easier to link back to you.</string>
+    <string name="payment_privacy_mode_balanced_accessibility">Balanced. Most of your money is ready to spend right away, while a small part waits a while to blend in with everyone else’s.</string>
     <string name="payment_privacy_mode_most_private_label">Most Private</string>
-    <string name="payment_privacy_mode_most_private_description">Maximum privacy, lowest speed</string>
-    <string name="payment_privacy_mode_most_private_accessibility">Most private. Maximum privacy, lowest speed.</string>
+    <string name="payment_privacy_mode_most_private_description">Your money waits until it has blended in with everyone else’s before you can spend it. That makes your payments the hardest to link back to you, but you may have to wait, and there’s no way to spend it sooner.</string>
+    <string name="payment_privacy_mode_most_private_accessibility">Most private. Your money waits until it has blended in with everyone else’s before you can spend it, so you may have to wait.</string>
     <string name="payment_privacy_mode_state_selected">Selected</string>
     <string name="payment_privacy_mode_state_not_selected">Not selected</string>
 
