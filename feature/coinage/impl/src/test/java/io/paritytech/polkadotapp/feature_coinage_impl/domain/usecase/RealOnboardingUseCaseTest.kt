@@ -96,7 +96,12 @@ class RealOnboardingUseCaseTest {
 
     @Before
     fun openTheWindow() {
-        coEvery { chainAssetProvider.chain() } returns mockk()
+        // A real Chain, not a bare mock: the loop renders the funding account as an address for the log,
+        // and an unstubbed property there is swallowed by the balance flow's retry rather than surfacing.
+        coEvery { chainAssetProvider.chain() } returns mockk {
+            every { isEthereumBased } returns false
+            every { addressPrefix } returns 42
+        }
         coEvery { chainAssetProvider.asset() } returns mockk()
         every { timeProvider.now() } returns WINDOW_OPEN
         coEvery { submissionUseCase(any(), any(), any(), any()) } returns Result.success(Unit)
