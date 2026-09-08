@@ -405,7 +405,7 @@ function CounterCard({ initialCount }: { initialCount: number }) {
     const [accountName, setAccountName] = useState<string | undefined>();
 
     useEffect(() => {
-        Promise.resolve(accountsProvider.getProductAccount('product-sample.dot', 0)).then(result => {
+        Promise.resolve(accountsProvider.getProductAccount(OWN_PRODUCT_ID, 0)).then(result => {
             if (result.isOk()) {
                 const publicKey = toHex(result.value.publicKey);
                 setAccountName(publicKey);
@@ -639,9 +639,15 @@ function toHex(bytes: Uint8Array): `0x${string}` {
     return `0x${Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * The product's own dotNS id. Must match the id it is registered under, because the host derives a product
+ * account from `//{productId}//{index}` — a mismatch silently hands out an account nothing else uses.
+ */
+const OWN_PRODUCT_ID = 'productsample.js.paseo';
+
 // RFC-0004 amended by RFC-0022: context = (productId, suffix), where the suffix is the same
 // selector an account carries — a plain index here. The ring addresses a Members-pallet ring on the PoP chain.
-const PROOF_CONTEXT: ProofContext = ['product-sample.dot', 0];
+const PROOF_CONTEXT: ProofContext = [OWN_PRODUCT_ID, 0];
 const MEMBERS_PALLET_INDEX = 67;
 
 // RingCollectionId is a 32-byte, space-padded identifier (matches RingCollectionId.Companion.PEOPLE / PEOPLE_LITE).
@@ -665,8 +671,6 @@ const FULL_PEOPLE_RING = peopleRing(ringCollectionId('pop:polkadot.network/peopl
 const LITE_PEOPLE_RING = peopleRing(ringCollectionId('pop:polkadot.network/people-lite'));
 
 type RingKind = 'full' | 'lite';
-
-const OWN_PRODUCT_ID = 'product-sample.dot';
 
 /** The product account a top up draws on — the one "Copy product account id" hands out to fund. */
 const TOP_UP_ACCOUNT_INDEX = 0;
@@ -908,7 +912,7 @@ function SignVrfCard() {
 
         // RFC-0023: the host never injects `signer` — the product fetches its own public key and
         // puts it into the transcript itself.
-        Promise.resolve(accountsProvider.getProductAccount('product-sample.dot', 0)).then(accountResult => {
+        Promise.resolve(accountsProvider.getProductAccount(OWN_PRODUCT_ID, 0)).then(accountResult => {
             if (!accountResult.isOk()) {
                 setError(`accountGet error: ${JSON.stringify(accountResult.error)}`);
                 setLoading(false);
@@ -923,7 +927,7 @@ function SignVrfCard() {
                 { label: new TextEncoder().encode('signer'), value: publicKey },
             ];
 
-            return Promise.resolve(accountsProvider.signVrf('product-sample.dot', 0, AIRDROP_TRANSCRIPT_LABEL, items)).then(result => {
+            return Promise.resolve(accountsProvider.signVrf(OWN_PRODUCT_ID, 0, AIRDROP_TRANSCRIPT_LABEL, items)).then(result => {
                 if (result.isOk()) {
                     setPreOutput(toHex(result.value.preOutput));
                     setProof(toHex(result.value.proof));
@@ -1093,12 +1097,12 @@ function CreateRoomFormCard() {
 }
 
 async function resolveProductAccountWithSigner(): Promise<{ address: string; signer: PolkadotSigner }> {
-    const accountResult = await accountsProvider.getProductAccount('product-sample.dot', 0);
+    const accountResult = await accountsProvider.getProductAccount(OWN_PRODUCT_ID, 0);
     if (!accountResult.isOk()) throw new Error('Failed to get account');
 
     const account = {
         ...accountResult.value,
-        dotNsIdentifier: 'product-sample.dot',
+        dotNsIdentifier: OWN_PRODUCT_ID,
         derivationIndex: 0,
     };
     const ss58Prefix = chainProperties?.ss58Prefix ?? 42;
@@ -1116,7 +1120,7 @@ function getAliceAddress(): string {
 }
 
 async function resolveAddress(): Promise<string> {
-    const accountResult = await accountsProvider.getProductAccount('product-sample.dot', 0);
+    const accountResult = await accountsProvider.getProductAccount(OWN_PRODUCT_ID, 0);
     if (!accountResult.isOk()) throw new Error('Failed to get account');
 
     const ss58Prefix = chainProperties?.ss58Prefix ?? 42;
@@ -1675,7 +1679,7 @@ function PaymentRequestCard() {
         setRequesting(true);
         setStatus('Awaiting user approval...');
 
-        accountsProvider.getProductAccount('product-sample.dot', 0).then(async (result) => {
+        accountsProvider.getProductAccount(OWN_PRODUCT_ID, 0).then(async (result) => {
             if (!result.isOk()) throw new Error(`Failed to get product account: ${JSON.stringify(result.error)}`);
             const destination = result.value.publicKey;
 

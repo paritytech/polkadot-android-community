@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.network.binding.Balance
+import io.paritytech.polkadotapp.chains.util.addressOf
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatMap
@@ -189,6 +190,8 @@ class RealOnboardingUseCase @Inject constructor(
 
         withTimeoutOrNull(FUNDING_TIMEOUT) {
             for (transferable in funding) {
+                coinageLogD("Onboarding got transferable update: $transferable")
+
                 // The newest look wins outright, even when it is smaller than the one before: the account
                 // can be spent from elsewhere, and onboarding against the largest balance ever seen would
                 // submit against money it no longer has.
@@ -243,6 +246,8 @@ class RealOnboardingUseCase @Inject constructor(
      */
     private fun subscribeTransferable(accountId: AccountId): Flow<Balance> {
         return flow {
+            coinageLogD("Subscribing to transferable balance of ${chainAssetProvider.chain().addressOf(accountId)}")
+
             val balanceType = tokenBalanceTypeRegistry.typeFor(chainAssetProvider.asset())
 
             emitAll(balanceType.subscribeAccountBalance(accountId).map { it.transferable })
