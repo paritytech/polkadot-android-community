@@ -21,7 +21,7 @@ class SendValidation @Inject constructor(
     context(validationProcess: ValidationProcess)
     override suspend fun validate(payload: SendValidationPayload): ValidationResult<SendValidationPayload> {
         val balance = totalBalanceUseCase.getBalance()
-            .getOrElse { return ValidationResult.Error(Throwable("Can't fetch balance")) }
+            .getOrElse { return ValidationResult.Error(SendValidationFailure.BalanceUnavailable()) }
 
         val asset = chainAssetProvider.asset()
         val transferAmountPlanks = payload.value.planksFromAmount(asset.precision)
@@ -34,7 +34,7 @@ class SendValidation @Inject constructor(
         // Either the strategy will not part with what it is holding, or even that would not cover the
         // amount. Both are the same answer to the user: this cannot be sent.
         if (!gainingPrivacy.canSpendWithConfirmation || transferAmountPlanks > reachable) {
-            return ValidationResult.Error(Throwable("Amount exceeds available balance"))
+            return ValidationResult.Error(SendValidationFailure.AmountNoLongerAvailable())
         }
 
         val action = ConfirmGainingPrivacySpendUserAction(
@@ -55,6 +55,18 @@ class SendValidation @Inject constructor(
 data class ConfirmGainingPrivacySpendUserAction(
     val totalTransfer: TokenAmountModel,
 ) : ValidationUserInputAction<ConfirmGainingPrivacySpendDecision>
+
+/**
+ * Why a send was refused before it was ever submitted.
+ *
+ * Typed rather than a message, so the screen picks the wording. Both cases mean the balance moved after the
+ * input accepted the amount — the recycler takes coins out of reach on its own schedule — so neither is the
+ * user asking for more than they have; the input already refuses that.
+ */
+sealed class SendValidationFailure : Exception() {
+    class BalanceUnavailable : SendValidationFailure()
+    class AmountNoLongerAvailable : SendValidationFailure()
+}
 
 /**
  * There is no "send only what is spendable" any more: the user asked for an amount, and silently sending a

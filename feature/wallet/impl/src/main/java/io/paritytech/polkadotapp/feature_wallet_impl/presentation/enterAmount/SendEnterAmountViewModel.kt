@@ -1,11 +1,14 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.chains.util.amountFromPlanks
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.validation.onError
 import io.paritytech.polkadotapp.common.domain.validation.onSuccess
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
@@ -39,6 +42,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.Se
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress.Settling.Stage
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendEnterAmountInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendState
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationFailure
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,6 +59,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 @HiltViewModel
 class SendEnterAmountViewModel @Inject constructor(
@@ -63,6 +68,7 @@ class SendEnterAmountViewModel @Inject constructor(
     private val walletRouter: PocketRouter,
     private val interactor: SendEnterAmountInteractor,
     private val tokenAmountMapper: TokenAmountMapper,
+    @param:ApplicationContext private val context: Context,
 ) : BaseViewModel(), SendEnterAmountContract {
     private val sendProgress = MutableStateFlow<SendProgress>(SendProgress.Idle)
     private val frozenBalance = MutableStateFlow<BigDecimal?>(null)
@@ -175,8 +181,9 @@ class SendEnterAmountViewModel @Inject constructor(
 
             val payload = SendValidationPayload(amount.amount, transferMethod)
 
-            sendValidationMixin.runValidation(interactor.sendValidation, payload)
-                .onSuccess { sendValidatedTransfer(it) }
+            val result = sendValidationMixin.runValidation(interactor.sendValidation, payload)
+            result.onSuccess { sendValidatedTransfer(it) }
+            result.onError { showError(context.getString(it.messageRes())) }
 
             sendProgress.value = SendProgress.Idle
         }
@@ -211,6 +218,12 @@ class SendEnterAmountViewModel @Inject constructor(
 
     override fun onBackClick() {
         walletRouter.back()
+    }
+
+    private fun Throwable.messageRes(): Int = when (this) {
+        is SendValidationFailure.BalanceUnavailable -> RCommon.string.send_error_balance_unavailable
+        is SendValidationFailure.AmountNoLongerAvailable -> RCommon.string.send_error_amount_no_longer_available
+        else -> RCommon.string.generic_error_notification
     }
 
     private fun applyPreset(preset: AmountPreset) {
