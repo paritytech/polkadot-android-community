@@ -20,12 +20,16 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDE
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import io.paritytech.polkadotapp.common.R
+import io.paritytech.polkadotapp.common.presentation.notification.AppNotifier
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import javax.inject.Inject
 
 abstract class BaseComposeBottomSheet<T : BaseViewModel> : BottomSheetDialogFragment() {
     abstract val viewModel: T
 
-    private val delegate = BaseFragmentDelegate(::viewModel)
+    // Injected into every @AndroidEntryPoint subclass.
+    @Inject
+    lateinit var appNotifier: AppNotifier
 
     protected val bottomSheetBehavior: BottomSheetBehavior<*>?
         get() = (dialog as? BottomSheetDialog)?.behavior
@@ -56,6 +60,8 @@ abstract class BaseComposeBottomSheet<T : BaseViewModel> : BottomSheetDialogFrag
                 Box(
                     modifier = Modifier.semantics { testTagsAsResourceId = true }
                 ) {
+                    ObserveViewModelEvents(viewModel, appNotifier)
+
                     Screen()
                 }
             }
@@ -66,7 +72,5 @@ abstract class BaseComposeBottomSheet<T : BaseViewModel> : BottomSheetDialogFrag
         super.onViewCreated(view, savedInstanceState)
 
         (view.parent as? View)?.setBackgroundResource(0)
-
-        delegate.subscribeViewModelEvents()
     }
 }

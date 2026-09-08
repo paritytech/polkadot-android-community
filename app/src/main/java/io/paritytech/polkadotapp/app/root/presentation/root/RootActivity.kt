@@ -31,8 +31,9 @@ import io.paritytech.polkadotapp.common.presentation.formatters.time.LocalTimeFo
 import io.paritytech.polkadotapp.common.presentation.formatters.time.TimeFormatter
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotificationHost
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotifier
+import io.paritytech.polkadotapp.common.presentation.notification.error
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
-import io.paritytech.polkadotapp.common.presentation.screens.BaseScreenDelegate
+import io.paritytech.polkadotapp.common.presentation.screens.ObserveViewModelEvents
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
@@ -55,11 +56,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
     lateinit var appNotifier: AppNotifier
 
     private val viewModel by viewModels<RootViewModel>()
-
-    private val delegate = BaseScreenDelegate(
-        context = { this },
-        viewModel = ::viewModel
-    )
 
     private val navHostFragment: NavHostFragment by lazy(LazyThreadSafetyMode.NONE) {
         supportFragmentManager.findFragmentById(R.id.rootNavHost) as NavHostFragment
@@ -91,8 +87,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
 
         setupChatExtensionOverlay()
         setupChainHealthBar()
-
-        delegate.subscribeViewModelEvents()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -113,7 +107,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             when (deeplinkProcessingOutcome) {
                 DeeplinkProcessingOutcome.NoOp -> {}
 
-                is DeeplinkProcessingOutcome.ShowMessage -> delegate.showMessage(
+                is DeeplinkProcessingOutcome.ShowMessage -> appNotifier.error(
                     deeplinkProcessingOutcome.message
                 )
 
@@ -142,6 +136,8 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 PolkadotTheme {
+                    ObserveViewModelEvents(viewModel, appNotifier)
+
                     AppNotificationHost(notifier = appNotifier)
                 }
             }

@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.compose
 
 import android.widget.Toast
-import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +43,7 @@ import io.paritytech.polkadotapp.feature_usernames_impl.domain.error.UsernameFlo
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.ClaimUsernameContract
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.ClaimUsernameFieldState
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.ClaimUsernameProgress
+import io.paritytech.polkadotapp.feature_usernames_impl.presentation.claim.toPresentationError
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private data class ClaimUsernameTexts(
@@ -411,16 +411,5 @@ private fun UsernameFlowError.toStatus(): UsernameFieldStatus = when (this) {
     // The ViewModel never stores this; rendering nothing is the right fallback if it ever does.
     UsernameFlowError.Cancelled -> UsernameFieldStatus(UsernameFieldStyle.Neutral, null)
 
-    else -> UsernameFieldStatus(UsernameFieldStyle.Error, stringResource(userMessage()))
-}
-
-@StringRes
-private fun UsernameFlowError.userMessage(): Int = when (this) {
-    UsernameFlowError.NoConnection -> RCommon.string.username_error_no_connection
-    UsernameFlowError.VerificationUnavailable -> RCommon.string.username_error_verification_unavailable
-    UsernameFlowError.VerificationRejected -> RCommon.string.username_error_verification_rejected
-    UsernameFlowError.VerificationBusy -> RCommon.string.username_error_verification_busy
-    UsernameFlowError.Server -> RCommon.string.username_error_server
-    UsernameFlowError.Cancelled,
-    UsernameFlowError.Unknown -> RCommon.string.username_error_unknown
+    else -> UsernameFieldStatus(UsernameFieldStyle.Error, toPresentationError().message())
 }
