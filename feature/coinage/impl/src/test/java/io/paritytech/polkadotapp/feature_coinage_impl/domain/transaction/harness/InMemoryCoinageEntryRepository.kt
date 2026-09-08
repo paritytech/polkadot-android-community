@@ -129,15 +129,6 @@ class InMemoryCoinageEntryRepository : CoinageEntryRepository {
     override fun subscribeGroupStatuses(groupId: CoinageOperationGroupId): Flow<List<CoinageTransactionState>> =
         revisions.map { groupStates(groupId) }
 
-    override suspend fun getGroupsMatching(
-        prefix: String,
-    ): Result<Map<CoinageOperationGroupId, List<CoinageTransactionState>>> = read {
-        entries.mapNotNull { it.groupId }
-            .filter { it.value.startsWith(prefix) }
-            .distinct()
-            .associateWith { groupStates(it) }
-    }
-
     override fun subscribeAssetStates(): Flow<Map<OwnAsset, CoinageAssetState>> = revisions.map { assetStates() }
 
     override suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState> =

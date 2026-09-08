@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
@@ -151,19 +152,52 @@ class RealExecuteTopUpUseCaseTest {
         assertEquals(listOf(TopUpStatus.Claiming), statusesOf(coinsOperation()))
     }
 
+    /**
+     * An amount below the smallest denomination cannot be claimed whole, so the host claims
+     * `amount - amount % 2^min_exponent` and the shortfall is the rounding.
+     *
+     * The product asked for more than it got, which is exactly what ClaimedPartially says — reporting a
+     * rounded-down claim as Claimed would tell a product it had been credited the amount it named.
+     */
+    @Test
+    fun `an amount rounded down to the smallest denomination reports as partial`() = runTest {
+        onboardingUseCase.emits(CoinageTransferDetection.Claimed(96.intoBalance(), finalized = true))
+
+        assertEquals(
+            listOf(TopUpStatus.ClaimedPartially(96.intoBalance())),
+            statusesOf(onboardOperation()),
+        )
+    }
+
     // ---- how the operation is identified and bounded ----
 
     /** The product's own id names the coinage group, so a resumed top-up rejoins rather than pays twice. */
     @Test
-    fun `the coinage group is named after the product and its id`() = runTest {
+    fun `the coinage group is named after the product and its top-up id`() = runTest {
         claimReceivedCoinsUseCase.emits(CoinageTransferDetection.NotClaimed)
 
         statusesOf(coinsOperation())
 
         assertEquals(
-            CoinageOperationGroupId("top-up:${PRODUCT.value}:${ID.value}"),
+            CoinageOperationGroupId("top up:${PRODUCT.value}:${ID.asHex()}"),
             claimReceivedCoinsUseCase.groupId,
         )
+    }
+
+    /**
+     * A top-up id is a product's own opaque bytes, so two products may each register the same one. Their
+     * transactions must not share a group: each product's claims would then count towards the other's total.
+     */
+    @Test
+    fun `the same top-up id under a different product names a different group`() = runTest {
+        claimReceivedCoinsUseCase.emits(CoinageTransferDetection.NotClaimed)
+
+        statusesOf(coinsOperation())
+        val mine = claimReceivedCoinsUseCase.groupId
+
+        statusesOf(coinsOperation(productId = OTHER_PRODUCT))
+
+        assertNotEquals(mine, claimReceivedCoinsUseCase.groupId)
     }
 
     /**
@@ -189,10 +223,21 @@ class RealExecuteTopUpUseCaseTest {
         startedAt = startedAt,
     )
 
-    private fun coinsOperation() = operation(source = PaymentTopUpSource.Coins(emptyList()))
+    private fun coinsOperation(productId: ProductId = PRODUCT) =
+        operation(source = PaymentTopUpSource.Coins(emptyList()), productId = productId)
 
-    private fun operation(source: PaymentTopUpSource, startedAt: Instant = OPENED) = OperationWithSource(
-        operation = TopUpOperation(id = ID, productId = PRODUCT, amount = REQUESTED, startedAt = startedAt),
+    private fun operation(
+        source: PaymentTopUpSource,
+        startedAt: Instant = OPENED,
+        productId: ProductId = PRODUCT,
+    ) = OperationWithSource(
+        operation = TopUpOperation(
+            id = ID,
+            productId = productId,
+            amount = REQUESTED,
+            startedAt = startedAt,
+            outcome = null,
+        ),
         source = source,
     )
 
@@ -206,8 +251,9 @@ class RealExecuteTopUpUseCaseTest {
     private companion object {
         val DOT_TLD: DotNsTld = requireNotNull(DotNsTld.parse("dot"))
 
-        val ID = PaymentTopUpId("topup-1")
+        val ID = topUpId("topup-1")
         val PRODUCT: ProductId = ProductId.fromString("alice.dot", DOT_TLD).getOrThrow()
+        val OTHER_PRODUCT: ProductId = ProductId.fromString("bob.dot", DOT_TLD).getOrThrow()
         val REQUESTED: Balance = 100.intoBalance()
         val OPENED: Instant = Instant.fromEpochSeconds(1_000_000)
     }

@@ -47,13 +47,13 @@ interface ExecuteTopUpUseCase {
     fun execute(operation: TopUpOperation, source: TopUpSource): Flow<TopUpStatus>
 
     /**
-     * How a top-up ended, read off the ledger alone.
+     * Where a top-up has got to, read off the ledger alone.
      *
-     * For a top-up whose source has been dropped, which is every one that reached a verdict. What the group
-     * minted is what the user got, and the amount the product asked for is in the group's own id — so the
-     * answer needs nothing that was thrown away.
+     * For a top-up that cannot be run — its source is gone — where what its transactions came to is still
+     * the honest answer. What the group minted is what the user got, and what was asked for is recorded, so
+     * this needs nothing that was thrown away.
      */
-    suspend fun verdictOf(operation: TopUpOperation): TopUpStatus
+    suspend fun statusOf(operation: TopUpOperation): TopUpStatus
 }
 
 @OptIn(ExperimentalTime::class)
@@ -66,7 +66,7 @@ class RealExecuteTopUpUseCase @Inject constructor(
 ) : ExecuteTopUpUseCase {
     override fun execute(operation: TopUpOperation, source: TopUpSource): Flow<TopUpStatus> {
         val amount = operation.amount
-        val groupId = groupOf(operation)
+        val groupId = operation.groupId
         val retryUntil = operation.startedAt + TOP_UP_RETRY_WINDOW
 
         Timber.tag(COINAGE_LOG_TAG)
@@ -86,8 +86,8 @@ class RealExecuteTopUpUseCase @Inject constructor(
             .onEach { Timber.tag(COINAGE_LOG_TAG).i("Top-up status group=${groupId.value} status=$it") }
     }
 
-    override suspend fun verdictOf(operation: TopUpOperation): TopUpStatus {
-        val groupId = groupOf(operation)
+    override suspend fun statusOf(operation: TopUpOperation): TopUpStatus {
+        val groupId = operation.groupId
 
         val entries = transactionService.getOperationGroupStatuses(groupId)
             .logFailure("Failed to read the top-up group ${groupId.value}")
@@ -146,13 +146,3 @@ private fun CoinageTransferDetection.toStatus(expected: Balance): TopUpStatus = 
 
     is CoinageTransferDetection.NotClaimed -> TopUpStatus.NotClaimed
 }
-
-/**
- * The product's own id names the coinage group, so a top-up picked back up rejoins the transactions its
- * first run registered instead of submitting them again.
- *
- * Qualified by the product, because the id is a string the product chose: two products both calling theirs
- * "topup-1" must not end up sharing one group of transactions.
- */
-private fun groupOf(operation: TopUpOperation) =
-    CoinageOperationGroupId("top-up:${operation.productId.value}:${operation.id.value}")

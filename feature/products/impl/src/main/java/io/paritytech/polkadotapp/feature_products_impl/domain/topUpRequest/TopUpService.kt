@@ -4,10 +4,8 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.getOrEmpty
-import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.TopUpRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.TopUpSourceStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -71,8 +69,8 @@ interface TopUpService {
 @Singleton // Important - stateful service!
 @OptIn(ExperimentalTime::class)
 class RealTopUpService @Inject constructor(
+    private val repository: TopUpRepository,
     private val sourceStorage: TopUpSourceStorage,
-    private val transactionService: CoinageTransactionService,
     private val executeTopUpUseCase: ExecuteTopUpUseCase,
     private val sourceResolver: TopUpSourceResolver,
     private val acknowledgements: TopUpAcknowledgementPresenter,
@@ -94,116 +92,101 @@ class RealTopUpService @Inject constructor(
         amount: Balance,
         source: PaymentTopUpSource,
     ): Result<Unit> = runningGuard.withLock {
-        if (findOperation(productId, id) != null) {
-            Timber.tag(COINAGE_LOG_TAG).w("Top-up id already taken product=${productId.value} id=${id.value}")
+        if (repository.get(productId, id) != null) {
+            Timber.tag(COINAGE_LOG_TAG).w("Top-up id already taken product=${productId.value} id=${id.asHex()}")
 
             return Result.failure(TopUpError.AlreadyExists(id))
         }
 
         claimantOf(productId, source)?.let { busyWith ->
-            Timber.tag(COINAGE_LOG_TAG).w("Top-up source busy product=${productId.value} busyWith=${busyWith.value}")
+            Timber.tag(COINAGE_LOG_TAG).w("Top-up source busy product=${productId.value} busyWith=${busyWith.asHex()}")
 
             return Result.failure(TopUpError.SourceBusy(busyWith))
         }
 
-        val operation = TopUpOperation(id, productId, amount, timeProvider.now())
+        val operation = TopUpOperation(
+            id = id,
+            productId = productId,
+            amount = amount,
+            startedAt = timeProvider.now(),
+            outcome = null,
+        )
 
         return sourceResolver.resolve(productId, source)
             .recoverCatching { throw TopUpError.InvalidSource(it) }
-            // Held before a single transaction is built. Until one is registered the ledger has never heard
-            // of this top-up, so nothing else could tell a product it exists.
-            .flatMap { resolved -> sourceStorage.put(operation.groupId(), source).map { resolved } }
+            // Both recorded before a single transaction is built. A product told its top-up was accepted must
+            // be able to ask after it again whatever becomes of this process, and to have it picked back up.
+            .flatMap { resolved -> sourceStorage.put(operation.groupId, source).map { resolved } }
+            .flatMap { resolved -> repository.insert(operation).map { resolved } }
             .onSuccess { resolved -> run(operation, resolved) }
             .map { }
     }
 
     override fun status(productId: ProductId, id: PaymentTopUpId): Flow<TopUpStatus> = flow {
         val statuses = runningGuard.withLock {
-            val operation = findOperation(productId, id) ?: throw TopUpError.NotFound(id)
+            val operation = repository.get(productId, id) ?: throw TopUpError.NotFound(id)
 
-            running[operation.groupId().value] ?: attach(operation)
+            running[operation.groupId.value] ?: attach(operation)
         }
 
         emitAll(statuses)
     }
 
     override suspend fun resumeUnfinished() {
-        val held = sourceStorage.held()
+        val unfinished = repository.unfinished()
 
-        Timber.tag(COINAGE_LOG_TAG).i("Top-ups to resume on launch: ${held.size}")
+        Timber.tag(COINAGE_LOG_TAG).i("Top-ups to resume on launch: ${unfinished.size}")
 
-        // A held source is exactly an unfinished top-up: it is dropped the moment a verdict is reached.
-        held.forEach { (groupId, source) ->
-            val operation = groupId.asTopUpOperation() ?: return@forEach
-
+        unfinished.forEach { operation ->
             runningGuard.withLock {
-                if (!running.containsKey(groupId.value)) resolveAndRun(operation, source)
+                if (!running.containsKey(operation.groupId.value)) attach(operation)
             }
         }
     }
 
     /**
-     * The operation itself, read back out of the group id it was written into.
-     *
-     * Two places know a top-up exists: the ledger, once a transaction is registered, and the held source,
-     * from the moment it is asked for. Between them they cover a top-up's whole life.
-     */
-    private suspend fun findOperation(productId: ProductId, id: PaymentTopUpId): TopUpOperation? {
-        val prefix = topUpGroupPrefixOf(productId, id)
-
-        val heldGroup = sourceStorage.held().firstOrNull { it.groupId.value.startsWith(prefix) }?.groupId
-        val groupId = heldGroup
-            ?: transactionService.getOperationGroupsMatching(prefix)
-                .logFailure("Failed to look up the top-up group for ${id.value}")
-                .getOrEmpty()
-                .keys
-                .firstOrNull()
-
-        return groupId?.asTopUpOperation()
-    }
-
-    /**
      * The unfinished top-up already drawing on [source], if there is one.
      *
-     * A held source is exactly an unfinished top-up, so the sources still held are the whole field of play —
-     * one that has reached a verdict has let go of its money and cannot race anybody for it.
+     * Only the unfinished ones are asked about — a top-up that has reached a verdict has let go of its money
+     * and cannot race anybody for it — so this reads the few sources still held rather than every one ever
+     * stored.
      */
     private suspend fun claimantOf(productId: ProductId, source: PaymentTopUpSource): PaymentTopUpId? {
-        return sourceStorage.held()
-            .firstOrNull { held ->
-                val holder = held.groupId.asTopUpOperation() ?: return@firstOrNull false
+        return repository.unfinished()
+            .firstOrNull { operation ->
+                val held = sourceStorage.get(operation.groupId) ?: return@firstOrNull false
 
-                source.drawsOnSameFundsAs(held.source, sameProduct = holder.productId == productId)
+                source.drawsOnSameFundsAs(held, sameProduct = operation.productId == productId)
             }
-            ?.groupId
-            ?.asTopUpOperation()
             ?.id
     }
 
-    /** Runs an unfinished top-up, or reports the verdict of one whose source has already been dropped. */
+    /**
+     * Runs an unfinished top-up, or reports the verdict of one that is over.
+     *
+     * A verdict is read back exactly as it was written rather than re-derived: entries a fork can still move
+     * would let a status change after it was called terminal, which the contract forbids.
+     */
     private suspend fun attach(operation: TopUpOperation): StateFlow<TopUpStatus> {
-        val groupId = operation.groupId()
-        val held = sourceStorage.held().firstOrNull { it.groupId == groupId }
-            ?: return MutableStateFlow(executeTopUpUseCase.verdictOf(operation))
+        operation.outcome?.let { return MutableStateFlow(it) }
 
-        return resolveAndRun(operation, held.source).getOrElse { throw it }
-    }
+        // Unfinished but unrunnable: the source is the one thing another attempt cannot do without. What its
+        // transactions came to is still on the ledger, and is the whole of what can be said about it.
+        val source = sourceStorage.get(operation.groupId)
+            ?: return MutableStateFlow(executeTopUpUseCase.statusOf(operation))
 
-    private suspend fun resolveAndRun(
-        operation: TopUpOperation,
-        source: PaymentTopUpSource,
-    ): Result<StateFlow<TopUpStatus>> {
         Timber.tag(COINAGE_LOG_TAG)
-            .i("Top-up resuming product=${operation.productId.value} id=${operation.id.value}")
+            .i("Top-up resuming product=${operation.productId.value} id=${operation.id.asHex()}")
 
         return sourceResolver.resolve(operation.productId, source)
             .recoverCatching { throw TopUpError.InvalidSource(it) }
             .map { resolved -> run(operation, resolved) }
+            .getOrElse { throw it }
     }
 
     private fun run(operation: TopUpOperation, source: TopUpSource): StateFlow<TopUpStatus> {
         val statuses = MutableStateFlow<TopUpStatus>(TopUpStatus.Detecting)
-        running[operation.groupId().value] = statuses
+        running[operation.groupId.value] = statuses
 
         // On the service's own scope, not the caller's: the product is not waiting on this, and a top-up
         // must keep going while nothing is listening to it.
@@ -218,19 +201,21 @@ class RealTopUpService @Inject constructor(
     }
 
     /**
-     * Drops the source, which is what bounds how long a product's secret keys are kept: they can only ever
-     * build another attempt, and there will not be another one. The ledger is the record from here on.
+     * Writes the verdict and drops the source, which does two things at once: it bounds how long a product's
+     * secret keys are kept — they can only ever build another attempt, and there will not be another one —
+     * and it fixes the status, so a top-up that ended is answerable for good and answers the same every time.
      */
     private suspend fun settle(operation: TopUpOperation, outcome: TopUpStatus) {
         if (!outcome.isTerminal) {
             // The run ended without a verdict — a chain that stalled past the window, say. The source stays,
             // so the next launch picks it up, by which time finality has almost certainly arrived.
-            Timber.tag(COINAGE_LOG_TAG).w("Top-up ended without a verdict id=${operation.id.value} last=$outcome")
+            Timber.tag(COINAGE_LOG_TAG).w("Top-up ended without a verdict id=${operation.id.asHex()} last=$outcome")
 
             return
         }
 
-        sourceStorage.remove(operation.groupId())
+        repository.settle(operation, outcome)
+        sourceStorage.remove(operation.groupId)
 
         acknowledgements.acknowledge(operation, outcome)
     }

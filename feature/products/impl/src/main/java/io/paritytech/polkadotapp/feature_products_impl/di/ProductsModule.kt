@@ -33,7 +33,9 @@ import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealProdu
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealProductIntegrationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealProductRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealRingVrfKeyRegistrationRepository
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealTopUpRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RingVrfKeyRegistrationRepository
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.TopUpRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.scheduledNotification.RealScheduledProductNotificationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.scheduledNotification.ScheduledProductNotificationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.AssetContainerScriptProvider
@@ -164,6 +166,9 @@ internal interface ProductsModule {
 
     @Binds
     fun bindTopUpSourceStorage(impl: RealTopUpSourceStorage): TopUpSourceStorage
+
+    @Binds
+    fun bindTopUpRepository(impl: RealTopUpRepository): TopUpRepository
 
     @Binds
     @Singleton

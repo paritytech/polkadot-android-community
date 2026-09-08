@@ -7,12 +7,10 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
-import io.paritytech.polkadotapp.feature_products_impl.data.storage.HeldTopUpSource
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.TopUpRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.TopUpSourceStorage
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
 import io.paritytech.polkadotapp.test_shared.any
@@ -25,8 +23,8 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
 import kotlin.time.ExperimentalTime
@@ -41,18 +39,13 @@ import kotlin.time.Instant
  */
 @OptIn(ExperimentalTime::class)
 class RealTopUpServiceTest {
+    private val repository = InMemoryTopUpRepository()
     private val sourceStorage = InMemoryTopUpSourceStorage()
-    private val transactionService: CoinageTransactionService = mock()
     private val executeTopUpUseCase = FakeExecuteTopUpUseCase()
     private val sourceResolver: TopUpSourceResolver = mock()
     private val acknowledgements: TopUpAcknowledgementPresenter = mock()
     private val timeProvider = object : TimeProvider {
         override fun now(): Instant = NOW
-    }
-
-    @Before
-    fun withNothingInTheLedger() = runTest {
-        whenever(transactionService.getOperationGroupsMatching(any())).thenReturn(Result.success(emptyMap()))
     }
 
     // ---- registering ----
@@ -63,7 +56,7 @@ class RealTopUpServiceTest {
 
         assertTrue(service().start(PRODUCT, ID, REQUESTED, SOURCE).isSuccess)
 
-        assertEquals(listOf(operation().groupId()), sourceStorage.held().map { it.groupId })
+        assertEquals(SOURCE, heldSource())
     }
 
     /**
@@ -90,7 +83,7 @@ class RealTopUpServiceTest {
     @Test
     fun `an id the ledger already holds a group for is refused`() = runTest {
         withResolvableSource()
-        givenLedgerHolds(operation())
+        givenSettled(TopUpStatus.NotClaimed)
 
         val result = service().start(PRODUCT, ID, REQUESTED, SOURCE)
 
@@ -118,7 +111,7 @@ class RealTopUpServiceTest {
         val result = service().start(PRODUCT, ID, REQUESTED, SOURCE)
 
         assertTrue(result.exceptionOrNull() is TopUpError.InvalidSource)
-        assertTrue(sourceStorage.held().isEmpty())
+        assertNull(heldSource())
         assertEquals(0, executeTopUpUseCase.runs)
     }
 
@@ -133,7 +126,7 @@ class RealTopUpServiceTest {
         service.start(PRODUCT, ID, REQUESTED, coins(COIN_A))
         advanceUntilIdle()
 
-        val result = service.start(PRODUCT, PaymentTopUpId("topup-2"), REQUESTED, coins(COIN_A))
+        val result = service.start(PRODUCT, topUpId("topup-2"), REQUESTED, coins(COIN_A))
 
         assertTrue("expected SourceBusy but was ${result.exceptionOrNull()}", result.exceptionOrNull() is TopUpError.SourceBusy)
     }
@@ -146,7 +139,7 @@ class RealTopUpServiceTest {
         service.start(PRODUCT, ID, REQUESTED, coins(COIN_A, COIN_B))
         advanceUntilIdle()
 
-        val result = service.start(PRODUCT, PaymentTopUpId("topup-2"), REQUESTED, coins(COIN_B))
+        val result = service.start(PRODUCT, topUpId("topup-2"), REQUESTED, coins(COIN_B))
 
         assertTrue(result.exceptionOrNull() is TopUpError.SourceBusy)
     }
@@ -158,7 +151,7 @@ class RealTopUpServiceTest {
         service.start(PRODUCT, ID, REQUESTED, coins(COIN_A))
         advanceUntilIdle()
 
-        val result = service.start(PRODUCT, PaymentTopUpId("topup-2"), REQUESTED, coins(COIN_B))
+        val result = service.start(PRODUCT, topUpId("topup-2"), REQUESTED, coins(COIN_B))
 
         assertTrue("expected success but was ${result.exceptionOrNull()}", result.isSuccess)
     }
@@ -173,7 +166,7 @@ class RealTopUpServiceTest {
         service.start(PRODUCT, ID, REQUESTED, coins(COIN_A))
         advanceUntilIdle()
 
-        val result = service.start(PRODUCT, PaymentTopUpId("topup-2"), REQUESTED, coins(COIN_A))
+        val result = service.start(PRODUCT, topUpId("topup-2"), REQUESTED, coins(COIN_A))
 
         assertTrue("expected success but was ${result.exceptionOrNull()}", result.isSuccess)
     }
@@ -186,7 +179,7 @@ class RealTopUpServiceTest {
         service.start(PRODUCT, ID, REQUESTED, PRODUCT_ACCOUNT)
         advanceUntilIdle()
 
-        val result = service.start(OTHER_PRODUCT, PaymentTopUpId("topup-2"), REQUESTED, PRODUCT_ACCOUNT)
+        val result = service.start(OTHER_PRODUCT, topUpId("topup-2"), REQUESTED, PRODUCT_ACCOUNT)
 
         assertTrue("expected success but was ${result.exceptionOrNull()}", result.isSuccess)
     }
@@ -198,7 +191,7 @@ class RealTopUpServiceTest {
         service.start(PRODUCT, ID, REQUESTED, PRODUCT_ACCOUNT)
         advanceUntilIdle()
 
-        val result = service.start(PRODUCT, PaymentTopUpId("topup-2"), REQUESTED, PRODUCT_ACCOUNT)
+        val result = service.start(PRODUCT, topUpId("topup-2"), REQUESTED, PRODUCT_ACCOUNT)
 
         assertTrue(result.exceptionOrNull() is TopUpError.SourceBusy)
     }
@@ -216,7 +209,7 @@ class RealTopUpServiceTest {
     @Test
     fun `following a top-up this process never started picks it back up`() = runTest {
         withResolvableSource()
-        sourceStorage.put(operation().groupId(), SOURCE)
+        givenUnfinished(SOURCE)
         executeTopUpUseCase.emits(TopUpStatus.Claimed(finalized = true))
 
         val status = service().status(PRODUCT, ID).first { it is TopUpStatus.Claimed }
@@ -232,7 +225,7 @@ class RealTopUpServiceTest {
     @Test
     fun `two followers share the run rather than starting a second`() = runTest {
         withResolvableSource()
-        sourceStorage.put(operation().groupId(), SOURCE)
+        givenUnfinished(SOURCE)
         executeTopUpUseCase.emits(TopUpStatus.Claiming)
         val service = service()
 
@@ -256,19 +249,69 @@ class RealTopUpServiceTest {
     }
 
     /**
-     * A top-up that finished in a previous process keeps no source, and needs none. What its group minted is
-     * what the user got, and the amount asked for is in the group's own id — so the verdict is read back off
-     * the ledger rather than by running anything.
+     * An unfinished top-up whose source is gone cannot be attempted again — that is the one thing a retry
+     * needs. What its transactions came to is still on the ledger, and is the honest answer.
      */
     @Test
-    fun `a top-up whose source is gone reports the verdict the ledger holds`() = runTest {
-        givenLedgerHolds(operation())
-        executeTopUpUseCase.settlesAs(TopUpStatus.ClaimedPartially(80.intoBalance()))
+    fun `an unfinished top-up whose source is gone reports what the ledger says`() = runTest {
+        repository.insert(operation())
+        executeTopUpUseCase.reportsFromLedger(TopUpStatus.ClaimedPartially(80.intoBalance()))
 
         val status = service().status(PRODUCT, ID).first()
 
         assertEquals(TopUpStatus.ClaimedPartially(80.intoBalance()), status)
         assertEquals(0, executeTopUpUseCase.runs)
+    }
+
+    /**
+     * The ordinary failure: the money never arrived, so nothing was ever registered and the ledger has no
+     * group to remember it by. The verdict still has to outlive the process, or a product that asks after
+     * its own top-up is told the id does not exist.
+     */
+    @Test
+    fun `a top-up that registered nothing still reports its verdict after settling`() = runTest {
+        withResolvableSource()
+        executeTopUpUseCase.emits(TopUpStatus.NotClaimed)
+        val service = service()
+
+        service.start(PRODUCT, ID, REQUESTED, SOURCE)
+        advanceUntilIdle()
+
+        assertEquals(TopUpStatus.NotClaimed, service.status(PRODUCT, ID).first())
+    }
+
+    /** And it keeps the id spent: an id is used once, whatever the top-up under it came to. */
+    @Test
+    fun `an id whose top-up registered nothing is never handed out again`() = runTest {
+        withResolvableSource()
+        executeTopUpUseCase.emits(TopUpStatus.NotClaimed)
+        val service = service()
+
+        service.start(PRODUCT, ID, REQUESTED, SOURCE)
+        advanceUntilIdle()
+
+        val result = service.start(PRODUCT, ID, REQUESTED, SOURCE)
+
+        assertTrue("expected AlreadyExists but was ${result.exceptionOrNull()}", result.exceptionOrNull() is TopUpError.AlreadyExists)
+    }
+
+    /**
+     * A verdict is what was decided, not what the entries happen to say now. Inclusion is not finality, so
+     * re-deriving one would let a status a product has already been given change under it.
+     */
+    @Test
+    fun `a verdict is reported as it was decided, not re-derived`() = runTest {
+        withResolvableSource()
+        executeTopUpUseCase.emits(TopUpStatus.ClaimedPartially(80.intoBalance()))
+        val service = service()
+
+        service.start(PRODUCT, ID, REQUESTED, SOURCE)
+        advanceUntilIdle()
+
+        // The ledger now says something else entirely; the verdict must not follow it.
+        executeTopUpUseCase.reportsFromLedger(TopUpStatus.NotClaimed)
+
+        assertEquals(TopUpStatus.ClaimedPartially(80.intoBalance()), service.status(PRODUCT, ID).first())
     }
 
     // ---- what is kept, and for how long ----
@@ -285,7 +328,7 @@ class RealTopUpServiceTest {
         service().start(PRODUCT, ID, REQUESTED, SOURCE)
         advanceUntilIdle()
 
-        assertTrue("the source outlived the top-up that needed it", sourceStorage.held().isEmpty())
+        assertNull("the source outlived the top-up that needed it", heldSource())
     }
 
     /**
@@ -300,7 +343,7 @@ class RealTopUpServiceTest {
         service().start(PRODUCT, ID, REQUESTED, SOURCE)
         advanceUntilIdle()
 
-        assertEquals(listOf(operation().groupId()), sourceStorage.held().map { it.groupId })
+        assertEquals(SOURCE, heldSource())
     }
 
     // ---- resuming at launch ----
@@ -312,7 +355,7 @@ class RealTopUpServiceTest {
     @Test
     fun `every unfinished top-up is picked up at launch`() = runTest {
         withResolvableSource()
-        sourceStorage.put(operation().groupId(), SOURCE)
+        givenUnfinished(SOURCE)
         executeTopUpUseCase.emits(TopUpStatus.Claiming)
 
         service().resumeUnfinished()
@@ -325,7 +368,7 @@ class RealTopUpServiceTest {
     @Test
     fun `a top-up that already reached a verdict is not picked up again`() = runTest {
         withResolvableSource()
-        givenLedgerHolds(operation())
+        givenSettled(TopUpStatus.NotClaimed)
 
         service().resumeUnfinished()
         advanceUntilIdle()
@@ -337,7 +380,7 @@ class RealTopUpServiceTest {
     @Test
     fun `a launch resume does not start a second run of a top-up already going`() = runTest {
         withResolvableSource()
-        sourceStorage.put(operation().groupId(), SOURCE)
+        givenUnfinished(SOURCE)
         executeTopUpUseCase.emits(TopUpStatus.Claiming)
         val service = service()
 
@@ -351,8 +394,8 @@ class RealTopUpServiceTest {
     // ---- harness ----
 
     private fun TestScope.service(): TopUpService = RealTopUpService(
+        repository = repository,
         sourceStorage = sourceStorage,
-        transactionService = transactionService,
         executeTopUpUseCase = executeTopUpUseCase,
         sourceResolver = sourceResolver,
         acknowledgements = acknowledgements,
@@ -371,20 +414,32 @@ class RealTopUpServiceTest {
             .thenReturn(Result.failure(IllegalStateException("no such account")))
     }
 
-    /** A group the ledger already holds, which is how a top-up outlives the source that started it. */
-    private suspend fun givenLedgerHolds(operation: TopUpOperation) {
-        whenever(transactionService.getOperationGroupsMatching(any()))
-            .thenReturn(Result.success(mapOf(operation.groupId() to emptyList<CoinageTransactionState>())))
+    /** A top-up a previous run registered and left unfinished, with its source still held. */
+    private suspend fun givenUnfinished(source: PaymentTopUpSource) {
+        val operation = operation()
+        repository.insert(operation)
+        sourceStorage.put(operation.groupId, source)
     }
 
-    private fun operation() = TopUpOperation(ID, PRODUCT, REQUESTED, NOW)
+    /** The source still held for the top-up under test, if any. */
+    private suspend fun heldSource(): PaymentTopUpSource? =
+        repository.get(PRODUCT, ID)?.let { sourceStorage.get(it.groupId) }
+
+    /** A top-up a previous run finished: its verdict is recorded and its source is long gone. */
+    private suspend fun givenSettled(outcome: TopUpStatus) {
+        val operation = operation()
+        repository.insert(operation)
+        repository.settle(operation, outcome)
+    }
+
+    private fun operation() = TopUpOperation(ID, PRODUCT, REQUESTED, NOW, outcome = null)
 
     private fun coins(vararg keys: DataByteArray) = PaymentTopUpSource.Coins(keys.toList())
 
     private companion object {
         val DOT_TLD: DotNsTld = requireNotNull(DotNsTld.parse("dot"))
 
-        val ID = PaymentTopUpId("topup-1")
+        val ID = topUpId("topup-1")
         val PRODUCT: ProductId = ProductId.fromString("alice.dot", DOT_TLD).getOrThrow()
         val OTHER_PRODUCT: ProductId = ProductId.fromString("bob.dot", DOT_TLD).getOrThrow()
         val REQUESTED: Balance = 100.intoBalance()
@@ -409,7 +464,7 @@ private class FakeExecuteTopUpUseCase : ExecuteTopUpUseCase {
         this.statuses = statuses.toList()
     }
 
-    fun settlesAs(verdict: TopUpStatus) {
+    fun reportsFromLedger(verdict: TopUpStatus) {
         this.verdict = verdict
     }
 
@@ -419,16 +474,44 @@ private class FakeExecuteTopUpUseCase : ExecuteTopUpUseCase {
         return flow { statuses.forEach { emit(it) } }
     }
 
-    override suspend fun verdictOf(operation: TopUpOperation): TopUpStatus = verdict
+    override suspend fun statusOf(operation: TopUpOperation): TopUpStatus = verdict
+}
+
+@OptIn(ExperimentalTime::class)
+private class InMemoryTopUpRepository : TopUpRepository {
+    private val operations = mutableMapOf<String, TopUpOperation>()
+
+    override suspend fun insert(operation: TopUpOperation): Result<Unit> {
+        val key = key(operation.productId, operation.id)
+        if (operations.containsKey(key)) return Result.failure(IllegalStateException("id taken"))
+
+        operations[key] = operation
+
+        return Result.success(Unit)
+    }
+
+    override suspend fun get(productId: ProductId, id: PaymentTopUpId): TopUpOperation? = operations[key(productId, id)]
+
+    override suspend fun unfinished(): List<TopUpOperation> = operations.values.filter { it.outcome == null }
+
+    override suspend fun settle(operation: TopUpOperation, outcome: TopUpStatus): Result<Unit> {
+        operations[key(operation.productId, operation.id)] = operation.copy(outcome = outcome)
+
+        return Result.success(Unit)
+    }
+
+    suspend fun unfinishedIds() = unfinished().map { it.groupId }
+
+    private fun key(productId: ProductId, id: PaymentTopUpId) = "${productId.value}:${id.asHex()}"
 }
 
 private class InMemoryTopUpSourceStorage : TopUpSourceStorage {
-    private val sources = mutableMapOf<String, HeldTopUpSource>()
+    private val sources = mutableMapOf<String, PaymentTopUpSource>()
 
-    override suspend fun held(): List<HeldTopUpSource> = sources.values.toList()
+    override suspend fun get(groupId: CoinageOperationGroupId): PaymentTopUpSource? = sources[groupId.value]
 
     override suspend fun put(groupId: CoinageOperationGroupId, source: PaymentTopUpSource): Result<Unit> {
-        sources[groupId.value] = HeldTopUpSource(groupId, source)
+        sources[groupId.value] = source
 
         return Result.success(Unit)
     }

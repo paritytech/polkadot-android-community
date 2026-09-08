@@ -51,13 +51,15 @@ class PaymentHostCalls(
             val amount = BigInteger(params.amount).intoBalance()
             val source = params.toDomainSource()
 
-            botApi.topUp(productId, PaymentTopUpId(params.id), amount, source).mapTopUpError()
+            val id = params.topUpId().getOrThrow()
+
+            botApi.topUp(productId, id, amount, source).mapTopUpError()
         }
 
         bridge.registerSubscription<PaymentTopUpStatusParams, PaymentTopUpStatusDto>("paymentTopUpStatusSubscribe") { params ->
             flowOfAll {
                 val productId = callingProductIdProvider.getProductId().getOrThrow()
-                botApi.subscribeTopUpStatus(productId, PaymentTopUpId(params.id))
+                botApi.subscribeTopUpStatus(productId, params.topUpId().getOrThrow())
                     .map { it.toDto() }
                     .catch { throw it.asTopUpHostCall() }
             }
@@ -115,8 +117,8 @@ private data class PaymentRequestParams(
 private data class PaymentReceiptDto(val id: String)
 
 private data class PaymentTopUpParams(
-    /** The product's own id for this top-up; the only thing that names it afterwards. */
-    val id: String,
+    /** The product's own id for this top-up; the only thing that names it afterwards. 32 bytes, as hex. */
+    val id: HexString,
     /** Amount in planks, as a decimal string (to preserve u128 precision across JSON). */
     val amount: String,
     /** "ProductAccount", "PrivateKey" or "Coins" — discriminator for the flattened source fields below. */
@@ -126,6 +128,8 @@ private data class PaymentTopUpParams(
     val sourceKeyHex: HexString? = null,
     val sourceKeyListHex: List<HexString>? = null,
 ) {
+    fun topUpId() = PaymentTopUpId.fromBytes(DataByteArray(id.fromHex()))
+
     fun toDomainSource(): PaymentTopUpSource = when (sourceTag) {
         "ProductAccount" -> PaymentTopUpSource.ProductAccount(
             index = requireNotNull(sourceDerivationIndex) {
@@ -143,7 +147,9 @@ private data class PaymentTopUpParams(
     }
 }
 
-private data class PaymentTopUpStatusParams(val id: String)
+private data class PaymentTopUpStatusParams(val id: HexString) {
+    fun topUpId() = PaymentTopUpId.fromBytes(DataByteArray(id.fromHex()))
+}
 
 private data class PaymentTopUpStatusDto(
     val tag: String,

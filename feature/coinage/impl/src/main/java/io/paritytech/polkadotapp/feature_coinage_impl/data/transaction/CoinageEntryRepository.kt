@@ -88,10 +88,6 @@ interface CoinageEntryRepository {
 
     fun subscribeGroupStatuses(groupId: CoinageOperationGroupId): Flow<List<CoinageTransactionState>>
 
-    suspend fun getGroupsMatching(
-        prefix: String,
-    ): Result<Map<CoinageOperationGroupId, List<CoinageTransactionState>>>
-
     fun subscribeAssetStates(): Flow<Map<OwnAsset, CoinageAssetState>>
 
     suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState>

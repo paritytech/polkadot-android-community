@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_products_impl.data.storage
 
 import io.novasama.substrate_sdk_android.extensions.fromHex
 import io.novasama.substrate_sdk_android.extensions.toHexString
-import io.paritytech.polkadotapp.common.data.storage.preferences.Preferences
 import io.paritytech.polkadotapp.common.data.storage.preferences.encrypted.EncryptedPreferences
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
@@ -18,24 +17,20 @@ import javax.inject.Inject
 
 private const val SOURCE_PREFIX = "TopUpSource."
 
-/** Which sources are still held. Plain rather than encrypted: the encrypted store cannot be enumerated. */
-private const val HELD_INDEX = "TopUpSource.held"
-
-/** A source a top-up can still be attempted from. */
-data class HeldTopUpSource(val groupId: CoinageOperationGroupId, val source: PaymentTopUpSource)
-
 /**
- * The keys a top-up still in flight would need to try again.
+ * Where a top-up still in flight draws its funds from.
  *
- * Deliberately not a record of the top-up — that is the coinage group id, which the ledger already holds.
- * This exists for the two things the ledger structurally cannot do: the entries carry a coin's *public* key
- * and no extrinsic bytes, so a registered transaction can be decided after a relaunch but never rebuilt; and
- * a top-up whose funds have not landed yet has no entries at all, so nothing else knows it exists.
+ * Separate from the top-up itself, which the database holds, because this is the one part of it that is
+ * secret: two of the three sources are bearer keys a product handed over. Encrypted, one entry per
+ * operation, and removed the moment a verdict is reached — the keys can only ever build another attempt, and
+ * there will not be another one.
  *
- * Held only while another attempt could still be made, and dropped the moment one could not.
+ * Never enumerated, which is why there is no index: the unfinished top-ups are a query on the database, and
+ * a source is only ever fetched for one of those.
  */
 interface TopUpSourceStorage {
-    suspend fun held(): List<HeldTopUpSource>
+    /** Only meaningful for a top-up that has not reached a verdict; null once one has. */
+    suspend fun get(groupId: CoinageOperationGroupId): PaymentTopUpSource?
 
     suspend fun put(groupId: CoinageOperationGroupId, source: PaymentTopUpSource): Result<Unit>
 
@@ -44,15 +39,16 @@ interface TopUpSourceStorage {
 
 class RealTopUpSourceStorage @Inject constructor(
     private val encryptedPreferences: EncryptedPreferences,
-    private val preferences: Preferences,
     private val dispatchers: CoroutineDispatchers,
 ) : TopUpSourceStorage {
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun held(): List<HeldTopUpSource> = withContext(dispatchers.io) {
-        preferences.getStringSet(HELD_INDEX).mapNotNull { groupId ->
-            read(CoinageOperationGroupId(groupId))
-        }
+    override suspend fun get(groupId: CoinageOperationGroupId): PaymentTopUpSource? = withContext(dispatchers.io) {
+        val stored = encryptedPreferences.getDecryptedString(prefsKey(groupId)) ?: return@withContext null
+
+        runCatching { json.decodeFromString<StoredSource>(stored).toDomain() }
+            .logFailure("Failed to read the source held for ${groupId.value}")
+            .getOrNull()
     }
 
     override suspend fun put(
@@ -61,29 +57,21 @@ class RealTopUpSourceStorage @Inject constructor(
     ): Result<Unit> = withContext(dispatchers.io) {
         runCatching {
             encryptedPreferences.putEncryptedString(prefsKey(groupId), json.encodeToString(source.toStored()))
-
-            // Indexed after the source, so an index entry always names something readable. The other order
-            // would have a launch trying to attempt a top-up whose keys had never been written.
-            preferences.putStringSet(HELD_INDEX, preferences.getStringSet(HELD_INDEX) + groupId.value)
         }.logFailure("Failed to hold the source for ${groupId.value}")
     }
 
     override suspend fun remove(groupId: CoinageOperationGroupId) = withContext(dispatchers.io) {
-        preferences.putStringSet(HELD_INDEX, preferences.getStringSet(HELD_INDEX) - groupId.value)
         encryptedPreferences.removeKey(prefsKey(groupId))
-    }
-
-    private fun read(groupId: CoinageOperationGroupId): HeldTopUpSource? {
-        val stored = encryptedPreferences.getDecryptedString(prefsKey(groupId)) ?: return null
-
-        return runCatching { HeldTopUpSource(groupId, json.decodeFromString<StoredSource>(stored).toDomain()) }
-            .logFailure("Failed to read the source held for ${groupId.value}")
-            .getOrNull()
     }
 
     private fun prefsKey(groupId: CoinageOperationGroupId) = SOURCE_PREFIX + groupId.value
 }
 
+/**
+ * The source as bytes rather than as anything resolved: a keypair and a derived signer are both built from
+ * these, and rebuilding them on the way out is what lets a resumed top-up sign exactly as the first attempt
+ * would have.
+ */
 @Serializable
 private class StoredSource(
     val tag: SourceTag,

@@ -964,7 +964,7 @@ container.handlePaymentRequest(async (params, { ok, err }) => {
 container.handlePaymentTopUp(async (params, { ok, err }) => {
   try {
     const nativeParams: Record<string, unknown> = {
-      id: params.id,
+      id: toHex(params.id),
       amount: params.amount.toString(),
       sourceTag: params.source.tag,
     };
@@ -994,7 +994,7 @@ container.handlePaymentTopUp(async (params, { ok, err }) => {
 container.handlePaymentTopUpStatusSubscribe((id, send, interrupt) => {
   return subscribeNative(
     'paymentTopUpStatusSubscribe',
-    { id },
+    { id: toHex(id) },
     (payload: { tag: string; finalized?: boolean; actualClaimed?: string }) => {
       switch (payload.tag) {
         case 'Claimed':

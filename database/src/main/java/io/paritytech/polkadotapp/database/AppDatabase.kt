@@ -39,6 +39,7 @@ import io.paritytech.polkadotapp.database.dao.ProductDao
 import io.paritytech.polkadotapp.database.dao.ProductFundingOperationDao
 import io.paritytech.polkadotapp.database.dao.ProductIntegrationDao
 import io.paritytech.polkadotapp.database.dao.ProductPermissionGrantDao
+import io.paritytech.polkadotapp.database.dao.ProductTopUpDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RemovedChatDao
 import io.paritytech.polkadotapp.database.dao.RingVrfKeyRegistrationDao
@@ -115,6 +116,7 @@ import io.paritytech.polkadotapp.database.model.ProductFundingOperationLocal
 import io.paritytech.polkadotapp.database.model.ProductIntegrationLocal
 import io.paritytech.polkadotapp.database.model.ProductLocal
 import io.paritytech.polkadotapp.database.model.ProductPermissionGrantLocal
+import io.paritytech.polkadotapp.database.model.ProductTopUpLocal
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
 import io.paritytech.polkadotapp.database.model.RemovedChatLocal
 import io.paritytech.polkadotapp.database.model.RingVrfKeyRegistrationLocal
@@ -140,7 +142,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 59,
+    version = 60,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -196,6 +198,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         CoinageEntryInputLocal::class,
         CoinageEntryOutputLocal::class,
         CoinageHandoffLocal::class,
+        ProductTopUpLocal::class,
     ],
     autoMigrations = [
         // Add ChatMessageReactionLocal
@@ -268,6 +271,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 56, to = 57),
         // Add product_funding_operations table (open funding operations, resumed on app start)
         AutoMigration(from = 58, to = 59),
+        // Add product_top_ups table (RFC-0006 top-ups, kept indefinitely and resumed on app start)
+        AutoMigration(from = 59, to = 60),
     ]
 )
 @TypeConverters(
@@ -369,6 +374,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun browserTabDao(): BrowserTabDao
 
     abstract fun productFundingOperationDao(): ProductFundingOperationDao
+
+    abstract fun productTopUpDao(): ProductTopUpDao
 
     abstract fun chatRequestDao(): ChatRequestDao
 
