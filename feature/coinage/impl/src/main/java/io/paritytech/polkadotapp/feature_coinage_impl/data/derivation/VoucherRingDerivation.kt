@@ -34,17 +34,13 @@ class RealVoucherRingDerivation @Inject constructor(
     private val accountRepository: AccountRepository,
     private val accountSecretsStorage: AccountSecretsStorage,
 ) : VoucherRingDerivation {
-    companion object {
-        private const val DERIVATION_PATH_BASE = "//pps//ring-vrf"
-
-        private fun getDerivationPath(derivationIndex: DerivationIndex) = "$DERIVATION_PATH_BASE//$derivationIndex"
-    }
-
     override suspend fun deriveBandersnatch(derivationIndex: DerivationIndex): BandersnatchEntropy {
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
 
-        return deriveBandersnatchFromEntropy(mnemonic.entropy, derivationIndex)
+        val path = getDefaultPurseDerivation(derivationIndex)
+
+        return deriveBandersnatch(mnemonic.entropy, path)
     }
 
     override suspend fun memberKeyOf(derivationIndex: DerivationIndex): BandersnatchPublicKey =
@@ -57,17 +53,13 @@ class RealVoucherRingDerivation @Inject constructor(
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
 
-        val base = deriveBandersnatch(mnemonic.entropy, DERIVATION_PATH_BASE)
+        val pathBase = ringVrfDefaultPurseDerivationBase()
+        val base = deriveBandersnatch(mnemonic.entropy, pathBase)
 
         return derivationIndices.map { derivationIndex ->
-            val individualPath = "//$derivationIndex"
-            deriveBandersnatch(base.value, individualPath)
+            val itemSegment = itemDerivationSegment(derivationIndex)
+            deriveBandersnatch(base.value, itemSegment)
         }
-    }
-
-    private fun deriveBandersnatchFromEntropy(entropy: ByteArray, derivationIndex: DerivationIndex): BandersnatchEntropy {
-        val path = getDerivationPath(derivationIndex)
-        return deriveBandersnatch(entropy, path)
     }
 
     private fun deriveBandersnatch(entropy: ByteArray, derivationPath: String): BandersnatchEntropy {
@@ -83,6 +75,24 @@ class RealVoucherRingDerivation @Inject constructor(
         }
 
         return BandersnatchEntropy(derivedEntropy)
+    }
+
+    private fun getDefaultPurseDerivation(item: Int): String = ringVrfDerivation(CoinageDerivationDefaults.COINAGE_MAIN_PURSE_INDEX, CoinageDerivationDefaults.COINAGE_PAGE_INDEX, item)
+
+    private fun ringVrfDefaultPurseDerivationBase(): String = ringVrfDerivationBase(CoinageDerivationDefaults.COINAGE_MAIN_PURSE_INDEX, CoinageDerivationDefaults.COINAGE_PAGE_INDEX)
+
+    @Suppress("SameParameterValue")
+    private fun ringVrfDerivation(purse: Long, page: Int, item: Int): String {
+        return ringVrfDerivationBase(purse, page) + itemDerivationSegment(item)
+    }
+
+    // Unlike coinage keys, the item junction is hard - ring-vrf entropy derivation is a blake2b chaincode chain with no soft variant
+    private fun itemDerivationSegment(item: Int): String {
+        return "//$item"
+    }
+
+    private fun ringVrfDerivationBase(purse: Long, page: Int): String {
+        return "//coinage-ring-vrf//$purse//$page"
     }
 }
 
