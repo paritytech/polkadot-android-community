@@ -271,7 +271,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 56, to = 57),
         // Add product_funding_operations table (open funding operations, resumed on app start)
         AutoMigration(from = 58, to = 59),
-        // Add product_top_ups table (RFC-0006 top-ups, kept indefinitely and resumed on app start)
+        // Add product_top_ups table (kept indefinitely and resumed on app start)
         AutoMigration(from = 59, to = 60),
     ]
 )

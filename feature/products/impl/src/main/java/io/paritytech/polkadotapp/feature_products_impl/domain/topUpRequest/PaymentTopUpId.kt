@@ -1,8 +1,9 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest
 
-import io.novasama.substrate_sdk_android.extensions.fromHex
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.common.domain.model.hexToDataByteArray
+import io.paritytech.polkadotapp.common.utils.flatMap
 
 private const val SIZE_BYTES = 32
 
@@ -31,6 +32,6 @@ value class PaymentTopUpId private constructor(val bytes: DataByteArray) {
         }
 
         fun fromHex(hex: String): Result<PaymentTopUpId> =
-            runCatching { DataByteArray(hex.fromHex()) }.mapCatching { fromBytes(it).getOrThrow() }
+            runCatching { hex.hexToDataByteArray() }.flatMap { fromBytes(it) }
     }
 }

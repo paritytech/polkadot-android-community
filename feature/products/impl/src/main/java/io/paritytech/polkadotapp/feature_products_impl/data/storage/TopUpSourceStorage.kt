@@ -1,5 +1,7 @@
 package io.paritytech.polkadotapp.feature_products_impl.data.storage
 
+import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import io.novasama.substrate_sdk_android.extensions.fromHex
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.data.storage.preferences.encrypted.EncryptedPreferences
@@ -10,9 +12,6 @@ import io.paritytech.polkadotapp.feature_account_api.domain.derivation.Derivatio
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpSource
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 private const val SOURCE_PREFIX = "TopUpSource."
@@ -39,14 +38,13 @@ interface TopUpSourceStorage {
 
 class RealTopUpSourceStorage @Inject constructor(
     private val encryptedPreferences: EncryptedPreferences,
+    private val gson: Gson,
     private val dispatchers: CoroutineDispatchers,
 ) : TopUpSourceStorage {
-    private val json = Json { ignoreUnknownKeys = true }
-
     override suspend fun get(groupId: CoinageOperationGroupId): PaymentTopUpSource? = withContext(dispatchers.io) {
         val stored = encryptedPreferences.getDecryptedString(prefsKey(groupId)) ?: return@withContext null
 
-        runCatching { json.decodeFromString<StoredSource>(stored).toDomain() }
+        runCatching { gson.fromJson(stored, StoredSource::class.java).toDomain() }
             .logFailure("Failed to read the source held for ${groupId.value}")
             .getOrNull()
     }
@@ -56,7 +54,7 @@ class RealTopUpSourceStorage @Inject constructor(
         source: PaymentTopUpSource,
     ): Result<Unit> = withContext(dispatchers.io) {
         runCatching {
-            encryptedPreferences.putEncryptedString(prefsKey(groupId), json.encodeToString(source.toStored()))
+            encryptedPreferences.putEncryptedString(prefsKey(groupId), gson.toJson(source.toStored()))
         }.logFailure("Failed to hold the source for ${groupId.value}")
     }
 
@@ -72,22 +70,20 @@ class RealTopUpSourceStorage @Inject constructor(
  * these, and rebuilding them on the way out is what lets a resumed top-up sign exactly as the first attempt
  * would have.
  */
-@Serializable
 private class StoredSource(
     val tag: SourceTag,
     val hex: String? = null,
     val listHex: List<String>? = null,
 )
 
-@Serializable
 private enum class SourceTag {
-    @SerialName("ProductAccount")
+    @SerializedName("ProductAccount")
     PRODUCT_ACCOUNT,
 
-    @SerialName("PrivateKey")
+    @SerializedName("PrivateKey")
     PRIVATE_KEY,
 
-    @SerialName("Coins")
+    @SerializedName("Coins")
     COINS,
 }
 

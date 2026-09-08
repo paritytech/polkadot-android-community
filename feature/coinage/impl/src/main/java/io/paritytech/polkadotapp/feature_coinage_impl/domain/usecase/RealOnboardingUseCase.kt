@@ -72,7 +72,7 @@ class RealOnboardingUseCase @Inject constructor(
         val FUNDING_TIMEOUT = 30.seconds
 
         /** How long a dropped balance subscription waits before it is opened again. */
-        val FUNDING_RESUBSCRIBE_DELAY = 5.seconds
+        val FUNDING_RESUBSCRIBE_DELAY = 1.seconds
     }
 
     override suspend fun onboard(

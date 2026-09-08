@@ -26,27 +26,15 @@ interface OnboardingUseCase {
     ): Result<Unit>
 
     /**
-     * Reports [CoinageTransferDetection.Claimed] as soon as every voucher is in a block, and keeps emitting
-     * until the onboarding is over — so a fork that takes an inclusion away is reported too, as a return to
-     * [CoinageTransferDetection.Claiming].
+     * Onboards [amount], retrying whatever fails until every voucher has finalized or [retryUntil] passes,
+     * and reports progress throughout. Fresh vouchers on each attempt — the ledger refuses an output it has
+     * already minted.
      *
-     * Onboarding is not one-shot. A voucher whose transaction failed minted nothing, so the money it stood
-     * for is still in [signerSource]'s account and still owed; the shortfall is submitted again as soon as
-     * the account can cover it. Fresh vouchers each time — the ledger refuses an output any entry has
-     * already minted, so a retry cannot re-offer the ones the failed attempt registered.
+     * Completion is what says the onboarding is over; the last status is its verdict.
      *
-     * The flow completes when every denomination has a finalized voucher, or when [retryUntil] has passed.
-     * Unlike a claim, a closed window is the end of it even on a first attempt: the funds are the caller's
-     * own and nothing else will spend them, so a late attempt would be a second charge against money the
-     * caller has already written off rather than money nobody else would collect.
-     *
-     * Because it ends only when nothing further will be attempted, completion is what tells a caller the
-     * onboarding is finished. No status emitted along the way means that, a partial
-     * [CoinageTransferDetection.Claimed] least of all.
-     *
-     * [groupId] must be derived from something stable about the operation — the one-time key the funds sit
-     * on, say — because a second call with the same id rejoins the vouchers already registered instead of
-     * onboarding the amount again. That is what makes a retry after process death safe.
+     * [groupId] must be derived from something stable about the operation: a second call with the same id
+     * rejoins the vouchers already registered instead of onboarding the amount again, which is what makes a
+     * retry after process death safe.
      */
     @OptIn(ExperimentalTime::class)
     fun onboardDurably(
