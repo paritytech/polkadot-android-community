@@ -284,7 +284,7 @@ abstract class AppDatabase : RoomDatabase() {
             chatMessageContentMigrations: Set<ChatMessageContentMigration<*, *>> = emptySet(),
         ): AppDatabase {
             return Room
-                .databaseBuilder(context.applicationContext, AppDatabase::class.java, "app.db")
+                .databaseBuilder(context.applicationContext, AppDatabase::class.java, "app_v2.db")
                 .addAppMigrations(preferences, chatMessageContentMigrations)
                 .build()
         }
