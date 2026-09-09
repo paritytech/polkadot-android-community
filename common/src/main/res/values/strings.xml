@@ -842,6 +842,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="product_payment_request_approve">Approve</string>
     <string name="product_payment_request_reject">Reject</string>
     <string name="product_top_up_failed_title">Failed to Accept Funds from %1$s</string>
+    <string name="product_top_up_failed_message">The funds could not be moved into your balance.</string>
     <string name="product_top_up_accepted_title">Accepted funds from %1$s</string>
     <string name="product_top_up_amount_mismatch_warning">The detected amount differs from the amount stated by the product.</string>
     <string name="product_resource_allocation_title">Product %1$s requests resource allocation</string>
