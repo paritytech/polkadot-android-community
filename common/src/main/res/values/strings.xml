@@ -1506,13 +1506,6 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="payment_privacy_mode_state_selected">Selected</string>
     <string name="payment_privacy_mode_state_not_selected">Not selected</string>
 
-    <string name="w3s_wait_title">Your username is being registered</string>
-    <string name="w3s_wait_subtitle">This usually takes around 10 seconds</string>
-    <string name="w3s_debug_skip">(Debug) Skip verification</string>
-    <string name="w3s_start_using_app">Start using the Polkadot App</string>
-    <string name="w3s_start_using_app_preparing">Finishing registration…</string>
-    <string name="w3s_ended">Web3 Summit ended — stay tuned for more updates!</string>
-
     <!-- Keys carried over from the branch, not yet present on master -->
     <string name="video_game_play_host_transition_title">Round %d of %d</string>
     <string name="video_game_play_finished_title">Game\ncomplete</string>

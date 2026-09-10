@@ -204,7 +204,6 @@ variables while credentials and mnemonics must be mapped from GitHub secrets.
 |--------------------|--------------------------------------------|-----------------|----------------------|---------|--------------------------------------|
 | `GOOGLE_OAUTH_ID`  | `tools/auth/impl` `gp` source set          | for Google sign-in | no                | empty   | Google OAuth client id (Sign-In)     |
 | `GOOGLE_PROJECT_ID`| `tools/integrity/impl` `gp` product flavor | for Play Integrity | no                | `0`     | Google Cloud project id (Play Integrity) |
-| `W3S_AUTH_KEY`     | `feature/web3summit/impl`                  | for Web3 Summit | for Web3 Summit      | empty   | Web3 Summit auth keypair seed        |
 
 These values no longer block Gradle configuration when absent. Their integrations
 validate or reject the placeholder when actually invoked. Both `GOOGLE_OAUTH_ID`
@@ -326,7 +325,7 @@ Prerequisites that differ from the `gp` edition:
 - **`google-services.json` still required** — see §4; Remote Config needs it.
 - **`GOOGLE_OAUTH_ID` not required** — `tools/auth/impl` uses a no-op implementation for `vanilla`.
 - **`GOOGLE_PROJECT_ID` not required** — scoped to the `gp` flavor in `tools/integrity/impl`.
-- All other secrets (signing, `W3S_AUTH_KEY`, Sentry, optional endpoint variables) apply identically.
+- All other secrets (signing, Sentry, optional endpoint variables) apply identically.
 
 ```bash
 # Debug (dev signing)
@@ -444,7 +443,6 @@ jobs:
       CI_KEYSTORE_KEY_PASS: ${{ secrets.CI_KEYSTORE_KEY_PASS }}
       INTERCOM_API_KEY: ${{ secrets.INTERCOM_API_KEY }}
       INTERCOM_APP_ID: ${{ secrets.INTERCOM_APP_ID }}
-      W3S_AUTH_KEY: ${{ secrets.W3S_AUTH_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
