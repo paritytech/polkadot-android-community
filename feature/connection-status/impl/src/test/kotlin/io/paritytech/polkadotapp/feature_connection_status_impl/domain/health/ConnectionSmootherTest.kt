@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
 
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
+import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -14,7 +14,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 class ConnectionSmootherTest {
@@ -97,9 +96,5 @@ class ConnectionSmootherTest {
             smoother.smooth(source).collect { results += it }
         }
         return results
-    }
-
-    private class FakeTimeProvider(private val nowMillis: () -> Long) : TimeProvider {
-        override fun now(): Instant = Instant.fromEpochMilliseconds(nowMillis())
     }
 }

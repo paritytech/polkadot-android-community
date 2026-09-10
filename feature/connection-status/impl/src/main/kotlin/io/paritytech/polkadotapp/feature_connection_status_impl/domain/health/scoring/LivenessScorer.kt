@@ -8,7 +8,7 @@ import kotlin.math.roundToInt
  * Scores best-block liveness. The signal is the worse of the 10-block moving-average latency and the
  * raw time since the last block (the acute-stall guard), each mapped through the same plateau→zero
  * curve relative to the chain's expected block time. Both null (freshly connected, nothing observed
- * yet) is treated optimistically as perfect so the ring starts full and self-corrects.
+ * yet) is treated optimistically as perfect so the score starts full and self-corrects.
  */
 class LivenessScorer @Inject constructor() {
     fun score(

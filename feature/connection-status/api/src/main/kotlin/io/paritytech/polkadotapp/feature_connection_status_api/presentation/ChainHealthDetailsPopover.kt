@@ -106,7 +106,7 @@ private fun ReadingRow(reading: ChainMetricReading) {
                 color = PolkadotTheme.colors.fg.primary,
             )
             NovaText(
-                text = stringResource(RCommon.string.chain_health_target, reading.targetValue()),
+                text = stringResource(reading.targetRes(), reading.targetValue()),
                 style = PolkadotTheme.typography.caption.medium,
                 color = PolkadotTheme.colors.fg.tertiary,
             )
@@ -125,14 +125,26 @@ private fun connectionLabel(connection: ChainConnectionPresentation): String = s
 
 private fun ChainMetricReading.labelRes(): Int = when (this) {
     is ChainMetricReading.BlockLatency -> RCommon.string.chain_health_metric_block_latency
+    is ChainMetricReading.BlockProduction -> RCommon.string.chain_health_metric_recent_blocks
     is ChainMetricReading.FinalityGap -> RCommon.string.chain_health_metric_finality_gap
     is ChainMetricReading.PendingRequestLatency -> RCommon.string.chain_health_metric_pending_request
     is ChainMetricReading.ResponseLatency -> RCommon.string.chain_health_metric_response
 }
 
+private fun ChainMetricReading.targetRes(): Int = when (this) {
+    is ChainMetricReading.BlockProduction -> RCommon.string.chain_health_target_at_least
+    is ChainMetricReading.BlockLatency,
+    is ChainMetricReading.FinalityGap,
+    is ChainMetricReading.PendingRequestLatency,
+    is ChainMetricReading.ResponseLatency,
+    -> RCommon.string.chain_health_target
+}
+
 @Composable
 private fun ChainMetricReading.actualValue(): String = when (this) {
     is ChainMetricReading.BlockLatency -> latency.formatSeconds()
+    is ChainMetricReading.BlockProduction ->
+        pluralStringResource(RCommon.plurals.chain_health_blocks, recentBlocks, recentBlocks)
     is ChainMetricReading.FinalityGap ->
         pluralStringResource(RCommon.plurals.chain_health_blocks, gapBlocks, gapBlocks)
     is ChainMetricReading.PendingRequestLatency -> latency.formatSeconds()
@@ -142,6 +154,8 @@ private fun ChainMetricReading.actualValue(): String = when (this) {
 @Composable
 private fun ChainMetricReading.targetValue(): String = when (this) {
     is ChainMetricReading.BlockLatency -> target.formatSeconds()
+    is ChainMetricReading.BlockProduction ->
+        pluralStringResource(RCommon.plurals.chain_health_blocks, requiredBlocks, requiredBlocks)
     is ChainMetricReading.FinalityGap ->
         pluralStringResource(RCommon.plurals.chain_health_blocks, targetBlocks, targetBlocks)
     is ChainMetricReading.PendingRequestLatency -> target.formatSeconds()

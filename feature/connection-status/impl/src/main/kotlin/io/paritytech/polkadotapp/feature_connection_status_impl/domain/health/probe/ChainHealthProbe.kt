@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe
 
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
@@ -18,11 +19,13 @@ data class ChainMetricContext(
     // Requests currently pending on the socket, as stable identities (Sendable has no id, so tracked
     // by referential identity).
     val pendingRequests: Flow<Set<Any>>,
+    val connection: Flow<ChainConnectionPresentation>,
 )
 
 /**
- * The extensibility seam: one probe per health metric. Bind a new probe with `@Binds @IntoSet` and it
- * contributes to both the ring score (via `min`) and the details popover with no further wiring.
+ * The extensibility seam: one probe per health metric. Bind a new probe with `@Binds @IntoSet` and its
+ * reading shows in the details popover with no further wiring; which readings colour the indicator is
+ * decided by the presentation mapper, so a new metric that should also colour it needs a branch there.
  */
 interface ChainHealthProbe {
     fun observe(context: ChainMetricContext): Flow<ChainMetricReading>

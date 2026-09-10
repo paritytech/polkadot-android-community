@@ -12,7 +12,6 @@ import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
 import io.paritytech.polkadotapp.common.utils.combine
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealth
-import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealthScore
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainHeadDataSource
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainMetricContext
@@ -32,10 +31,9 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Builds a per-chain [ChainHealth] by smoothing the socket state (inner icon), scoring the pluggable
- * probe set with `min` (ring), and carrying the probe readings for the details popover. The whole
- * per-chain pipeline runs only while collected (foreground) and keeps the socket up via the ref
- * counter for as long as it is subscribed.
+ * Builds a per-chain [ChainHealth] from the smoothed socket state and the readings of the pluggable
+ * probe set. The whole per-chain pipeline runs only while collected (foreground) and keeps the socket
+ * up via the ref counter for as long as it is subscribed.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
@@ -68,22 +66,24 @@ class RealChainHealthMonitor @Inject constructor(
             val finalizedBlock = chainHeadDataSource.finalizedBlockNumber(chainId)
                 .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
 
+            val connection = connectionSmoother.smooth(observeSocketState(chainId))
+                .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
+
             val context = ChainMetricContext(
                 chain = chain,
                 bestBlockNumber = bestBlock,
                 finalizedBlockNumber = finalizedBlock,
                 expectedBlockTime = blockTime,
                 pendingRequests = observePendingRequests(chainId),
+                connection = connection,
             )
             val readings = probes.map { it.observe(context) }.combine()
-            val connection = connectionSmoother.smooth(observeSocketState(chainId))
 
             combine(connection, readings) { presentation, readingList ->
                 ChainHealth(
                     chainId = chainId,
                     chainName = chain.name,
                     connection = presentation,
-                    score = readingList.minOfOrNull { it.score } ?: ChainHealthScore.Perfect,
                     readings = readingList,
                 )
             }.collect { send(it) }

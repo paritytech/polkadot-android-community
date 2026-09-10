@@ -5,65 +5,75 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealthScore
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Tone
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlin.math.ceil
 import kotlin.time.Duration.Companion.seconds
 
 class ChainHealthIndicatorMapperTest {
     @Test
-    fun `disconnected wins over a perfect score`() {
-        val health = health(ChainConnectionPresentation.Disconnected, socketSide(100))
+    fun `disconnected wins over everything`() {
+        val health = health(ChainConnectionPresentation.Disconnected, blocks(5, 5), pending(100))
 
         assertEquals(ChainHealthIndicator.Disconnected, health.toIndicator())
     }
 
     @Test
-    fun `connecting wins over a perfect score`() {
-        val health = health(ChainConnectionPresentation.Connecting, socketSide(100))
+    fun `connecting wins over an outage`() {
+        val health = health(ChainConnectionPresentation.Connecting, blocks(0, 5))
 
         assertEquals(ChainHealthIndicator.Connecting, health.toIndicator())
     }
 
     @Test
+    fun `a node that stopped answering is dead even while the socket is connected`() {
+        assertEquals(ChainHealthIndicator.Disconnected, connected(blocks(5, 5), pending(0)).toIndicator())
+    }
+
+    @Test
     fun `no readings is healthy`() {
-        assertEquals(ChainHealthIndicator.Healthy, health(ChainConnectionPresentation.Connected).toIndicator())
+        assertEquals(ChainHealthIndicator.Healthy, connected().toIndicator())
     }
 
     @Test
-    fun `score at the healthy threshold is healthy whatever the metric`() {
-        assertEquals(ChainHealthIndicator.Healthy, connected(chainSide(90)).toIndicator())
-        assertEquals(ChainHealthIndicator.Healthy, connected(socketSide(90)).toIndicator())
+    fun `five sixths of the expected blocks is the outage line`() {
+        assertEquals(ChainHealthIndicator.Healthy, connected(blocks(5, 5)).toIndicator())
+        assertEquals(ChainHealthIndicator.Healthy, connected(blocks(5, 6)).toIndicator())
+        assertOutage(0.8f, connected(blocks(4, 5)).toIndicator())
+        assertOutage(0f, connected(blocks(0, 5)).toIndicator())
     }
 
     @Test
-    fun `a degraded chain-side reading is always an error arc`() {
-        assertDegraded(Tone.Error, 0.89f, connected(chainSide(89)).toIndicator())
-        assertDegraded(Tone.Error, 0.5f, connected(chainSide(50), socketSide(60)).toIndicator())
+    fun `an outage wins over a slow connection`() {
+        assertOutage(0.6f, connected(blocks(3, 5), pending(10)).toIndicator())
     }
 
     @Test
-    fun `a degraded chain-side reading wins over a slower socket-side one`() {
-        assertDegraded(Tone.Error, 0.5f, connected(chainSide(60), socketSide(50)).toIndicator())
-        assertDegraded(Tone.Error, 0.4f, connected(chainSide(40), socketSide(40)).toIndicator())
+    fun `connection speed is graded by the worst of pending and response`() {
+        assertEquals(ChainHealthIndicator.Healthy, connected(pending(70), response(100)).toIndicator())
+        assertEquals(slow(Speed.Slow), connected(pending(100), response(69)).toIndicator())
+        assertEquals(slow(Speed.Slow), connected(pending(40)).toIndicator())
+        assertEquals(slow(Speed.Unusable), connected(pending(39)).toIndicator())
+        assertEquals(slow(Speed.Unusable), connected(response(0)).toIndicator())
     }
 
     @Test
-    fun `a socket-side worst reading is graded by tier`() {
-        assertDegraded(Tone.Neutral, 0.7f, connected(socketSide(70)).toIndicator())
-        assertDegraded(Tone.Warning, 0.4f, connected(socketSide(40)).toIndicator())
-        assertDegraded(Tone.Error, 0.39f, connected(socketSide(39)).toIndicator())
+    fun `block latency and finality gap do not colour the indicator`() {
+        val health = connected(
+            blocks(5, 5),
+            ChainMetricReading.BlockLatency(latency = 60.seconds, target = 6.seconds, score = ChainHealthScore.Zero),
+            ChainMetricReading.FinalityGap(gapBlocks = 100, targetBlocks = 6, score = ChainHealthScore.Zero),
+        )
+
+        assertEquals(ChainHealthIndicator.Healthy, health.toIndicator())
     }
 
-    @Test
-    fun `a healthy chain-side reading leaves the socket ladder in charge`() {
-        assertDegraded(Tone.Warning, 0.5f, connected(chainSide(95), socketSide(50)).toIndicator())
-    }
+    private fun slow(speed: Speed) = ChainHealthIndicator.SlowConnection(speed)
 
-    private fun assertDegraded(tone: Tone, fraction: Float, actual: ChainHealthIndicator) {
-        val degraded = actual as ChainHealthIndicator.Degraded
-        assertEquals(tone, degraded.tone)
-        assertEquals(fraction, degraded.fraction, FRACTION_TOLERANCE)
+    private fun assertOutage(fraction: Float, actual: ChainHealthIndicator) {
+        val outage = actual as ChainHealthIndicator.Outage
+        assertEquals(fraction, outage.fraction, FRACTION_TOLERANCE)
     }
 
     private fun connected(vararg readings: ChainMetricReading): ChainHealth =
@@ -74,17 +84,23 @@ class ChainHealthIndicatorMapperTest {
             chainId = "people",
             chainName = "People",
             connection = connection,
-            score = readings.minOfOrNull { it.score } ?: ChainHealthScore.Perfect,
             readings = readings.toList(),
         )
 
-    private fun chainSide(score: Int): ChainMetricReading = ChainMetricReading.BlockLatency(
-        latency = 6.seconds,
-        target = 6.seconds,
+    private fun blocks(recent: Int, expected: Int): ChainMetricReading = ChainMetricReading.BlockProduction(
+        recentBlocks = recent,
+        expectedBlocks = expected,
+        requiredBlocks = ceil(expected * 5.0 / 6.0).toInt(),
+        score = ChainHealthScore.coerced(recent * ChainHealthScore.MAX_VALUE / expected),
+    )
+
+    private fun pending(score: Int): ChainMetricReading = ChainMetricReading.PendingRequestLatency(
+        latency = 1.seconds,
+        target = 1.seconds,
         score = ChainHealthScore.coerced(score),
     )
 
-    private fun socketSide(score: Int): ChainMetricReading = ChainMetricReading.ResponseLatency(
+    private fun response(score: Int): ChainMetricReading = ChainMetricReading.ResponseLatency(
         latency = 1.seconds,
         target = 1.seconds,
         score = ChainHealthScore.coerced(score),

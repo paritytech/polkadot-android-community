@@ -1471,7 +1471,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chain_health_metric_finality_gap">Finality gap</string>
     <string name="chain_health_metric_pending_request">Pending request</string>
     <string name="chain_health_metric_response">Response time</string>
+    <string name="chain_health_metric_recent_blocks">Recent blocks</string>
     <string name="chain_health_target">target ≤ %1$s</string>
+    <string name="chain_health_target_at_least">target ≥ %1$s</string>
     <plurals name="chain_health_blocks">
         <item quantity="one">%1$d block</item>
         <item quantity="other">%1$d blocks</item>

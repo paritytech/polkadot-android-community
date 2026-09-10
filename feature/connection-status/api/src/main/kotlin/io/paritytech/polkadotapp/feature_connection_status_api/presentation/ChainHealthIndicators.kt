@@ -24,11 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
@@ -46,16 +43,14 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Tone
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
 import kotlinx.collections.immutable.persistentListOf
-import kotlin.math.PI
 
 private val ICON_SIZE = 20.dp
 private val GLYPH_SIZE = 10.dp
 private val RING_STROKE = 2.dp
-private const val RING_DOTS = 8
 private const val PULSE_MIN_ALPHA = 0.3f
 private const val PULSE_DURATION_MS = 900
 
@@ -99,9 +94,10 @@ private fun ChainHealthIcon(item: ChainHealthItemModel) {
     ) {
         when (val indicator = item.indicator) {
             ChainHealthIndicator.Healthy -> HealthyDisc(item)
-            is ChainHealthIndicator.Degraded -> DegradedRing(item, indicator)
+            is ChainHealthIndicator.Outage -> OutageArc(item, indicator)
+            is ChainHealthIndicator.SlowConnection -> SlowRing(item, indicator)
             ChainHealthIndicator.Connecting -> ConnectingRing(item)
-            ChainHealthIndicator.Disconnected -> DisconnectedRing(item)
+            ChainHealthIndicator.Disconnected -> DeadRing(item)
         }
 
         ChainHealthDetailsPopover(
@@ -126,30 +122,31 @@ private fun HealthyDisc(item: ChainHealthItemModel) {
 }
 
 @Composable
-private fun DegradedRing(item: ChainHealthItemModel, indicator: ChainHealthIndicator.Degraded) {
+private fun OutageArc(item: ChainHealthItemModel, indicator: ChainHealthIndicator.Outage) {
     NovaCircularProgressIndicator(
         modifier = Modifier.fillMaxSize(),
         progress = { indicator.fraction },
-        color = indicator.tone.color(),
+        color = PolkadotTheme.colors.fg.error,
         trackColor = PolkadotTheme.colors.fg.tertiary,
         strokeWidth = RING_STROKE,
         strokeCap = StrokeCap.Round,
     )
-    val glyphTint = when (indicator.tone) {
-        Tone.Neutral -> PolkadotTheme.colors.fg.primary
-        Tone.Warning, Tone.Error -> PolkadotTheme.colors.fg.secondary
+    Glyph(item = item, tint = PolkadotTheme.colors.fg.secondary)
+}
+
+@Composable
+private fun SlowRing(item: ChainHealthItemModel, indicator: ChainHealthIndicator.SlowConnection) {
+    val ringColor = when (indicator.speed) {
+        Speed.Slow -> PolkadotTheme.colors.fg.warning
+        Speed.Unusable -> PolkadotTheme.colors.fg.error
     }
-    Glyph(item = item, tint = glyphTint)
+    Ring(color = ringColor)
+    Glyph(item = item, tint = PolkadotTheme.colors.fg.secondary)
 }
 
 @Composable
 private fun ConnectingRing(item: ChainHealthItemModel) {
-    PolkadotSurface(
-        modifier = Modifier.fillMaxSize(),
-        shape = CircleShape,
-        color = Color.Transparent,
-        border = BorderStroke(RING_STROKE, PolkadotTheme.colors.fg.tertiary),
-    ) {}
+    Ring(color = PolkadotTheme.colors.fg.tertiary)
     val pulse = rememberInfiniteTransition(label = "ChainConnectingPulse")
     val alpha by pulse.animateFloat(
         initialValue = 1f,
@@ -163,28 +160,19 @@ private fun ConnectingRing(item: ChainHealthItemModel) {
 }
 
 @Composable
-private fun DisconnectedRing(item: ChainHealthItemModel) {
-    val color = PolkadotTheme.colors.fg.disabled
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .drawBehind {
-                val stroke = RING_STROKE.toPx()
-                val radius = (size.minDimension - stroke) / 2
-                // The dash period must divide the circumference exactly or the last dot overlaps the first.
-                val period = (2 * PI * radius / RING_DOTS).toFloat()
-                drawCircle(
-                    color = color,
-                    radius = radius,
-                    style = Stroke(
-                        width = stroke,
-                        cap = StrokeCap.Round,
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(stroke, period - stroke)),
-                    ),
-                )
-            },
-    )
-    Glyph(item = item, tint = color)
+private fun DeadRing(item: ChainHealthItemModel) {
+    Ring(color = PolkadotTheme.colors.fg.disabled)
+    Glyph(item = item, tint = PolkadotTheme.colors.fg.disabled)
+}
+
+@Composable
+private fun Ring(color: Color) {
+    PolkadotSurface(
+        modifier = Modifier.fillMaxSize(),
+        shape = CircleShape,
+        color = Color.Transparent,
+        border = BorderStroke(RING_STROKE, color),
+    ) {}
 }
 
 @Composable
@@ -196,13 +184,6 @@ private fun Glyph(item: ChainHealthItemModel, tint: Color) {
         tint = tint,
         contentDescription = item.chainName,
     )
-}
-
-@Composable
-private fun Tone.color(): Color = when (this) {
-    Tone.Neutral -> PolkadotTheme.colors.fg.primary
-    Tone.Warning -> PolkadotTheme.colors.fg.warning
-    Tone.Error -> PolkadotTheme.colors.fg.error
 }
 
 private fun ChainGlyph.imageVector(): ImageVector = when (this) {
@@ -220,9 +201,10 @@ private fun ChainHealthIndicatorsPreview() {
             model = ChainHealthIndicatorsModel(
                 persistentListOf(
                     previewItem("people", ChainGlyph.People, ChainHealthIndicator.Healthy),
-                    previewItem("hub", ChainGlyph.AssetHub, ChainHealthIndicator.Degraded(Tone.Warning, 0.5f)),
-                    previewItem("bulletin", ChainGlyph.Bulletin, ChainHealthIndicator.Degraded(Tone.Error, 0.25f)),
-                    previewItem("connecting", ChainGlyph.People, ChainHealthIndicator.Connecting),
+                    previewItem("hub", ChainGlyph.AssetHub, ChainHealthIndicator.Outage(0.6f)),
+                    previewItem("bulletin", ChainGlyph.Bulletin, ChainHealthIndicator.SlowConnection(Speed.Slow)),
+                    previewItem("unusable", ChainGlyph.People, ChainHealthIndicator.SlowConnection(Speed.Unusable)),
+                    previewItem("connecting", ChainGlyph.AssetHub, ChainHealthIndicator.Connecting),
                     previewItem("dead", ChainGlyph.Bulletin, ChainHealthIndicator.Disconnected),
                 ),
             ),

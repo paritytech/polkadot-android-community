@@ -14,31 +14,35 @@ enum class ChainGlyph {
 }
 
 /**
- * What one chain's indicator draws. Connectivity outranks health: a chain that is not connected is
- * [Disconnected] or [Connecting] whatever its last score was.
+ * What one chain's indicator draws, in the priority the health rules give them: connectivity first,
+ * then block production, then connection speed; [Healthy] only when none of them has anything to say.
  */
 sealed interface ChainHealthIndicator {
-    /** Every metric within tolerance: a solid disc, no colour. */
+    /** Everything adequate: a plain disc, no colour. */
     data object Healthy : ChainHealthIndicator
 
     /**
-     * Connected but at least one metric is out of tolerance. [fraction] (0..1) is the arc the ring
-     * draws; [tone] is its colour, [Tone.Error] whenever the chain itself (block production or
-     * finality) is behind, otherwise graded by how slow the connection is.
+     * The chain produced fewer than five sixths of the blocks expected in the last 30 s. [fraction]
+     * is recent / expected and is the share of the surround the dark red arc covers.
      */
-    data class Degraded(
-        val tone: Tone,
+    data class Outage(
         val fraction: Float,
     ) : ChainHealthIndicator
 
+    /** Connected and producing blocks, but requests queue up: an unbroken yellow or red surround. */
+    data class SlowConnection(
+        val speed: Speed,
+    ) : ChainHealthIndicator
+
+    /** Reconnecting: the glyph fades in and out while the socket settles. */
     data object Connecting : ChainHealthIndicator
 
+    /** No node responding, or a node that no longer answers requests: glyph and surround both dark grey. */
     data object Disconnected : ChainHealthIndicator
 
-    enum class Tone {
-        Neutral,
-        Warning,
-        Error,
+    enum class Speed {
+        Slow,
+        Unusable,
     }
 }
 

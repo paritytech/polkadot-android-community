@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealt
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.RealChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.BlockLivenessProbe
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.BlockProductionProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.FinalityGapProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.PendingRequestLatencyProbe
@@ -29,6 +30,10 @@ interface ConnectionStatusFeatureModule {
     @Binds
     @IntoSet
     fun bindBlockLivenessProbe(impl: BlockLivenessProbe): ChainHealthProbe
+
+    @Binds
+    @IntoSet
+    fun bindBlockProductionProbe(impl: BlockProductionProbe): ChainHealthProbe
 
     @Binds
     @IntoSet

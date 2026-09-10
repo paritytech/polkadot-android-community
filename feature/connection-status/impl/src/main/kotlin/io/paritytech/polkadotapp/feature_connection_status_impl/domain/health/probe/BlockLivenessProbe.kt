@@ -20,7 +20,7 @@ import kotlin.time.ExperimentalTime
 /**
  * Latency of best-block production. The score is driven by the worse of the 10-block moving-average
  * interval and the raw time since the last block, re-evaluated on every new block and on a periodic
- * tick so the ring depletes during a stall even while no block arrives.
+ * tick so the score decays during a stall even while no block arrives.
  */
 @OptIn(ExperimentalTime::class)
 class BlockLivenessProbe @Inject constructor(

@@ -7,7 +7,6 @@ import io.paritytech.polkadotapp.common.presentation.AppLifecycleObserver
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealth
-import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealthScore
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
 import io.paritytech.polkadotapp.test_shared.whenever
@@ -95,7 +94,6 @@ class RealChainHealthMixinTest {
         chainId = chainId,
         chainName = chainId,
         connection = ChainConnectionPresentation.Connected,
-        score = ChainHealthScore.Perfect,
         readings = emptyList(),
     )
 
