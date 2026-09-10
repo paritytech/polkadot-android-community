@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -189,7 +190,8 @@ private fun DisconnectedRing(item: ChainHealthItemModel) {
 @Composable
 private fun Glyph(item: ChainHealthItemModel, tint: Color) {
     NovaIcon(
-        modifier = Modifier.size(GLYPH_SIZE),
+        // The healthy disc is a surface that propagates its 20dp minimum to its content; size() would yield to it.
+        modifier = Modifier.requiredSize(GLYPH_SIZE),
         imageVector = item.glyph.imageVector(),
         tint = tint,
         contentDescription = item.chainName,
