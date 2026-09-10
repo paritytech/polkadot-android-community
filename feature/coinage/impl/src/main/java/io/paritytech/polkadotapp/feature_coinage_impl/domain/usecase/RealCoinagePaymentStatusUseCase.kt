@@ -2,8 +2,8 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.hasEverBeenOnChain
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
@@ -66,7 +66,7 @@ private fun TrackedCoin.paymentStatus(atFinalized: Map<AccountId, Boolean>): Coi
     -> CoinagePaymentStatus.Claimed(finalized = true)
 
     // Never minted: the key the peer holds controls nothing, and nothing will change that.
-    state.minterStatus == CoinageTransactionStatus.FAILURE -> CoinagePaymentStatus.Failed
+    state.minterStatus == DurableTxStatus.FAILURE -> CoinagePaymentStatus.Failed
 
     coin.isOnChain -> CoinagePaymentStatus.AwaitingClaim
 

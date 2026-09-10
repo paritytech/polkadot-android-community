@@ -5,10 +5,10 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CheckpointBlock
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FAILURE
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.AssetPublicKey
@@ -51,7 +51,7 @@ class CoinageFuzzDriver(private val harness: DurabilityHarness) {
 
     /** Marks whose keys really did leave, so a relaunch must keep them however it clears uncommitted ones. */
     private val committedMarks = mutableSetOf<AssetPublicKey>()
-    private val terminalSeen = mutableMapOf<Long, Pair<CoinageTransactionStatus, CheckpointBlock?>>()
+    private val terminalSeen = mutableMapOf<Long, Pair<DurableTxStatus, CheckpointBlock?>>()
 
     /** See [canonicalTransactions]. [indexedHash] is the block [indexedUpTo] named when it was folded in. */
     private val canonicalIndex = mutableMapOf<String, CanonicalInclusion>()

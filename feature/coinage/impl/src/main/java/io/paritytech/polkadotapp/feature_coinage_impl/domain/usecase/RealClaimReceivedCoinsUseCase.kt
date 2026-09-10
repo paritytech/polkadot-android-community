@@ -13,7 +13,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageT
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
@@ -191,11 +191,11 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
      * point would leave it unclaimed for good if a fork took the block away.
      */
     private fun List<CoinageTransactionState>.finalizedCoins(): Set<AccountId> =
-        filter { it.status == CoinageTransactionStatus.FINALIZED_SUCCESS }.receivedInputs()
+        filter { it.status == DurableTxStatus.FINALIZED_SUCCESS }.receivedInputs()
 
     /** Coins an attempt of ours failed on, so they are waiting on a retry rather than on a block. */
     private fun List<CoinageTransactionState>.failedCoins(): Set<AccountId> =
-        filter { it.status == CoinageTransactionStatus.FAILURE }.receivedInputs()
+        filter { it.status == DurableTxStatus.FAILURE }.receivedInputs()
 
     private fun List<CoinageTransactionState>.receivedInputs(): Set<AccountId> =
         flatMap { it.inputs }

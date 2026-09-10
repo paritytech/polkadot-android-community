@@ -9,9 +9,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionRequest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.toCoinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.CoinKeypairDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.getDerivedAccountId
@@ -29,7 +28,6 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxRegistrationError
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -107,11 +105,11 @@ class RealCoinageTransactionService @Inject constructor(
 
     override fun startRecovery() = engine.startRecovery()
 
-    override suspend fun getTransactionStatus(id: CoinageTransactionId): Result<CoinageTransactionStatus> =
-        engine.getStatus(id).map { it.toCoinage() }
+    override suspend fun getTransactionStatus(id: CoinageTransactionId): Result<DurableTxStatus> =
+        engine.getStatus(id)
 
-    override fun subscribeTransactionStatus(id: CoinageTransactionId): Flow<CoinageTransactionStatus> =
-        engine.subscribeStatus(id).map { it.toCoinage() }
+    override fun subscribeTransactionStatus(id: CoinageTransactionId): Flow<DurableTxStatus> =
+        engine.subscribeStatus(id)
 
     override suspend fun getOperationGroupStatuses(
         groupId: CoinageOperationGroupId,

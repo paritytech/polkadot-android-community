@@ -15,7 +15,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageRegistrationError
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -233,10 +233,10 @@ private fun CoinageAssetKind.toLocal() = when (this) {
 }
 
 private fun DurableTxLocal.Status.toDomain() = when (this) {
-    DurableTxLocal.Status.PENDING -> CoinageTransactionStatus.PENDING
-    DurableTxLocal.Status.PENDING_SUCCESS -> CoinageTransactionStatus.PENDING_SUCCESS
-    DurableTxLocal.Status.FINALIZED_SUCCESS -> CoinageTransactionStatus.FINALIZED_SUCCESS
-    DurableTxLocal.Status.FAILURE -> CoinageTransactionStatus.FAILURE
+    DurableTxLocal.Status.PENDING -> DurableTxStatus.PENDING
+    DurableTxLocal.Status.PENDING_SUCCESS -> DurableTxStatus.PENDING_SUCCESS
+    DurableTxLocal.Status.FINALIZED_SUCCESS -> DurableTxStatus.FINALIZED_SUCCESS
+    DurableTxLocal.Status.FAILURE -> DurableTxStatus.FAILURE
 }
 
 private fun OwnAsset.kind() = when (this) {

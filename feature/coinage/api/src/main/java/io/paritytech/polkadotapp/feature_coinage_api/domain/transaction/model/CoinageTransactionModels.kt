@@ -11,52 +11,15 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Operati
 /**
  * Coinage's transactions are rows of the shared durability ledger, so these name the engine's types rather
  * than parallel ones. Callers keep the coinage-flavoured spelling; there is one set of values underneath.
+ *
+ * The status has no alias: Kotlin cannot import an enum entry through one, and callers import these by
+ * name, so they name [DurableTxStatus] directly.
  */
 typealias CoinageTransactionId = DurableTxId
 
 typealias CoinageOperationGroupId = OperationGroupId
 
 typealias CheckpointBlock = io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
-
-/**
- * Deliberately its own enum rather than an alias of the engine's status.
- *
- * Kotlin cannot import an enum entry through a typealias (KT-64431), and callers throughout the app import
- * these entries by name. Mapping at the boundary costs one `when`; aliasing would cost every call site.
- */
-enum class CoinageTransactionStatus {
-    PENDING,
-    PENDING_SUCCESS,
-
-    /** Terminal: executed successfully in a finalized block. */
-    FINALIZED_SUCCESS,
-
-    /** Terminal: proven not to have executed, and unable to. */
-    FAILURE,
-    ;
-
-    /** Live transactions hold their inputs locked. */
-    val isLive: Boolean get() = this == PENDING || this == PENDING_SUCCESS
-
-    /**
-     * Executed in a block, finalized or not.
-     *
-     * The threshold to read on-chain presence against: a coin is only absent-because-consumed if whatever
-     * minted it actually ran, and asking for finality there while presence is read at the best head reports
-     * a coin that plainly existed a moment ago as one that may never have.
-     */
-    val isArrived: Boolean get() = this == PENDING_SUCCESS || this == FINALIZED_SUCCESS
-
-    /** The only transaction that provably cannot complete is a terminal [FAILURE]. */
-    val canArrive: Boolean get() = this != FAILURE
-}
-
-fun DurableTxStatus.toCoinage(): CoinageTransactionStatus = when (this) {
-    DurableTxStatus.PENDING -> CoinageTransactionStatus.PENDING
-    DurableTxStatus.PENDING_SUCCESS -> CoinageTransactionStatus.PENDING_SUCCESS
-    DurableTxStatus.FINALIZED_SUCCESS -> CoinageTransactionStatus.FINALIZED_SUCCESS
-    DurableTxStatus.FAILURE -> CoinageTransactionStatus.FAILURE
-}
 
 /** One signed transaction with the assets it consumes and mints. */
 data class CoinageTransactionRequest(
@@ -84,7 +47,7 @@ sealed interface OwnAsset {
 
 data class CoinageTransactionState(
     val id: CoinageTransactionId,
-    val status: CoinageTransactionStatus,
+    val status: DurableTxStatus,
     val inputs: List<CoinageInput>,
     val outputs: List<OwnAsset>,
 )
@@ -100,14 +63,14 @@ data class CoinageTransactionState(
  */
 data class CoinageAssetState(
     val handedOff: Boolean,
-    val minterStatus: CoinageTransactionStatus?,
-    val consumerStatus: CoinageTransactionStatus?,
+    val minterStatus: DurableTxStatus?,
+    val consumerStatus: DurableTxStatus?,
 ) {
     /** An input of a transaction that has not resolved: unavailable, but not gone. */
     val isInUse: Boolean get() = consumerStatus?.isLive == true
 
     /** Gone for good — a finalized transaction spent it. */
-    val isConsumed: Boolean get() = consumerStatus == CoinageTransactionStatus.FINALIZED_SUCCESS
+    val isConsumed: Boolean get() = consumerStatus == DurableTxStatus.FINALIZED_SUCCESS
 
     /** Neither locked nor spent, so it may be offered for selection subject to on-chain checks. */
     val isFree: Boolean get() = !handedOff && !isInUse && !isConsumed

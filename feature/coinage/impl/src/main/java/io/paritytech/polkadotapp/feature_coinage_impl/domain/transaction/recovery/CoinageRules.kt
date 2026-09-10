@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery
 
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
 
@@ -57,7 +57,7 @@ private fun ChainEvidence.alias(atFinalized: Boolean) =
 private fun LedgerAsset.spent(dag: CoinageEntryDag, evidence: ChainEvidence): Boolean {
     // A transaction that succeeded consumed all of its inputs.
     val consumedByFinalized = dag.consumers(publicKey)
-        .any { it.status == CoinageTransactionStatus.FINALIZED_SUCCESS }
+        .any { it.status == DurableTxStatus.FINALIZED_SUCCESS }
 
     return consumedByFinalized || evidence.provenConsumedOnChain(this) || spentByAbsence(dag, evidence)
 }
@@ -72,7 +72,7 @@ private fun LedgerAsset.spentByAbsence(dag: CoinageEntryDag, evidence: ChainEvid
     if (!absenceProvesConsumption) return false
     val minter = dag.minter(publicKey) ?: return false
 
-    return minter.status == CoinageTransactionStatus.FINALIZED_SUCCESS &&
+    return minter.status == DurableTxStatus.FINALIZED_SUCCESS &&
         evidence.absent(this, atFinalized = true) &&
         evidence.windowClosed(minter)
 }
@@ -82,7 +82,7 @@ fun LedgerAsset.noPotentialConsumers(dag: CoinageEntryDag, evidence: ChainEviden
     if (dag.isHandedOff(publicKey)) return false
     if (spent(dag, evidence)) return false
 
-    return dag.consumers(publicKey).none { it.status != CoinageTransactionStatus.FAILURE }
+    return dag.consumers(publicKey).none { it.status != DurableTxStatus.FAILURE }
 }
 
 /**
@@ -100,7 +100,7 @@ fun LedgerEntry.hasOnlyProvenOwnInputs(dag: CoinageEntryDag, evidence: ChainEvid
             input.asset != null &&
             !dag.isHandedOff(input.publicKey) &&
             minter != null &&
-            minter.status == CoinageTransactionStatus.FINALIZED_SUCCESS &&
+            minter.status == DurableTxStatus.FINALIZED_SUCCESS &&
             evidence.windowClosed(minter)
     }
 }

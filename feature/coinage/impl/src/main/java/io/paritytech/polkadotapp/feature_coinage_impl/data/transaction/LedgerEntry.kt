@@ -5,9 +5,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ch
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.toCoinage
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
 
 /** An asset's on-chain identity: a coin's derived account id, or a voucher's ring VRF public key. */
@@ -33,7 +32,7 @@ data class LedgerEntry(
 
     val mortalityBlocks: Long get() = facts.mortalityBlocks
 
-    val status: CoinageTransactionStatus get() = facts.status.toCoinage()
+    val status: DurableTxStatus get() = facts.status
 
     val successDetectedAt: CheckpointBlock? get() = facts.successDetectedAt
 

@@ -30,7 +30,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionRequest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -310,7 +310,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
     }
 
     private fun List<CoinageTransactionState>.toUnloadStatus(): ExternalUnloadStatus {
-        val executed = count { it.status == CoinageTransactionStatus.FINALIZED_SUCCESS }
+        val executed = count { it.status == DurableTxStatus.FINALIZED_SUCCESS }
 
         return when {
             any { it.status.isLive } || isEmpty() -> ExternalUnloadStatus.Submitted

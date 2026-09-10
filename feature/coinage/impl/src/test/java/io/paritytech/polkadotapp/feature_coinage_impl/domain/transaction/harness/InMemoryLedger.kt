@@ -5,9 +5,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.toCoinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.AssetPublicKey
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.AssetRegistration
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
@@ -19,7 +18,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxState
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
@@ -111,7 +109,7 @@ class InMemoryLedger {
                 minterStatus = entries.firstOrNull { entry -> entry.outputs.any { it.asset == asset } }?.status,
                 consumerStatus = entries
                     .firstOrNull { entry ->
-                        entry.status != CoinageTransactionStatus.FAILURE && entry.inputs.any { it.asset == asset }
+                        entry.status != DurableTxStatus.FAILURE && entry.inputs.any { it.asset == asset }
                     }
                     ?.status,
             )
@@ -127,8 +125,8 @@ class HarnessLedgerReads(private val store: InMemoryLedger) {
 
     suspend fun hasLiveEntries(): Result<Boolean> = store.read { store.facts.any { it.status.isLive } }
 
-    suspend fun getStatus(id: CoinageTransactionId): Result<CoinageTransactionStatus?> =
-        store.read { store.facts.firstOrNull { it.id == id }?.status?.toCoinage() }
+    suspend fun getStatus(id: CoinageTransactionId): Result<DurableTxStatus?> =
+        store.read { store.facts.firstOrNull { it.id == id }?.status }
 
     suspend fun getHandoffKeys(): Result<Set<AssetPublicKey>> = store.coinage.getHandoffKeys()
 
@@ -341,7 +339,7 @@ private fun InMemoryLedger.groupStates(groupId: CoinageOperationGroupId) =
 
         CoinageTransactionState(
             id = facts.id,
-            status = facts.status.toCoinage(),
+            status = facts.status,
             inputs = entryAssets.inputs.map { it.toCoinageInput() },
             outputs = entryAssets.outputs.mapNotNull { it.asset },
         )
@@ -358,7 +356,7 @@ private fun InMemoryLedger.filterReceived(keys: List<AssetPublicKey>) =
 private fun InMemoryLedger.filterClaimed(keys: List<AssetPublicKey>) =
     keys.filterTo(mutableSetOf()) { key ->
         entries().any { entry ->
-            entry.status != CoinageTransactionStatus.FAILURE && entry.inputs.any { it.publicKey == key }
+            entry.status != DurableTxStatus.FAILURE && entry.inputs.any { it.publicKey == key }
         }
     }
 

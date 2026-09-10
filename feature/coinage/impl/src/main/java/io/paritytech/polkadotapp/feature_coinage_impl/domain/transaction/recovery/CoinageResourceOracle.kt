@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
@@ -103,4 +103,4 @@ internal class CoinagePassScope(
  * decided by their own mortality, in parallel, within one window rather than one window per hop.
  */
 internal fun CoinageEntryDag.successorProvesCompletion(entry: LedgerEntry): Boolean =
-    successors(entry).any { it.status == CoinageTransactionStatus.FINALIZED_SUCCESS }
+    successors(entry).any { it.status == DurableTxStatus.FINALIZED_SUCCESS }

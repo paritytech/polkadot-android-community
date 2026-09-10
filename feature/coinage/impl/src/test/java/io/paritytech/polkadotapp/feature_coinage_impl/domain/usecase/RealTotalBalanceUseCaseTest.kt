@@ -13,7 +13,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
@@ -128,7 +128,7 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.PENDING)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.PENDING)),
             vouchers = emptyList(),
             expected = balanceOf(pending = 1.exponentToBalance()),
         )
@@ -144,7 +144,7 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.FINALIZED_SUCCESS)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.FINALIZED_SUCCESS)),
             vouchers = emptyList(),
             expected = balanceOf(pending = 1.exponentToBalance()),
         )
@@ -156,7 +156,7 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.FAILURE)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.FAILURE)),
             vouchers = emptyList(),
             expected = balanceOf(),
         )
@@ -236,7 +236,7 @@ class RealTotalBalanceUseCaseTest {
             coinStates = listOf(
                 CoinageAssetState.UNTRACKED,
                 CoinageAssetState.UNTRACKED,
-                stateWithMinter(CoinageTransactionStatus.PENDING),
+                stateWithMinter(DurableTxStatus.PENDING),
             ),
             vouchers = emptyList(),
             verdicts = mapOf(
@@ -332,7 +332,7 @@ class RealTotalBalanceUseCaseTest {
         pending = pending,
     )
 
-    private fun stateWithMinter(status: CoinageTransactionStatus) =
+    private fun stateWithMinter(status: DurableTxStatus) =
         CoinageAssetState(handedOff = false, minterStatus = status, consumerStatus = null)
 
     private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members)

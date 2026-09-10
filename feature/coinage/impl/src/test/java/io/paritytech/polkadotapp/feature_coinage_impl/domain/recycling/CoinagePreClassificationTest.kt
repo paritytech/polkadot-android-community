@@ -10,7 +10,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import org.junit.Assert.assertEquals
@@ -54,8 +54,8 @@ class CoinagePreClassificationTest {
         val failed = coinOf(age = Coin.Age.Unknown, onChain = false, derivationIndex = 2)
 
         val buckets = listOf(
-            tracked(arriving, minterStatus = CoinageTransactionStatus.PENDING),
-            tracked(failed, minterStatus = CoinageTransactionStatus.FAILURE),
+            tracked(arriving, minterStatus = DurableTxStatus.PENDING),
+            tracked(failed, minterStatus = DurableTxStatus.FAILURE),
         ).preClassifyCoins()
 
         assertEquals(listOf(arriving), buckets.minting)
@@ -70,7 +70,7 @@ class CoinagePreClassificationTest {
     fun `a coin whose mint finalized before presence caught up is still minting`() {
         val coin = coinOf(age = Coin.Age.Unknown, onChain = false)
 
-        val buckets = listOf(tracked(coin, minterStatus = CoinageTransactionStatus.FINALIZED_SUCCESS))
+        val buckets = listOf(tracked(coin, minterStatus = DurableTxStatus.FINALIZED_SUCCESS))
             .preClassifyCoins()
 
         assertEquals(listOf(coin), buckets.minting)
@@ -82,7 +82,7 @@ class CoinagePreClassificationTest {
      */
     @Test
     fun `a free coin is in the total for every minter status but failure`() {
-        val counted = CoinageTransactionStatus.entries - CoinageTransactionStatus.FAILURE
+        val counted = DurableTxStatus.entries - DurableTxStatus.FAILURE
 
         counted.forEach { status ->
             val onChain = coinOf(age = Coin.Age.Known(3), onChain = true, derivationIndex = 1)
@@ -99,7 +99,7 @@ class CoinagePreClassificationTest {
     fun `a coin whose mint failed is in no bucket`() {
         val failed = coinOf(age = Coin.Age.Unknown, onChain = false)
 
-        val buckets = listOf(tracked(failed, minterStatus = CoinageTransactionStatus.FAILURE)).preClassifyCoins()
+        val buckets = listOf(tracked(failed, minterStatus = DurableTxStatus.FAILURE)).preClassifyCoins()
 
         assertTrue(buckets.total.isEmpty())
     }
@@ -147,7 +147,7 @@ class CoinagePreClassificationTest {
     fun `a voucher whose mint finalized before its location synced is still minting`() {
         val voucher = voucherOf(Location.Unknown)
 
-        val buckets = listOf(trackedVoucher(voucher, CoinageTransactionStatus.FINALIZED_SUCCESS))
+        val buckets = listOf(trackedVoucher(voucher, DurableTxStatus.FINALIZED_SUCCESS))
             .preClassifyVouchers(minPrivacy, context())
 
         assertEquals(listOf(voucher), buckets.minting)
@@ -157,7 +157,7 @@ class CoinagePreClassificationTest {
     fun `a voucher whose mint failed is in no bucket`() {
         val voucher = voucherOf(Location.Unknown)
 
-        val buckets = listOf(trackedVoucher(voucher, CoinageTransactionStatus.FAILURE))
+        val buckets = listOf(trackedVoucher(voucher, DurableTxStatus.FAILURE))
             .preClassifyVouchers(minPrivacy, context())
 
         assertTrue(buckets.total.isEmpty())
@@ -179,13 +179,13 @@ class CoinagePreClassificationTest {
 
     private fun tracked(
         coin: Coin,
-        minterStatus: CoinageTransactionStatus? = null,
+        minterStatus: DurableTxStatus? = null,
         state: CoinageAssetState = CoinageAssetState(false, minterStatus, null),
     ) = TrackedCoin(coin, state)
 
     private fun trackedVoucher(
         voucher: RecyclerVoucher,
-        minterStatus: CoinageTransactionStatus = CoinageTransactionStatus.PENDING,
+        minterStatus: DurableTxStatus = DurableTxStatus.PENDING,
     ) = TrackedVoucher(
         voucher,
         CoinageAssetState(handedOff = false, minterStatus = minterStatus, consumerStatus = null),
