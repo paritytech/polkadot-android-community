@@ -6,7 +6,7 @@ package io.paritytech.polkadotapp.feature_products_api.domain.runtime
  * it affects the next session, not live ones.
  */
 interface ProductRuntimeSettings {
-    /** Debug-only override: release builds always run the native host. */
+    /** Defaults to the TrUAPI core. Debug-only: release builds always run the native host. */
     fun isTrUAPIRuntimeEnabled(): Boolean
 
     fun setTrUAPIRuntimeEnabled(enabled: Boolean)

@@ -2,7 +2,7 @@
 
 Three distinct concepts. Don't conflate. Products run on one of **two host
 runtimes** — the native JS-bridge HostApi or the Rust TrUAPI core — selected
-per session by `ProductRuntimeSettings` (debug toggle, default native).
+per session by `ProductRuntimeSettings` (debug toggle, default TrUAPI).
 
 ## Rules at a glance
 
@@ -73,7 +73,7 @@ Products are stored in the Room DB and resolved via `ProductRepository`. Scripts
 
 ## Runtime selection
 
-`ProductRuntimeSettings` (`feature/products/api/.../domain/runtime/`) is the single switch: a prefs-backed, **debug-only** toggle (release builds always run native), surfaced in the debug menu. It is read **once per session creation** — flipping it affects the next session, never a live one. The seams that read it:
+`ProductRuntimeSettings` (`feature/products/api/.../domain/runtime/`) is the single switch: a prefs-backed, **debug-only** toggle defaulting to the TrUAPI core (release builds always run native), surfaced in the debug menu. It is read **once per session creation** — flipping it affects the next session, never a live one. The seams that read it:
 
 - `RuntimeSelectingSpaHost` — the `SpaHost` binding; picks `NativeSpaHost` or `TrUAPISpaHost` per `createSession`.
 - `ProductTabSessionFactory` — picks `NativeProductTabSessionFactory` or `TrUAPIProductTabSessionFactory` per browser tab.
