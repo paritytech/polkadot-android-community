@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinUpdate
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
@@ -127,7 +128,7 @@ class CoinPresenceSyncServiceTest {
     }
 
     private fun coinOf(age: Int?, onChain: Boolean) = Coin(
-        derivationIndex = 0,
+        derivationIndex = testKey(0),
         valueExponent = ValueExponent(3),
         age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
         isOnChain = onChain,

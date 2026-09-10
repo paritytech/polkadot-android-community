@@ -2,10 +2,8 @@ package io.paritytech.polkadotapp.feature_coinage_api.domain.model
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 
-typealias DerivationIndex = Int
-
 data class Coin(
-    val derivationIndex: DerivationIndex,
+    val derivationIndex: CoinageKeyIndex,
     val valueExponent: ValueExponent,
     val age: Age,
     val isOnChain: Boolean,

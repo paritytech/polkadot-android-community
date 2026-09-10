@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
 import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
 import io.paritytech.polkadotapp.database.model.DurableTxLocal
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
@@ -16,6 +17,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.queryPerInstallation
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.toCoinageKeyIndex
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import kotlinx.coroutines.flow.Flow
@@ -135,14 +138,21 @@ class RealCoinageAssetLedger @Inject constructor(
         dao.subscribeAssetStates().map { projections -> projections.associate { it.toDomain() } }
 
     override suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState> = runCatching {
-        dao.getAssetState(asset.kind().toLocal(), asset.index())?.toDomain()?.second ?: CoinageAssetState.UNTRACKED
+        val index = asset.index()
+
+        dao.getAssetState(asset.kind().toLocal(), index.installation.value.value, index.item)?.toDomain()?.second
+            ?: CoinageAssetState.UNTRACKED
     }
 
     override suspend fun getAssetStates(
         assets: List<OwnAsset>,
     ): Result<Map<OwnAsset, CoinageAssetState>> = runCatching {
         val tracked = assets.groupBy { it.kind() }
-            .flatMap { (kind, ofKind) -> dao.getAssetStates(kind.toLocal(), ofKind.map { it.index() }) }
+            .flatMap { (kind, ofKind) ->
+                ofKind.map { it.index() }.queryPerInstallation { installationId, items ->
+                    dao.getAssetStates(kind.toLocal(), installationId, items)
+                }
+            }
             .associate { it.toDomain() }
 
         assets.associateWith { tracked[it] ?: CoinageAssetState.UNTRACKED }
@@ -170,7 +180,8 @@ private fun RegistrationInput.toLocal(entryId: Long, position: Int) = CoinageEnt
     entryId = entryId,
     position = position,
     assetKind = input.kind().toLocal(),
-    derivationIndex = input.indexOrNull(),
+    installationId = input.indexOrNull()?.installation?.value?.value,
+    derivationIndex = input.indexOrNull()?.item,
     onChainKey = publicKey.value,
 )
 
@@ -178,7 +189,8 @@ private fun RegistrationOutput.toLocal(entryId: Long, position: Int) = CoinageEn
     entryId = entryId,
     position = position,
     assetKind = output.kind().toLocal(),
-    derivationIndex = output.index(),
+    installationId = output.index().installation.value.value,
+    derivationIndex = output.index().item,
     onChainKey = publicKey.value,
 )
 
@@ -188,20 +200,21 @@ private fun LedgerAsset.toHandoffLocal(): CoinageHandoffLocal? {
     return CoinageHandoffLocal(
         onChainKey = publicKey.value,
         assetKind = owned.kind().toLocal(),
-        derivationIndex = owned.index(),
+        installationId = owned.index().installation.value.value,
+        derivationIndex = owned.index().item,
         committed = false,
     )
 }
 
 private fun CoinageEntryInputLocal.toDomain() = LedgerAsset(
     kind = assetKind.toDomain(),
-    asset = derivationIndex?.let { assetKind.toOwnAsset(it) },
+    asset = derivationIndex?.let { item -> assetKind.toOwnAsset(requireNotNull(installationId).toCoinageKeyIndex(item)) },
     publicKey = onChainKey.toDataByteArray(),
 )
 
 private fun CoinageEntryOutputLocal.toDomain() = LedgerAsset(
     kind = assetKind.toDomain(),
-    asset = assetKind.toOwnAsset(derivationIndex),
+    asset = assetKind.toOwnAsset(installationId.toCoinageKeyIndex(derivationIndex)),
     publicKey = onChainKey.toDataByteArray(),
 )
 
@@ -222,13 +235,13 @@ private fun LedgerAsset.toCoinageInput(): CoinageInput = when (val ownAsset = as
 }
 
 private fun CoinageAssetStateProjection.toDomain(): Pair<OwnAsset, CoinageAssetState> =
-    assetKind.toOwnAsset(derivationIndex) to CoinageAssetState(
+    assetKind.toOwnAsset(installationId.toCoinageKeyIndex(derivationIndex)) to CoinageAssetState(
         handedOff = handedOff,
         minterStatus = minterStatus?.toDomain(),
         consumerStatus = consumerStatus?.toDomain(),
     )
 
-private fun CoinageAssetKindLocal.toOwnAsset(derivationIndex: Int): OwnAsset = when (this) {
+private fun CoinageAssetKindLocal.toOwnAsset(derivationIndex: CoinageKeyIndex): OwnAsset = when (this) {
     CoinageAssetKindLocal.COIN -> OwnAsset.Coin(derivationIndex)
     CoinageAssetKindLocal.VOUCHER -> OwnAsset.Voucher(derivationIndex)
 }

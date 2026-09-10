@@ -12,8 +12,9 @@ import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherLocationUpdate
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstanceId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -21,6 +22,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.filterInRecycl
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclerAliasStates
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclersCoinToRecycler
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.queryPerInstallation
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.toCoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.getNextIndex
 import kotlinx.coroutines.flow.Flow
@@ -35,9 +38,13 @@ interface VoucherRepository {
 
     suspend fun updateLocations(locations: Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler>)
 
-    suspend fun getNextDerivationIndex(): DerivationIndex
+    suspend fun getNextDerivationIndex(installation: CoinageInstallationId): Int
 
     suspend fun saveAll(vouchers: List<RecyclerVoucher>)
+
+    suspend fun saveNew(voucher: RecyclerVoucher)
+
+    suspend fun saveNew(vouchers: List<RecyclerVoucher>)
 
     /** Vouchers that are in a recycler. Says nothing about whether they may be used — see the ledger. */
     suspend fun getVouchersInRecycler(): List<RecyclerVoucher>
@@ -50,7 +57,7 @@ interface VoucherRepository {
         voucherKeys: List<BandersnatchPublicKey>
     ): Result<Map<BandersnatchPublicKey, ValueExponent>>
 
-    suspend fun getByRingVrfKeyIndices(indices: List<DerivationIndex>): List<RecyclerVoucher>
+    suspend fun getByRingVrfKeyIndices(indices: List<CoinageKeyIndex>): List<RecyclerVoucher>
 
     fun subscribeVouchersInRecycler(): Flow<List<RecyclerVoucher>>
 
@@ -76,6 +83,14 @@ class RealVoucherRepository @Inject constructor(
         recyclerVoucherDao.insertAll(vouchers.map { it.toLocal() })
     }
 
+    override suspend fun saveNew(voucher: RecyclerVoucher) {
+        recyclerVoucherDao.insertNew(listOf(voucher.toLocal()))
+    }
+
+    override suspend fun saveNew(vouchers: List<RecyclerVoucher>) {
+        recyclerVoucherDao.insertNew(vouchers.map { it.toLocal() })
+    }
+
     override fun subscribeAllVouchers(): Flow<List<RecyclerVoucher>> {
         return recyclerVoucherDao.subscribeAll().mapList { it.toDomain() }
     }
@@ -91,12 +106,14 @@ class RealVoucherRepository @Inject constructor(
         recyclerVoucherDao.updateLocations(updates)
     }
 
-    override suspend fun getByRingVrfKeyIndices(indices: List<DerivationIndex>): List<RecyclerVoucher> {
-        return recyclerVoucherDao.getByRingVrfKeyIndices(indices).map { it.toDomain() }
+    override suspend fun getByRingVrfKeyIndices(indices: List<CoinageKeyIndex>): List<RecyclerVoucher> {
+        return indices.queryPerInstallation { installationId, items ->
+            recyclerVoucherDao.getByRingVrfKeyIndices(installationId, items)
+        }.map { it.toDomain() }
     }
 
-    override suspend fun getNextDerivationIndex(): DerivationIndex {
-        return recyclerVoucherDao.getMaxRingVrfKeyIndex().getNextIndex()
+    override suspend fun getNextDerivationIndex(installation: CoinageInstallationId): Int {
+        return recyclerVoucherDao.getMaxRingVrfKeyIndex(installation.value.value).getNextIndex()
     }
 
     override suspend fun fetchRecyclerAliasStates(
@@ -140,7 +157,7 @@ class RealVoucherRepository @Inject constructor(
 
     private fun RecyclerVoucherLocal.toDomain(): RecyclerVoucher {
         return RecyclerVoucher(
-            ringVrfKeyIndex = ringVrfKeyIndex,
+            ringVrfKeyIndex = installationId.toCoinageKeyIndex(ringVrfKeyIndex),
             ringVrfPublicKey = ringVrfPublicKey.toDataByteArray(),
             recyclerValue = ValueExponent(recyclerValue),
             location = toDomainLocation(),
@@ -163,7 +180,8 @@ class RealVoucherRepository @Inject constructor(
     private fun RecyclerVoucher.toLocal(): RecyclerVoucherLocal {
         val inRecycler = location as? RecyclerVoucher.Location.InRecycler
         return RecyclerVoucherLocal(
-            ringVrfKeyIndex = ringVrfKeyIndex,
+            installationId = ringVrfKeyIndex.installation.value.value,
+            ringVrfKeyIndex = ringVrfKeyIndex.item,
             ringVrfPublicKey = ringVrfPublicKey.value,
             recyclerValue = recyclerValue.value,
             locationRecyclerIndex = inRecycler?.recyclerIndex?.value?.toInt(),

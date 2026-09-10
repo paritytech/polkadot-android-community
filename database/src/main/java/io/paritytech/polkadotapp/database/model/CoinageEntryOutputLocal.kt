@@ -15,13 +15,14 @@ import androidx.room.Index
     indices = [
         Index(value = ["onChainKey"], unique = true),
         Index(value = ["entryId"]),
-        Index(value = ["assetKind", "derivationIndex"]),
+        Index(value = ["assetKind", "installationId", "derivationIndex"]),
     ],
 )
 class CoinageEntryOutputLocal(
     val entryId: Long,
     val position: Int,
     val assetKind: CoinageAssetKindLocal,
+    val installationId: ByteArray,
     val derivationIndex: Int,
     val onChainKey: ByteArray,
 )

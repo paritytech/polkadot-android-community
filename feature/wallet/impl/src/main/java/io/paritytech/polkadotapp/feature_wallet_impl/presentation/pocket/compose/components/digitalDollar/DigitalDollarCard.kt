@@ -28,6 +28,7 @@ import io.paritytech.polkadotapp.common.utils.CurrencyConfig
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Refreshing
+import io.paritytech.polkadotapp.design.components.icon.vectors.WarningFilled
 import io.paritytech.polkadotapp.design.components.progress.Shimmer
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
@@ -162,6 +163,7 @@ fun DigitalDollarCard(
                     val amounts = card.amounts.dataOrNull
                     val balanceStatus = when {
                         card.syncInProgress -> BalanceStatus.Syncing
+                        card.accountBackupPending -> BalanceStatus.AccountBackupPending
                         amounts != null && amounts.notFullyAvailable -> BalanceStatus.Available(amounts.available)
                         else -> BalanceStatus.Hidden
                     }
@@ -172,6 +174,7 @@ fun DigitalDollarCard(
                     ) { status ->
                         when (status) {
                             BalanceStatus.Syncing -> SyncProgress()
+                            BalanceStatus.AccountBackupPending -> AccountBackupPending()
                             is BalanceStatus.Available -> AvailableBalance(amount = status.amount)
 
                             BalanceStatus.Hidden -> Unit
@@ -266,8 +269,29 @@ private fun SyncProgress() {
     }
 }
 
+@Composable
+private fun AccountBackupPending() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        NovaIcon(
+            modifier = Modifier.size(18.dp),
+            imageVector = NovaIcons.WarningFilled,
+            tint = PocketCardColors.Primary
+        )
+
+        HorizontalSpacer { tiny }
+
+        NovaText(
+            text = stringResource(RCommon.string.pocket_digital_dollar_account_backup_pending),
+            style = PolkadotTheme.typography.body.medium,
+            color = PocketCardColors.Primary
+        )
+    }
+}
+
 private sealed interface BalanceStatus {
     data object Syncing : BalanceStatus
+
+    data object AccountBackupPending : BalanceStatus
 
     data class Available(val amount: TokenAmountModel) : BalanceStatus
 
@@ -288,6 +312,19 @@ private fun DigitalDollarCardPreview() {
         ),
         syncInProgress = true,
         isExpanded = true
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardAccountBackupPendingPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loaded(
+            PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
+        ),
+        syncInProgress = false,
+        isExpanded = true,
+        accountBackupPending = true,
     )
 }
 
@@ -337,7 +374,8 @@ private fun DigitalDollarCardSyncingWhileLoadingPreview() {
 private fun DigitalDollarCardPreviewContainer(
     amounts: LoadingState<PocketCardUiModel.DigitalDollar.Amounts>,
     syncInProgress: Boolean,
-    isExpanded: Boolean
+    isExpanded: Boolean,
+    accountBackupPending: Boolean = false,
 ) {
     PolkadotTheme {
         CompositionLocalProvider(
@@ -346,7 +384,8 @@ private fun DigitalDollarCardPreviewContainer(
             DigitalDollarCard(
                 card = PocketCardUiModel.DigitalDollar(
                     amounts = amounts,
-                    syncInProgress = syncInProgress
+                    syncInProgress = syncInProgress,
+                    accountBackupPending = accountBackupPending,
                 ),
                 isExpanded = isExpanded
             )

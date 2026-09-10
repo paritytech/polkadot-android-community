@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.flow.flowOf
@@ -161,7 +162,7 @@ class CoinageAssetSelectorTest {
     private fun freeCoin(coin: Coin) = TrackedCoin(coin, CoinageAssetState.UNTRACKED)
 
     private fun coinOf(derivationIndex: Int) = Coin(
-        derivationIndex = derivationIndex,
+        derivationIndex = testKey(derivationIndex),
         valueExponent = ValueExponent(1),
         age = Coin.Age.Known(3),
         isOnChain = true,
@@ -169,7 +170,7 @@ class CoinageAssetSelectorTest {
     )
 
     private fun voucherOf(ringVrfKeyIndex: Int, members: Int) = RecyclerVoucher(
-        ringVrfKeyIndex = ringVrfKeyIndex,
+        ringVrfKeyIndex = testKey(ringVrfKeyIndex),
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = members),

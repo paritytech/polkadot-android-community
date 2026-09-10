@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.Recycling
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.test_shared.any
 import kotlinx.coroutines.runBlocking
@@ -338,7 +339,7 @@ class RealTotalBalanceUseCaseTest {
     private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members)
 
     private fun coinOf(exponent: Int, age: Int?, onChain: Boolean = true, derivationIndex: Int = 0) = Coin(
-        derivationIndex = derivationIndex,
+        derivationIndex = testKey(derivationIndex),
         valueExponent = ValueExponent(exponent),
         age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
         isOnChain = onChain,
@@ -346,7 +347,7 @@ class RealTotalBalanceUseCaseTest {
     )
 
     private fun voucherOf(exponent: Int, location: Location) = RecyclerVoucher(
-        ringVrfKeyIndex = 0,
+        ringVrfKeyIndex = testKey(0),
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(exponent),
         location = location,

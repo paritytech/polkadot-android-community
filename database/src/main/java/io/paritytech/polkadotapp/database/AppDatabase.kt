@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.database.dao.ChatRoomDao
 import io.paritytech.polkadotapp.database.dao.ChatSearchRecentDao
 import io.paritytech.polkadotapp.database.dao.CoinDao
 import io.paritytech.polkadotapp.database.dao.CoinageEntryDao
+import io.paritytech.polkadotapp.database.dao.CoinageInstallationDao
 import io.paritytech.polkadotapp.database.dao.ContactDao
 import io.paritytech.polkadotapp.database.dao.ContactDeviceDao
 import io.paritytech.polkadotapp.database.dao.DurableTxDao
@@ -87,6 +88,7 @@ import io.paritytech.polkadotapp.database.migrations.Migration54To55Spec
 import io.paritytech.polkadotapp.database.migrations.Migration55To56
 import io.paritytech.polkadotapp.database.migrations.Migration57To58
 import io.paritytech.polkadotapp.database.migrations.Migration60To61
+import io.paritytech.polkadotapp.database.migrations.Migration61To62
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
@@ -103,6 +105,7 @@ import io.paritytech.polkadotapp.database.model.CoinLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
 import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
+import io.paritytech.polkadotapp.database.model.CoinageInstallationLocal
 import io.paritytech.polkadotapp.database.model.ContactDeviceLocal
 import io.paritytech.polkadotapp.database.model.ContactLocal
 import io.paritytech.polkadotapp.database.model.DurableTxLocal
@@ -144,7 +147,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 61,
+    version = 62,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -197,6 +200,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         ChatSearchRecentLocal::class,
         RingVrfKeyRegistrationLocal::class,
         DurableTxLocal::class,
+        CoinageInstallationLocal::class,
         CoinageEntryInputLocal::class,
         CoinageEntryOutputLocal::class,
         CoinageHandoffLocal::class,
@@ -325,6 +329,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration55To56(),
                 Migration57To58(),
                 Migration60To61(),
+                Migration61To62(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }
@@ -421,4 +426,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun ringVrfKeyRegistrationDao(): RingVrfKeyRegistrationDao
 
     abstract fun durableTxDao(): DurableTxDao
+
+    abstract fun coinageInstallationDao(): CoinageInstallationDao
 }

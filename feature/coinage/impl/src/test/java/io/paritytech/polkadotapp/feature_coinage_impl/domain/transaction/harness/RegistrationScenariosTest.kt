@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.FINALIZED
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.IN_BEST
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -102,8 +103,8 @@ class RegistrationScenariosTest {
 
         val id = service.submitTransaction(
             extrinsic = extrinsic,
-            inputs = listOf(CoinageInput.Coin.Own(COIN_A)),
-            outputs = listOf(OwnAsset.Coin(COIN_B)),
+            inputs = listOf(CoinageInput.Coin.Own(testKey(COIN_A))),
+            outputs = listOf(OwnAsset.Coin(testKey(COIN_B))),
             groupId = null,
         ).getOrThrow()
 
@@ -132,8 +133,8 @@ class RegistrationScenariosTest {
 
         val id = service.submitTransaction(
             extrinsic = extrinsic,
-            inputs = listOf(CoinageInput.Coin.Own(COIN_A)),
-            outputs = listOf(OwnAsset.Coin(COIN_B)),
+            inputs = listOf(CoinageInput.Coin.Own(testKey(COIN_A))),
+            outputs = listOf(OwnAsset.Coin(testKey(COIN_B))),
             groupId = null,
         ).getOrThrow()
 
@@ -158,8 +159,8 @@ class RegistrationScenariosTest {
                 anchorBlock = chain.chain.finalizedHead.number,
                 periodBlocks = HARNESS_MORTAL_PERIOD,
             ),
-            inputs = listOf(CoinageInput.Coin.Own(COIN_A)),
-            outputs = listOf(OwnAsset.Coin(COIN_B)),
+            inputs = listOf(CoinageInput.Coin.Own(testKey(COIN_A))),
+            outputs = listOf(OwnAsset.Coin(testKey(COIN_B))),
             groupId = null,
         )
 
@@ -173,8 +174,8 @@ class RegistrationScenariosTest {
 
         val result = service.submitTransaction(
             extrinsic = immortalExtrinsic(),
-            inputs = listOf(CoinageInput.Coin.Own(COIN_A)),
-            outputs = listOf(OwnAsset.Coin(COIN_B)),
+            inputs = listOf(CoinageInput.Coin.Own(testKey(COIN_A))),
+            outputs = listOf(OwnAsset.Coin(testKey(COIN_B))),
             groupId = null,
         )
 

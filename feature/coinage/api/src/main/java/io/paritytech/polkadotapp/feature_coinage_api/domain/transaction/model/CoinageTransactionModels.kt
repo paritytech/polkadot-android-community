@@ -1,8 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model
 
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
@@ -30,19 +29,19 @@ data class CoinageTransactionRequest(
 
 sealed interface CoinageInput {
     sealed interface Coin : CoinageInput {
-        data class Own(val derivationIndex: DerivationIndex) : Coin
+        data class Own(val derivationIndex: CoinageKeyIndex) : Coin
 
         /** A coin whose key a peer sent us: never a local asset, only an input of the claim. */
         data class Received(val publicKey: DataByteArray) : Coin
     }
 
-    data class Voucher(val ringVrfIndex: RingVrfIndex) : CoinageInput
+    data class Voucher(val ringVrfIndex: CoinageKeyIndex) : CoinageInput
 }
 
 sealed interface OwnAsset {
-    data class Coin(val derivationIndex: DerivationIndex) : OwnAsset
+    data class Coin(val derivationIndex: CoinageKeyIndex) : OwnAsset
 
-    data class Voucher(val ringVrfIndex: RingVrfIndex) : OwnAsset
+    data class Voucher(val ringVrfIndex: CoinageKeyIndex) : OwnAsset
 }
 
 data class CoinageTransactionState(
