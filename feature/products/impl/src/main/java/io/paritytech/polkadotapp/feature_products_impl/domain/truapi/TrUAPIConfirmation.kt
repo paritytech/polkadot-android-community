@@ -69,4 +69,9 @@ sealed interface TrUAPIConfirmation {
         override val requesterProductId: String,
         val targetProductId: String,
     ) : TrUAPIConfirmation.Prompt
+
+    /** Resolve a product's own account subtree over SSO. */
+    class ProductSubtree(
+        override val requesterProductId: String,
+    ) : TrUAPIConfirmation.Prompt
 }

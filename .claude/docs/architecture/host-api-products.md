@@ -178,31 +178,44 @@ Android `HostBridge` implementation move together: bumping one without checking
 the other is how a callback goes silently dead, because the generated interface
 defaults most members.
 
-### `ProductTrUAPIHostBridge`
+### Runtime and executions
 
-`feature/products/impl/.../domain/truapi/ProductTrUAPIHostBridge.kt` implements
-`io.parity.truapi.HostBridge` directly and delegates every wired callback to
-`HostApiInteractor` — the same facade the native handler groups sit on. Do not
-reimplement dispatch on the Kotlin side.
+The core is one process-wide `TrUAPIHostRuntime` with a `TrUAPIProductExecution`
+per product connection, and the Android side mirrors that split:
 
-`TrUAPISessionStarter` owns the boot sequence for all consumers: build the
-`RuntimeConfig`, register the bootstrap at document start
+- `TrUAPIHostRuntimeProvider` (`@Singleton`) builds the runtime lazily on first
+  use from `HostRuntimeConfig` (host identity, People/Bulletin genesis hashes,
+  the local session) and keeps it for the process. Its runtime-level
+  `HostBridge` serves only what the signing runtime asks for — core storage,
+  auth state, signing-side chain access, and the confirmations SSO raises.
+  Product-scoped calls have no product there and fail closed, as on iOS. It
+  re-activates the local session when the wallet account changes.
+- `ProductTrUAPIHostBridge` (`feature/products/impl/.../domain/truapi/`) opens
+  one execution per product WebView with a product-scoped `HostBridge` and
+  delegates every wired callback to `HostApiInteractor` — the same facade the
+  native handler groups sit on. Do not reimplement dispatch on the Kotlin side.
+  Closing the bridge closes its execution; the runtime stays up.
+
+`TrUAPISessionStarter` owns the boot sequence for all consumers: resolve the
+shared runtime, register the bootstrap at document start
 (`WebViewCompat.addDocumentStartJavaScript`), then trigger the initial page
 load — the bootstrap must be in place before the page loads or the product
-never connects.
+never connects. The bootstrap carries the stored WebRTC decision as a literal
+(`permissionAuthorizationStatus`, a peek that never prompts), so a fresh grant
+only applies once the page reloads.
 
 ### Local session
 
 SSO pairing is not in the core yet (truapi#334), so the core has no session of
 its own and without one it holds no keys — every account and signing call fails
 regardless of what the user approves. `TrUAPILocalSessionSource` supplies
-`RuntimeConfig.localSessionSecret` from the wallet's **raw BIP-39 entropy**,
+`HostRuntimeConfig.localSessionSecret` from the wallet's **raw BIP-39 entropy**,
 which the core derives the session's root and identity keypairs from directly;
 anything derived would give the same recovery phrase different product accounts
-than iOS derives from it. The core activates the session inside its constructor,
-so `attach` builds it off the caller's thread. A wallet with no readable
-passphrase logs and boots without a session — the product still loads, signing
-still fails.
+than iOS derives from it. The core activates the session inside the runtime
+constructor, so `TrUAPIHostRuntimeProvider` builds it off the main thread. A
+wallet with no readable passphrase logs and boots without a session — products
+still load, signing still fails.
 
 ### Typed FFI payloads
 
@@ -219,12 +232,14 @@ it cannot describe. Every variant is covered by
 ### Threading contract
 
 - **Prompt-driven callbacks** (`confirmUserAction`, `devicePermission`, `remotePermission`, `navigateTo`, `featureSupported`) are `suspend` and awaited by the core — they may stay pending until the user decides.
-- **Dispatcher-thread callbacks** (chain, theme, storage, core log) run inline and **must return promptly** — no blocking work. Chain I/O goes through the non-blocking `WebSocketChainProvider`; theme is served from a cached value.
+- **Dispatcher-thread callbacks** (chain, theme, storage, core log) run inline and **must return promptly** — no blocking work. Chain I/O goes through the non-blocking `WebSocketChainProvider`, one per bridge so each notifies the runtime or execution it dials for; theme is served from a cached value.
+- `devicePermissionStatus` and `currentLocale` are left on the shell defaults (not applicable / system locale) — wire them when a product needs them.
 
 ### Chain agreement
 
 `supportedChains`, `featureSupported(Chain)` and `chainConnect` all answer from
-the one `TrUAPIChains` snapshot resolved at `attach`, through
+one `TrUAPIChains` snapshot — resolved at `attach` per execution, and once at
+boot for the runtime — through
 `TrUAPIChains.canDial`. Never answer any of them from the registry directly: the
 registry holds chains with no `wss` endpoints, so the host would advertise or
 promise a chain `chainConnect` then refuses. `TrUAPIChainAgreementTest` pins the

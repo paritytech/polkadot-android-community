@@ -83,6 +83,11 @@ class TrUAPIChains(
     fun canDial(genesisHash: ByteArray): Boolean = !endpoints[genesisHash.hexKey()].isNullOrEmpty()
 }
 
+internal val EMPTY_CHAINS = TrUAPIChains(
+    advertised = HostChainSet(network = "", chains = emptyList()),
+    endpoints = emptyMap(),
+)
+
 @OptIn(ExperimentalStdlibApi::class)
 internal fun GenesisHash.hexKey(): String = value.toHexString()
 

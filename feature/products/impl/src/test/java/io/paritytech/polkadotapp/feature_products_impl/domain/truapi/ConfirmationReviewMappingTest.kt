@@ -26,6 +26,7 @@ import uniffi.truapi_platform.AccountAccessReview
 import uniffi.truapi_platform.CreateTransactionReview
 import uniffi.truapi_platform.IdentityDisclosureReview
 import uniffi.truapi_platform.PreimageSubmitReview
+import uniffi.truapi_platform.ProductSubtreeReview
 import uniffi.truapi_platform.ResourceAllocationReview
 import uniffi.truapi_platform.SignPayloadReview
 import uniffi.truapi_platform.SignRawReview
@@ -252,6 +253,15 @@ class ConfirmationReviewMappingTest {
 
         assertEquals("caller.dot", confirmation.requesterProductId)
         assertEquals("target.dot", confirmation.targetProductId)
+    }
+
+    @Test
+    fun `product subtree maps the product as its own requester`() {
+        val review = UserConfirmationReview.ProductSubtree(ProductSubtreeReview(productId = "self.dot"))
+
+        val confirmation = review.toConfirmation(caller) as TrUAPIConfirmation.ProductSubtree
+
+        assertEquals("self.dot", confirmation.requesterProductId)
     }
 
     @Test
