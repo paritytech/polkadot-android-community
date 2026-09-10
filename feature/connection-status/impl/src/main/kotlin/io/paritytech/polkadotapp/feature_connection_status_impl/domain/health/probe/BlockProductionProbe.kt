@@ -21,10 +21,6 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-// Arrival at the client stands in for the block's own timestamp, which headers do not carry. Arrivals
-// count for one block time longer than the window so network jitter alone cannot dip N below Nmax, and
-// the probe reports every expected block until a full window has been observed, also after a reconnect,
-// so a connectivity gap is not read as the chain stalling.
 @OptIn(ExperimentalTime::class)
 class BlockProductionProbe @Inject constructor(
     private val timeProvider: TimeProvider,

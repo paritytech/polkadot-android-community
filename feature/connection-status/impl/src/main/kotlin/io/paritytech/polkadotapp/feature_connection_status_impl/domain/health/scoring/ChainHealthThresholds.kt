@@ -23,10 +23,8 @@ object ChainHealthThresholds {
     // Cadence at which liveness re-evaluates with no new block, so the score decays during a stall.
     val LIVENESS_TICK: Duration = 1.seconds
 
-    // Recent-block window for block production: N heads seen within it against Nmax = window / block time.
     val BLOCK_PRODUCTION_WINDOW: Duration = 30.seconds
 
-    // Share of Nmax that must have arrived, else the chain counts as not producing blocks.
     const val BLOCK_PRODUCTION_REQUIRED_RATIO = 5.0 / 6.0
 
     // --- Finality gap, in blocks (best - finalized). Per-chain overrides live in Chain.additional

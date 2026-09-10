@@ -4,7 +4,6 @@ import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-// Not thread-safe: drive it from a single collector.
 @OptIn(ExperimentalTime::class)
 class BlockArrivalWindow(private val window: Duration) {
     private val arrivals = ArrayDeque<Instant>()

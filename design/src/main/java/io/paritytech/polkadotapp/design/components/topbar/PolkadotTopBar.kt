@@ -225,8 +225,6 @@ private fun TrailingGroup(
             horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.mediumIncreased),
         ) {
             if (trailingContent != null) {
-                // Action buttons carry their own 12dp inner padding, so the bar keeps a 4dp edge; content
-                // standing last has to add that padding itself to end on the same margin as the title.
                 val endPadding = if (actions.isEmpty()) PolkadotTheme.spacings.extraMedium else 0.dp
                 Box(modifier = Modifier.padding(end = endPadding)) {
                     trailingContent()

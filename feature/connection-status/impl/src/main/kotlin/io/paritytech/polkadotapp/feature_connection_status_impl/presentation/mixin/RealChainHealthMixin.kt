@@ -29,9 +29,6 @@ internal class RealChainHealthMixin(
     private val knownChains: KnownChains,
     appLifecycleObserver: AppLifecycleObserver,
 ) : ChainHealthMixin, ComputationalScope by scope {
-    // Hot for the whole foreground session rather than per collector: the tab screens that draw the
-    // indicators lose their composition behind every pushed screen, and a per-collector pipeline would
-    // release the chain sockets and replay the smoother's connecting window on each return.
     override val model: StateFlow<ChainHealthIndicatorsModel> = appLifecycleObserver.subscribeIsForeground()
         .flatMapLatest { inForeground ->
             if (inForeground) monitor.observeChainsHealth().map { healths -> healths.toModel() } else emptyFlow()

@@ -65,8 +65,6 @@ fun ChainHealthIndicators(
     modifier: Modifier = Modifier,
     model: ChainHealthIndicatorsModel,
 ) {
-    // Clickable icons otherwise inflate the row to the 48dp minimum touch target; the indicators are
-    // deliberately tighter than that.
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         Row(
             modifier = modifier,
@@ -124,7 +122,6 @@ private fun HealthyDisc(item: ChainHealthItemModel) {
 
 @Composable
 private fun OutageArc(item: ChainHealthItemModel, indicator: ChainHealthIndicator.Outage) {
-    // The design grows the arc counter-clockwise from twelve o'clock; the indicator sweeps clockwise, so mirror it.
     NovaCircularProgressIndicator(
         modifier = Modifier
             .fillMaxSize()
@@ -182,7 +179,6 @@ private fun Ring(color: Color) {
 @Composable
 private fun Glyph(item: ChainHealthItemModel, tint: Color) {
     NovaIcon(
-        // The healthy disc is a surface that propagates its 20dp minimum to its content; size() would yield to it.
         modifier = Modifier.requiredSize(GLYPH_SIZE),
         imageVector = item.glyph.imageVector(),
         tint = tint,
