@@ -53,6 +53,17 @@ private const val ASSET_STATE_QUERY = """
 
 @Dao
 abstract class CoinageEntryDao {
+    /**
+     * Runs [action] in one database transaction.
+     *
+     * Registration does not need this — it runs inside the engine's transaction already — but a handoff
+     * writes coinage rows alone and still has to check and mark atomically.
+     */
+    @Transaction
+    open suspend fun withTransaction(action: suspend () -> Unit) {
+        return action()
+    }
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertInputs(inputs: List<CoinageEntryInputLocal>)
 

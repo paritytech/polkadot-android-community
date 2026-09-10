@@ -70,14 +70,18 @@ class RealCoinageAssetLedger @Inject constructor(
     override suspend fun markHandedOff(assets: List<LedgerAsset>): Result<Unit> = runCatching {
         val keys = assets.map { it.publicKey }
 
-        // The mirror of Blocked handoff: an asset a transaction of ours still has a claim on cannot also
-        // leave the device, or the peer and that transaction would both be spending it.
-        val claimed = DaoValidationScope(dao).filterClaimed(keys)
-        assets.firstOrNull { it.publicKey in claimed }?.asset?.let {
-            throw CoinageRegistrationError.HandoffOfClaimedAsset(it)
-        }
+        // One transaction, so nothing can claim these between the check and the mark. Unlike registration,
+        // no engine transaction is open around this call: a handoff writes coinage rows only.
+        dao.withTransaction {
+            // The mirror of Blocked handoff: an asset a transaction of ours still has a claim on cannot
+            // also leave the device, or the peer and that transaction would both be spending it.
+            val claimed = DaoValidationScope(dao).filterClaimed(keys)
+            assets.firstOrNull { it.publicKey in claimed }?.asset?.let {
+                throw CoinageRegistrationError.HandoffOfClaimedAsset(it)
+            }
 
-        dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal() })
+            dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal() })
+        }
     }
 
     override suspend fun commitHandoffs(keys: List<AssetPublicKey>): Result<Unit> = runCatching {
