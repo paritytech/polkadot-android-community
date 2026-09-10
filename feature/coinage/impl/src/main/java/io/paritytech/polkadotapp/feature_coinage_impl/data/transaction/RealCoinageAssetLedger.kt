@@ -1,0 +1,261 @@
+package io.paritytech.polkadotapp.feature_coinage_impl.data.transaction
+
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.database.dao.CoinageAssetStateProjection
+import io.paritytech.polkadotapp.database.dao.CoinageEntryDao
+import io.paritytech.polkadotapp.database.dao.CoinageEntryWithAssets
+import io.paritytech.polkadotapp.database.model.CoinageAssetKindLocal
+import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
+import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
+import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
+import io.paritytech.polkadotapp.database.model.DurableTxLocal
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageRegistrationError
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+
+class RealCoinageAssetLedger @Inject constructor(
+    private val dao: CoinageEntryDao,
+) : CoinageAssetLedger {
+    override suspend fun registerAssets(registrations: List<Pair<CoinageTransactionId, AssetRegistration>>) {
+        brokenInvariant(registrations.map { it.second })?.let { throw it }
+
+        registrations.forEach { (id, registration) ->
+            dao.insertInputs(registration.inputs.mapIndexed { position, it -> it.toLocal(id.value, position) })
+            dao.insertOutputs(registration.outputs.mapIndexed { position, it -> it.toLocal(id.value, position) })
+        }
+    }
+
+    /**
+     * The three invariants, checked across the whole batch: these rows do not exist yet, so the queries
+     * cannot see one registration's assets while checking another's.
+     */
+    private suspend fun brokenInvariant(registrations: List<AssetRegistration>): CoinageRegistrationError? {
+        val scope = DaoValidationScope(dao)
+
+        val outputs = registrations.flatMap { it.outputs }
+        val inputs = registrations.flatMap { it.inputs }
+
+        val outputKeys = outputs.map { it.publicKey }
+        val inputKeys = inputs.map { it.publicKey }
+
+        // Fresh outputs: an output address is an output of no other transaction, and not a key a peer sent us.
+        val notFresh = scope.filterMinted(outputKeys) + scope.filterReceived(outputKeys) + outputKeys.duplicates()
+        outputs.firstOrNull { it.publicKey in notFresh }?.let {
+            return CoinageRegistrationError.OutputNotFresh(it.output)
+        }
+
+        // Blocked handoff: a handed-off asset is never an input.
+        val handedOff = scope.filterHandedOff(inputKeys)
+        inputs.firstOrNull { it.publicKey in handedOff }?.let {
+            return CoinageRegistrationError.InputHandedOff(it.input)
+        }
+
+        // Unique consumer: an asset is an input of at most one transaction that is not a failure.
+        val claimed = scope.filterClaimed(inputKeys) + inputKeys.duplicates()
+        inputs.firstOrNull { it.publicKey in claimed }?.let {
+            return CoinageRegistrationError.InputAlreadyClaimed(it.input)
+        }
+
+        return null
+    }
+
+    override suspend fun markHandedOff(assets: List<LedgerAsset>): Result<Unit> = runCatching {
+        val keys = assets.map { it.publicKey }
+
+        // The mirror of Blocked handoff: an asset a transaction of ours still has a claim on cannot also
+        // leave the device, or the peer and that transaction would both be spending it.
+        val claimed = DaoValidationScope(dao).filterClaimed(keys)
+        assets.firstOrNull { it.publicKey in claimed }?.asset?.let {
+            throw CoinageRegistrationError.HandoffOfClaimedAsset(it)
+        }
+
+        dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal() })
+    }
+
+    override suspend fun commitHandoffs(keys: List<AssetPublicKey>): Result<Unit> = runCatching {
+        dao.commitHandoffs(keys.map { it.value })
+    }
+
+    override suspend fun releaseUncommittedHandoffs(): Result<Unit> = runCatching {
+        dao.deleteUncommittedHandoffs()
+    }
+
+    override suspend fun getHandoffKeys(): Result<Set<AssetPublicKey>> = runCatching {
+        dao.getHandoffs().mapTo(mutableSetOf()) { it.onChainKey.toDataByteArray() }
+    }
+
+    override suspend fun assetsOf(
+        ids: List<CoinageTransactionId>,
+    ): Result<Map<CoinageTransactionId, EntryAssets>> = runCatching {
+        if (ids.isEmpty()) return@runCatching emptyMap()
+
+        val raw = ids.map { it.value }
+        val inputs = dao.inputsOf(raw).groupBy { it.entryId }
+        val outputs = dao.outputsOf(raw).groupBy { it.entryId }
+
+        ids.associateWith { id ->
+            EntryAssets(
+                inputs = inputs[id.value].orEmpty().sortedBy { it.position }.map { it.toDomain() },
+                outputs = outputs[id.value].orEmpty().sortedBy { it.position }.map { it.toDomain() },
+            )
+        }
+    }
+
+    override suspend fun getGroupStatuses(
+        groupId: CoinageOperationGroupId,
+    ): Result<List<CoinageTransactionState>> = runCatching {
+        dao.getGroupEntries(groupId.value).toTransactionStates()
+    }
+
+    override fun subscribeGroupStatuses(
+        groupId: CoinageOperationGroupId,
+    ): Flow<List<CoinageTransactionState>> =
+        dao.subscribeGroupEntries(groupId.value).map { it.toTransactionStates() }
+
+    override fun subscribeAssetStates(): Flow<Map<OwnAsset, CoinageAssetState>> =
+        dao.subscribeAssetStates().map { projections -> projections.associate { it.toDomain() } }
+
+    override suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState> = runCatching {
+        dao.getAssetState(asset.kind().toLocal(), asset.index())?.toDomain()?.second ?: CoinageAssetState.UNTRACKED
+    }
+
+    override suspend fun getAssetStates(
+        assets: List<OwnAsset>,
+    ): Result<Map<OwnAsset, CoinageAssetState>> = runCatching {
+        val tracked = assets.groupBy { it.kind() }
+            .flatMap { (kind, ofKind) -> dao.getAssetStates(kind.toLocal(), ofKind.map { it.index() }) }
+            .associate { it.toDomain() }
+
+        assets.associateWith { tracked[it] ?: CoinageAssetState.UNTRACKED }
+    }
+}
+
+private class DaoValidationScope(private val dao: CoinageEntryDao) : RegistrationValidationScope {
+    override suspend fun filterMinted(keys: List<AssetPublicKey>) = dao.filterMinted(keys.raw()).wrap()
+
+    override suspend fun filterReceived(keys: List<AssetPublicKey>) = dao.filterReceivedKeys(keys.raw()).wrap()
+
+    override suspend fun filterClaimed(keys: List<AssetPublicKey>) = dao.filterClaimed(keys.raw()).wrap()
+
+    override suspend fun filterHandedOff(keys: List<AssetPublicKey>) = dao.filterHandedOff(keys.raw()).wrap()
+
+    private fun List<AssetPublicKey>.raw() = map { it.value }
+
+    private fun List<ByteArray>.wrap() = mapTo(mutableSetOf()) { it.toDataByteArray() }
+}
+
+private fun List<AssetPublicKey>.duplicates(): Set<AssetPublicKey> =
+    groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+
+private fun RegistrationInput.toLocal(entryId: Long, position: Int) = CoinageEntryInputLocal(
+    entryId = entryId,
+    position = position,
+    assetKind = input.kind().toLocal(),
+    derivationIndex = input.indexOrNull(),
+    onChainKey = publicKey.value,
+)
+
+private fun RegistrationOutput.toLocal(entryId: Long, position: Int) = CoinageEntryOutputLocal(
+    entryId = entryId,
+    position = position,
+    assetKind = output.kind().toLocal(),
+    derivationIndex = output.index(),
+    onChainKey = publicKey.value,
+)
+
+private fun LedgerAsset.toHandoffLocal(): CoinageHandoffLocal? {
+    val owned = asset ?: return null
+
+    return CoinageHandoffLocal(
+        onChainKey = publicKey.value,
+        assetKind = owned.kind().toLocal(),
+        derivationIndex = owned.index(),
+        committed = false,
+    )
+}
+
+private fun CoinageEntryInputLocal.toDomain() = LedgerAsset(
+    kind = assetKind.toDomain(),
+    asset = derivationIndex?.let { assetKind.toOwnAsset(it) },
+    publicKey = onChainKey.toDataByteArray(),
+)
+
+private fun CoinageEntryOutputLocal.toDomain() = LedgerAsset(
+    kind = assetKind.toDomain(),
+    asset = assetKind.toOwnAsset(derivationIndex),
+    publicKey = onChainKey.toDataByteArray(),
+)
+
+private fun List<CoinageEntryWithAssets>.toTransactionStates() = map { row ->
+    CoinageTransactionState(
+        id = CoinageTransactionId(row.entry.id),
+        status = row.entry.status.toDomain(),
+        inputs = row.inputs.sortedBy { it.position }.map { it.toDomain().toCoinageInput() },
+        outputs = row.outputs.sortedBy { it.position }.mapNotNull { it.toDomain().asset },
+    )
+}
+
+/** A null [LedgerAsset.asset] is the peer-sent coin case: an on-chain identity we hold no local asset for. */
+private fun LedgerAsset.toCoinageInput(): CoinageInput = when (val ownAsset = asset) {
+    is OwnAsset.Coin -> CoinageInput.Coin.Own(ownAsset.derivationIndex)
+    is OwnAsset.Voucher -> CoinageInput.Voucher(ownAsset.ringVrfIndex)
+    null -> CoinageInput.Coin.Received(publicKey)
+}
+
+private fun CoinageAssetStateProjection.toDomain(): Pair<OwnAsset, CoinageAssetState> =
+    assetKind.toOwnAsset(derivationIndex) to CoinageAssetState(
+        handedOff = handedOff,
+        minterStatus = minterStatus?.toDomain(),
+        consumerStatus = consumerStatus?.toDomain(),
+    )
+
+private fun CoinageAssetKindLocal.toOwnAsset(derivationIndex: Int): OwnAsset = when (this) {
+    CoinageAssetKindLocal.COIN -> OwnAsset.Coin(derivationIndex)
+    CoinageAssetKindLocal.VOUCHER -> OwnAsset.Voucher(derivationIndex)
+}
+
+private fun CoinageAssetKindLocal.toDomain() = when (this) {
+    CoinageAssetKindLocal.COIN -> CoinageAssetKind.COIN
+    CoinageAssetKindLocal.VOUCHER -> CoinageAssetKind.VOUCHER
+}
+
+private fun CoinageAssetKind.toLocal() = when (this) {
+    CoinageAssetKind.COIN -> CoinageAssetKindLocal.COIN
+    CoinageAssetKind.VOUCHER -> CoinageAssetKindLocal.VOUCHER
+}
+
+private fun DurableTxLocal.Status.toDomain() = when (this) {
+    DurableTxLocal.Status.PENDING -> CoinageTransactionStatus.PENDING
+    DurableTxLocal.Status.PENDING_SUCCESS -> CoinageTransactionStatus.PENDING_SUCCESS
+    DurableTxLocal.Status.FINALIZED_SUCCESS -> CoinageTransactionStatus.FINALIZED_SUCCESS
+    DurableTxLocal.Status.FAILURE -> CoinageTransactionStatus.FAILURE
+}
+
+private fun OwnAsset.kind() = when (this) {
+    is OwnAsset.Coin -> CoinageAssetKind.COIN
+    is OwnAsset.Voucher -> CoinageAssetKind.VOUCHER
+}
+
+private fun OwnAsset.index() = when (this) {
+    is OwnAsset.Coin -> derivationIndex
+    is OwnAsset.Voucher -> ringVrfIndex
+}
+
+private fun CoinageInput.kind() = when (this) {
+    is CoinageInput.Coin -> CoinageAssetKind.COIN
+    is CoinageInput.Voucher -> CoinageAssetKind.VOUCHER
+}
+
+private fun CoinageInput.indexOrNull() = when (this) {
+    is CoinageInput.Coin.Own -> derivationIndex
+    is CoinageInput.Coin.Received -> null
+    is CoinageInput.Voucher -> ringVrfIndex
+}

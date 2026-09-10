@@ -9,7 +9,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePayme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageChainViewFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -27,7 +28,8 @@ import javax.inject.Inject
  */
 class RealCoinagePaymentStatusUseCase @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
-    private val chainViewFactory: CoinageChainViewFactory,
+    private val chainViewFactory: PinnedChainViewFactory,
+    private val stateReaderFactory: CoinageStateReaderFactory,
 ) : CoinagePaymentStatusUseCase {
     override fun subscribeStatuses(coins: List<AccountId>): Flow<Map<AccountId, CoinagePaymentState>> {
         return coinageAssetsUseCase.subscribeCoinsBy(coins).map { tracked ->
@@ -51,7 +53,8 @@ class RealCoinagePaymentStatusUseCase @Inject constructor(
         if (minted.isEmpty()) return emptyMap()
 
         val view = chainViewFactory.pin().getOrNull() ?: return emptyMap()
-        val coins = view.coinsAt(view.finalizedHead.blockHash, minted).getOrNull() ?: return emptyMap()
+        val reader = runCatching { stateReaderFactory.create(view) }.getOrNull() ?: return emptyMap()
+        val coins = reader.coinsAt(view.finalizedHead.blockHash, minted).getOrNull() ?: return emptyMap()
 
         return minted.associateWith { coins[it] != null }
     }

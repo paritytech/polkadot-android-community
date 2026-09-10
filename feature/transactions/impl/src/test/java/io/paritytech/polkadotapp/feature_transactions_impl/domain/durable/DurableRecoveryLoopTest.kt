@@ -1,12 +1,12 @@
-package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery
+package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.paritytech.polkadotapp.chains.network.binding.BlockNumber
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageChainViewFactory
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageEntryRepository
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
+import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -20,12 +20,12 @@ import org.junit.Test
  * The loop's whole job is deciding when to stop: too early strands a lock nothing else will release, too
  * late holds a foreground service up for nothing.
  */
-class CoinageRecoveryLoopTest {
-    private val repository: CoinageEntryRepository = mockk()
-    private val recoveryPass: CoinageRecoveryPass = mockk()
-    private val chainViewFactory: CoinageChainViewFactory = mockk()
+class DurableRecoveryLoopTest {
+    private val repository: DurableTxRepository = mockk()
+    private val recoveryPass: DurableRecoveryPass = mockk()
+    private val chainViewFactory: PinnedChainViewFactory = mockk()
 
-    private val loop = CoinageRecoveryLoop(repository, recoveryPass, chainViewFactory)
+    private val loop = DurableRecoveryLoop(repository, recoveryPass, chainViewFactory)
 
     private var passesRun = 0
 
@@ -79,7 +79,7 @@ class CoinageRecoveryLoopTest {
     @Test
     fun `an unreadable ledger keeps the loop running rather than abandoning entries`() = runBlocking<Unit> {
         givenPassesSucceed()
-        coEvery { repository.hasLiveEntries() } returns Result.failure(IllegalStateException("no database"))
+        coEvery { repository.hasLiveTransactions() } returns Result.failure(IllegalStateException("no database"))
         givenHeads(1, 2)
 
         // It never settles by design, so the loop has to be cut off rather than awaited: the point is that
@@ -95,7 +95,7 @@ class CoinageRecoveryLoopTest {
     }
 
     private fun givenLiveWhilePassesBelow(threshold: Int) {
-        coEvery { repository.hasLiveEntries() } answers { Result.success(passesRun < threshold) }
+        coEvery { repository.hasLiveTransactions() } answers { Result.success(passesRun < threshold) }
     }
 
     private fun givenHeads(vararg numbers: Int) {

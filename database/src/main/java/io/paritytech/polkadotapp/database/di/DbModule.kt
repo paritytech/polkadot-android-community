@@ -109,6 +109,10 @@ class DbModule {
 
     @Provides
     @Singleton
+    fun provideDurableTxDao(appDatabase: AppDatabase) = appDatabase.durableTxDao()
+
+    @Provides
+    @Singleton
     fun provideVideoGameVoteDao(appDatabase: AppDatabase) = appDatabase.videoGameVoteDao()
 
     @Provides

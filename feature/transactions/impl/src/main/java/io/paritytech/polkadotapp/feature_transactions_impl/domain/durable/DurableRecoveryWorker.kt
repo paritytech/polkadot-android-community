@@ -1,4 +1,4 @@
-package io.paritytech.polkadotapp.feature_coinage_impl.domain.worker
+package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -23,49 +23,45 @@ import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionR
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageRecoveryLoop
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageRecoveryScheduler
-import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
-import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableChainProvider
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import io.paritytech.polkadotapp.common.R as RCommon
 
 /**
- * Hosts [CoinageRecoveryLoop] for as long as any entry is undecided.
+ * Hosts [DurableRecoveryLoop] for as long as any transaction is undecided.
  *
- * One-time rather than periodic: the loop is driven by finalized heads and ends by itself once the ledger
- * settles, so a repeat interval would only add passes that could not learn anything. `KEEP` makes every
- * caller's [CoinageRecoveryScheduler.ensureRunning] idempotent against the running loop.
+ * One-time rather than periodic: the loop is driven by heads and ends by itself once the ledger settles, so
+ * a repeat interval would only add passes that could not learn anything. `KEEP` makes every caller's
+ * [DurableRecoveryScheduler.ensureRunning] idempotent against the running loop.
  *
- * It runs in the foreground because an entry can stay undecided for a whole mortality window, well past
- * WorkManager's execution limit for a background worker — and letting a lock outlive the process that could
- * release it is the failure this subsystem exists to prevent.
+ * It runs in the foreground because a transaction can stay undecided for a whole mortality window, well
+ * past WorkManager's execution limit for a background worker — and letting a lock outlive the process that
+ * could release it is the failure this subsystem exists to prevent.
  */
 @HiltWorker
-class CoinageRecoveryWorker @AssistedInject constructor(
+class DurableRecoveryWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
-    private val recoveryLoop: CoinageRecoveryLoop,
+    private val recoveryLoop: DurableRecoveryLoop,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
-    @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
+    private val chainProvider: DurableChainProvider,
 ) : CoroutineWorker(appContext, params) {
     companion object {
-        private const val WORK_ID = "CoinageRecovery"
+        private const val WORK_ID = "DurableTxRecovery"
 
         private val NOTIFICATION_ID = WORK_ID.hashCode()
 
         fun enqueue(context: Context) {
-            val request = OneTimeWorkRequestBuilder<CoinageRecoveryWorker>()
+            val request = OneTimeWorkRequestBuilder<DurableRecoveryWorker>()
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
                         .build()
                 )
-                // Connectivity returning is a trigger in its own right: a loop that dropped its subscription
-                // fails, and the constraint above holds the retry until there is a network to retry on.
+                // Connectivity returning is a trigger in its own right: a loop that dropped its
+                // subscription fails, and the constraint above holds the retry until there is a network.
                 .setBackoffCriteria(
                     BackoffPolicy.LINEAR,
                     WorkRequest.MIN_BACKOFF_MILLIS,
@@ -79,15 +75,11 @@ class CoinageRecoveryWorker @AssistedInject constructor(
     }
 
     override suspend fun doWork(): Result {
-        coinageLogD("Recovery worker run started")
-
         promoteToForeground()
 
-        return chainConnectionRefCounter.withConnectionEnabled(chainAssetProvider.chainId(), WORK_ID) {
+        return chainConnectionRefCounter.withConnectionEnabled(chainProvider.chainId(), WORK_ID) {
             recoveryLoop.runUntilSettled()
-        }.logFailure("Coinage recovery loop stopped early")
-            .onSuccess { coinageLogD("Recovery worker run settled") }
-            .onFailure { coinageLogW("Recovery worker run stopped early: $it") }
+        }.logFailure("Durable recovery loop stopped early")
             .toWorkerResult(retryOnFailure = true)
     }
 
@@ -97,7 +89,7 @@ class CoinageRecoveryWorker @AssistedInject constructor(
      */
     private suspend fun promoteToForeground() {
         runCatching { setForeground(getForegroundInfo()) }
-            .onFailure { coinageLogW("Coinage recovery could not run in the foreground: $it") }
+            .onFailure { Timber.w(it, "Durable recovery could not run in the foreground") }
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
@@ -125,22 +117,23 @@ class CoinageRecoveryWorker @AssistedInject constructor(
             applicationContext.getString(RCommon.string.workers_notification_channel_name),
             NotificationManager.IMPORTANCE_LOW
         )
-        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager =
+            applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
 
         return channelId
     }
 }
 
-class WorkManagerCoinageRecoveryScheduler @Inject constructor(
+class WorkManagerDurableRecoveryScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) : CoinageRecoveryScheduler {
+) : DurableRecoveryScheduler {
     /**
      * Enqueueing is best-effort by contract: the caller has already committed a ledger row, and losing the
      * scheduler must never undo that. The next launch starts the loop anyway.
      */
     override fun ensureRunning() {
-        runCatching { CoinageRecoveryWorker.enqueue(context) }
-            .onFailure { coinageLogW("Could not enqueue coinage recovery: $it") }
+        runCatching { DurableRecoveryWorker.enqueue(context) }
+            .onFailure { Timber.w(it, "Could not enqueue durable recovery") }
     }
 }

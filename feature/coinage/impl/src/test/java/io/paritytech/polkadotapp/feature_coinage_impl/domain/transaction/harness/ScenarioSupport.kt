@@ -398,7 +398,9 @@ suspend fun DurabilityHarness.evidenceFor(id: CoinageTransactionId): ChainEviden
         coinageSigningContextProvider = RealCoinageSigningContextProvider(),
     )
 
-    return collector.collect(repository.getEntry(id).getOrThrow()!!, chain.pin().getOrThrow())
+    val view = chain.pin().getOrThrow()
+
+    return collector.collect(repository.getEntry(id).getOrThrow()!!, chain.create(view), view)
 }
 
 // ---- internals ----------------------------------------------------------------------------------------

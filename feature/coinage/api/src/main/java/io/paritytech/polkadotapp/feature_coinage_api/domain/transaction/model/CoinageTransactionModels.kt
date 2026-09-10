@@ -4,18 +4,58 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
-import java.util.UUID
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 
-@JvmInline
-value class CoinageTransactionId(val value: Long)
+/**
+ * Coinage's transactions are rows of the shared durability ledger, so these name the engine's types rather
+ * than parallel ones. Callers keep the coinage-flavoured spelling; there is one set of values underneath.
+ */
+typealias CoinageTransactionId = DurableTxId
 
-/** Caller-chosen and opaque, so a group can be found again without storing the id anywhere. */
-@JvmInline
-value class CoinageOperationGroupId(val value: String) {
-    companion object {
-        /** For an operation with no identity of its own to derive one from. */
-        fun generateNew() = CoinageOperationGroupId(UUID.randomUUID().toString())
-    }
+typealias CoinageOperationGroupId = OperationGroupId
+
+typealias CheckpointBlock = io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
+
+/**
+ * Deliberately its own enum rather than an alias of the engine's status.
+ *
+ * Kotlin cannot import an enum entry through a typealias (KT-64431), and callers throughout the app import
+ * these entries by name. Mapping at the boundary costs one `when`; aliasing would cost every call site.
+ */
+enum class CoinageTransactionStatus {
+    PENDING,
+    PENDING_SUCCESS,
+
+    /** Terminal: executed successfully in a finalized block. */
+    FINALIZED_SUCCESS,
+
+    /** Terminal: proven not to have executed, and unable to. */
+    FAILURE,
+    ;
+
+    /** Live transactions hold their inputs locked. */
+    val isLive: Boolean get() = this == PENDING || this == PENDING_SUCCESS
+
+    /**
+     * Executed in a block, finalized or not.
+     *
+     * The threshold to read on-chain presence against: a coin is only absent-because-consumed if whatever
+     * minted it actually ran, and asking for finality there while presence is read at the best head reports
+     * a coin that plainly existed a moment ago as one that may never have.
+     */
+    val isArrived: Boolean get() = this == PENDING_SUCCESS || this == FINALIZED_SUCCESS
+
+    /** The only transaction that provably cannot complete is a terminal [FAILURE]. */
+    val canArrive: Boolean get() = this != FAILURE
+}
+
+fun DurableTxStatus.toCoinage(): CoinageTransactionStatus = when (this) {
+    DurableTxStatus.PENDING -> CoinageTransactionStatus.PENDING
+    DurableTxStatus.PENDING_SUCCESS -> CoinageTransactionStatus.PENDING_SUCCESS
+    DurableTxStatus.FINALIZED_SUCCESS -> CoinageTransactionStatus.FINALIZED_SUCCESS
+    DurableTxStatus.FAILURE -> CoinageTransactionStatus.FAILURE
 }
 
 /** One signed transaction with the assets it consumes and mints. */
@@ -40,36 +80,6 @@ sealed interface OwnAsset {
     data class Coin(val derivationIndex: DerivationIndex) : OwnAsset
 
     data class Voucher(val ringVrfIndex: RingVrfIndex) : OwnAsset
-}
-
-enum class CoinageTransactionStatus {
-    PENDING,
-    PENDING_SUCCESS,
-
-    /** Terminal: executed successfully in a finalized block. */
-    FINALIZED_SUCCESS,
-
-    /** Terminal: proven not to have executed, and unable to. */
-    FAILURE,
-    ;
-
-    /** Live transactions hold their inputs locked. */
-    val isLive: Boolean get() = this == PENDING || this == PENDING_SUCCESS
-
-    /**
-     * Executed in a block, finalized or not.
-     *
-     * The threshold to read on-chain presence against: a coin is only absent-because-consumed if whatever
-     * minted it actually ran, and asking for finality there while presence is read at the best head reports
-     * a coin that plainly existed a moment ago as one that may never have.
-     */
-    val isArrived: Boolean get() = this == PENDING_SUCCESS || this == FINALIZED_SUCCESS
-
-    /**
-     * Whether there's a way for this transaction to be completed (already or in the future)
-     * The only transaction that cannot provably complete is the one marked as terminal FAILURE
-     */
-    val canArrive: Boolean get() = this != FAILURE
 }
 
 data class CoinageTransactionState(
@@ -106,9 +116,3 @@ data class CoinageAssetState(
         val UNTRACKED = CoinageAssetState(handedOff = false, minterStatus = null, consumerStatus = null)
     }
 }
-
-/** The finalized block a transaction's mortality is anchored to. */
-data class CheckpointBlock(
-    val blockNumber: Long,
-    val blockHash: String,
-)

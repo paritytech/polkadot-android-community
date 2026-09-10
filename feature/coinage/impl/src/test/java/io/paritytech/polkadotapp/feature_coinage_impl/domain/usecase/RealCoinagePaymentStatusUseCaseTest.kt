@@ -18,8 +18,10 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageChainView
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageChainViewFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReader
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -36,10 +38,13 @@ import org.junit.Test
  */
 class RealCoinagePaymentStatusUseCaseTest {
     private val coinageAssetsUseCase: CoinageAssetsUseCase = mockk()
-    private val chainViewFactory: CoinageChainViewFactory = mockk()
-    private val chainView: CoinageChainView = mockk()
+    private val chainViewFactory: PinnedChainViewFactory = mockk()
+    private val chainView: PinnedChainView = mockk()
+    private val stateReaderFactory: CoinageStateReaderFactory = mockk()
+    private val stateReader: CoinageStateReader = mockk()
 
-    private val useCase = RealCoinagePaymentStatusUseCase(coinageAssetsUseCase, chainViewFactory)
+    private val useCase =
+        RealCoinagePaymentStatusUseCase(coinageAssetsUseCase, chainViewFactory, stateReaderFactory)
 
     @Test
     fun `a coin still on chain is waiting for the peer to take it`() = runTest {
@@ -177,7 +182,8 @@ class RealCoinagePaymentStatusUseCaseTest {
             else -> Result.success(chainView)
         }
         every { chainView.finalizedHead } returns CheckpointBlock(blockNumber = 100, blockHash = "0xfinal")
-        coEvery { chainView.coinsAt(any(), any()) } returns Result.success(
+        coEvery { stateReaderFactory.create(any()) } returns stateReader
+        coEvery { stateReader.coinsAt(any(), any()) } returns Result.success(
             mapOf(ACCOUNT to OnChainCoinInfo(instanceId = 0, value = 3, age = 0).takeIf { atFinalized == PRESENT })
         )
     }

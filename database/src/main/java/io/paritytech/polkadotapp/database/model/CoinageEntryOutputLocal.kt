@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.Index
 
 /**
- * One asset minted by [CoinageEntryLocal]. Always an asset we own, so [derivationIndex] is never null.
+ * One asset minted by a durable transaction. Always an asset we own, so [derivationIndex] is never null.
  *
  * The unique index on [onChainKey] is the Fresh-outputs invariant made structural: no address is ever the
  * output of two entries.
@@ -21,7 +21,7 @@ import androidx.room.Index
 class CoinageEntryOutputLocal(
     val entryId: Long,
     val position: Int,
-    val assetKind: CoinageEntryLocal.AssetKind,
+    val assetKind: CoinageAssetKindLocal,
     val derivationIndex: Int,
     val onChainKey: ByteArray,
 )

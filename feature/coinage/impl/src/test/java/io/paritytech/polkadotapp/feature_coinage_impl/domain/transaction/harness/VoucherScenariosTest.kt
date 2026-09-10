@@ -17,7 +17,7 @@ import org.junit.Test
  *
  * A voucher is the only asset with positive consumption proof: its recycler alias reads as unloaded. A coin
  * has nothing equivalent — its absence is the strongest signal there is — so every rule that turns on
- * `provenConsumedOnChain` or `provenNotUnloaded` is exercised here and nowhere else.
+ * `provenConsumedOnChain` or `provenNotConsumed` is exercised here and nowhere else.
  */
 class VoucherScenariosTest {
     @Test

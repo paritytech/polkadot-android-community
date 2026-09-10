@@ -8,10 +8,13 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageChainView
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.TransactionSearchResult
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TransactionSearchResult
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.RuleOutcome
 import io.paritytech.polkadotapp.test_shared.anyLong
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
@@ -357,16 +360,19 @@ class CoinageRulesTest {
     private val receivedIn = received(4)
 
     /** The ladder consults the view for one thing only: the body search of its last rule. */
-    private val chainView: CoinageChainView = mock()
+    private val chainView: PinnedChainView = mock()
 
     private suspend fun evaluate(
         entry: LedgerEntry,
-        evidence: ChainEvidence,
+        evidence: TestEvidence,
         dag: CoinageEntryDag = dag(entry),
         search: TransactionSearchResult = TransactionSearchResult.NotFound(wholeRangeRead = false),
     ): RuleOutcome {
         whenever(chainView.searchForTransaction(anyLong(), anyLong(), anyString())).thenReturn(search)
-        return evaluateRules(entry, dag, evidence, chainView)
+        whenever(chainView.finalizedHead).thenReturn(evidence.evidence.finalized)
+        whenever(chainView.bestHead).thenReturn(evidence.evidence.best)
+
+        return evaluateRules(entry, dag, evidence.evidence, chainView, evidence.recordedStillCanonical)
     }
 
     /** The ladder reached the last rule instead of deciding on state alone. */
@@ -380,7 +386,8 @@ class CoinageRulesTest {
     ): RuleOutcome.Decided {
         assertTrue("expected a decision but was $outcome", outcome is RuleOutcome.Decided)
         outcome as RuleOutcome.Decided
-        assertEquals(expectedStatus, outcome.verdict.status)
+        // The ladder speaks the engine's status; the cases were written in coinage's.
+        assertEquals(expectedStatus.toDurable(), outcome.verdict.status)
         return outcome
     }
 
@@ -405,13 +412,16 @@ class CoinageRulesTest {
         successDetectedAt: CheckpointBlock? = null,
         checkpointNumber: Long = CHECKPOINT_NUMBER,
     ) = LedgerEntry(
-        id = CoinageTransactionId(id),
-        groupId = null,
-        txHash = "0xtx$id",
-        checkpoint = CheckpointBlock(checkpointNumber, "0xcheckpoint"),
-        mortalityBlocks = MORTALITY,
-        successDetectedAt = successDetectedAt,
-        status = status,
+        facts = DurableTxFacts(
+            id = CoinageTransactionId(id),
+            domainId = io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE_DOMAIN,
+            groupId = null,
+            txHash = "0xtx$id",
+            checkpoint = CheckpointBlock(checkpointNumber, "0xcheckpoint"),
+            mortalityBlocks = MORTALITY,
+            successDetectedAt = successDetectedAt,
+            status = status.toDurable(),
+        ),
         inputs = inputs,
         outputs = outputs,
     )
@@ -446,7 +456,7 @@ private fun evidence(
     unloadedAtFinalized: Set<LedgerAsset> = emptySet(),
     unreadable: Set<LedgerAsset> = emptySet(),
     recordedBlockStillCanonical: Boolean? = null,
-): ChainEvidence {
+): TestEvidence {
     fun presence(present: Set<LedgerAsset>, absent: Set<LedgerAsset>) =
         (present.map { it.publicKey to ChainPresence.PRESENT } + absent.map { it.publicKey to ChainPresence.ABSENT })
             .filterNot { (key, _) -> key in unreadable.map { it.publicKey } }
@@ -454,13 +464,33 @@ private fun evidence(
 
     val aliases = unloadedAtFinalized.associate { it.publicKey to AliasRead.UNLOADED }
 
-    return ChainEvidence(
-        finalized = CheckpointBlock(finalizedNumber, "0xfinalized"),
-        best = BEST_BLOCK,
-        presenceAtFinalized = presence(presentAtFinalized, absentAtFinalized),
-        presenceAtBest = presence(presentAtBest, absentAtBest),
-        aliasAtFinalized = aliases,
-        aliasAtBest = aliases,
-        recordedBlockStillCanonical = recordedBlockStillCanonical,
+    return TestEvidence(
+        evidence = ChainEvidence(
+            finalized = CheckpointBlock(finalizedNumber, "0xfinalized"),
+            best = BEST_BLOCK,
+            presenceAtFinalized = presence(presentAtFinalized, absentAtFinalized),
+            presenceAtBest = presence(presentAtBest, absentAtBest),
+            aliasAtFinalized = aliases,
+            aliasAtBest = aliases,
+        ),
+        recordedStillCanonical = recordedBlockStillCanonical,
     )
+}
+
+/**
+ * What the rules read, plus the one fact that left [ChainEvidence] when the pass took over resolving it.
+ *
+ * Bundled so the cases still write `evaluate(entry, evidence(...))` and still name
+ * `recordedBlockStillCanonical` where they set it.
+ */
+private class TestEvidence(
+    val evidence: ChainEvidence,
+    val recordedStillCanonical: Boolean?,
+)
+
+private fun CoinageTransactionStatus.toDurable() = when (this) {
+    CoinageTransactionStatus.PENDING -> DurableTxStatus.PENDING
+    CoinageTransactionStatus.PENDING_SUCCESS -> DurableTxStatus.PENDING_SUCCESS
+    CoinageTransactionStatus.FINALIZED_SUCCESS -> DurableTxStatus.FINALIZED_SUCCESS
+    CoinageTransactionStatus.FAILURE -> DurableTxStatus.FAILURE
 }

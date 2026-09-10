@@ -6,12 +6,13 @@ import io.paritytech.polkadotapp.common.utils.ensureKeysWithNullDefault
 import io.paritytech.polkadotapp.common.utils.filterNotNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CheckpointBlock
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.CoinageSigningContextProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.AssetPublicKey
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageChainView
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReader
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RecyclerAliasKey
@@ -33,18 +34,21 @@ class CoinageEvidenceCollector @Inject constructor(
     private val voucherRingDerivation: VoucherRingDerivation,
     private val coinageSigningContextProvider: CoinageSigningContextProvider,
 ) {
-    suspend fun collect(entry: LedgerEntry, view: CoinageChainView): ChainEvidence = coroutineScope {
+    suspend fun collect(
+        entry: LedgerEntry,
+        reader: CoinageStateReader,
+        view: PinnedChainView,
+    ): ChainEvidence = coroutineScope {
         val assets = entry.inputs + entry.outputs
         val coinKeys = assets.filter { it.isCoin }.map { it.publicKey }.distinct()
         val voucherAssets = assets.filter { it.isVoucher }.distinctBy { it.publicKey }
         val logId = entry.logId()
 
         // Independent reads, so they go out together rather than one head after the other.
-        val coinsAtFinalized = async { view.coinPresence(logId, view.finalizedHead, coinKeys) }
-        val coinsAtBest = async { view.coinPresence(logId, view.bestHead, coinKeys) }
-        val vouchersAtFinalized = async { view.voucherEvidence(logId, view.finalizedHead, voucherAssets) }
-        val vouchersAtBest = async { view.voucherEvidence(logId, view.bestHead, voucherAssets) }
-        val recordedStillCanonical = async { entry.successDetectedAt?.let { view.stillCanonical(logId, it) } }
+        val coinsAtFinalized = async { reader.coinPresence(logId, view.finalizedHead, coinKeys) }
+        val coinsAtBest = async { reader.coinPresence(logId, view.bestHead, coinKeys) }
+        val vouchersAtFinalized = async { reader.voucherEvidence(logId, view.finalizedHead, voucherAssets) }
+        val vouchersAtBest = async { reader.voucherEvidence(logId, view.bestHead, voucherAssets) }
 
         val finalized = vouchersAtFinalized.await()
         val best = vouchersAtBest.await()
@@ -56,7 +60,6 @@ class CoinageEvidenceCollector @Inject constructor(
             presenceAtBest = coinsAtBest.await() + best.presence,
             aliasAtFinalized = finalized.alias,
             aliasAtBest = best.alias,
-            recordedBlockStillCanonical = recordedStillCanonical.await(),
         )
     }
 
@@ -68,7 +71,7 @@ class CoinageEvidenceCollector @Inject constructor(
      * subscription and can name a ring the voucher has already left, which would send the alias read to a
      * key that answers "no entry" — indistinguishable from a voucher that was never unloaded.
      */
-    private suspend fun CoinageChainView.voucherEvidence(
+    private suspend fun CoinageStateReader.voucherEvidence(
         logId: String,
         at: CheckpointBlock,
         vouchers: List<LedgerAsset>,
@@ -106,7 +109,7 @@ class CoinageEvidenceCollector @Inject constructor(
         return VoucherEvidence(presence = presence, alias = alias)
     }
 
-    private suspend fun CoinageChainView.ringPositionsOf(
+    private suspend fun CoinageStateReader.ringPositionsOf(
         at: CheckpointBlock,
         memberships: Map<AssetPublicKey, ValueExponent?>,
     ): Result<Map<AssetPublicKey, RingPosition?>> {
@@ -198,7 +201,7 @@ private fun LedgerAsset.voucherIndex() = (asset as? OwnAsset.Voucher)?.ringVrfIn
  * A failed read is the whole batch failing; there is no per-key channel below this. Within a successful read
  * every requested key is present, so a null value is the chain holding no coin there — absent.
  */
-private suspend fun CoinageChainView.coinPresence(
+private suspend fun CoinageStateReader.coinPresence(
     logId: String,
     at: CheckpointBlock,
     coinKeys: List<AssetPublicKey>,
@@ -215,16 +218,3 @@ private suspend fun CoinageChainView.coinPresence(
         }
     }
 }
-
-/** Null when the read failed, which aborts the entry rather than discarding the record. */
-private suspend fun CoinageChainView.stillCanonical(logId: String, recorded: CheckpointBlock): Boolean? =
-    blockHashAt(recorded.blockNumber).fold(
-        // No block at that height is the chain answering, not failing to: a chain shorter than the record
-        // does not have the block, so the record is stale. Only a failed read is unknown.
-        onSuccess = { hash -> hash == recorded.blockHash },
-        onFailure = {
-            coinageLogW("$logId read-unknown what=record-canonicality at=${recorded.blockNumber} error=$it")
-
-            null
-        },
-    )
