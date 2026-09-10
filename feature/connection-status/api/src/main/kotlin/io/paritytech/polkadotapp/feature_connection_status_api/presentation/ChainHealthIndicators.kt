@@ -52,8 +52,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.PI
 
 private val ICON_SIZE = 20.dp
-private val GLYPH_SIZE = 11.dp
-private val GLYPH_INSET = 1.dp
+private val GLYPH_SIZE = 10.dp
 private val RING_STROKE = 2.dp
 private const val RING_DOTS = 8
 private const val PULSE_MIN_ALPHA = 0.3f
@@ -190,9 +189,7 @@ private fun DisconnectedRing(item: ChainHealthItemModel) {
 @Composable
 private fun Glyph(item: ChainHealthItemModel, tint: Color) {
     NovaIcon(
-        modifier = Modifier
-            .size(GLYPH_SIZE)
-            .padding(GLYPH_INSET),
+        modifier = Modifier.size(GLYPH_SIZE),
         imageVector = item.glyph.imageVector(),
         tint = tint,
         contentDescription = item.chainName,
