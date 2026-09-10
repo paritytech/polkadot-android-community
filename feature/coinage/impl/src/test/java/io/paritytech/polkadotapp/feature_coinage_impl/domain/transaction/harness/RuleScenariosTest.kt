@@ -3,14 +3,14 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harnes
 import io.paritytech.polkadotapp.chains.extrinsic.ExtrinsicStatus
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.ExtrinsicOutcome
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageRegistrationError
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FAILURE
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.FINALIZED
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.IN_BEST
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -341,7 +341,7 @@ class RuleScenariosTest {
     private fun statusEvents() = MutableSharedFlow<ExtrinsicStatus>(replay = 4, extraBufferCapacity = 8)
 
     private suspend fun DurabilityHarness.nonFailedClaimantsOf(coin: Int) = repository.getAllEntries().getOrThrow()
-        .filter { it.status != CoinageTransactionStatus.FAILURE }
+        .filter { it.status != DurableTxStatus.FAILURE }
         .count { entry -> entry.inputs.any { it.asset == OwnAsset.Coin(coin) } }
 }
 

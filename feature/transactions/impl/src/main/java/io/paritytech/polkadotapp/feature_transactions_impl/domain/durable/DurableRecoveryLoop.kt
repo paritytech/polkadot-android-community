@@ -1,10 +1,9 @@
-package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery
+package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageChainViewFactory
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageEntryRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
+import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
@@ -16,15 +15,15 @@ import kotlinx.coroutines.flow.transformWhile
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Why a pass is being run. Kept for the log — the pass itself reads the chain the same way whatever woke it. */
+/** Why a pass is being run. Kept for the log — the pass reads the chain the same way whatever woke it. */
 private enum class Trigger { LAUNCH, FINALIZED_HEAD, BEST_HEAD, MANUAL_TRIGGER }
 
 /**
- * Runs recovery passes until the ledger holds no live entry.
+ * Runs recovery passes until the ledger holds no live transaction.
  *
  * A pass is worth running exactly when the facts the rules read can have changed: a new best block moves
- * inclusion and payment status, a new finalized block moves everything terminal, and a released submission
- * hands an entry back that the pass had been skipping. All three feed one runner.
+ * pre-finality completion, a new finalized block moves everything terminal, and a released submission hands
+ * a transaction back that the pass had been skipping. All three feed one runner.
  *
  * The stream is conflated, so a pass takes as long as it takes and the heads that arrive meanwhile collapse
  * into a single follow-up rather than queueing into a backlog the loop can never work off.
@@ -33,11 +32,15 @@ private enum class Trigger { LAUNCH, FINALIZED_HEAD, BEST_HEAD, MANUAL_TRIGGER }
  * can be stopped at any point and resumed by being called again.
  */
 @Singleton
-class CoinageRecoveryLoop @Inject constructor(
-    private val repository: CoinageEntryRepository,
-    private val recoveryPass: CoinageRecoveryPass,
-    private val chainViewFactory: CoinageChainViewFactory,
+class DurableRecoveryLoop @Inject constructor(
+    private val repository: DurableTxRepository,
+    private val recoveryPass: DurableRecoveryPass,
+    private val chainViewFactory: PinnedChainViewFactory,
+    private val oracles: Map<String, @JvmSuppressWildcards TxCompletionOracle>,
 ) {
+    /** Fixed at build time, so the loop can subscribe once rather than re-deriving it per pass. */
+    private val watchedChains = oracles.values.map { it.chainId }.distinct()
+
     // Dropping oldest is right: a nudge says "something may be decidable now", and a newer one says it at
     // least as well. What must not happen is a nudge blocking the caller that raised it.
     private val nudges = MutableSharedFlow<Trigger>(
@@ -55,7 +58,7 @@ class CoinageRecoveryLoop @Inject constructor(
 
     /**
      * Returns once nothing is live. Fails when a head subscription does, which the caller retries: a lost
-     * subscription would otherwise leave live entries with nothing driving them.
+     * subscription would otherwise leave live transactions with nothing driving them.
      */
     suspend fun runUntilSettled(): Result<Unit> = runCancellableCatching {
         triggers()
@@ -63,7 +66,7 @@ class CoinageRecoveryLoop @Inject constructor(
             .transformWhile { trigger ->
                 runPass(trigger)
                 emit(Unit)
-                hasLiveEntries()
+                hasLiveTransactions()
             }
             .collect()
     }
@@ -73,19 +76,31 @@ class CoinageRecoveryLoop @Inject constructor(
      * decided by the first pass and the loop ends without ever seeing a head.
      */
     private fun triggers() = merge(
-        chainViewFactory.finalizedHeads().map { Trigger.FINALIZED_HEAD },
-        chainViewFactory.bestHeads().map { Trigger.BEST_HEAD },
+        *watchedChains.map { chainViewFactory.finalizedHeads(it).map { _ -> Trigger.FINALIZED_HEAD } }
+            .toTypedArray(),
+        *watchedChains.map { chainViewFactory.bestHeads(it).map { _ -> Trigger.BEST_HEAD } }.toTypedArray(),
         nudges,
     ).onStart { emit(Trigger.LAUNCH) }
 
     private suspend fun runPass(trigger: Trigger) {
-        coinageLogD("recovery-trigger $trigger")
+        durabilityLogD("recovery-trigger $trigger")
 
-        recoveryPass.run().onFailure { coinageLogW("recovery-pass-failed trigger=$trigger error=$it") }
+        recoveryPass.run().onFailure { durabilityLogW("recovery-pass-failed trigger=$trigger error=$it") }
     }
 
-    /** An unreadable ledger counts as live: abandoning entries is far worse than one wasted pass. */
-    private suspend fun hasLiveEntries(): Boolean = repository.hasLiveEntries()
-        .onFailure { coinageLogW("live-entries-read-failed error=$it") }
+    /** An unreadable ledger counts as live: abandoning transactions is far worse than one wasted pass. */
+    private suspend fun hasLiveTransactions(): Boolean = repository.hasLiveTransactions()
+        .onFailure { durabilityLogW("live-transactions-read-failed error=$it") }
         .getOrDefault(true)
+}
+
+/**
+ * Brings the recovery loop up, wherever it is hosted.
+ *
+ * A seam rather than a direct `WorkManager` call so that the transaction service — which decides *when*
+ * recovery is needed — never has to hold an Android context.
+ */
+interface DurableRecoveryScheduler {
+    /** Idempotent: a no-op while a loop is already running. */
+    fun ensureRunning()
 }
