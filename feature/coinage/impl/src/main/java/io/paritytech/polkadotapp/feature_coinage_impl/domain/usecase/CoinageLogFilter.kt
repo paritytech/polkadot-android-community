@@ -1,21 +1,20 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.COINAGE_LOG_TAG
-
 private val LOG_ENTRY_START = Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}""")
 
-// Entry-aware rather than line-aware: a stack trace belongs to the entry above it and carries none of the tag
-// itself, so filtering per line would drop exactly the failures the export exists to show.
-internal fun Sequence<String>.filterCoinageLogEntries(maxLines: Int): List<String> {
+// Filter whole entries, not individual lines. Each entry starts with a timestamp and tag
+// stack trace lines belong to that entry but have no tag, so line-by-line filtering would discard
+// the stack traces the export exists to preserve.
+internal fun Sequence<String>.filterLogEntries(tags: Set<String>, maxLines: Int): List<String> {
     val lines = ArrayDeque<String>()
-    var inCoinageEntry = false
+    var inRetainedEntry = false
 
     forEach { line ->
         if (LOG_ENTRY_START.containsMatchIn(line)) {
-            inCoinageEntry = COINAGE_LOG_TAG in line
+            inRetainedEntry = tags.any { it in line }
         }
 
-        if (inCoinageEntry) {
+        if (inRetainedEntry) {
             lines.addLast(line)
             if (lines.size > maxLines) lines.removeFirst()
         }

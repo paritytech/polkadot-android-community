@@ -1,32 +1,52 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.COINAGE_LOG_TAG
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DURABILITY_LOG_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class CoinageLogFilterTest {
+    private val exportedTags = setOf(COINAGE_LOG_TAG, DURABILITY_LOG_TAG)
+
     @Test
-    fun `keeps only coinage entries`() {
+    fun `keeps only entries carrying one of the given tags`() {
         val log = sequenceOf(
-            "2026-09-07 10:00:00.000 Network DEBUG connected",
-            "2026-09-07 10:00:01.000 CoinageTransfer INFO tx-submitted",
-            "2026-09-07 10:00:02.000 Network DEBUG disconnected"
+            entry("Network", "connected"),
+            entry(COINAGE_LOG_TAG, "tx-submitted"),
+            entry("Network", "disconnected")
         )
 
-        val filtered = log.filterCoinageLogEntries(maxLines = 100)
+        val filtered = log.filterLogEntries(exportedTags, maxLines = 100)
 
-        assertEquals(listOf("2026-09-07 10:00:01.000 CoinageTransfer INFO tx-submitted"), filtered)
+        assertEquals(listOf(entry(COINAGE_LOG_TAG, "tx-submitted")), filtered)
     }
 
     @Test
-    fun `keeps stack trace lines that belong to a coinage entry`() {
+    fun `keeps durability entries alongside coinage ones`() {
         val log = sequenceOf(
-            "2026-09-07 10:00:01.000 CoinageTransfer ERROR tx-failed",
-            "java.lang.IllegalStateException: boom",
-            "\tat io.paritytech.polkadotapp.Coinage.transfer(Coinage.kt:42)",
-            "2026-09-07 10:00:02.000 Network DEBUG disconnected"
+            entry(COINAGE_LOG_TAG, "tx-submitted"),
+            entry(DURABILITY_LOG_TAG, "verdict=confirmed"),
+            entry("Network", "disconnected")
         )
 
-        val filtered = log.filterCoinageLogEntries(maxLines = 100)
+        val filtered = log.filterLogEntries(exportedTags, maxLines = 100)
+
+        assertEquals(
+            listOf(entry(COINAGE_LOG_TAG, "tx-submitted"), entry(DURABILITY_LOG_TAG, "verdict=confirmed")),
+            filtered
+        )
+    }
+
+    @Test
+    fun `keeps stack trace lines that belong to a retained entry`() {
+        val log = sequenceOf(
+            entry(COINAGE_LOG_TAG, "tx-failed"),
+            "java.lang.IllegalStateException: boom",
+            "\tat io.paritytech.polkadotapp.Coinage.transfer(Coinage.kt:42)",
+            entry("Network", "disconnected")
+        )
+
+        val filtered = log.filterLogEntries(exportedTags, maxLines = 100)
 
         assertEquals(3, filtered.size)
         assertEquals("\tat io.paritytech.polkadotapp.Coinage.transfer(Coinage.kt:42)", filtered.last())
@@ -35,23 +55,30 @@ class CoinageLogFilterTest {
     @Test
     fun `drops stack trace lines that belong to another tag`() {
         val log = sequenceOf(
-            "2026-09-07 10:00:01.000 Network ERROR request-failed",
+            entry("Network", "request-failed"),
             "java.net.SocketTimeoutException: timeout"
         )
 
-        val filtered = log.filterCoinageLogEntries(maxLines = 100)
+        val filtered = log.filterLogEntries(exportedTags, maxLines = 100)
 
         assertEquals(emptyList<String>(), filtered)
     }
 
     @Test
     fun `drops the oldest lines and keeps the newest when the cap is reached`() {
-        val log = (1..10).asSequence().map { entry(it) }
+        val log = (1..10).asSequence().map { entry(COINAGE_LOG_TAG, "entry-$it") }
 
-        val filtered = log.filterCoinageLogEntries(maxLines = 3)
+        val filtered = log.filterLogEntries(exportedTags, maxLines = 3)
 
-        assertEquals(listOf(entry(8), entry(9), entry(10)), filtered)
+        assertEquals(
+            listOf(
+                entry(COINAGE_LOG_TAG, "entry-8"),
+                entry(COINAGE_LOG_TAG, "entry-9"),
+                entry(COINAGE_LOG_TAG, "entry-10")
+            ),
+            filtered
+        )
     }
 
-    private fun entry(index: Int) = "2026-09-07 10:00:00.00$index CoinageTransfer INFO entry-$index"
+    private fun entry(tag: String, message: String) = "2026-09-07 10:00:00.000 $tag INFO $message"
 }

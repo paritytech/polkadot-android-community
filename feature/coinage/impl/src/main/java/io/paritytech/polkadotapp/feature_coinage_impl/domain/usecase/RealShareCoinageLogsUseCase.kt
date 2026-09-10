@@ -13,6 +13,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.tokenAmount
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.COINAGE_LOG_TAG
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DURABILITY_LOG_TAG
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -40,6 +42,10 @@ class RealShareCoinageLogsUseCase @Inject constructor(
         const val LOG_SNAPSHOT_NAME = "coinage_log_snapshot.log"
         const val MAX_LOG_LINES = 5_000
         const val CENTS_PER_DOLLAR = 100.0
+
+        // Durability lines carry the engine's tag: the verdicts and the reads behind them live there now, and
+        // a coinage export without them shows a status changing for no reason.
+        val EXPORTED_LOG_TAGS = setOf(COINAGE_LOG_TAG, DURABILITY_LOG_TAG)
 
         val FILE_NAME_TIMESTAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
         val REPORT_TIMESTAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -122,7 +128,7 @@ class RealShareCoinageLogsUseCase @Inject constructor(
 
         return try {
             appLogFile.copyTo(snapshotFile, overwrite = true)
-            snapshotFile.useLines { it.filterCoinageLogEntries(MAX_LOG_LINES) }
+            snapshotFile.useLines { it.filterLogEntries(EXPORTED_LOG_TAGS, MAX_LOG_LINES) }
         } finally {
             snapshotFile.delete()
         }

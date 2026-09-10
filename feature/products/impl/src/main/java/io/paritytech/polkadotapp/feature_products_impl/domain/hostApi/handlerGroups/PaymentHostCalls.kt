@@ -16,7 +16,12 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serializat
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.DerivationIndexWireAdapter
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.serialization.toDomain
 import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.ContainerBridge
+import io.paritytech.polkadotapp.feature_products_impl.domain.jsEngine.HostCallException
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpId
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpSource
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpError
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpStatus
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.math.BigInteger
 
@@ -45,7 +50,19 @@ class PaymentHostCalls(
             val productId = callingProductIdProvider.getProductId().getOrThrow()
             val amount = BigInteger(params.amount).intoBalance()
             val source = params.toDomainSource()
-            botApi.topUp(productId, amount, source)
+
+            val id = params.topUpId().getOrThrow()
+
+            botApi.topUp(productId, id, amount, source).mapTopUpError()
+        }
+
+        bridge.registerSubscription<PaymentTopUpStatusParams, PaymentTopUpStatusDto>("paymentTopUpStatusSubscribe") { params ->
+            flowOfAll {
+                val productId = callingProductIdProvider.getProductId().getOrThrow()
+                botApi.subscribeTopUpStatus(productId, params.topUpId().getOrThrow())
+                    .map { it.toDto() }
+                    .catch { throw it.asTopUpHostCall() }
+            }
         }
 
         bridge.registerSubscription<PaymentStatusSubscribeParams, PaymentStatusDto>("paymentStatusSubscribe") { params ->
@@ -64,6 +81,31 @@ private fun PaymentStatus.toDto(): PaymentStatusDto = when (this) {
     is PaymentStatus.Failed -> PaymentStatusDto(tag = "Failed", value = reason)
 }
 
+private fun TopUpStatus.toDto(): PaymentTopUpStatusDto = when (this) {
+    TopUpStatus.Detecting -> PaymentTopUpStatusDto(tag = "Detecting")
+    TopUpStatus.Claiming -> PaymentTopUpStatusDto(tag = "Claiming")
+    is TopUpStatus.Claimed -> PaymentTopUpStatusDto(tag = "Claimed", finalized = finalized)
+
+    is TopUpStatus.ClaimedPartially ->
+        PaymentTopUpStatusDto(tag = "ClaimedPartially", actualClaimed = actualClaimed.value.toString())
+
+    TopUpStatus.NotClaimed -> PaymentTopUpStatusDto(tag = "NotClaimed")
+}
+
+private fun <T> Result<T>.mapTopUpError(): Result<T> = recoverCatching { throw it.asTopUpHostCall() }
+
+private fun Throwable.asTopUpHostCall(): HostCallException {
+    val code = when (this) {
+        is TopUpError.InvalidSource -> "InvalidSource"
+        is TopUpError.AlreadyExists -> "AlreadyExists"
+        is TopUpError.SourceBusy -> "SourceBusy"
+        is TopUpError.NotFound -> "NotFound"
+        else -> "Unknown"
+    }
+
+    return HostCallException(code, message ?: code)
+}
+
 private data class PaymentBalanceDto(val available: String)
 
 private data class PaymentRequestParams(
@@ -75,6 +117,8 @@ private data class PaymentRequestParams(
 private data class PaymentReceiptDto(val id: String)
 
 private data class PaymentTopUpParams(
+    /** The product's own id for this top-up; the only thing that names it afterwards. 32 bytes, as hex. */
+    val id: HexString,
     /** Amount in planks, as a decimal string (to preserve u128 precision across JSON). */
     val amount: String,
     /** "ProductAccount", "PrivateKey" or "Coins" — discriminator for the flattened source fields below. */
@@ -84,6 +128,8 @@ private data class PaymentTopUpParams(
     val sourceKeyHex: HexString? = null,
     val sourceKeyListHex: List<HexString>? = null,
 ) {
+    fun topUpId() = PaymentTopUpId.fromBytes(DataByteArray(id.fromHex()))
+
     fun toDomainSource(): PaymentTopUpSource = when (sourceTag) {
         "ProductAccount" -> PaymentTopUpSource.ProductAccount(
             index = requireNotNull(sourceDerivationIndex) {
@@ -100,6 +146,18 @@ private data class PaymentTopUpParams(
         else -> throw IllegalArgumentException("Unknown top-up source tag: $sourceTag")
     }
 }
+
+private data class PaymentTopUpStatusParams(val id: HexString) {
+    fun topUpId() = PaymentTopUpId.fromBytes(DataByteArray(id.fromHex()))
+}
+
+private data class PaymentTopUpStatusDto(
+    val tag: String,
+    /** Only on "Claimed". */
+    val finalized: Boolean? = null,
+    /** Only on "ClaimedPartially"; planks, as a decimal string. */
+    val actualClaimed: String? = null,
+)
 
 private data class PaymentStatusSubscribeParams(val paymentId: String)
 

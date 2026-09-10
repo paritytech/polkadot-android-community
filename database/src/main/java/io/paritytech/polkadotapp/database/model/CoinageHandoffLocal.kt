@@ -19,7 +19,7 @@ import androidx.room.PrimaryKey
 )
 class CoinageHandoffLocal(
     @PrimaryKey val onChainKey: ByteArray,
-    val assetKind: CoinageEntryLocal.AssetKind,
+    val assetKind: CoinageAssetKindLocal,
     val derivationIndex: Int,
     val committed: Boolean,
 )

@@ -166,7 +166,9 @@ class ContainerBridge(
                 .onEach { value -> sendUpdate(id, gson.toJson(value)) }
                 .onCompletion { cause ->
                     if (cause != null) {
-                        respondError(id, cause.message ?: "Subscription error")
+                        // The Throwable overload, so a HostCallException thrown while subscribing keeps its
+                        // code: a subscription that can fail for more than one reason is unreadable without it.
+                        respondError(id, cause)
                     } else {
                         sendComplete(id)
                     }
@@ -180,7 +182,7 @@ class ContainerBridge(
             respondError(id, "Invalid params: ${e.message}")
         } catch (e: Exception) {
             Timber.e(e, "ContainerBridge: subscription setup failed for $method")
-            respondError(id, e.message ?: "Unknown error")
+            respondError(id, e)
         }
     }
 
