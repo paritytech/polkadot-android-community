@@ -31,8 +31,11 @@ class Migration60To61 : Migration(60, 61) {
             """.trimIndent()
         )
 
-        // AUTOINCREMENT reads its next value from sqlite_sequence, so without this a fresh insert would
-        // reuse an id the copied rows already hold — and a domain's asset rows are keyed on exactly that id.
+        // Belt and braces. SQLite already advances `sqlite_sequence` when a row is inserted with an
+        // explicit rowid above the current maximum, so the copy above does this by itself — verified by
+        // `Migration60To61Test`, which still passes with this statement removed. It stays because the
+        // failure it guards against is silent: a reused id hands one transaction another's asset rows, and
+        // that is not a thing to leave resting on an implementation detail of the copy.
         db.execSQL(
             """
             INSERT OR REPLACE INTO `sqlite_sequence` (`name`, `seq`)
