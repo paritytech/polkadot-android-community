@@ -26,20 +26,23 @@ interface RecyclerVoucherDao {
         """
         UPDATE recycler_vouchers
         SET locationRecyclerIndex = :recyclerIndex,
-            recyclerMembers = :recyclerMembers
+            recyclerMembers = :recyclerMembers,
+            enteredAt = CASE WHEN locationRecyclerIndex = :recyclerIndex
+                THEN COALESCE(enteredAt, :enteredAt) ELSE :enteredAt END
         WHERE ringVrfPublicKey = :ringVrfPublicKey
         """
     )
     suspend fun updateLocation(
         ringVrfPublicKey: ByteArray,
         recyclerIndex: Int,
-        recyclerMembers: Int
+        recyclerMembers: Int,
+        enteredAt: Long?
     )
 
     @Transaction
     suspend fun updateLocations(updates: List<RecyclerVoucherLocationUpdate>) {
         updates.forEach { update ->
-            updateLocation(update.ringVrfPublicKey, update.recyclerIndex, update.recyclerMembers)
+            updateLocation(update.ringVrfPublicKey, update.recyclerIndex, update.recyclerMembers, update.enteredAt)
         }
     }
 
@@ -65,5 +68,6 @@ interface RecyclerVoucherDao {
 class RecyclerVoucherLocationUpdate(
     val ringVrfPublicKey: ByteArray,
     val recyclerIndex: Int,
-    val recyclerMembers: Int
+    val recyclerMembers: Int,
+    val enteredAt: Long?
 )
