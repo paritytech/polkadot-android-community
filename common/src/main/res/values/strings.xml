@@ -1066,6 +1066,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_message_contact_added_outgoing">You added %1$s</string>
     <string name="chat_message_last_outgoing">You: %1$s</string>
     <string name="chat_message_payment_incoming">%1$s sent you</string>
+    <string name="chat_message_payment_incoming_pending">%1$s is sending you</string>
     <string name="chat_message_payment_outgoing">You sent</string>
     <string name="chat_payment_status_detecting_sender">Sending…</string>
     <string name="chat_payment_status_detecting_recipient">Receiving…</string>
