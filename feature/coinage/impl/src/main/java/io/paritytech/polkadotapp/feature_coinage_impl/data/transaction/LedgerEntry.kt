@@ -5,9 +5,9 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ch
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 
 /** An asset's on-chain identity: a coin's derived account id, or a voucher's ring VRF public key. */
 typealias AssetPublicKey = DataByteArray

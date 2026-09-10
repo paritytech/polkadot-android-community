@@ -57,7 +57,6 @@ private class ListMembershipOracle(
 }
 
 class MonotoneEffectOracleTest {
-
     @Test
     fun `a value present at the finalized head finalizes`() = runBlocking<Unit> {
         val outcome = evaluate(listAt = mapOf(FINALIZED to setOf(VALUE)))

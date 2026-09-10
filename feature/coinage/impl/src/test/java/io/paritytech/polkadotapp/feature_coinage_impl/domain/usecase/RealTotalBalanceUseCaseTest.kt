@@ -13,7 +13,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
@@ -26,6 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.Recycling
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.test_shared.any
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

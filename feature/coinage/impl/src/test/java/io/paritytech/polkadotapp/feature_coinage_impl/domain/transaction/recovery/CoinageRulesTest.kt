@@ -5,12 +5,12 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CheckpointBlock
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TransactionSearchResult
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.RuleOutcome
@@ -498,4 +498,3 @@ private class TestEvidence(
     val evidence: ChainEvidence,
     val recordedStillCanonical: Boolean?,
 )
-

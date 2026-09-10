@@ -25,9 +25,9 @@ import io.paritytech.polkadotapp.database.dao.ChatRoomDao
 import io.paritytech.polkadotapp.database.dao.ChatSearchRecentDao
 import io.paritytech.polkadotapp.database.dao.CoinDao
 import io.paritytech.polkadotapp.database.dao.CoinageEntryDao
-import io.paritytech.polkadotapp.database.dao.DurableTxDao
 import io.paritytech.polkadotapp.database.dao.ContactDao
 import io.paritytech.polkadotapp.database.dao.ContactDeviceDao
+import io.paritytech.polkadotapp.database.dao.DurableTxDao
 import io.paritytech.polkadotapp.database.dao.ExternalPaymentDao
 import io.paritytech.polkadotapp.database.dao.FileDownloadDao
 import io.paritytech.polkadotapp.database.dao.FileUploadDao
@@ -101,11 +101,11 @@ import io.paritytech.polkadotapp.database.model.ChatRoomLocal
 import io.paritytech.polkadotapp.database.model.ChatSearchRecentLocal
 import io.paritytech.polkadotapp.database.model.CoinLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
-import io.paritytech.polkadotapp.database.model.DurableTxLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
 import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
 import io.paritytech.polkadotapp.database.model.ContactDeviceLocal
 import io.paritytech.polkadotapp.database.model.ContactLocal
+import io.paritytech.polkadotapp.database.model.DurableTxLocal
 import io.paritytech.polkadotapp.database.model.ExternalPaymentLocal
 import io.paritytech.polkadotapp.database.model.FileDownloadLocal
 import io.paritytech.polkadotapp.database.model.FileUploadLocal

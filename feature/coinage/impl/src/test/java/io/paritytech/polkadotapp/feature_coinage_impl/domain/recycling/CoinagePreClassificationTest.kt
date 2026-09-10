@@ -10,9 +10,9 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

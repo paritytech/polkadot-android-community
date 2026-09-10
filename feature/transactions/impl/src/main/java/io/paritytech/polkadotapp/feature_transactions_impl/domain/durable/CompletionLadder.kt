@@ -159,4 +159,3 @@ private fun decided(
 
     return RuleOutcome.Decided(Verdict(status, successDetectedAt))
 }
-

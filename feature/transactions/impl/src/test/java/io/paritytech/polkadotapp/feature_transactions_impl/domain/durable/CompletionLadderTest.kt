@@ -29,7 +29,6 @@ private const val MORTALITY_END = CHECKPOINT + MORTALITY
  * domain that reads a storage value, a list membership, or nothing at all.
  */
 class CompletionLadderTest {
-
     // ---- Rule 0 — a recorded inclusion ----
 
     @Test

@@ -24,9 +24,9 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasSta
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingPosition
 import io.paritytech.polkadotapp.feature_members_api.data.repository.MembersRepository
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import javax.inject.Inject
 
 class RealCoinageStateReaderFactory @Inject constructor(

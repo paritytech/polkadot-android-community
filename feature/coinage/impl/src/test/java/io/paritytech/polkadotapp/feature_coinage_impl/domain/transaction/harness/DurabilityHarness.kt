@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness
 
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.paritytech.polkadotapp.chains.extrinsic.ExtrinsicStatus

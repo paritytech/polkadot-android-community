@@ -6,7 +6,6 @@ import io.paritytech.polkadotapp.common.utils.ensureKeysWithNullDefault
 import io.paritytech.polkadotapp.common.utils.filterNotNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CheckpointBlock
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasState
@@ -20,6 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.logId
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingPosition
 import io.paritytech.polkadotapp.feature_members_api.data.model.ringIndex
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject

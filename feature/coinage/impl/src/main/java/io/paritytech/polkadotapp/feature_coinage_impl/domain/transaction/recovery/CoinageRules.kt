@@ -1,8 +1,8 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery
 
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 
 // ---- predicates over a pinned view -------------------------------------------------------------------
 //

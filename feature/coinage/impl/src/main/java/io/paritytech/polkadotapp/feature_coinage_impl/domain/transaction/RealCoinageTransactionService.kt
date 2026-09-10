@@ -9,7 +9,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionRequest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.CoinKeypairDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
@@ -27,6 +26,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.shortKe
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxRegistrationError
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject

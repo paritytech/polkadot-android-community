@@ -4,6 +4,7 @@ import io.novasama.substrate_sdk_android.runtime.extrinsic.signer.SendableExtrin
 import io.paritytech.polkadotapp.chains.extrinsic.ExtrinsicStatus
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.chains.multiNetwork.getChain
@@ -15,9 +16,8 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Checkpo
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
-import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel

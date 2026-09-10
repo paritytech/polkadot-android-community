@@ -2,8 +2,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.hasEverBeenOnChain
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
@@ -12,6 +10,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
