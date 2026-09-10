@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.common.utils.mapAsync
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.LedgerView
@@ -10,10 +11,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompl
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
-import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,7 +41,7 @@ class RealDurableRecoveryPass @Inject constructor(
 
     override suspend fun run(): Result<Unit> {
         if (!running.tryLock()) {
-            Timber.d("recovery-pass skipped reason=already-running")
+            durabilityLogD("recovery-pass skipped reason=already-running")
 
             return Result.success(Unit)
         }
@@ -58,21 +56,47 @@ class RealDurableRecoveryPass @Inject constructor(
     private suspend fun runPass(): Result<Unit> {
         val domains = repository.liveDomains().getOrElse { return Result.failure(it) }
         if (domains.isEmpty()) {
-            Timber.d("recovery-pass skipped reason=nothing-live")
+            durabilityLogD("recovery-pass skipped reason=nothing-live")
 
             return Result.success(Unit)
         }
 
-        // Pinning is a chain read, so it happens only once something is actually decidable.
-        val view = chainViewFactory.pin().getOrElse { return Result.failure(it) }
+        // One view per distinct chain, not per domain: two domains on the same chain read the same heads,
+        // and pinning is a chain read worth paying for once. A domain with no registered oracle has no
+        // chain to pin, so it is skipped rather than guessed at.
+        val byChain = domains.mapNotNull { domain -> oracles[domain.value]?.let { it.chainId to domain } }
+            .groupBy({ it.first }, { it.second })
 
-        domains.forEach { domain ->
-            runDomainPass(domain, view).onFailure {
-                Timber.w(it, "recovery-pass domain=${domain.value} failed")
+        (domains.map { it.value } - byChain.values.flatten().mapTo(mutableSetOf()) { it.value })
+            .forEach { durabilityLogW("recovery-pass skipped domain=$it reason=no-registered-oracle") }
+
+        // A chain that cannot be read fails the pass even when another chain's domains were decided: the
+        // caller retries on failure, and silently reporting success would strand everything on that chain.
+        // The other chains are still worked first, so one unreachable chain does not hold the rest up.
+        var failure: Throwable? = null
+
+        byChain.forEach { (chainId, chainDomains) ->
+            val view = chainViewFactory.pin(chainId).getOrElse {
+                durabilityLogW("recovery-pass chain=$chainId pin-failed error=$it")
+                failure = failure ?: it
+
+                return@forEach
+            }
+
+            durabilityLogD(
+                "recovery-pass start chain=$chainId domains=${chainDomains.size} " +
+                    "f=${view.finalizedHead.blockNumber} b=${view.bestHead.blockNumber}"
+            )
+
+            chainDomains.forEach { domain ->
+                runDomainPass(domain, view).onFailure {
+                    durabilityLogW("recovery-pass domain=${domain.value} failed error=$it")
+                    failure = failure ?: it
+                }
             }
         }
 
-        return Result.success(Unit)
+        return failure?.let { Result.failure(it) } ?: Result.success(Unit)
     }
 
     /**
@@ -82,17 +106,21 @@ class RealDurableRecoveryPass @Inject constructor(
      * not to need: the next head runs another one.
      */
     private suspend fun runDomainPass(domain: TxDomainId, view: PinnedChainView): Result<Unit> {
-        val wrote = evaluateRound(domain, view).getOrElse { return Result.failure(it) }
-        if (wrote == 0) return Result.success(Unit)
+        val first = evaluateRound(domain, view).getOrElse { return Result.failure(it) }
+        if (first == 0) return Result.success(Unit)
 
-        evaluateRound(domain, view).onFailure { return Result.failure(it) }
+        // The second round is what the separate propagation phase used to be, so it is logged as such: a
+        // write here is a transaction its successor's verdict decided.
+        val propagated = evaluateRound(domain, view).getOrElse { return Result.failure(it) }
+
+        durabilityLogD("recovery-pass end domain=${domain.value} written=$first propagated=$propagated")
 
         return Result.success(Unit)
     }
 
     /** Returns how many transactions this round wrote. */
     private suspend fun evaluateRound(domain: TxDomainId, view: PinnedChainView): Result<Int> {
-        val all = repository.getAllFacts(domain).getOrElse { return Result.failure(it) }
+        val all = repository.getAllEntries(domain).getOrElse { return Result.failure(it) }
 
         val decidable = all.filter { it.status.isLive && !submissionOwned.isOwnedBySubmission(it.id) }
         if (decidable.isEmpty()) return Result.success(0)
@@ -110,7 +138,10 @@ class RealDurableRecoveryPass @Inject constructor(
             if (outcome is RuleOutcome.Decided && write(tx, outcome.verdict)) wrote++
         }
 
-        Timber.d("recovery-pass domain=${domain.value} decidable=${decidable.size} written=$wrote")
+        durabilityLogD(
+            "recovery-pass round domain=${domain.value} " +
+                "transactions=${all.size} decidable=${decidable.size} written=$wrote"
+        )
 
         return Result.success(wrote)
     }
@@ -122,17 +153,17 @@ class RealDurableRecoveryPass @Inject constructor(
      * on a transport error.
      */
     private suspend fun recordedCanonicality(
-        transactions: List<DurableTxFacts>,
+        transactions: List<DurableTxEntry>,
         view: PinnedChainView,
-    ): Map<DurableTxId, Boolean> = coroutineScope {
+    ): Map<DurableTxId, Boolean> {
         val recorded = transactions.mapNotNull { tx -> tx.successDetectedAt?.let { tx.id to it } }
-        if (recorded.isEmpty()) return@coroutineScope emptyMap()
+        if (recorded.isEmpty()) return emptyMap()
 
-        val byHeight = recorded.map { it.second.blockNumber }.distinct()
-        val hashes = byHeight.map { height -> height to async { view.blockHashAt(height) } }
-            .associate { (height, deferred) -> height to deferred.await() }
+        val hashes = recorded.map { it.second.blockNumber }.distinct()
+            .mapAsync { height -> height to view.blockHashAt(height) }
+            .toMap()
 
-        buildMap {
+        return buildMap {
             recorded.forEach { (id, block) ->
                 val read = hashes[block.blockNumber] ?: return@forEach
                 // A chain shorter than the record does not have the block, so the record is stale. Only a
@@ -142,20 +173,21 @@ class RealDurableRecoveryPass @Inject constructor(
         }
     }
 
-    private suspend fun write(tx: DurableTxFacts, verdict: Verdict): Boolean {
+    private suspend fun write(tx: DurableTxEntry, verdict: Verdict): Boolean {
         if (verdict.status == tx.status && verdict.successDetectedAt == tx.successDetectedAt) return false
 
         return repository.compareAndSetStatus(tx.id, tx.status, verdict)
-            .onFailure { Timber.w(it, "verdict-write-failed id=${tx.id.value} to=${verdict.status}") }
+            .onFailure { durabilityLogW("${tx.logId()} verdict-write-failed to=${verdict.status} error=$it") }
             .getOrDefault(false)
     }
 
+    /** Only domains with a registered oracle reach a pass, so this is always present by the time it runs. */
     private fun oracle(domain: TxDomainId): TxCompletionOracle =
-        oracles[domain.value] ?: TxCompletionOracle.Unobservable
+        oracles.getValue(domain.value)
 }
 
 private class SnapshotLedgerView(
-    override val transactions: List<DurableTxFacts>,
+    override val transactions: List<DurableTxEntry>,
 ) : LedgerView {
     private val byId: Map<DurableTxId, DurableTxStatus> = transactions.associate { it.id to it.status }
 

@@ -12,28 +12,26 @@ import io.paritytech.polkadotapp.chains.network.rpc.getBlockNumber
 import io.paritytech.polkadotapp.chains.util.extrinsicHash
 import io.paritytech.polkadotapp.common.utils.flowOfAll
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableChainProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TransactionSearchResult
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionHash
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.durabilityLogD
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.durabilityLogW
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.shortHash
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import timber.log.Timber
 import java.math.BigInteger
 import javax.inject.Inject
 
 class RealPinnedChainViewFactory @Inject constructor(
-    private val chainProvider: DurableChainProvider,
     private val chainEventsRepositoryFactory: ChainEventsRepositoryFactory,
     private val rpcCalls: RpcCalls,
 ) : PinnedChainViewFactory {
-    override suspend fun pin(): Result<PinnedChainView> = runCatching {
+    override suspend fun pin(chainId: ChainId): Result<PinnedChainView> = runCatching {
         coroutineScope {
-            val chainId = chainProvider.chainId()
-
             val finalizedHash = rpcCalls.getFinalizedHead(chainId)
             val bestHash = rpcCalls.getBlockHash(chainId)
 
@@ -50,15 +48,15 @@ class RealPinnedChainViewFactory @Inject constructor(
         }
     }.onFailure {
         // A failed pin aborts a whole recovery pass before anything else can be logged about it.
-        Timber.w(it, "chain-view-pin-failed")
+        durabilityLogW("chain-view-pin-failed error=$it")
     }
 
-    override fun finalizedHeads(): Flow<BlockNumber> = flowOfAll {
-        rpcCalls.subscribeFinalizedHeads(chainProvider.chainId())
+    override fun finalizedHeads(chainId: ChainId): Flow<BlockNumber> = flowOfAll {
+        rpcCalls.subscribeFinalizedHeads(chainId)
     }.map { BlockNumber(it.number.toBigInteger()) }
 
-    override fun bestHeads(): Flow<BlockNumber> = flowOfAll {
-        rpcCalls.subscribeNewHeads(chainProvider.chainId())
+    override fun bestHeads(chainId: ChainId): Flow<BlockNumber> = flowOfAll {
+        rpcCalls.subscribeNewHeads(chainId)
     }.map { BlockNumber(it.number.toBigInteger()) }
 }
 
@@ -130,18 +128,18 @@ suspend fun PinnedChainView.searchRange(
         // The body is already in hand, so the outcome costs one further read of that block's events.
         val outcome = dispatchOutcomeAt(hash, txHash).getOrNull()
 
-        Timber.d("tx-search found tx=$txHash block=$number outcome=$outcome unreadable=$unreadableBlocks")
+        durabilityLogD("tx-search found tx=${txHash.shortHash()} block=$number outcome=$outcome unreadable=$unreadableBlocks")
 
         return@coroutineScope TransactionSearchResult.Found(CheckpointBlock(number, hash), outcome)
     }
 
     if (unreadableBlocks > 0) {
-        Timber.w(
-            "tx-search absence-inconclusive tx=$txHash " +
+        durabilityLogW(
+            "tx-search absence-inconclusive tx=${txHash.shortHash()} " +
                 "range=$fromBlockNumber..$toBlockNumber unreadable=$unreadableBlocks"
         )
     } else {
-        Timber.d("tx-search absent tx=$txHash range=$fromBlockNumber..$toBlockNumber")
+        durabilityLogD("tx-search absent tx=${txHash.shortHash()} range=$fromBlockNumber..$toBlockNumber")
     }
 
     TransactionSearchResult.NotFound(wholeRangeRead = unreadableBlocks == 0)

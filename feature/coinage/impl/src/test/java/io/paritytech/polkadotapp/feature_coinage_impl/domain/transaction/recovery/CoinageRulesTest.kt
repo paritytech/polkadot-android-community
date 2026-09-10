@@ -10,10 +10,11 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ow
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TransactionSearchResult
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.RuleOutcome
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.evaluateLadder
 import io.paritytech.polkadotapp.test_shared.anyLong
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
@@ -28,6 +29,13 @@ private const val CHECKPOINT_NUMBER = 100L
 private const val MORTALITY = 64L
 private const val MORTALITY_END = CHECKPOINT_NUMBER + MORTALITY
 
+/**
+ * The ladder as coinage drives it: the engine's rules over coinage's evidence.
+ *
+ * Production reaches this composition through the recovery pass; [evaluate] below is the same one, narrowed
+ * to a single transaction so a case can hand it evidence directly. The cases are unchanged from when the
+ * ladder lived in this module, which is what makes them evidence that moving it changed nothing.
+ */
 class CoinageRulesTest {
     // ---- Rule 0 — recorded inclusion ----
 
@@ -371,7 +379,12 @@ class CoinageRulesTest {
         whenever(chainView.finalizedHead).thenReturn(evidence.evidence.finalized)
         whenever(chainView.bestHead).thenReturn(evidence.evidence.best)
 
-        return evaluateRules(entry, dag, evidence.evidence, chainView, evidence.recordedStillCanonical)
+        return evaluateLadder(
+            tx = entry.entry,
+            scope = CoinagePassScope(dag, mapOf(entry.id to evidence.evidence)),
+            view = chainView,
+            recordedStillCanonical = evidence.recordedStillCanonical,
+        )
     }
 
     /** The ladder reached the last rule instead of deciding on state alone. */
@@ -410,7 +423,7 @@ class CoinageRulesTest {
         successDetectedAt: CheckpointBlock? = null,
         checkpointNumber: Long = CHECKPOINT_NUMBER,
     ) = LedgerEntry(
-        facts = DurableTxFacts(
+        entry = DurableTxEntry(
             id = CoinageTransactionId(id),
             domainId = io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE_DOMAIN,
             groupId = null,

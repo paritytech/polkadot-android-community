@@ -3,7 +3,7 @@ package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.ExtrinsicOutcome
 import io.paritytech.polkadotapp.chains.network.binding.BlockHash
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.LedgerView
@@ -36,11 +36,13 @@ private class ListMembershipOracle(
     /** Heights whose read fails, so a transport error can be told apart from an empty list. */
     private val unreadable: Set<Long> = emptySet(),
 ) : MonotoneEffectOracle() {
+    override val chainId = "test-chain"
+
     var reads = 0
         private set
 
     override suspend fun effectsAt(
-        transactions: List<DurableTxFacts>,
+        transactions: List<DurableTxEntry>,
         at: CheckpointBlock,
     ): Map<DurableTxId, Boolean> {
         reads++
@@ -156,7 +158,7 @@ class MonotoneEffectOracleTest {
         search: TransactionSearchResult = TransactionSearchResult.NotFound(wholeRangeRead = true),
     ) = SearchOnlyChainView(finalized, search)
 
-    private fun tx(id: Long = 1) = DurableTxFacts(
+    private fun tx(id: Long = 1) = DurableTxEntry(
         id = DurableTxId(id),
         domainId = TxDomainId("list-consumer"),
         groupId = null,
@@ -167,10 +169,10 @@ class MonotoneEffectOracleTest {
         successDetectedAt = null,
     )
 
-    private fun ledgerOf(facts: List<DurableTxFacts>) = object : LedgerView {
-        override val transactions = facts
+    private fun ledgerOf(entry: List<DurableTxEntry>) = object : LedgerView {
+        override val transactions = entry
 
-        override fun statusOf(id: DurableTxId) = facts.firstOrNull { it.id == id }?.status
+        override fun statusOf(id: DurableTxId) = entry.firstOrNull { it.id == id }?.status
     }
 
     private companion object {

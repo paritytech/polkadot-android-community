@@ -15,7 +15,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAsse
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE_DOMAIN
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxState
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
@@ -48,7 +48,7 @@ class InMemoryLedger {
     internal val mutex = Mutex()
     internal val revisions = MutableStateFlow(0)
 
-    internal var facts: List<DurableTxFacts> = emptyList()
+    internal var rows: List<DurableTxEntry> = emptyList()
     internal var assets: Map<CoinageTransactionId, EntryAssets> = emptyMap()
     internal var handoffs: Map<AssetPublicKey, HandoffRow> = emptyMap()
     internal var nextId = 1L
@@ -62,20 +62,20 @@ class InMemoryLedger {
      */
     val repository = HarnessLedgerReads(this)
 
-    /** Entries as the rules see them: the engine's facts joined to coinage's assets. */
-    fun entries(): List<LedgerEntry> = facts.sortedBy { it.id.value }.map { it.toEntry() }
+    /** Entries as the rules see them: the engine's row joined to coinage's assets. */
+    fun entries(): List<LedgerEntry> = rows.sortedBy { it.id.value }.map { it.toEntry() }
 
     fun entryOrNull(id: CoinageTransactionId): LedgerEntry? =
-        facts.firstOrNull { it.id == id }?.toEntry()
+        rows.firstOrNull { it.id == id }?.toEntry()
 
-    private fun DurableTxFacts.toEntry(): LedgerEntry {
+    private fun DurableTxEntry.toEntry(): LedgerEntry {
         val entryAssets = assets[id] ?: EntryAssets(emptyList(), emptyList())
 
         return LedgerEntry(this, entryAssets.inputs, entryAssets.outputs)
     }
 
     internal suspend fun <T> transaction(block: suspend () -> T): Result<T> = mutex.withLock {
-        val factsBefore = facts
+        val rowsBefore = rows
         val assetsBefore = assets
         val handoffsBefore = handoffs
         val nextIdBefore = nextId
@@ -83,7 +83,7 @@ class InMemoryLedger {
         runCatching { block() }
             .onSuccess { revisions.value++ }
             .onFailure {
-                facts = factsBefore
+                rows = rowsBefore
                 assets = assetsBefore
                 handoffs = handoffsBefore
                 nextId = nextIdBefore
@@ -123,10 +123,10 @@ class HarnessLedgerReads(private val store: InMemoryLedger) {
 
     suspend fun getAllEntries(): Result<List<LedgerEntry>> = store.read { store.entries() }
 
-    suspend fun hasLiveEntries(): Result<Boolean> = store.read { store.facts.any { it.status.isLive } }
+    suspend fun hasLiveEntries(): Result<Boolean> = store.read { store.rows.any { it.status.isLive } }
 
     suspend fun getStatus(id: CoinageTransactionId): Result<DurableTxStatus?> =
-        store.read { store.facts.firstOrNull { it.id == id }?.status }
+        store.read { store.rows.firstOrNull { it.id == id }?.status }
 
     suspend fun getHandoffKeys(): Result<Set<AssetPublicKey>> = store.coinage.getHandoffKeys()
 
@@ -154,29 +154,29 @@ private class InMemoryDurableTxRepository(private val store: InMemoryLedger) : D
         ids
     }
 
-    override suspend fun getFacts(id: DurableTxId): Result<DurableTxFacts?> =
-        store.read { store.facts.firstOrNull { it.id == id } }
+    override suspend fun getEntry(id: DurableTxId): Result<DurableTxEntry?> =
+        store.read { store.rows.firstOrNull { it.id == id } }
 
-    override suspend fun getAllFacts(domainId: TxDomainId): Result<List<DurableTxFacts>> =
-        store.read { store.facts.filter { it.domainId == domainId }.sortedBy { it.id.value } }
+    override suspend fun getAllEntries(domainId: TxDomainId): Result<List<DurableTxEntry>> =
+        store.read { store.rows.filter { it.domainId == domainId }.sortedBy { it.id.value } }
 
     override suspend fun getStatus(id: DurableTxId): Result<DurableTxStatus?> =
-        store.read { store.facts.firstOrNull { it.id == id }?.status }
+        store.read { store.rows.firstOrNull { it.id == id }?.status }
 
     override fun subscribeStatus(id: DurableTxId): Flow<DurableTxStatus> =
-        store.revisions.map { store.facts.firstOrNull { it.id == id }?.status }.filterNotNull()
+        store.revisions.map { store.rows.firstOrNull { it.id == id }?.status }.filterNotNull()
 
     override suspend fun compareAndSetStatus(
         id: DurableTxId,
         observed: DurableTxStatus,
         verdict: Verdict,
     ): Result<Boolean> = store.transaction {
-        val current = store.facts.firstOrNull { it.id == id }
+        val current = store.rows.firstOrNull { it.id == id }
 
         if (current == null || current.status != observed) {
             false
         } else {
-            store.facts = store.facts.map {
+            store.rows = store.rows.map {
                 if (it.id == id) {
                     it.copy(status = verdict.status, successDetectedAt = verdict.successDetectedAt)
                 } else {
@@ -188,23 +188,23 @@ private class InMemoryDurableTxRepository(private val store: InMemoryLedger) : D
     }
 
     override suspend fun hasLiveTransactions(): Result<Boolean> =
-        store.read { store.facts.any { it.status.isLive } }
+        store.read { store.rows.any { it.status.isLive } }
 
     override suspend fun liveDomains(): Result<List<TxDomainId>> =
-        store.read { store.facts.filter { it.status.isLive }.map { it.domainId }.distinct() }
+        store.read { store.rows.filter { it.status.isLive }.map { it.domainId }.distinct() }
 
     override suspend fun getGroupStates(
         domainId: TxDomainId,
         groupId: OperationGroupId,
-    ): Result<List<DurableTxState>> = store.read { store.groupFacts(domainId, groupId).map { it.toState() } }
+    ): Result<List<DurableTxState>> = store.read { store.groupRows(domainId, groupId).map { it.toState() } }
 
     override fun subscribeGroupStates(
         domainId: TxDomainId,
         groupId: OperationGroupId,
     ): Flow<List<DurableTxState>> =
-        store.revisions.map { store.groupFacts(domainId, groupId).map { it.toState() } }
+        store.revisions.map { store.groupRows(domainId, groupId).map { it.toState() } }
 
-    private fun DurableTxFacts.toState() = DurableTxState(id, status)
+    private fun DurableTxEntry.toState() = DurableTxState(id, status)
 }
 
 private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : CoinageAssetLedger {
@@ -212,6 +212,7 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
      * Called from inside the engine's transaction, which already holds the lock and will restore the
      * snapshot if this throws — so it neither locks nor rolls back itself.
      */
+    context(_: RegistrationScope)
     override suspend fun registerAssets(registrations: List<Pair<CoinageTransactionId, AssetRegistration>>) {
         brokenInvariant(registrations.map { it.second })?.let { throw it }
 
@@ -230,6 +231,11 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
     }
 
     private fun brokenInvariant(registrations: List<AssetRegistration>): Throwable? {
+        if (registrations.any { it.inputs.isEmpty() && it.outputs.isEmpty() }) {
+            return io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model
+                .CoinageRegistrationError.EmptyTransaction
+        }
+
         val outputs = registrations.flatMap { it.outputs }
         val inputs = registrations.flatMap { it.inputs }
 
@@ -316,7 +322,7 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
 private fun InMemoryLedger.insert(registration: DurableTxRegistration): DurableTxId {
     val id = DurableTxId(nextId++)
 
-    facts = facts + DurableTxFacts(
+    rows = rows + DurableTxEntry(
         id = id,
         domainId = registration.domainId,
         groupId = registration.groupId,
@@ -330,16 +336,16 @@ private fun InMemoryLedger.insert(registration: DurableTxRegistration): DurableT
     return id
 }
 
-private fun InMemoryLedger.groupFacts(domainId: TxDomainId, groupId: OperationGroupId) =
-    facts.filter { it.domainId == domainId && it.groupId == groupId }.sortedBy { it.id.value }
+private fun InMemoryLedger.groupRows(domainId: TxDomainId, groupId: OperationGroupId) =
+    rows.filter { it.domainId == domainId && it.groupId == groupId }.sortedBy { it.id.value }
 
 private fun InMemoryLedger.groupStates(groupId: CoinageOperationGroupId) =
-    groupFacts(COINAGE_DOMAIN, groupId).map { facts ->
-        val entryAssets = assets[facts.id] ?: EntryAssets(emptyList(), emptyList())
+    groupRows(COINAGE_DOMAIN, groupId).map { entry ->
+        val entryAssets = assets[entry.id] ?: EntryAssets(emptyList(), emptyList())
 
         CoinageTransactionState(
-            id = facts.id,
-            status = facts.status,
+            id = entry.id,
+            status = entry.status,
             inputs = entryAssets.inputs.map { it.toCoinageInput() },
             outputs = entryAssets.outputs.mapNotNull { it.asset },
         )

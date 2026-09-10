@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -24,6 +25,7 @@ import javax.inject.Inject
 class RealCoinageAssetLedger @Inject constructor(
     private val dao: CoinageEntryDao,
 ) : CoinageAssetLedger {
+    context(_: RegistrationScope)
     override suspend fun registerAssets(registrations: List<Pair<CoinageTransactionId, AssetRegistration>>) {
         brokenInvariant(registrations.map { it.second })?.let { throw it }
 
@@ -34,11 +36,16 @@ class RealCoinageAssetLedger @Inject constructor(
     }
 
     /**
-     * The three invariants, checked across the whole batch: these rows do not exist yet, so the queries
-     * cannot see one registration's assets while checking another's.
+     * The invariants, checked across the whole batch: these rows do not exist yet, so the queries cannot
+     * see one registration's assets while checking another's.
      */
     private suspend fun brokenInvariant(registrations: List<AssetRegistration>): CoinageRegistrationError? {
         val scope = DaoValidationScope(dao)
+
+        // Nothing to lock and nothing to look for on chain, so the rules could never decide it.
+        if (registrations.any { it.inputs.isEmpty() && it.outputs.isEmpty() }) {
+            return CoinageRegistrationError.EmptyTransaction
+        }
 
         val outputs = registrations.flatMap { it.outputs }
         val inputs = registrations.flatMap { it.inputs }

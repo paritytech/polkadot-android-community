@@ -23,7 +23,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
-import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,8 +62,14 @@ class RealDurableTransactionService @Inject constructor(
             // never reach it before the watcher does.
             submissionOwned.acquire(id)
         }.onSuccess { id ->
+            durabilityLogI(
+                "entry-registered ${durabilityLogId(domain, id, registration.txHash, groupId)} " +
+                    "checkpoint=${registration.checkpoint.blockNumber} mortality=${registration.mortalityBlocks} " +
+                    "window=${registration.checkpoint.blockNumber}.." +
+                    "${registration.checkpoint.blockNumber + registration.mortalityBlocks}"
+            )
             submissionTracker.watch(scope, id, extrinsic) { onSubmissionReleased() }
-        }.onFailure { Timber.w(it, "submit failed domain=${domain.value}") }
+        }.onFailure { durabilityLogW("submit failed domain=${domain.value} error=$it") }
     }
 
     override suspend fun submitAll(
@@ -80,13 +85,22 @@ class RealDurableTransactionService @Inject constructor(
             onRegister(ids)
             ids.forEach { submissionOwned.acquire(it) }
         }.onSuccess { ids ->
+            ids.zip(registrations).forEach { (id, registration) ->
+                durabilityLogI(
+                    "entry-registered ${durabilityLogId(domain, id, registration.txHash, groupId)} " +
+                        "checkpoint=${registration.checkpoint.blockNumber} " +
+                        "mortality=${registration.mortalityBlocks}"
+                )
+            }
             ids.zip(extrinsics).forEach { (id, extrinsic) ->
                 submissionTracker.watch(scope, id, extrinsic) { onSubmissionReleased() }
             }
-        }.onFailure { Timber.w(it, "submitAll failed domain=${domain.value} group=${groupId.value}") }
+        }.onFailure { durabilityLogW("submitAll failed domain=${domain.value} group=${groupId.value} error=$it") }
     }
 
     override fun startRecovery() {
+        durabilityLogD("start-recovery")
+
         recoveryScheduler.ensureRunning()
     }
 

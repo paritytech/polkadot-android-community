@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import kotlinx.coroutines.flow.Flow
 
 /** The assets one transaction consumes and mints, as registration supplies them. */
@@ -44,9 +45,11 @@ interface CoinageAssetLedger {
     /**
      * Writes the asset rows for [registrations] after checking the invariants they must not break.
      *
-     * Called from inside the engine's write transaction, so throwing rolls the whole registration back —
-     * which is how a broken invariant rejects it.
+     * The [RegistrationScope] context is the point: these rows are only correct inside the engine's write
+     * transaction, where throwing rolls the whole registration back. Requiring it makes calling this
+     * anywhere else a compile error rather than a silently unprotected write.
      */
+    context(_: RegistrationScope)
     suspend fun registerAssets(registrations: List<Pair<CoinageTransactionId, AssetRegistration>>)
 
     /**

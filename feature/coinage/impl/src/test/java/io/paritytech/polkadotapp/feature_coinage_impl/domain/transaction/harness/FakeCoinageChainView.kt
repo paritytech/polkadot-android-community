@@ -56,7 +56,7 @@ class FakeCoinageChainViewFactory(
     var pins = 0
         private set
 
-    override suspend fun pin(): Result<PinnedChainView> {
+    override suspend fun pin(chainId: String): Result<PinnedChainView> {
         pins++
 
         return if (faults.pinFails) {
@@ -73,9 +73,9 @@ class FakeCoinageChainViewFactory(
     override suspend fun create(view: PinnedChainView): CoinageStateReader =
         FakeCoinageChainView(chain, faults, chain.finalizedHead, chain.bestHead)
 
-    override fun finalizedHeads(): Flow<BlockNumber> = finalizedHeads
+    override fun finalizedHeads(chainId: String): Flow<BlockNumber> = finalizedHeads
 
-    override fun bestHeads(): Flow<BlockNumber> = bestHeads
+    override fun bestHeads(chainId: String): Flow<BlockNumber> = bestHeads
 
     fun produceBlock(body: List<TransactionHash> = emptyList(), mutate: (CoinageChainState) -> CoinageChainState = { it }) =
         chain.produceBlock(body, mutate).also { announce() }

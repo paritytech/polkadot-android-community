@@ -2,14 +2,13 @@ package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.ExtrinsicOutcome
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.HeadKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TransactionSearchResult
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
-import timber.log.Timber
 
 sealed interface RuleOutcome {
     data class Decided(val verdict: Verdict) : RuleOutcome
@@ -30,7 +29,7 @@ sealed interface RuleOutcome {
  * so Rule 0 costs no read of its own here — null is a read that failed, which aborts this transaction.
  */
 suspend fun evaluateLadder(
-    tx: DurableTxFacts,
+    tx: DurableTxEntry,
     scope: TxCompletionOracle.PassScope,
     view: PinnedChainView,
     recordedStillCanonical: Boolean?,
@@ -67,7 +66,7 @@ suspend fun evaluateLadder(
 
 /** Nothing above could decide it, so look for the transaction itself. */
 private suspend fun searchForTransaction(
-    tx: DurableTxFacts,
+    tx: DurableTxEntry,
     view: PinnedChainView,
     windowClosed: Boolean,
 ): RuleOutcome {
@@ -108,14 +107,14 @@ private suspend fun searchForTransaction(
  * to PENDING and lose whatever its effect made selectable for a full mortality window.
  */
 private fun recordedInclusion(
-    tx: DurableTxFacts,
+    tx: DurableTxEntry,
     scope: TxCompletionOracle.PassScope,
     view: PinnedChainView,
     recordedStillCanonical: Boolean?,
 ): RuleOutcome? {
     val recorded = tx.successDetectedAt ?: return null
     val stillCanonical = recordedStillCanonical ?: run {
-        Timber.w("${tx.logId()} rule=undecided reason=record-canonicality-unread record=${recorded.blockNumber}")
+        durabilityLogW("${tx.logId()} rule=undecided reason=record-canonicality-unread record=${recorded.blockNumber}")
 
         return RuleOutcome.Undecided
     }
@@ -147,13 +146,13 @@ private fun recordedInclusion(
 
 /** Every terminal path names itself, so a log line says which rule spoke and not merely what it concluded. */
 private fun decided(
-    tx: DurableTxFacts,
+    tx: DurableTxEntry,
     rule: String,
     status: DurableTxStatus,
     successDetectedAt: CheckpointBlock?,
     view: PinnedChainView,
 ): RuleOutcome {
-    Timber.d(
+    durabilityLogD(
         "${tx.logId()} rule=\"$rule\" -> $status f=${view.finalizedHead.blockNumber} " +
             "b=${view.bestHead.blockNumber} record=${successDetectedAt?.blockNumber ?: "none"}"
     )
@@ -161,4 +160,3 @@ private fun decided(
     return RuleOutcome.Decided(Verdict(status, successDetectedAt))
 }
 
-private fun DurableTxFacts.logId(): String = "[${domainId.value}#${id.value}]"

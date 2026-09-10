@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.paritytech.polkadotapp.chains.network.binding.BlockNumber
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
@@ -24,8 +25,11 @@ class DurableRecoveryLoopTest {
     private val repository: DurableTxRepository = mockk()
     private val recoveryPass: DurableRecoveryPass = mockk()
     private val chainViewFactory: PinnedChainViewFactory = mockk()
+    private val oracle: TxCompletionOracle = mockk<TxCompletionOracle>().also {
+        every { it.chainId } returns "test-chain"
+    }
 
-    private val loop = DurableRecoveryLoop(repository, recoveryPass, chainViewFactory)
+    private val loop = DurableRecoveryLoop(repository, recoveryPass, chainViewFactory, mapOf("test" to oracle))
 
     private var passesRun = 0
 
@@ -56,8 +60,8 @@ class DurableRecoveryLoopTest {
     fun `a best head drives a pass just as a finalized one does`() = runBlocking<Unit> {
         givenPassesSucceed()
         givenLiveWhilePassesBelow(2)
-        every { chainViewFactory.finalizedHeads() } returns emptyFlow()
-        every { chainViewFactory.bestHeads() } returns blocks(1, 2, 3)
+        every { chainViewFactory.finalizedHeads(any()) } returns emptyFlow()
+        every { chainViewFactory.bestHeads(any()) } returns blocks(1, 2, 3)
 
         loop.runUntilSettled()
 
@@ -68,8 +72,8 @@ class DurableRecoveryLoopTest {
     fun `a lost head subscription fails the loop so its host can retry`() = runBlocking<Unit> {
         givenPassesSucceed()
         givenLiveWhilePassesBelow(Int.MAX_VALUE)
-        every { chainViewFactory.finalizedHeads() } returns flow { throw IllegalStateException("socket closed") }
-        every { chainViewFactory.bestHeads() } returns emptyFlow()
+        every { chainViewFactory.finalizedHeads(any()) } returns flow { throw IllegalStateException("socket closed") }
+        every { chainViewFactory.bestHeads(any()) } returns emptyFlow()
 
         val result = loop.runUntilSettled()
 
@@ -99,8 +103,8 @@ class DurableRecoveryLoopTest {
     }
 
     private fun givenHeads(vararg numbers: Int) {
-        every { chainViewFactory.finalizedHeads() } returns blocks(*numbers)
-        every { chainViewFactory.bestHeads() } returns emptyFlow()
+        every { chainViewFactory.finalizedHeads(any()) } returns blocks(*numbers)
+        every { chainViewFactory.bestHeads(any()) } returns emptyFlow()
     }
 
     private fun blocks(vararg numbers: Int) =

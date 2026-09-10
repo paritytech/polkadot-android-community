@@ -32,12 +32,12 @@ abstract class MonotoneEffectOracle : TxCompletionOracle {
      * Returning `false` is a positive claim that the effect is not there — see the soundness note above.
      */
     protected abstract suspend fun effectsAt(
-        transactions: List<DurableTxFacts>,
+        transactions: List<DurableTxEntry>,
         at: CheckpointBlock,
     ): Map<DurableTxId, Boolean>
 
     final override suspend fun openPass(
-        transactions: List<DurableTxFacts>,
+        transactions: List<DurableTxEntry>,
         ledger: LedgerView,
         view: PinnedChainView,
     ): Result<TxCompletionOracle.PassScope> = runCatching {
@@ -52,9 +52,9 @@ private class MonotoneScope(
     private val atFinalized: Map<DurableTxId, Boolean>,
     private val atBest: Map<DurableTxId, Boolean>,
 ) : TxCompletionOracle.PassScope {
-    override fun provenCompleted(tx: DurableTxFacts, head: HeadKind): Boolean = read(head)[tx.id] == true
+    override fun provenCompleted(tx: DurableTxEntry, head: HeadKind): Boolean = read(head)[tx.id] == true
 
-    override fun provenNotCompleted(tx: DurableTxFacts, head: HeadKind): Boolean = read(head)[tx.id] == false
+    override fun provenNotCompleted(tx: DurableTxEntry, head: HeadKind): Boolean = read(head)[tx.id] == false
 
     private fun read(head: HeadKind) = when (head) {
         HeadKind.FINALIZED -> atFinalized

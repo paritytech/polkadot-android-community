@@ -23,6 +23,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.Registrat
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RegistrationOutput
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.shortKey
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxRegistrationError
@@ -59,16 +60,12 @@ class RealCoinageTransactionService @Inject constructor(
     ): Result<CoinageTransactionId> {
         coinageLogI("submit-transaction inputs=${inputs.size} outputs=${outputs.size} group=${groupId?.value}")
 
-        if (inputs.isEmpty() && outputs.isEmpty()) {
-            return Result.failure(CoinageRegistrationError.EmptyTransaction)
-        }
-
         val registration = runCatching { assetRegistration(inputs, outputs) }
             .getOrElse { return Result.failure(it) }
 
         return engine.submit(COINAGE_DOMAIN, extrinsic, groupId) { id ->
             assetLedger.registerAssets(listOf(id to registration))
-        }.asCoinageError().onFailure { coinageLogW("submit-transaction failed error=$it") }
+        }.asCoinageError().onFailure(::logRejected)
     }
 
     override suspend fun submitTransactions(
@@ -77,16 +74,12 @@ class RealCoinageTransactionService @Inject constructor(
     ): Result<List<CoinageTransactionId>> {
         coinageLogI("submit-transactions count=${transactions.size} group=${groupId.value}")
 
-        transactions.firstOrNull { it.inputs.isEmpty() && it.outputs.isEmpty() }?.let {
-            return Result.failure(CoinageRegistrationError.EmptyTransaction)
-        }
-
         val registrations = runCatching { transactions.map { assetRegistration(it.inputs, it.outputs) } }
             .getOrElse { return Result.failure(it) }
 
         return engine.submitAll(COINAGE_DOMAIN, transactions.map { it.extrinsic }, groupId) { ids ->
             assetLedger.registerAssets(ids.zip(registrations))
-        }.asCoinageError().onFailure { coinageLogW("submit-transactions failed group=${groupId.value} error=$it") }
+        }.asCoinageError().onFailure(::logRejected)
     }
 
     override suspend fun preCommitHandoff(assets: List<OwnAsset>): Result<CoinageHandoffCommit> {
@@ -96,8 +89,8 @@ class RealCoinageTransactionService @Inject constructor(
         val keys = marks.map { it.publicKey }
 
         return assetLedger.markHandedOff(marks)
-            .onSuccess { coinageLogI("handoff-marked assets=${marks.size}") }
-            .onFailure { coinageLogW("handoff-mark-failed error=$it") }
+            .onSuccess { coinageLogI("handoff-marked assets=${marks.map { it.describe() }}") }
+            .onFailure { logRejected(it) }
             .map { LedgerHandoffCommit(assetLedger, keys) }
     }
 
@@ -152,6 +145,10 @@ class RealCoinageTransactionService @Inject constructor(
         is OwnAsset.Voucher -> CoinageAssetKind.VOUCHER
     }
 
+    private fun logRejected(error: Throwable) {
+        coinageLogW("registration-rejected reason=${error::class.simpleName} detail=${error.message}")
+    }
+
     /**
      * The engine rejects a non-mortal extrinsic in its own vocabulary, but [CoinageRegistrationError] is
      * what this module publishes and what callers match on, so the two mortality rejections keep their
@@ -171,6 +168,6 @@ private class LedgerHandoffCommit(
     private val keys: List<AssetPublicKey>,
 ) : CoinageHandoffCommit {
     override suspend fun commit(): Result<Unit> = assetLedger.commitHandoffs(keys)
-        .onSuccess { coinageLogI("handoff-committed keys=${keys.size}") }
-        .onFailure { coinageLogW("handoff-commit-failed error=$it") }
+        .onSuccess { coinageLogI("handoff-committed keys=${keys.map { it.shortKey() }}") }
+        .onFailure { error -> coinageLogW("handoff-commit-failed keys=${keys.map { it.shortKey() }} error=$error") }
 }

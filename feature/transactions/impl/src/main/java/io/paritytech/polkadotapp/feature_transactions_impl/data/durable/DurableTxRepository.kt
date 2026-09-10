@@ -4,7 +4,7 @@ import io.paritytech.polkadotapp.database.dao.DurableTxDao
 import io.paritytech.polkadotapp.database.model.BlockRefLocal
 import io.paritytech.polkadotapp.database.model.DurableTxLocal
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxState
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
@@ -13,6 +13,8 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Registr
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionHash
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.durabilityLogI
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.durabilityLogW
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -51,9 +53,9 @@ interface DurableTxRepository {
         onRegister: suspend RegistrationScope.(List<DurableTxId>) -> Unit,
     ): Result<List<DurableTxId>>
 
-    suspend fun getFacts(id: DurableTxId): Result<DurableTxFacts?>
+    suspend fun getEntry(id: DurableTxId): Result<DurableTxEntry?>
 
-    suspend fun getAllFacts(domainId: TxDomainId): Result<List<DurableTxFacts>>
+    suspend fun getAllEntries(domainId: TxDomainId): Result<List<DurableTxEntry>>
 
     suspend fun getStatus(id: DurableTxId): Result<DurableTxStatus?>
 
@@ -107,11 +109,11 @@ class RealDurableTxRepository @Inject constructor(
         ids
     }
 
-    override suspend fun getFacts(id: DurableTxId): Result<DurableTxFacts?> =
-        runCatching { dao.get(id.value)?.toFacts() }
+    override suspend fun getEntry(id: DurableTxId): Result<DurableTxEntry?> =
+        runCatching { dao.get(id.value)?.toEntry() }
 
-    override suspend fun getAllFacts(domainId: TxDomainId): Result<List<DurableTxFacts>> =
-        runCatching { dao.getAll(domainId.value).map { it.toFacts() } }
+    override suspend fun getAllEntries(domainId: TxDomainId): Result<List<DurableTxEntry>> =
+        runCatching { dao.getAll(domainId.value).map { it.toEntry() } }
 
     override suspend fun getStatus(id: DurableTxId): Result<DurableTxStatus?> =
         runCatching { dao.getStatus(id.value)?.toDomain() }
@@ -124,13 +126,23 @@ class RealDurableTxRepository @Inject constructor(
         observed: DurableTxStatus,
         verdict: Verdict,
     ): Result<Boolean> = runCatching {
-        dao.compareAndSetStatus(
+        val written = dao.compareAndSetStatus(
             id = id.value,
             expected = observed.toLocal(),
             status = verdict.status.toLocal(),
             successDetectedBlockNumber = verdict.successDetectedAt?.blockNumber,
             successDetectedBlockHash = verdict.successDetectedAt?.blockHash,
-        ) > 0
+        )
+
+        val record = verdict.successDetectedAt?.blockNumber?.toString() ?: "none"
+
+        if (written > 0) {
+            durabilityLogI("entry=${id.value} cas-written from=$observed to=${verdict.status} record=$record")
+        } else {
+            durabilityLogW("entry=${id.value} cas-declined observed=$observed to=${verdict.status} record=$record")
+        }
+
+        written > 0
     }
 
     override suspend fun hasLiveTransactions(): Result<Boolean> = runCatching { dao.hasLiveTransactions() }
@@ -162,7 +174,7 @@ class RealDurableTxRepository @Inject constructor(
         status = DurableTxLocal.Status.PENDING,
     )
 
-    private fun DurableTxLocal.toFacts() = DurableTxFacts(
+    private fun DurableTxLocal.toEntry() = DurableTxEntry(
         id = DurableTxId(id),
         domainId = TxDomainId(domainId),
         groupId = operationGroupId?.let(::OperationGroupId),

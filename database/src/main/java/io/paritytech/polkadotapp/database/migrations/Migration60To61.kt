@@ -16,6 +16,9 @@ class Migration60To61 : Migration(60, 61) {
         db.execSQL(INDEX_DOMAIN_GROUP)
         db.execSQL(INDEX_DOMAIN_STATUS)
 
+        // Explicit ids, which is also what carries `sqlite_sequence` forward for the AUTOINCREMENT column:
+        // SQLite advances it whenever a row lands above the current maximum, so a later insert cannot reuse
+        // one — and a domain's asset rows are keyed on exactly these. `Migration60To61Test` pins that.
         db.execSQL(
             """
             INSERT INTO `durable_tx` (
@@ -31,43 +34,40 @@ class Migration60To61 : Migration(60, 61) {
             """.trimIndent()
         )
 
-        // Belt and braces. SQLite already advances `sqlite_sequence` when a row is inserted with an
-        // explicit rowid above the current maximum, so the copy above does this by itself — verified by
-        // `Migration60To61Test`, which still passes with this statement removed. It stays because the
-        // failure it guards against is silent: a reused id hands one transaction another's asset rows, and
-        // that is not a thing to leave resting on an implementation detail of the copy.
-        db.execSQL(
-            """
-            INSERT OR REPLACE INTO `sqlite_sequence` (`name`, `seq`)
-            SELECT 'durable_tx', COALESCE(MAX(`id`), 0) FROM `durable_tx`
-            """.trimIndent()
-        )
-
         db.execSQL("DROP TABLE `coinage_entry`")
     }
 
     private companion object {
-        /** Must stay byte-identical to what Room generates for `DurableTxLocal`; see `schemas/61.json`. */
-        const val CREATE_DURABLE_TX =
-            "CREATE TABLE IF NOT EXISTS `durable_tx` (" +
-                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                "`domainId` TEXT NOT NULL, " +
-                "`operationGroupId` TEXT, " +
-                "`txHash` TEXT NOT NULL, " +
-                "`mortalityBlocks` INTEGER NOT NULL, " +
-                "`status` TEXT NOT NULL, " +
-                "`checkpointblockNumber` INTEGER NOT NULL, " +
-                "`checkpointblockHash` TEXT NOT NULL, " +
-                "`successDetectedblockNumber` INTEGER, " +
-                "`successDetectedblockHash` TEXT)"
+        /**
+         * Structurally what Room generates for `DurableTxLocal`; see `schemas/61.json`.
+         *
+         * Only the shape has to match: Room validates the table it finds after the migration, not the
+         * statement that produced it, so the layout here is free to be readable.
+         */
+        val CREATE_DURABLE_TX = """
+            CREATE TABLE IF NOT EXISTS `durable_tx` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `domainId` TEXT NOT NULL,
+                `operationGroupId` TEXT,
+                `txHash` TEXT NOT NULL,
+                `mortalityBlocks` INTEGER NOT NULL,
+                `status` TEXT NOT NULL,
+                `checkpointblockNumber` INTEGER NOT NULL,
+                `checkpointblockHash` TEXT NOT NULL,
+                `successDetectedblockNumber` INTEGER,
+                `successDetectedblockHash` TEXT
+            )
+        """.trimIndent()
 
-        const val INDEX_DOMAIN_GROUP =
-            "CREATE INDEX IF NOT EXISTS `index_durable_tx_domainId_operationGroupId` " +
-                "ON `durable_tx` (`domainId`, `operationGroupId`)"
+        val INDEX_DOMAIN_GROUP = """
+            CREATE INDEX IF NOT EXISTS `index_durable_tx_domainId_operationGroupId`
+            ON `durable_tx` (`domainId`, `operationGroupId`)
+        """.trimIndent()
 
-        const val INDEX_DOMAIN_STATUS =
-            "CREATE INDEX IF NOT EXISTS `index_durable_tx_domainId_status` " +
-                "ON `durable_tx` (`domainId`, `status`)"
+        val INDEX_DOMAIN_STATUS = """
+            CREATE INDEX IF NOT EXISTS `index_durable_tx_domainId_status`
+            ON `durable_tx` (`domainId`, `status`)
+        """.trimIndent()
 
         const val COINAGE_DOMAIN_ID = "coinage"
     }

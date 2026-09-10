@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -11,7 +12,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.transformWhile
-import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,7 +36,11 @@ class DurableRecoveryLoop @Inject constructor(
     private val repository: DurableTxRepository,
     private val recoveryPass: DurableRecoveryPass,
     private val chainViewFactory: PinnedChainViewFactory,
+    private val oracles: Map<String, @JvmSuppressWildcards TxCompletionOracle>,
 ) {
+    /** Fixed at build time, so the loop can subscribe once rather than re-deriving it per pass. */
+    private val watchedChains = oracles.values.map { it.chainId }.distinct()
+
     // Dropping oldest is right: a nudge says "something may be decidable now", and a newer one says it at
     // least as well. What must not happen is a nudge blocking the caller that raised it.
     private val nudges = MutableSharedFlow<Trigger>(
@@ -72,20 +76,21 @@ class DurableRecoveryLoop @Inject constructor(
      * decided by the first pass and the loop ends without ever seeing a head.
      */
     private fun triggers() = merge(
-        chainViewFactory.finalizedHeads().map { Trigger.FINALIZED_HEAD },
-        chainViewFactory.bestHeads().map { Trigger.BEST_HEAD },
+        *watchedChains.map { chainViewFactory.finalizedHeads(it).map { _ -> Trigger.FINALIZED_HEAD } }
+            .toTypedArray(),
+        *watchedChains.map { chainViewFactory.bestHeads(it).map { _ -> Trigger.BEST_HEAD } }.toTypedArray(),
         nudges,
     ).onStart { emit(Trigger.LAUNCH) }
 
     private suspend fun runPass(trigger: Trigger) {
-        Timber.d("recovery-trigger $trigger")
+        durabilityLogD("recovery-trigger $trigger")
 
-        recoveryPass.run().onFailure { Timber.w(it, "recovery-pass-failed trigger=$trigger") }
+        recoveryPass.run().onFailure { durabilityLogW("recovery-pass-failed trigger=$trigger error=$it") }
     }
 
     /** An unreadable ledger counts as live: abandoning transactions is far worse than one wasted pass. */
     private suspend fun hasLiveTransactions(): Boolean = repository.hasLiveTransactions()
-        .onFailure { Timber.w(it, "live-transactions-read-failed") }
+        .onFailure { durabilityLogW("live-transactions-read-failed error=$it") }
         .getOrDefault(true)
 }
 

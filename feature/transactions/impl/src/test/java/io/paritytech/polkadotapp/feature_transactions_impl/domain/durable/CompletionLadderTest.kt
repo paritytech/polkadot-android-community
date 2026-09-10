@@ -3,7 +3,7 @@ package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.ExtrinsicOutcome
 import io.paritytech.polkadotapp.chains.network.binding.BlockHash
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.HeadKind
@@ -267,7 +267,7 @@ class CompletionLadderTest {
      */
     @Test
     fun `a domain with no oracle is still decided by the search`() = runBlocking<Unit> {
-        val scope = TxCompletionOracle.Unobservable
+        val scope = TxCompletionOracle.unobservableOn("test-chain")
             .openPass(emptyList(), ledgerOf(), FakePinnedChainView())
             .getOrThrow()
 
@@ -287,7 +287,7 @@ class CompletionLadderTest {
     // ---- fixtures ----
 
     private suspend fun evaluate(
-        tx: DurableTxFacts,
+        tx: DurableTxEntry,
         oracle: ScriptedOracle,
         finalized: Long = 130,
         recordedStillCanonical: Boolean? = null,
@@ -310,7 +310,7 @@ class CompletionLadderTest {
     private fun tx(
         successDetectedAt: CheckpointBlock? = null,
         status: DurableTxStatus = DurableTxStatus.PENDING,
-    ) = DurableTxFacts(
+    ) = DurableTxEntry(
         id = DurableTxId(1),
         domainId = TxDomainId("test"),
         groupId = null,
@@ -324,9 +324,9 @@ class CompletionLadderTest {
 
 private fun block(number: Long) = CheckpointBlock(number, "0xblock$number")
 
-private fun ledgerOf(vararg facts: DurableTxFacts) =
+private fun ledgerOf(vararg entry: DurableTxEntry) =
     object : io.paritytech.polkadotapp.feature_transactions.api.domain.durable.LedgerView {
-        override val transactions = facts.toList()
+        override val transactions = entry.toList()
 
         override fun statusOf(id: DurableTxId) = transactions.firstOrNull { it.id == id }?.status
     }
@@ -346,12 +346,12 @@ private class ScriptedOracle(
     private val notCompletedAtBest: Boolean,
 ) {
     fun scope() = object : TxCompletionOracle.PassScope {
-        override fun provenCompleted(tx: DurableTxFacts, head: HeadKind) = when (head) {
+        override fun provenCompleted(tx: DurableTxEntry, head: HeadKind) = when (head) {
             HeadKind.FINALIZED -> completedAtFinalized
             HeadKind.BEST -> completedAtBest
         }
 
-        override fun provenNotCompleted(tx: DurableTxFacts, head: HeadKind) = when (head) {
+        override fun provenNotCompleted(tx: DurableTxEntry, head: HeadKind) = when (head) {
             HeadKind.FINALIZED -> notCompletedAtFinalized
             HeadKind.BEST -> notCompletedAtBest
         }

@@ -16,14 +16,14 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableChainProvider
+import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 
@@ -38,7 +38,7 @@ import kotlin.time.Duration.Companion.seconds
  * not on a resubmission, not on anything. Release drops it, stops the subscription and triggers a pass.
  */
 class DurableSubmissionTracker @Inject constructor(
-    private val chainProvider: DurableChainProvider,
+    private val oracles: Map<String, @JvmSuppressWildcards TxCompletionOracle>,
     private val chainRegistry: ChainRegistry,
     private val extrinsicService: ExtrinsicService,
     private val repository: DurableTxRepository,
@@ -55,7 +55,7 @@ class DurableSubmissionTracker @Inject constructor(
     ) {
         scope.launch {
             runCatching { follow(id, extrinsic) }
-                .onFailure { Timber.w(it, "tx=${id.value} submission-watch-failed") }
+                .onFailure { durabilityLogW("${logId(id)} submission-watch-failed error=$it") }
 
             submissionOwned.release(id)
 
@@ -71,7 +71,7 @@ class DurableSubmissionTracker @Inject constructor(
         val status = repository.getStatus(id).getOrNull()
 
         if (status?.isLive == false) {
-            Timber.d("tx=${id.value} recovery-skipped reason=decided status=$status")
+            durabilityLogD("${logId(id)} recovery-skipped reason=decided status=$status")
 
             return false
         }
@@ -80,7 +80,7 @@ class DurableSubmissionTracker @Inject constructor(
     }
 
     private suspend fun follow(id: DurableTxId, extrinsic: SendableExtrinsic) {
-        val chain = chainRegistry.getChain(chainProvider.chainId())
+        val chain = chainRegistry.getChain(chainOf(id))
 
         // Held for as long as the watch lives. This subscription is the only thing following the
         // transaction while it is in flight, and a connection torn down because the app went to background
@@ -117,9 +117,14 @@ class DurableSubmissionTracker @Inject constructor(
                 }
 
                 if (status == null) {
-                    Timber.w("tx=${id.value} submission-abandoned reason=silence-timeout")
+                    durabilityLogW("${logId(id)} submission-abandoned reason=silence-timeout")
                     break
                 }
+
+                // Only the status that ends the watch goes to info: a batch of twenty vouchers reports four
+                // times each, which would spend the whole breadcrumb budget on one operation.
+                val line = "${logId(id)} submission-status ${status.describe()}"
+                if (status.terminal) durabilityLogI(line) else durabilityLogD(line)
 
                 if (handle(id, status)) break
             }
@@ -140,8 +145,10 @@ class DurableSubmissionTracker @Inject constructor(
         // Not finalized, so a terminal verdict must not rest on it: a proven failure here proposes nothing
         // and the transaction stays PENDING for the pass to decide.
         is ExtrinsicStatus.InBlock -> {
-            val at = blockOf(status.blockHash)
+            val at = blockOf(id, status.blockHash)
             val outcome = at?.let { dispatchOutcome(status.blockHash, id) }
+
+            durabilityLogD("${logId(id)} in-block block=${at?.blockNumber} outcome=$outcome")
 
             if (outcome == ExtrinsicOutcome.SUCCESS) {
                 propose(id, Verdict(DurableTxStatus.PENDING_SUCCESS, successDetectedAt = at))
@@ -155,9 +162,13 @@ class DurableSubmissionTracker @Inject constructor(
         }
 
         is ExtrinsicStatus.Finalized -> {
-            when (dispatchOutcome(status.blockHash, id)) {
+            val outcome = dispatchOutcome(status.blockHash, id)
+
+            durabilityLogD("${logId(id)} finalized outcome=$outcome")
+
+            when (outcome) {
                 ExtrinsicOutcome.SUCCESS ->
-                    propose(id, Verdict(DurableTxStatus.FINALIZED_SUCCESS, blockOf(status.blockHash)))
+                    propose(id, Verdict(DurableTxStatus.FINALIZED_SUCCESS, blockOf(id, status.blockHash)))
 
                 ExtrinsicOutcome.FAILURE ->
                     propose(id, Verdict(DurableTxStatus.FAILURE, successDetectedAt = null))
@@ -191,8 +202,8 @@ class DurableSubmissionTracker @Inject constructor(
      * mortality window on the strength of a block that no longer exists.
      */
     private suspend fun clearRecordIfItNames(id: DurableTxId, blockHash: String) {
-        val facts = repository.getFacts(id).getOrNull() ?: return
-        if (facts.successDetectedAt?.blockHash != blockHash) return
+        val entry = repository.getEntry(id).getOrNull() ?: return
+        if (entry.successDetectedAt?.blockHash != blockHash) return
 
         propose(id, Verdict(DurableTxStatus.PENDING, successDetectedAt = null))
     }
@@ -203,34 +214,50 @@ class DurableSubmissionTracker @Inject constructor(
      */
     private suspend fun propose(id: DurableTxId, verdict: Verdict) {
         val observed = repository.getStatus(id).getOrNull() ?: run {
-            Timber.w("tx=${id.value} proposal-skipped to=${verdict.status} reason=status-unreadable")
+            durabilityLogW("${logId(id)} proposal-skipped to=${verdict.status} reason=status-unreadable")
 
             return
         }
 
         if (!observed.isLive) {
-            Timber.d("tx=${id.value} proposal-skipped to=${verdict.status} reason=not-live observed=$observed")
+            durabilityLogD("${logId(id)} proposal-skipped to=${verdict.status} reason=not-live observed=$observed")
 
             return
         }
 
+        durabilityLogD(
+            "${logId(id)} proposing from=$observed to=${verdict.status} " +
+                "record=${verdict.successDetectedAt?.blockNumber ?: "none"}"
+        )
+
         repository.compareAndSetStatus(id, observed, verdict)
-            .onFailure { Timber.w(it, "tx=${id.value} proposal-write-failed to=${verdict.status}") }
+            .onFailure { durabilityLogW("${logId(id)} proposal-write-failed to=${verdict.status} error=$it") }
     }
 
     private suspend fun dispatchOutcome(blockHash: String, id: DurableTxId): ExtrinsicOutcome? {
-        val facts = repository.getFacts(id).getOrNull() ?: return null
-        val view = chainViewFactory.pin().getOrNull() ?: return null
+        val entry = repository.getEntry(id).getOrNull() ?: return null
+        val view = chainViewFactory.pin(chainOf(id)).getOrNull() ?: return null
 
-        return view.dispatchOutcomeAt(blockHash, facts.txHash).getOrNull()
+        return view.dispatchOutcomeAt(blockHash, entry.txHash).getOrNull()
     }
 
-    private suspend fun blockOf(blockHash: String): CheckpointBlock? {
-        val view = chainViewFactory.pin().getOrNull() ?: return null
+    private suspend fun blockOf(id: DurableTxId, blockHash: String): CheckpointBlock? {
+        val view = chainViewFactory.pin(chainOf(id)).getOrNull() ?: return null
         val number = view.blockNumberAt(blockHash).getOrNull() ?: return null
 
         return CheckpointBlock(number, blockHash)
     }
+
+    /** The chain a transaction lives on is its domain's, which its oracle declares. */
+    private suspend fun chainOf(id: DurableTxId): ChainId {
+        val domain = repository.getEntry(id).getOrNull()?.domainId?.value
+
+        return oracles[domain]?.chainId ?: error("No registered oracle for domain $domain")
+    }
+
+    /** Falls back to the bare id when the row cannot be read — a log line must never fail the watch. */
+    private suspend fun logId(id: DurableTxId): String =
+        repository.getEntry(id).getOrNull()?.logId() ?: "entry=${id.value}"
 
     private companion object {
         const val CONNECTION_LABEL = "DurableSubmission"
@@ -240,4 +267,14 @@ class DurableSubmissionTracker @Inject constructor(
         /** Mirrors the platform default; the constant itself lives in a module this cannot depend on. */
         const val RECOVERY_MAX_ATTEMPTS = 3
     }
+}
+
+private fun ExtrinsicStatus.describe(): String = when (this) {
+    is ExtrinsicStatus.InBlock -> "InBlock at=${blockHash.shortHash()}"
+    is ExtrinsicStatus.Retracted -> "Retracted at=${blockHash.shortHash()}"
+    is ExtrinsicStatus.Finalized -> "Finalized at=${blockHash.shortHash()}"
+    is ExtrinsicStatus.FailedToSubmit -> "FailedToSubmit error=${exception::class.simpleName}"
+    is ExtrinsicStatus.Usurped -> "Usurped by=${by.shortHash()}"
+    is ExtrinsicStatus.Other -> "Other raw=$rawStatus"
+    else -> this::class.simpleName.orEmpty()
 }

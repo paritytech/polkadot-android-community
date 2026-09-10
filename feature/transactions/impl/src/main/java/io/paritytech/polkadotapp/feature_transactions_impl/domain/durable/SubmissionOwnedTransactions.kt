@@ -3,7 +3,6 @@ package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,9 +31,9 @@ class SubmissionOwnedTransactions @Inject constructor() {
     suspend fun acquire(id: DurableTxId) = mutex.withLock {
         if (id.value !in everReleased) {
             owned += id.value
-            Timber.d("tx=${id.value} submission-ownership acquired")
+            durabilityLogD("entry=${id.value} submission-ownership acquired")
         } else {
-            Timber.w("tx=${id.value} submission-ownership acquire-ignored reason=already-released")
+            durabilityLogW("entry=${id.value} submission-ownership acquire-ignored reason=already-released")
         }
     }
 
@@ -42,7 +41,7 @@ class SubmissionOwnedTransactions @Inject constructor() {
         owned -= id.value
         everReleased += id.value
 
-        Timber.i("tx=${id.value} submission-ownership released")
+        durabilityLogI("entry=${id.value} submission-ownership released")
     }
 
     suspend fun isOwnedBySubmission(id: DurableTxId): Boolean = mutex.withLock {

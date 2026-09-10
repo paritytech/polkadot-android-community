@@ -18,6 +18,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
+import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReader
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
@@ -43,8 +44,16 @@ class RealCoinagePaymentStatusUseCaseTest {
     private val stateReaderFactory: CoinageStateReaderFactory = mockk()
     private val stateReader: CoinageStateReader = mockk()
 
-    private val useCase =
-        RealCoinagePaymentStatusUseCase(coinageAssetsUseCase, chainViewFactory, stateReaderFactory)
+    private val chainAssetProvider: ChainAssetProvider = mockk<ChainAssetProvider>().also {
+        every { it.chainId() } returns "test-chain"
+    }
+
+    private val useCase = RealCoinagePaymentStatusUseCase(
+        coinageAssetsUseCase,
+        chainViewFactory,
+        stateReaderFactory,
+        chainAssetProvider,
+    )
 
     @Test
     fun `a coin still on chain is waiting for the peer to take it`() = runTest {
@@ -177,7 +186,7 @@ class RealCoinagePaymentStatusUseCaseTest {
 
         every { coinageAssetsUseCase.subscribeCoinsBy(any()) } returns flowOf(listOf(tracked))
 
-        coEvery { chainViewFactory.pin() } returns when (atFinalized) {
+        coEvery { chainViewFactory.pin(any()) } returns when (atFinalized) {
             UNREADABLE -> Result.failure(IllegalStateException("no view"))
             else -> Result.success(chainView)
         }

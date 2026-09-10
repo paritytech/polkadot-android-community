@@ -111,10 +111,10 @@ class Migration60To61Test {
     /**
      * The property that matters, whatever guarantees it.
      *
-     * A reused id hands one transaction another's asset rows, silently. This passes with the migration's
-     * `sqlite_sequence` reseed removed — SQLite advances the sequence itself when the copy inserts explicit
-     * rowids above the current maximum — so it is pinning the outcome rather than that one statement, which
-     * is what makes it worth keeping if the copy is ever rewritten.
+     * A reused id hands one transaction another's asset rows, silently. Nothing in the migration arranges
+     * this: SQLite advances `sqlite_sequence` itself when the copy inserts explicit rowids above the
+     * current maximum. That is exactly why it is worth a test — the guarantee lives outside the code, so a
+     * rewritten copy could lose it without a line of the migration looking wrong.
      */
     @Test
     fun theNextInsertCannotReuseACarriedOverId() {

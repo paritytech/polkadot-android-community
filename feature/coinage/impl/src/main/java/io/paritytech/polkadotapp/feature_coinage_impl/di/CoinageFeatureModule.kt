@@ -85,7 +85,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RealCoina
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.service.RealCoinageBackupService
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.service.RealCoinageServiceStarter
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageDurableChainProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RealCoinageAssetLedger
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.RealCoinageStateReaderFactory
@@ -93,7 +92,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.RealCoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageResourceOracle
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableChainProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainKey
 import dagger.multibindings.IntoMap
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.CoinageOnboardingSubmissionUseCase
@@ -215,9 +213,6 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindCoinageStateReaderFactory(impl: RealCoinageStateReaderFactory): CoinageStateReaderFactory
-
-    @Binds
-    fun bindDurableChainProvider(impl: CoinageDurableChainProvider): DurableChainProvider
 
     /**
      * Coinage's oracle, keyed by its domain so the engine's pass can find it. Every domain contributes one

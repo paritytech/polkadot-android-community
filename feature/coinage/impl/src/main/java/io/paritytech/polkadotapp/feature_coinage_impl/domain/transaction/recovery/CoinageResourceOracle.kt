@@ -5,7 +5,10 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
+import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
+import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.HeadKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.LedgerView
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
@@ -23,12 +26,15 @@ import javax.inject.Singleton
  */
 @Singleton
 class CoinageResourceOracle @Inject constructor(
+    @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val assetLedger: CoinageAssetLedger,
     private val stateReaderFactory: CoinageStateReaderFactory,
     private val evidenceCollector: CoinageEvidenceCollector,
 ) : TxCompletionOracle {
+    override val chainId: ChainId get() = chainAssetProvider.chainId()
+
     override suspend fun openPass(
-        transactions: List<DurableTxFacts>,
+        transactions: List<DurableTxEntry>,
         ledger: LedgerView,
         view: PinnedChainView,
     ): Result<TxCompletionOracle.PassScope> = runCatching {
@@ -36,16 +42,16 @@ class CoinageResourceOracle @Inject constructor(
         val assets = assetLedger.assetsOf(ledger.transactions.map { it.id }).getOrThrow()
         val handedOff = assetLedger.getHandoffKeys().getOrThrow()
 
-        val entries = ledger.transactions.mapNotNull { facts ->
-            assets[facts.id]?.let { LedgerEntry(facts, it.inputs, it.outputs) }
+        val entries = ledger.transactions.mapNotNull { entry ->
+            assets[entry.id]?.let { LedgerEntry(entry, it.inputs, it.outputs) }
         }
         val dag = CoinageEntryDag(entries, handedOff)
 
         val reader = stateReaderFactory.create(view)
 
         // Unchanged granularity: one collect() per transaction, five concurrent reads inside each.
-        val evidence = transactions.associate { facts ->
-            facts.id to evidenceCollector.collect(dag.entryOf(facts.id), reader, view)
+        val evidence = transactions.associate { entry ->
+            entry.id to evidenceCollector.collect(dag.entryOf(entry.id), reader, view)
         }
 
         CoinagePassScope(dag, evidence)
@@ -60,7 +66,7 @@ internal class CoinagePassScope(
      * The old Rules 1 and 2 (an effect is visible) and 5 and 6 (every input we minted ourselves is gone),
      * which were the same two questions asked at two heads.
      */
-    override fun provenCompleted(tx: DurableTxFacts, head: HeadKind): Boolean {
+    override fun provenCompleted(tx: DurableTxEntry, head: HeadKind): Boolean {
         val entry = dag.entryOf(tx.id)
         val evidence = evidence[tx.id] ?: return false
         val atFinalized = head == HeadKind.FINALIZED
@@ -83,7 +89,7 @@ internal class CoinagePassScope(
      * Sound by construction rather than by review — [noPotentialConsumers] enumerates every party that
      * could have erased the effect: a peer holding the key, another of our transactions, a live claimant.
      */
-    override fun provenNotCompleted(tx: DurableTxFacts, head: HeadKind): Boolean {
+    override fun provenNotCompleted(tx: DurableTxEntry, head: HeadKind): Boolean {
         val entry = dag.entryOf(tx.id)
         val evidence = evidence[tx.id] ?: return false
         val atFinalized = head == HeadKind.FINALIZED

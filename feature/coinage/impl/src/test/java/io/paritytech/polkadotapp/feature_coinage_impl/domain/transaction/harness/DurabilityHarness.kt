@@ -13,7 +13,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.RealCoi
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageEvidenceCollector
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageResourceOracle
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableChainProvider
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableRecoveryLoop
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableRecoveryScheduler
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableSubmissionTracker
@@ -140,6 +139,7 @@ class DurabilityHarness(
         val ownedEntries = SubmissionOwnedTransactions()
 
         val oracle = CoinageResourceOracle(
+            chainAssetProvider = harnessChainAssetProvider(),
             assetLedger = ledger.coinage,
             stateReaderFactory = chain,
             evidenceCollector = CoinageEvidenceCollector(
@@ -155,12 +155,17 @@ class DurabilityHarness(
             oracles = mapOf(COINAGE_DOMAIN_ID to oracle),
         )
 
-        val loop = DurableRecoveryLoop(repository = ledger.engine, recoveryPass = pass, chainViewFactory = chain)
+        val loop = DurableRecoveryLoop(
+            repository = ledger.engine,
+            recoveryPass = pass,
+            chainViewFactory = chain,
+            oracles = mapOf(COINAGE_DOMAIN_ID to oracle),
+        )
         val scheduler = RecordingRecoveryScheduler()
 
         val engine = RealDurableTransactionService(
             repository = ledger.engine,
-            submissionTracker = submissionTracker(ownedEntries),
+            submissionTracker = submissionTracker(ownedEntries, oracle),
             submissionOwned = ownedEntries,
             recoveryLoop = loop,
             recoveryScheduler = scheduler,
@@ -177,17 +182,18 @@ class DurabilityHarness(
         return Subsystem(service, engine, ownedEntries, pass, scheduler, scope)
     }
 
-    private fun submissionTracker(ownedEntries: SubmissionOwnedTransactions): DurableSubmissionTracker {
-        val chainProvider: DurableChainProvider = mockk()
+    private fun submissionTracker(
+        ownedEntries: SubmissionOwnedTransactions,
+        oracle: CoinageResourceOracle,
+    ): DurableSubmissionTracker {
         val extrinsicService: ExtrinsicService = mockk()
 
-        coEvery { chainProvider.chainId() } returns "harness-chain"
         every { extrinsicService.submitAndWatchBuiltExtrinsic(any(), any(), any()) } answers {
             submissionStatuses(submissions++)
         }
 
         return DurableSubmissionTracker(
-            chainProvider = chainProvider,
+            oracles = mapOf(COINAGE_DOMAIN_ID to oracle),
             chainRegistry = mockk(relaxed = true),
             extrinsicService = extrinsicService,
             repository = ledger.engine,
@@ -228,6 +234,14 @@ private class RecordingRecoveryScheduler : DurableRecoveryScheduler {
         requests++
     }
 }
+
+/** The one chain the harness models; the engine only needs it to be consistent. */
+const val HARNESS_CHAIN = "harness-chain"
+
+private fun harnessChainAssetProvider(): io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider =
+    mockk<io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider>().also {
+        every { it.chainId() } returns HARNESS_CHAIN
+    }
 
 /** Blocks a coinage extrinsic stays valid for in the harness, matching what the chain would build. */
 const val HARNESS_MORTAL_PERIOD = 128

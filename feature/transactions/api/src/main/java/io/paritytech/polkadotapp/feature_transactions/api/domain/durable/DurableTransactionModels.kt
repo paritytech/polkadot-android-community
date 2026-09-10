@@ -64,7 +64,7 @@ enum class DurableTxStatus {
  * Deliberately thin: the bytes, the window they are valid in, and what the ledger has concluded so far.
  * Anything domain-shaped reaches the ladder only through [TxCompletionOracle].
  */
-data class DurableTxFacts(
+data class DurableTxEntry(
     val id: DurableTxId,
     val domainId: TxDomainId,
     val groupId: OperationGroupId?,

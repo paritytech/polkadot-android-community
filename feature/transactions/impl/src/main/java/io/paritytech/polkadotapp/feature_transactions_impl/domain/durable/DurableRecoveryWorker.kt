@@ -23,8 +23,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionR
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableChainProvider
-import timber.log.Timber
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -46,7 +45,7 @@ class DurableRecoveryWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val recoveryLoop: DurableRecoveryLoop,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
-    private val chainProvider: DurableChainProvider,
+    private val oracles: Map<String, @JvmSuppressWildcards TxCompletionOracle>,
 ) : CoroutineWorker(appContext, params) {
     companion object {
         private const val WORK_ID = "DurableTxRecovery"
@@ -75,11 +74,18 @@ class DurableRecoveryWorker @AssistedInject constructor(
     }
 
     override suspend fun doWork(): Result {
+        durabilityLogD("Recovery worker run started")
+
         promoteToForeground()
 
-        return chainConnectionRefCounter.withConnectionEnabled(chainProvider.chainId(), WORK_ID) {
+        // A connection per chain a domain lives on: the loop watches all of them, and a pass can pin any.
+        val chains = oracles.values.mapTo(mutableSetOf()) { it.chainId }
+
+        return chainConnectionRefCounter.withConnectionEnabled(chains, WORK_ID) {
             recoveryLoop.runUntilSettled()
         }.logFailure("Durable recovery loop stopped early")
+            .onSuccess { durabilityLogD("Recovery worker run settled") }
+            .onFailure { durabilityLogW("Recovery worker run stopped early: $it") }
             .toWorkerResult(retryOnFailure = true)
     }
 
@@ -89,7 +95,7 @@ class DurableRecoveryWorker @AssistedInject constructor(
      */
     private suspend fun promoteToForeground() {
         runCatching { setForeground(getForegroundInfo()) }
-            .onFailure { Timber.w(it, "Durable recovery could not run in the foreground") }
+            .onFailure { durabilityLogW("Durable recovery could not run in the foreground: $it") }
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
@@ -134,6 +140,6 @@ class WorkManagerDurableRecoveryScheduler @Inject constructor(
      */
     override fun ensureRunning() {
         runCatching { DurableRecoveryWorker.enqueue(context) }
-            .onFailure { Timber.w(it, "Could not enqueue durable recovery") }
+            .onFailure { durabilityLogW("Could not enqueue durable recovery: $it") }
     }
 }

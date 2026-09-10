@@ -7,37 +7,37 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxFacts
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 
 /** An asset's on-chain identity: a coin's derived account id, or a voucher's ring VRF public key. */
 typealias AssetPublicKey = DataByteArray
 
 /**
- * One transaction as the rules see it: the engine's facts joined to the assets coinage holds for it.
+ * One transaction as the rules see it: the engine's row joined to the assets coinage holds for it.
  *
- * The facts half is domain-neutral and lives in the shared ledger; the asset half is coinage's alone.
+ * The engine half is domain-neutral and lives in the shared ledger; the asset half is coinage's alone.
  */
 data class LedgerEntry(
-    val facts: DurableTxFacts,
+    val entry: DurableTxEntry,
     val inputs: List<LedgerAsset>,
     val outputs: List<LedgerAsset>,
 ) {
-    val id: CoinageTransactionId get() = facts.id
+    val id: CoinageTransactionId get() = entry.id
 
-    val groupId: CoinageOperationGroupId? get() = facts.groupId
+    val groupId: CoinageOperationGroupId? get() = entry.groupId
 
-    val txHash: String get() = facts.txHash
+    val txHash: String get() = entry.txHash
 
-    val checkpoint: CheckpointBlock get() = facts.checkpoint
+    val checkpoint: CheckpointBlock get() = entry.checkpoint
 
-    val mortalityBlocks: Long get() = facts.mortalityBlocks
+    val mortalityBlocks: Long get() = entry.mortalityBlocks
 
-    val status: DurableTxStatus get() = facts.status
+    val status: DurableTxStatus get() = entry.status
 
-    val successDetectedAt: CheckpointBlock? get() = facts.successDetectedAt
+    val successDetectedAt: CheckpointBlock? get() = entry.successDetectedAt
 
     /** The last block this transaction can still execute in. */
-    val mortalityEnd: Long get() = facts.mortalityEnd
+    val mortalityEnd: Long get() = entry.mortalityEnd
 }
 
 enum class CoinageAssetKind { COIN, VOUCHER }

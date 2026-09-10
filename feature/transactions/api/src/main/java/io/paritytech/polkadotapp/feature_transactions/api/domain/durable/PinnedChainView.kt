@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_transactions.api.domain.durable
 
+import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.ExtrinsicOutcome
 import io.paritytech.polkadotapp.chains.network.binding.BlockHash
 import io.paritytech.polkadotapp.chains.network.binding.BlockNumber
@@ -54,19 +55,19 @@ interface PinnedChainView {
     ): TransactionSearchResult
 }
 
-/** Pins one view per pass, from a single connection. */
+/** Pins one view per chain per pass. */
 interface PinnedChainViewFactory {
-    suspend fun pin(): Result<PinnedChainView>
+    suspend fun pin(chainId: ChainId): Result<PinnedChainView>
 
     /**
      * Emits every newly finalized block, so recovery can run a pass exactly when the facts it reads can have
      * changed. The number is a tick and nothing more — each pass still pins its own view.
      */
-    fun finalizedHeads(): Flow<BlockNumber>
+    fun finalizedHeads(chainId: ChainId): Flow<BlockNumber>
 
     /**
      * Emits every new best block. Pre-finality success is read at the best head, so those facts move here
      * rather than at finality — several blocks earlier.
      */
-    fun bestHeads(): Flow<BlockNumber>
+    fun bestHeads(chainId: ChainId): Flow<BlockNumber>
 }
