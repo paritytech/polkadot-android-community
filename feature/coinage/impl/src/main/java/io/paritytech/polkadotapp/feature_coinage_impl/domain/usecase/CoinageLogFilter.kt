@@ -4,12 +4,8 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.COINAGE_LOG_TAG
 
 private val LOG_ENTRY_START = Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}""")
 
-/**
- * Keeps the last [maxLines] lines of the coinage entries in an app log.
- *
- * Entry-aware rather than line-aware: a stack trace belongs to the entry above it and carries none of the tag
- * itself, so filtering per line would drop exactly the failures the export exists to show.
- */
+// Entry-aware rather than line-aware: a stack trace belongs to the entry above it and carries none of the tag
+// itself, so filtering per line would drop exactly the failures the export exists to show.
 internal fun Sequence<String>.filterCoinageLogEntries(maxLines: Int): List<String> {
     val lines = ArrayDeque<String>()
     var inCoinageEntry = false

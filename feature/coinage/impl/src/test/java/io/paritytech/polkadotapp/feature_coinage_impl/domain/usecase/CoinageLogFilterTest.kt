@@ -45,13 +45,13 @@ class CoinageLogFilterTest {
     }
 
     @Test
-    fun `keeps the most recent lines when the cap is reached`() {
-        val log = (1..10).asSequence()
-            .map { "2026-09-07 10:00:0$it.000 CoinageTransfer INFO entry-$it" }
+    fun `drops the oldest lines and keeps the newest when the cap is reached`() {
+        val log = (1..10).asSequence().map { entry(it) }
 
         val filtered = log.filterCoinageLogEntries(maxLines = 3)
 
-        assertEquals(3, filtered.size)
-        assertEquals("2026-09-07 10:00:010.000 CoinageTransfer INFO entry-10", filtered.last())
+        assertEquals(listOf(entry(8), entry(9), entry(10)), filtered)
     }
+
+    private fun entry(index: Int) = "2026-09-07 10:00:00.00$index CoinageTransfer INFO entry-$index"
 }
