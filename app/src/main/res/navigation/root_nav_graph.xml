@@ -182,18 +182,6 @@
         app:popUpToInclusive="true" />
 
     <action
-        android:id="@+id/action_global_to_w3s_spa_graph"
-        app:destination="@id/w3s_spa_graph"
-        app:popUpTo="@id/root_nav_graph"
-        app:popUpToInclusive="true" />
-
-    <action
-        android:id="@+id/action_global_to_w3s_ended_graph"
-        app:destination="@id/w3s_ended_graph"
-        app:popUpTo="@id/root_nav_graph"
-        app:popUpToInclusive="true" />
-
-    <action
         android:id="@+id/action_global_to_chatFeedFragment"
         app:destination="@id/chatFeedFragment"
         app:popUpTo="@id/mainFragment" />
@@ -372,8 +360,6 @@
 
     <include app:graph="@navigation/main_graph" />
     <include app:graph="@navigation/username_graph" />
-    <include app:graph="@navigation/w3s_spa_graph" />
-    <include app:graph="@navigation/w3s_ended_graph" />
     <include app:graph="@navigation/send_contact_payment_graph" />
     <include app:graph="@navigation/send_enter_amount_graph" />
     <include app:graph="@navigation/backup_graph" />
