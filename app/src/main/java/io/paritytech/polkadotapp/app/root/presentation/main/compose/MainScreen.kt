@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.GlobeAltFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.SettingsFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.WalletFilled
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.ChatListScreen
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthIndicators
 import io.paritytech.polkadotapp.feature_products_impl.presentation.exploreProducts.compose.ExploreProductsScreen
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.SettingsScreen
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.PocketScreen
@@ -28,12 +29,19 @@ fun MainScreen(viewModel: MainViewModel) {
     ForceShowTabBar()
 
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
+    val chainsHealth by viewModel.chainsHealth.collectAsStateWithLifecycle()
 
-    MainScreenInternal(currentTab = currentTab)
+    MainScreenInternal(
+        currentTab = currentTab,
+        statusIndicators = { ChainHealthIndicators(model = chainsHealth) },
+    )
 }
 
 @Composable
-private fun MainScreenInternal(currentTab: BottomTab) {
+private fun MainScreenInternal(
+    currentTab: BottomTab,
+    statusIndicators: @Composable () -> Unit,
+) {
     // The nav-bar inset (LocalAppNavigationBarInsets) is provided by MainFragment from the bar height.
     Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(
@@ -41,10 +49,10 @@ private fun MainScreenInternal(currentTab: BottomTab) {
             targetState = currentTab,
         ) {
             when (it) {
-                BottomTab.CHATS -> ChatListScreen()
-                BottomTab.WALLET -> PocketScreen()
-                BottomTab.EXPLORE -> ExploreProductsScreen()
-                BottomTab.SETTINGS -> SettingsScreen()
+                BottomTab.CHATS -> ChatListScreen(statusIndicators = statusIndicators)
+                BottomTab.WALLET -> PocketScreen(statusIndicators = statusIndicators)
+                BottomTab.EXPLORE -> ExploreProductsScreen(statusIndicators = statusIndicators)
+                BottomTab.SETTINGS -> SettingsScreen(statusIndicators = statusIndicators)
             }
         }
     }

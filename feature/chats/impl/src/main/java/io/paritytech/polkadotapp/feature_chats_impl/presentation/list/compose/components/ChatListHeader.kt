@@ -24,7 +24,8 @@ import kotlinx.collections.immutable.persistentListOf
 @Composable
 fun ChatListHeader(
     onAddContactClick: () -> Unit,
-    isLoading: Boolean
+    isLoading: Boolean,
+    statusIndicators: @Composable () -> Unit,
 ) {
     Box {
         PolkadotTopBar(
@@ -37,6 +38,7 @@ fun ChatListHeader(
                 ),
             ),
             titleSize = TopBarTitleSize.Large,
+            trailingContent = statusIndicators,
         )
 
         AnimatedVisibility(

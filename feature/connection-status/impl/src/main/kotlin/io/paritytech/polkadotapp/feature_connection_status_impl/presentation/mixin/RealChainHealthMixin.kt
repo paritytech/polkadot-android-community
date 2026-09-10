@@ -3,37 +3,50 @@ package io.paritytech.polkadotapp.feature_connection_status_impl.presentation.mi
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.presentation.AppLifecycleObserver
+import io.paritytech.polkadotapp.common.presentation.subscribeIsForeground
 import io.paritytech.polkadotapp.common.utils.stateInBackground
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealth
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthBarModel
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
+import io.paritytech.polkadotapp.feature_connection_status_impl.presentation.mixin.mapper.toIndicator
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 
+@OptIn(ExperimentalCoroutinesApi::class)
 internal class RealChainHealthMixin(
     scope: ComputationalScope,
     monitor: ChainHealthMonitor,
     private val knownChains: KnownChains,
+    appLifecycleObserver: AppLifecycleObserver,
 ) : ChainHealthMixin, ComputationalScope by scope {
-    override val model: StateFlow<ChainHealthBarModel> = monitor.observeChainsHealth()
-        .map { healths -> healths.toBarModel() }
-        .stateInBackground(SharingStarted.WhileSubscribed(), EMPTY_MODEL)
+    // Hot for the whole foreground session rather than per collector: the tab screens that draw the
+    // indicators lose their composition behind every pushed screen, and a per-collector pipeline would
+    // release the chain sockets and replay the smoother's connecting window on each return.
+    override val model: StateFlow<ChainHealthIndicatorsModel> = appLifecycleObserver.subscribeIsForeground()
+        .flatMapLatest { inForeground ->
+            if (inForeground) monitor.observeChainsHealth().map { healths -> healths.toModel() } else emptyFlow()
+        }
+        .stateInBackground(SharingStarted.Eagerly, EMPTY_MODEL)
 
-    private fun List<ChainHealth>.toBarModel(): ChainHealthBarModel =
-        ChainHealthBarModel(map(::toItem).toImmutableList())
+    private fun List<ChainHealth>.toModel(): ChainHealthIndicatorsModel =
+        ChainHealthIndicatorsModel(map(::toItem).toImmutableList())
 
     private fun toItem(health: ChainHealth): ChainHealthItemModel = ChainHealthItemModel(
         chainId = health.chainId,
         chainName = health.chainName,
         glyph = glyphFor(health.chainId),
         connection = health.connection,
-        score = health.score,
+        indicator = health.toIndicator(),
         readings = health.readings.toImmutableList(),
     )
 
@@ -44,6 +57,6 @@ internal class RealChainHealthMixin(
     }
 
     private companion object {
-        val EMPTY_MODEL = ChainHealthBarModel(persistentListOf())
+        val EMPTY_MODEL = ChainHealthIndicatorsModel(persistentListOf())
     }
 }

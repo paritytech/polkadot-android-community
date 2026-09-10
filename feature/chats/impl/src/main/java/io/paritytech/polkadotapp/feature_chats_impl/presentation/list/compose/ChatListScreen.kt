@@ -22,7 +22,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.Cha
 import kotlinx.collections.immutable.persistentListOf
 
 @Composable
-fun ChatListScreen() {
+fun ChatListScreen(statusIndicators: @Composable () -> Unit) {
     val viewModel = hiltViewModel<ChatListViewModel>()
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -32,6 +32,7 @@ fun ChatListScreen() {
         onChatClick = viewModel::onChatClick,
         onNewRequestsClick = viewModel::onNewRequestsClick,
         onSearchBarClick = viewModel::onSearchBarClick,
+        statusIndicators = statusIndicators,
     )
 }
 
@@ -42,6 +43,7 @@ private fun ChatListScreenInternal(
     onChatClick: (ChatListUiState.ChatItem) -> Unit,
     onNewRequestsClick: () -> Unit,
     onSearchBarClick: () -> Unit,
+    statusIndicators: @Composable () -> Unit,
 ) {
     val revealState = rememberSearchRevealState()
 
@@ -51,7 +53,8 @@ private fun ChatListScreenInternal(
         ) {
             ChatListHeader(
                 onAddContactClick = onAddContactClick,
-                isLoading = loadingState is LoadingState.Loading
+                isLoading = loadingState is LoadingState.Loading,
+                statusIndicators = statusIndicators,
             )
 
             when (loadingState) {
@@ -88,6 +91,7 @@ private fun ChatListScreenPreview() {
             onChatClick = {},
             onNewRequestsClick = {},
             onSearchBarClick = {},
+            statusIndicators = {},
         )
     }
 }

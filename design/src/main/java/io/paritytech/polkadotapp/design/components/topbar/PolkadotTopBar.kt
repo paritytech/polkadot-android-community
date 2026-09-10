@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowLeft
 import io.paritytech.polkadotapp.design.components.icon.vectors.CallFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.More
 import io.paritytech.polkadotapp.design.components.icon.vectors.VideocamFilled
+import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import kotlinx.collections.immutable.ImmutableList
@@ -44,6 +46,8 @@ const val MAX_TOP_BAR_ACTIONS = 3
 private val LeadingContentSize = 40.dp
 
 private val TopBarHeight = 64.dp
+
+private val TrailingPreviewDotSize = 20.dp
 
 enum class TopBarTitleAlignment { Start, Center }
 
@@ -59,6 +63,7 @@ fun PolkadotTopBar(
     titleSize: TopBarTitleSize = TopBarTitleSize.Standard,
     actions: ImmutableList<TopBarAction> = persistentListOf(),
     leadingContent: (@Composable () -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null,
 ) {
     require(actions.size <= MAX_TOP_BAR_ACTIONS) { "Top bar supports at most $MAX_TOP_BAR_ACTIONS actions" }
@@ -89,6 +94,7 @@ fun PolkadotTopBar(
                 title = title,
                 subtitle = subtitle,
                 titleStyle = titleStyle,
+                trailingContent = trailingContent,
                 actions = actions,
             )
         } else {
@@ -99,6 +105,7 @@ fun PolkadotTopBar(
                 title = title,
                 subtitle = subtitle,
                 titleStyle = titleStyle,
+                trailingContent = trailingContent,
                 actions = actions,
                 content = content,
             )
@@ -113,6 +120,7 @@ private fun CenteredTopBar(
     title: String?,
     subtitle: String?,
     titleStyle: TextStyle,
+    trailingContent: (@Composable () -> Unit)?,
     actions: ImmutableList<TopBarAction>,
     modifier: Modifier = Modifier,
 ) {
@@ -131,7 +139,7 @@ private fun CenteredTopBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 )
             },
-            { if (actions.isNotEmpty()) TopBarActions(actions) },
+            { TrailingGroup(trailingContent, actions) },
         ),
     ) { (startMeasurables, centerMeasurables, endMeasurables), constraints ->
         val looseConstraints = constraints.copy(minWidth = 0)
@@ -171,6 +179,7 @@ private fun StartTopBar(
     title: String?,
     subtitle: String?,
     titleStyle: TextStyle,
+    trailingContent: (@Composable () -> Unit)?,
     actions: ImmutableList<TopBarAction>,
     content: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
@@ -201,8 +210,32 @@ private fun StartTopBar(
             )
         }
 
-        if (actions.isNotEmpty()) {
-            TopBarActions(actions)
+        TrailingGroup(trailingContent, actions)
+    }
+}
+
+@Composable
+private fun TrailingGroup(
+    trailingContent: (@Composable () -> Unit)?,
+    actions: ImmutableList<TopBarAction>,
+) {
+    if (trailingContent != null || actions.isNotEmpty()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.mediumIncreased),
+        ) {
+            if (trailingContent != null) {
+                // Action buttons carry their own 12dp inner padding, so the bar keeps a 4dp edge; content
+                // standing last has to add that padding itself to end on the same margin as the title.
+                val endPadding = if (actions.isEmpty()) PolkadotTheme.spacings.extraMedium else 0.dp
+                Box(modifier = Modifier.padding(end = endPadding)) {
+                    trailingContent()
+                }
+            }
+
+            if (actions.isNotEmpty()) {
+                TopBarActions(actions)
+            }
         }
     }
 }
@@ -309,6 +342,19 @@ private fun PolkadotTopBarPreview() {
             PolkadotTopBar(
                 title = "Label",
                 titleSize = TopBarTitleSize.Large,
+                actions = persistentListOf(rememberTopBarAction(action = {}, icon = NovaIcons.More)),
+            )
+
+            PolkadotTopBar(
+                title = "Label",
+                titleSize = TopBarTitleSize.Large,
+                trailingContent = {
+                    PolkadotSurface(
+                        modifier = Modifier.size(TrailingPreviewDotSize),
+                        shape = CircleShape,
+                        color = PolkadotTheme.colors.fg.primary,
+                    ) {}
+                },
                 actions = persistentListOf(rememberTopBarAction(action = {}, icon = NovaIcons.More)),
             )
 

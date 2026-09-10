@@ -41,7 +41,7 @@ import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.compone
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(statusIndicators: @Composable () -> Unit) {
     val viewModel = hiltViewModel<SettingsViewModel>()
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -57,7 +57,8 @@ fun SettingsScreen() {
         onConnectedDevicesClick = viewModel::onLinkedDevicesClick,
         onPrivacyPolicyClick = viewModel::onPrivacyPolicyClick,
         onTermsOfUseClick = viewModel::onTermsOfUseClick,
-        onDebugMenuClick = viewModel::onDebugMenuClick
+        onDebugMenuClick = viewModel::onDebugMenuClick,
+        statusIndicators = statusIndicators,
     )
 }
 
@@ -74,7 +75,8 @@ private fun SettingsScreenInternal(
     onConnectedDevicesClick: () -> Unit,
     onPrivacyPolicyClick: () -> Unit,
     onTermsOfUseClick: () -> Unit,
-    onDebugMenuClick: () -> Unit
+    onDebugMenuClick: () -> Unit,
+    statusIndicators: @Composable () -> Unit,
 ) {
     PolkadotSurface {
         Column(
@@ -85,6 +87,7 @@ private fun SettingsScreenInternal(
             PolkadotTopBar(
                 title = stringResource(RCommon.string.settings_toolbar_title),
                 titleSize = TopBarTitleSize.Large,
+                trailingContent = statusIndicators,
             )
 
             VerticalSpacer { large }
@@ -224,7 +227,8 @@ private fun SettingsScreenPreview() {
             onConnectedDevicesClick = {},
             onPrivacyPolicyClick = {},
             onTermsOfUseClick = {},
-            onDebugMenuClick = {}
+            onDebugMenuClick = {},
+            statusIndicators = {},
         )
     }
 }
