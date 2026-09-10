@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -123,8 +124,11 @@ private fun HealthyDisc(item: ChainHealthItemModel) {
 
 @Composable
 private fun OutageArc(item: ChainHealthItemModel, indicator: ChainHealthIndicator.Outage) {
+    // The design grows the arc counter-clockwise from twelve o'clock; the indicator sweeps clockwise, so mirror it.
     NovaCircularProgressIndicator(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .scale(scaleX = -1f, scaleY = 1f),
         progress = { indicator.fraction },
         color = PolkadotTheme.colors.fg.error,
         trackColor = PolkadotTheme.colors.fg.tertiary,
