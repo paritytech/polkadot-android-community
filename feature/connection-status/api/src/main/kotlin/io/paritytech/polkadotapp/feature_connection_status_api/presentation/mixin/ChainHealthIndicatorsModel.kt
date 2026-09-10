@@ -18,26 +18,24 @@ enum class ChainGlyph {
  * then block production, then connection speed; [Healthy] only when none of them has anything to say.
  */
 sealed interface ChainHealthIndicator {
-    /** Everything adequate: a plain disc, no colour. */
+    /** Every metric within tolerance. */
     data object Healthy : ChainHealthIndicator
 
-    /**
-     * The chain produced fewer than five sixths of the blocks expected in the last 30 s. [fraction]
-     * is recent / expected and is the share of the surround the dark red arc covers.
-     */
+    /** The chain produced fewer of the blocks expected in the recent window than the health rules require. */
     data class Outage(
-        val fraction: Float,
+        val recentBlocks: Int,
+        val expectedBlocks: Int,
     ) : ChainHealthIndicator
 
-    /** Connected and producing blocks, but requests queue up: an unbroken yellow or red surround. */
+    /** Connected and producing blocks, but requests queue up. */
     data class SlowConnection(
         val speed: Speed,
     ) : ChainHealthIndicator
 
-    /** Reconnecting: the glyph fades in and out while the socket settles. */
+    /** The socket is re-establishing. */
     data object Connecting : ChainHealthIndicator
 
-    /** No node responding, or a node that no longer answers requests: glyph and surround both dark grey. */
+    /** No node responding, or a connected node that no longer answers requests. */
     data object Disconnected : ChainHealthIndicator
 
     enum class Speed {

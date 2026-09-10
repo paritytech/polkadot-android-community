@@ -12,6 +12,10 @@ class BlockArrivalWindow(private val window: Duration) {
         arrivals.addLast(at)
     }
 
+    fun clear() {
+        arrivals.clear()
+    }
+
     fun pruneAndCount(now: Instant): Int {
         val cutoff = now - window
         while (arrivals.isNotEmpty() && arrivals.first() < cutoff) arrivals.removeFirst()

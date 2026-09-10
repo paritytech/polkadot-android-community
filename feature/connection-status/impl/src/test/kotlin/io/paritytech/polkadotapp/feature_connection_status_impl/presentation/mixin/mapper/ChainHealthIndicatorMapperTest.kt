@@ -40,13 +40,13 @@ class ChainHealthIndicatorMapperTest {
     fun `five sixths of the expected blocks is the outage line`() {
         assertEquals(ChainHealthIndicator.Healthy, connected(blocks(5, 5)).toIndicator())
         assertEquals(ChainHealthIndicator.Healthy, connected(blocks(5, 6)).toIndicator())
-        assertOutage(0.8f, connected(blocks(4, 5)).toIndicator())
-        assertOutage(0f, connected(blocks(0, 5)).toIndicator())
+        assertEquals(ChainHealthIndicator.Outage(4, 5), connected(blocks(4, 5)).toIndicator())
+        assertEquals(ChainHealthIndicator.Outage(0, 5), connected(blocks(0, 5)).toIndicator())
     }
 
     @Test
     fun `an outage wins over a slow connection`() {
-        assertOutage(0.6f, connected(blocks(3, 5), pending(10)).toIndicator())
+        assertEquals(ChainHealthIndicator.Outage(3, 5), connected(blocks(3, 5), pending(10)).toIndicator())
     }
 
     @Test
@@ -70,11 +70,6 @@ class ChainHealthIndicatorMapperTest {
     }
 
     private fun slow(speed: Speed) = ChainHealthIndicator.SlowConnection(speed)
-
-    private fun assertOutage(fraction: Float, actual: ChainHealthIndicator) {
-        val outage = actual as ChainHealthIndicator.Outage
-        assertEquals(fraction, outage.fraction, FRACTION_TOLERANCE)
-    }
 
     private fun connected(vararg readings: ChainMetricReading): ChainHealth =
         health(ChainConnectionPresentation.Connected, *readings)
@@ -105,8 +100,4 @@ class ChainHealthIndicatorMapperTest {
         target = 1.seconds,
         score = ChainHealthScore.coerced(score),
     )
-
-    private companion object {
-        const val FRACTION_TOLERANCE = 0.0001f
-    }
 }

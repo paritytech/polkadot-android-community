@@ -17,7 +17,7 @@ sealed interface ChainMetricReading {
     ) : ChainMetricReading
 
     /**
-     * Best heads seen in the last 30 s ([recentBlocks]) against the number the block time predicts
+     * Best heads seen in the recent window ([recentBlocks]) against the number the block time predicts
      * ([expectedBlocks]); fewer than [requiredBlocks] means the chain is not producing.
      */
     data class BlockProduction(

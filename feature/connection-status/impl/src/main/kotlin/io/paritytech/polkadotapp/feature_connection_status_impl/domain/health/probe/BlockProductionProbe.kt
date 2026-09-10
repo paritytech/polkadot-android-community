@@ -27,10 +27,10 @@ class BlockProductionProbe @Inject constructor(
 ) : ChainHealthProbe {
     override fun observe(context: ChainMetricContext): Flow<ChainMetricReading> = flow {
         val window = ChainHealthThresholds.BLOCK_PRODUCTION_WINDOW
-        val blockTime = context.expectedBlockTime.coerceAtLeast(1.milliseconds)
-        val expectedBlocks = (window / blockTime).toInt().coerceAtLeast(1)
+        val blockTime = context.expectedBlockTime.coerceAtLeast(MIN_BLOCK_TIME)
+        val expectedBlocks = (window / blockTime).toInt().coerceAtLeast(MIN_EXPECTED_BLOCKS)
         val requiredBlocks = ceil(expectedBlocks * ChainHealthThresholds.BLOCK_PRODUCTION_REQUIRED_RATIO).toInt()
-        var arrivals = BlockArrivalWindow(window + blockTime)
+        val arrivals = BlockArrivalWindow(window + blockTime)
         var observingSince: Instant = timeProvider.now()
 
         val blocks = context.bestBlockNumber.distinctUntilChanged().map { Event.Block }
@@ -47,7 +47,7 @@ class BlockProductionProbe @Inject constructor(
                 when (event) {
                     Event.Block -> arrivals.recordArrival(now)
                     Event.Reconnected -> {
-                        arrivals = BlockArrivalWindow(window + blockTime)
+                        arrivals.clear()
                         observingSince = now
                     }
                     Event.Tick -> Unit
@@ -77,5 +77,10 @@ class BlockProductionProbe @Inject constructor(
         data object Block : Event
         data object Reconnected : Event
         data object Tick : Event
+    }
+
+    private companion object {
+        val MIN_BLOCK_TIME: Duration = 1.milliseconds
+        const val MIN_EXPECTED_BLOCKS = 1
     }
 }

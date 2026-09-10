@@ -6,9 +6,7 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
-
-private const val ADEQUATE_FROM = 70
-private const val UNUSABLE_BELOW = 40
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
 
 fun ChainHealth.toIndicator(): ChainHealthIndicator = when (connection) {
     ChainConnectionPresentation.Disconnected -> ChainHealthIndicator.Disconnected
@@ -21,19 +19,19 @@ fun ChainHealth.toIndicator(): ChainHealthIndicator = when (connection) {
 
 private fun ChainHealth.nodeUnresponsive(): Boolean = readings
     .filterIsInstance<ChainMetricReading.PendingRequestLatency>()
-    .any { it.score.value == ChainHealthScore.MIN_VALUE }
+    .any { it.score == ChainHealthScore.Zero }
 
 private fun ChainHealth.outage(): ChainHealthIndicator.Outage? {
     val production = readings.filterIsInstance<ChainMetricReading.BlockProduction>().firstOrNull() ?: return null
     if (production.recentBlocks >= production.requiredBlocks) return null
-    return ChainHealthIndicator.Outage(production.recentBlocks.toFloat() / production.expectedBlocks)
+    return ChainHealthIndicator.Outage(production.recentBlocks, production.expectedBlocks)
 }
 
 private fun ChainHealth.slowConnection(): ChainHealthIndicator.SlowConnection? {
     val worstScore = readings.filter { it.isConnectionSpeed() }.minOfOrNull { it.score.value } ?: return null
     return when {
-        worstScore >= ADEQUATE_FROM -> null
-        worstScore < UNUSABLE_BELOW -> ChainHealthIndicator.SlowConnection(Speed.Unusable)
+        worstScore >= ChainHealthThresholds.CONNECTION_ADEQUATE_FROM -> null
+        worstScore < ChainHealthThresholds.CONNECTION_UNUSABLE_BELOW -> ChainHealthIndicator.SlowConnection(Speed.Unusable)
         else -> ChainHealthIndicator.SlowConnection(Speed.Slow)
     }
 }

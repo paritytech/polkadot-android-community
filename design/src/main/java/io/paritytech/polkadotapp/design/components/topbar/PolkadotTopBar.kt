@@ -47,8 +47,6 @@ private val LeadingContentSize = 40.dp
 
 private val TopBarHeight = 64.dp
 
-private val TrailingPreviewDotSize = 20.dp
-
 enum class TopBarTitleAlignment { Start, Center }
 
 enum class TopBarTitleSize { Standard, Large }
@@ -348,7 +346,7 @@ private fun PolkadotTopBarPreview() {
                 titleSize = TopBarTitleSize.Large,
                 trailingContent = {
                     PolkadotSurface(
-                        modifier = Modifier.size(TrailingPreviewDotSize),
+                        modifier = Modifier.size(20.dp),
                         shape = CircleShape,
                         color = PolkadotTheme.colors.fg.primary,
                     ) {}

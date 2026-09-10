@@ -25,7 +25,12 @@ object ChainHealthThresholds {
 
     val BLOCK_PRODUCTION_WINDOW: Duration = 30.seconds
 
+    // The health rules call a chain that produced fewer than five sixths of its expected blocks an outage.
     const val BLOCK_PRODUCTION_REQUIRED_RATIO = 5.0 / 6.0
+
+    // Worst of the pending-request and response scores: adequate from here up, unusable below the second.
+    const val CONNECTION_ADEQUATE_FROM = 70
+    const val CONNECTION_UNUSABLE_BELOW = 40
 
     // --- Finality gap, in blocks (best - finalized). Per-chain overrides live in Chain.additional
     // (finalityGapIdeal / finalityGapOutage); these are the fallback defaults. ---
