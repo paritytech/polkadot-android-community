@@ -22,7 +22,7 @@ import kotlin.time.TimeSource
  * How long an operation may run before the user is told it is running late. Below the threshold at which people start
  * doubting a spinner, but long enough that ordinary calls never trip it.
  */
-val DEFAULT_REVEAL_AFTER: Duration = 5.seconds
+val DEFAULT_REVEAL_AFTER: Duration = 3.seconds
 
 private val ELAPSED_TICK: Duration = 1.seconds
 

@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_transfers_api.presentation.PreviousPaym
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 class RealPreviousPaymentsAddressConverterFactory @Inject constructor(
     private val chainRegistry: ChainRegistry,
@@ -29,40 +30,33 @@ private class PreviousPaymentsAddressConverter(
     private val sendRecipientsUseCase: PreviousSendRecipientsUseCase,
 ) : AddressInputMixin.AddressConverter {
     private var cache: List<ExtractedAddress>? = null
-    private var mutex = Mutex()
+    private val mutex = Mutex()
 
     override suspend fun convertToAddress(input: String): ExtractedAddressesSection {
-        val allPreviousPayments = getAllPreviousPayments()
-        val relevantPreviousPayments = if (input.isNotEmpty()) {
-            allPreviousPayments.filter { input in it.display }
-        } else {
-            allPreviousPayments
-        }
+        val relevantPreviousPayments = getAllPreviousPayments()
+            .filter { it.display.contains(input, ignoreCase = true) }
 
         return ExtractedAddressesSection(
-            category = ExtractedAddressesCategory.Custom(""),
+            category = ExtractedAddressesCategory.Custom(RCommon.string.address_section_previous_payments),
             addresses = relevantPreviousPayments
         )
     }
 
     private suspend fun getAllPreviousPayments(): List<ExtractedAddress> {
         return mutex.withLock {
-            if (cache == null) {
-                cache = fetchAllPreviousPayments()
-            }
-
-            cache!!
+            cache ?: fetchAllPreviousPayments().also { cache = it }
         }
     }
 
     private suspend fun fetchAllPreviousPayments(): List<ExtractedAddress> {
         val chain = chainRegistry.getChain(chainId)
+
         return sendRecipientsUseCase().getOrEmpty()
-            .sortedByDescending {
-                it.createdAt
-            }
+            .sortedByDescending { it.createdAt }
+            .distinctBy { it.accountId }
             .map {
                 val label = it.label
+
                 if (label == null) {
                     ExtractedAddress(
                         display = chain.addressOf(it.accountId),

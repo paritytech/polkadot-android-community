@@ -17,6 +17,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -37,6 +39,7 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessagePop
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ReactionDetail
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 fun ReactionDetailsDialog(
@@ -89,13 +92,17 @@ private fun ReactionDetailsContent(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     NovaText(
-                        text = "Reactions",
+                        text = stringResource(RCommon.string.chat_reactions_details_title),
                         style = PolkadotTheme.typography.title.large,
                         color = PolkadotTheme.colors.fg.primary
                     )
 
                     NovaText(
-                        text = "${reactionDetails.totalReactionsCount} total",
+                        text = pluralStringResource(
+                            RCommon.plurals.chat_reactions_details_total,
+                            reactionDetails.totalReactionsCount,
+                            reactionDetails.totalReactionsCount
+                        ),
                         style = PolkadotTheme.typography.body.medium,
                         color = PolkadotTheme.colors.fg.secondary
                     )

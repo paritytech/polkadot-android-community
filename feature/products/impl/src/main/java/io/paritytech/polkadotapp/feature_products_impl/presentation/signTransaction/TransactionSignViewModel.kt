@@ -4,6 +4,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.domain.model.toSubstrateAddress
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.SigningFailedPresentationError
+import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.combineResults
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.inBackground
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import timber.log.Timber
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 @HiltViewModel
 class TransactionSignViewModel @Inject constructor(
@@ -72,11 +75,11 @@ class TransactionSignViewModel @Inject constructor(
 
         signingContext.approve { interactor.sign() }
             .onSuccess {
-                showMessage("Signed")
+                showMessage(RCommon.string.sign_transaction_signed)
 
                 router.back()
             }
-            .onFailure(::showError)
+            .onFailure { showPresentationError(SigningFailedPresentationError(it)) }
 
         signing.value = false
     }
@@ -87,7 +90,7 @@ class TransactionSignViewModel @Inject constructor(
         Timber.d("Reject clicked for ${signingContext.requesterName}")
 
         signingContext.deliverRejection()
-            .onFailure(::showError)
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
 
         router.back()
 

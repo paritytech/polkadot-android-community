@@ -5,8 +5,11 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.search.SearchState
 import io.paritytech.polkadotapp.common.presentation.search.withQuerySearching
+import io.paritytech.polkadotapp.common.utils.SizedList
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.common.utils.shareInBackground
+import io.paritytech.polkadotapp.feature_chats_api.domain.error.asStartChatError
+import io.paritytech.polkadotapp.feature_chats_api.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.AddContactInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatAvatar
@@ -33,7 +36,7 @@ internal class AddContactViewModel @Inject constructor(
 ) : BaseViewModel(), AddContactContract {
     private val searchQuery = MutableStateFlow("")
 
-    private val searchResult: Flow<SearchState<UserSearchResultUiModel>> = searchQuery
+    private val searchResult: Flow<SearchState<SizedList<UserSearchResultUiModel>>> = searchQuery
         .withQuerySearching { query ->
             interactor.searchContacts(query)
                 .mapList { it.toUi() }
@@ -70,7 +73,7 @@ internal class AddContactViewModel @Inject constructor(
 
             interactor.getStartChatData(result.contactAccountId)
                 .onSuccess(::openChatFeed)
-                .onFailure(::showError)
+                .onFailure { showPresentationError(it.asStartChatError().toPresentationError()) }
 
             loadingContactId.value = null
         }

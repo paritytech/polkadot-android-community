@@ -20,11 +20,27 @@ class RealDotNsContractApi @Inject constructor(
         val node = NameHash.nameHash(dotNsName)
         val callData = EvmContractCaller.encodeContentHash(node)
 
-        return dotNsConfigProvider.getDotNsConfig().flatMap { config ->
-            contentResolverFor(config, dotNsName).flatMap { resolver ->
-                callContract(callData, resolver).map { outputBytes ->
-                    val contentHash = if (outputBytes.isEmpty()) null else EvmContractCaller.decodeContentHash(outputBytes)
-                    contentHash?.let(::stripEip1577Prefix)
+        return dotNsConfigProvider.getDotNsConfig()
+            .flatMap { config -> readContentHash(config, dotNsName, callData) }
+            .map { outputBytes ->
+                val contentHash = if (outputBytes.isEmpty()) null else EvmContractCaller.decodeContentHash(outputBytes)
+                contentHash?.let(::stripEip1577Prefix)
+            }
+    }
+
+    // A name's own resolver serves its records and need not carry a content hash - the hash then
+    // stays on the fixed resolver, so an empty answer from a registry one is retried there.
+    private suspend fun readContentHash(
+        config: DotNsConfig,
+        dotNsName: String,
+        callData: ByteArray,
+    ): Result<ByteArray> {
+        return contentResolverFor(config, dotNsName).flatMap { resolver ->
+            callContract(callData, resolver).flatMap { outputBytes ->
+                if (outputBytes.isNotEmpty() || resolver == config.resolverContractAddress) {
+                    Result.success(outputBytes)
+                } else {
+                    callContract(callData, config.resolverContractAddress)
                 }
             }
         }

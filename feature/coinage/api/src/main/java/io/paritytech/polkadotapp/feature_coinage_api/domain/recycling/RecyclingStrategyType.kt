@@ -12,32 +12,39 @@ enum class RecyclingStrategyType {
 }
 
 /**
- * [forcedRecyclingAge] is the age at which the chain stops accepting a coin. It is both the point every
- * strategy must recycle by and the anchor the softer thresholds are expressed against, so the presets track
- * it rather than hardcoding ages of their own.
+ * The presets express their recycling age against the age at which the chain stops accepting a coin, rather
+ * than hardcoding ages of their own — see [MinRecyclingAge]. Reading that limit is the strategy's job, which
+ * is what lets a preset be built without touching the chain.
  */
-fun RecyclingStrategyType.paramsFor(forcedRecyclingAge: Int): RecyclingParams = when (this) {
-    RecyclingStrategyType.MIN_PRIVACY -> RecyclingParams(
-        maxUnavailableBalance = Fraction.ZERO,
-        minRecyclingAge = forcedRecyclingAge,
-        requiredRingFill = Fraction.ZERO,
-        // Nothing is ever held back under this strategy, so the offer has nothing to apply to.
-        allowsConfirmedSpend = true,
-    )
+val RecyclingStrategyType.params: RecyclingParams
+    get() = when (this) {
+        RecyclingStrategyType.MIN_PRIVACY -> RecyclingParams(
+            maxUnavailableBalance = Fraction.ZERO,
+            minRecyclingAge = MinRecyclingAge.UseChainLimit(divisor = 1),
+            requiredRingFill = Fraction.ZERO,
+            // Nothing is ever held back under this strategy, so the offer has nothing to apply to.
+            allowsConfirmedSpend = true,
+        )
 
-    RecyclingStrategyType.BALANCED -> RecyclingParams(
-        maxUnavailableBalance = BALANCED_UNAVAILABLE_BALANCE,
-        minRecyclingAge = max(MIN_RECYCLABLE_AGE, forcedRecyclingAge / BALANCED_AGE_DIVISOR),
-        requiredRingFill = BALANCED_RING_FILL,
-        allowsConfirmedSpend = true,
-    )
+        RecyclingStrategyType.BALANCED -> RecyclingParams(
+            maxUnavailableBalance = BALANCED_UNAVAILABLE_BALANCE,
+            minRecyclingAge = MinRecyclingAge.UseChainLimit(divisor = BALANCED_AGE_DIVISOR),
+            requiredRingFill = BALANCED_RING_FILL,
+            allowsConfirmedSpend = true,
+        )
 
-    RecyclingStrategyType.MAX_PRIVACY -> RecyclingParams(
-        maxUnavailableBalance = Fraction.FULL,
-        minRecyclingAge = MIN_RECYCLABLE_AGE,
-        requiredRingFill = Fraction.FULL,
-        allowsConfirmedSpend = false,
-    )
+        RecyclingStrategyType.MAX_PRIVACY -> RecyclingParams(
+            maxUnavailableBalance = Fraction.FULL,
+            minRecyclingAge = MinRecyclingAge.Override(MIN_RECYCLABLE_AGE),
+            requiredRingFill = Fraction.FULL,
+            allowsConfirmedSpend = false,
+        )
+    }
+
+/** [forcedRecyclingAge] is the age at which the chain stops accepting a coin. */
+fun MinRecyclingAge.resolveAgainst(forcedRecyclingAge: Int): Int = when (this) {
+    is MinRecyclingAge.Override -> age
+    is MinRecyclingAge.UseChainLimit -> max(MIN_RECYCLABLE_AGE, forcedRecyclingAge / divisor)
 }
 
 /**

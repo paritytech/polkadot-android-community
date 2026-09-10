@@ -79,7 +79,7 @@ class RealUsernameRepository @Inject constructor(
                 signature = params.dotNsSignature.toHexString(true),
                 signedAt = params.dotNsSignedAt,
                 reservedUsername = params.dotNsReservedUsername
-            ),
+            )
         )
 
         api.claimUsername(request).toClaimResult()

@@ -10,9 +10,11 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactWithReque
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatFeedPayload
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
+import io.paritytech.polkadotapp.feature_chats_impl.domain.error.asChatRequestError
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatRequestsListInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatRequestsList.models.ChatRequestDeclineConfirmationState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatRequestsList.models.ChatRequestsListUiState
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.toUi
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,9 +58,9 @@ class ChatRequestsListViewModel @Inject constructor(
     }
 
     override fun onConfirmDeclineClick() = launchUnit {
-        declineConfirmationState.value.requestItem?.let {
-            interactor.declineRequest(it.accountId)
-                .onFailure(::showError)
+        declineConfirmationState.value.requestItem?.let { request ->
+            interactor.declineRequest(request.accountId)
+                .onFailure { showPresentationError(it.asChatRequestError().toPresentationError()) }
         }
 
         declineConfirmationState.update { ChatRequestDeclineConfirmationState.Hidden }

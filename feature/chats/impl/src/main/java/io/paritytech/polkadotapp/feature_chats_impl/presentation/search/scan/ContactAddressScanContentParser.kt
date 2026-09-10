@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.model.isValidSubstrateAddress
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -25,8 +26,8 @@ class ContactAddressScanContentParser @Inject constructor(
     private val startChatDataUseCase: StartChatDataUseCase,
     private val router: ChatsRouter
 ) : ScanContentParser {
-    override fun canHandle(content: String): Boolean {
-        return runCatching { content.toAccountId() }.isSuccess
+    override suspend fun canHandle(content: String): Boolean {
+        return content.isValidSubstrateAddress()
     }
 
     context(scope: ComputationalScope)

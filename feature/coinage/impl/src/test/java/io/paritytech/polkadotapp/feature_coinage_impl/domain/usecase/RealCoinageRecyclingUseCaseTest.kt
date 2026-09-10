@@ -20,8 +20,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionRequest
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
@@ -31,6 +29,8 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableE
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.FormMultiExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.data.StoringMultiExtrinsicBuilder
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import io.paritytech.polkadotapp.test_shared.testDispatchers
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -54,7 +54,7 @@ class RealCoinageRecyclingUseCaseTest {
 
     init {
 
-        every { coinRepository.getCoinRecyclingAge() } returns recyclingAge
+        coEvery { coinRepository.getCoinRecyclingAge() } returns Result.success(recyclingAge)
         every { chainAssetProvider.chainId() } returns chainId
         coEvery { chainConnectionRefCounter.requestConnectionEnabled(any(), any()) } returns mockk(relaxed = true)
         coEvery { chainRegistry.getChain(any()) } returns mockk(relaxed = true)

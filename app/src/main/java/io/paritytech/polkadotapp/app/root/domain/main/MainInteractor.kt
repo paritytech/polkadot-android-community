@@ -9,8 +9,6 @@ import io.paritytech.polkadotapp.app.root.data.storage.ScannerTooltipStorage
 import io.paritytech.polkadotapp.app.root.domain.ObserveTabWarningsUseCase
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.tabs.BottomTab
-import io.paritytech.polkadotapp.common.utils.FeatureOption
-import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatMessageSender
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -29,9 +27,7 @@ class MainInteractor @Inject constructor(
             AppSetIdManager.get(context)
         }
 
-        if (FeatureOption.CHAT_EXTENSIONS.isEnabled) {
-            messageSender.startExtensions()
-        }
+        messageSender.startExtensions()
     }
 
     fun observeTabWarnings(): Flow<Map<BottomTab, Boolean>> = observeTabWarningsUseCase()

@@ -30,18 +30,18 @@ internal class RealAmountFormatterTest {
 
     @Test
     fun digitalDollarTest() = with(TokenSymbolAppearance.DigitalDollar) {
-        runFormattingTest("0.50 CASH", "0.5")
-        runFormattingTest("0.50 CASH", "0.50")
-        runFormattingTest("0.80 CASH", "0.8")
-        runFormattingTest("2.50 CASH", "2.5")
-        runFormattingTest("2 CASH", "2")
-        runFormattingTest("1,234.50 CASH", "1234.5")
-        runFormattingTest("1,500 CASH", "1500")
-        runFormattingTest("1.5M CASH", "1500000")
-        runFormattingTest("2M CASH", "2000000")
-        runFormattingTest("3.4B CASH", "3400000000")
-        runFormattingTest("1.50M CASH", "1500000.5")
-        runFormattingTest("2.23M CASH", "2234567.89")
+        runFormattingTest("0.50 $symbol", "0.5")
+        runFormattingTest("0.50 $symbol", "0.50")
+        runFormattingTest("0.80 $symbol", "0.8")
+        runFormattingTest("2.50 $symbol", "2.5")
+        runFormattingTest("2 $symbol", "2")
+        runFormattingTest("1,234.50 $symbol", "1234.5")
+        runFormattingTest("1,500 $symbol", "1500")
+        runFormattingTest("1.5M $symbol", "1500000")
+        runFormattingTest("2M $symbol", "2000000")
+        runFormattingTest("3.4B $symbol", "3400000000")
+        runFormattingTest("1.50M $symbol", "1500000.5")
+        runFormattingTest("2.23M $symbol", "2234567.89")
     }
 
     private fun TokenSymbolAppearance.runFormattingTest(

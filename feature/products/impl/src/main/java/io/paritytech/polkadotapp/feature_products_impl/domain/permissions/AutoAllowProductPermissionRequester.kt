@@ -6,7 +6,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission.RemotePermission
 
 class AutoAllowProductPermissionRequester(
-    private val allowedLabels: Set<String>,
+    private val whitelistedProductsProvider: WhitelistedProductsProvider,
     private val delegate: ProductPermissionRequester,
 ) : ProductPermissionRequester {
     override suspend fun prompt(productId: ProductId, permission: ProductPermission): PermissionDecision {
@@ -24,9 +24,7 @@ class AutoAllowProductPermissionRequester(
         return delegate.promptBatched(productId, permissions)
     }
 
-    private fun ProductId.isAutoAllowed(): Boolean {
-        val label = value.substringBeforeLast('.', missingDelimiterValue = "")
-
-        return label.isNotEmpty() && label in allowedLabels
+    private suspend fun ProductId.isAutoAllowed(): Boolean {
+        return this in whitelistedProductsProvider.whitelistedProducts()
     }
 }

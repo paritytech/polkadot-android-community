@@ -5,8 +5,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.isEnabled
+import io.paritytech.polkadotapp.common.utils.launchUnit
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.design.theme.AppThemeSelector
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_settings_impl.BuildConfig
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
 import io.paritytech.polkadotapp.feature_settings_impl.domain.settings.SettingsInteractor
@@ -18,7 +21,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    interactor: SettingsInteractor,
+    private val interactor: SettingsInteractor,
     appThemeSelector: AppThemeSelector,
     private val router: SettingsRouter
 ) : BaseViewModel() {
@@ -27,8 +30,9 @@ class SettingsViewModel @Inject constructor(
     val state: StateFlow<SettingsUiState> = combine(
         interactor.observeBackupExists(),
         interactor.subscribeHasBlockedContacts(),
+        interactor.observePrivacyMode(),
         appThemeSelector.selectedTheme
-    ) { backupExists, hasBlockedUsers, selectedTheme ->
+    ) { backupExists, hasBlockedUsers, privacyMode, selectedTheme ->
         SettingsUiState(
             isDebug = BuildConfig.DEBUG,
             debugMenuEnabled = FeatureOption.DEBUG_MENU.isEnabled,
@@ -36,6 +40,7 @@ class SettingsViewModel @Inject constructor(
             productSettingsEnabled = FeatureOption.PRODUCT_SETTINGS.isEnabled,
             isLanguageSettingsAvailable = isLanguageSettingsAvailable,
             selectedTheme = selectedTheme,
+            privacyMode = privacyMode,
             isBackupMissing = !backupExists,
             hasBlockedUsers = hasBlockedUsers
         )
@@ -50,10 +55,16 @@ class SettingsViewModel @Inject constructor(
                 productSettingsEnabled = FeatureOption.PRODUCT_SETTINGS.isEnabled,
                 isLanguageSettingsAvailable = isLanguageSettingsAvailable,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
+                privacyMode = null,
                 isBackupMissing = false,
                 hasBlockedUsers = false
             )
         )
+
+    fun onPrivacyModeSelected(mode: RecyclingStrategyType) = launchUnit {
+        interactor.setPrivacyMode(mode)
+            .logFailure("Failed to change payment privacy mode")
+    }
 
     fun onBackupClick() {
         router.openBackup()

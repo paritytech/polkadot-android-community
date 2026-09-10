@@ -19,7 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isOnboarding
 data class CoinBuckets(
     /** On chain with a known age: the only coins a strategy may gate. */
     val minted: List<Coin>,
-    /** Not on chain yet, but the transaction minting them is still live. */
+    /** Not on chain yet, but nothing has proven the transaction minting them never ran. */
     val minting: List<Coin>,
 ) {
     /**

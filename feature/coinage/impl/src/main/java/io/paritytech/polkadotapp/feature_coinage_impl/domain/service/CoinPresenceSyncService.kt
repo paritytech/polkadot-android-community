@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinUpdate
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -40,9 +41,20 @@ class CoinPresenceSyncService @Inject constructor(
             .filter { it.isNotEmpty() }
             .distinctUntilChanged()
             .flatMapLatest { coins ->
+                coinageLogD("presence-subscribe coins=${coins.size} offChain=${coins.count { !it.isOnChain }}")
+
                 coinRepository.subscribeCoinsInfoFor(asset.chainId, coins.map { it.accountId })
                     .map { it.logFailure("Can't fetch info for coins").getOrEmpty() }
-                    .onEach { coinRepository.updateCoins(coins.toPresenceUpdates(it)) }
+                    .onEach { onChainData ->
+                        val updates = coins.toPresenceUpdates(onChainData)
+
+                        coinageLogD(
+                            "presence-update watching=${coins.size} " +
+                                "present=${onChainData.count { it.value != null }} written=${updates.size}"
+                        )
+
+                        coinRepository.updateCoins(updates)
+                    }
             }
             .launchIn(scope)
     }

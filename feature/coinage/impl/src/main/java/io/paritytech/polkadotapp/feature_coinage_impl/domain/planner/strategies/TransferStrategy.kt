@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.PlannedMemoEntry
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
 
@@ -9,6 +10,7 @@ sealed interface TransferStrategy {
      * [io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction]. Returns the memo entries
      * describing the coins handed to the recipient, built from the coins actually allocated here.
      */
+    context(diagnostics: StalenessReportCollector)
     suspend fun run(): Result<PreparedTransfer>
 }
 

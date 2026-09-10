@@ -38,24 +38,25 @@ data class TrackedVoucher(
 )
 
 /**
- * Not on chain yet, but expected to arrive: the transaction minting it has not resolved.
+ * Not on chain yet, but expected to arrive: nothing has proven the transaction minting it never ran.
  *
  * This is what keeps a freshly-split change coin visible instead of vanishing for a whole mortality window,
- * and it is exactly why absence alone cannot be read as "gone".
+ * and it is exactly why absence alone cannot be read as "gone". Finality is the strongest case for counting
+ * it, not the cue to stop: at that point only the presence the chain reports is behind.
  */
 fun TrackedCoin.isMinting(): Boolean =
-    state.isFree && !coin.isOnChain && state.minterStatus?.isLive == true
+    state.isFree && !coin.isOnChain && state.minterStatus?.canArrive == true
 
 /** Registered on chain and working its way into a ring: not usable yet, but it exists. */
 fun TrackedVoucher.isOnboarding(): Boolean =
     state.isFree && voucher.location is RecyclerVoucher.Location.Onboarding
 
 /**
- * Nowhere on chain yet, but expected to arrive: the transaction minting it has not resolved.
+ * Nowhere on chain yet, but expected to arrive: nothing has proven the transaction minting it never ran.
  *
- * The counterpart of [TrackedCoin.isMinting], and it matters for the same reason — a voucher whose minting
- * transaction failed is not on its way anywhere, and counting it as pending would leave money in the balance
- * that can never arrive.
+ * A voucher whose minting transaction failed is not on its way anywhere, and counting it as pending would
+ * leave money in the balance that can never arrive. Finality is the opposite case and must still count: the
+ * mint is then most certainly done, and only the location the chain reports is behind.
  */
 fun TrackedVoucher.isMinting(): Boolean =
-    state.isFree && voucher.location is RecyclerVoucher.Location.Unknown && state.minterStatus?.isLive == true
+    state.isFree && voucher.location is RecyclerVoucher.Location.Unknown && state.minterStatus?.canArrive == true

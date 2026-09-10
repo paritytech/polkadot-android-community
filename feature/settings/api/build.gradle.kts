@@ -7,5 +7,5 @@ android {
 }
 
 dependencies {
-
+    api(project(":common"))
 }

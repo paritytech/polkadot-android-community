@@ -7,11 +7,11 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.flow.first
@@ -134,9 +134,9 @@ class RealCoinageAssetsUseCaseTest {
         assertEquals(1, emissions.size)
     }
 
-    private fun givenCoins(vararg coins: Coin) {
+    private suspend fun givenCoins(vararg coins: Coin) {
         whenever(coinRepository.subscribeAllCoins()).thenReturn(flowOf(coins.toList()))
-        whenever(coinRepository.getCoinRecyclingAge()).thenReturn(RECYCLING_AGE)
+        whenever(coinRepository.getCoinRecyclingAge()).thenReturn(Result.success(RECYCLING_AGE))
     }
 
     private fun givenVouchers(vararg vouchers: RecyclerVoucher) {

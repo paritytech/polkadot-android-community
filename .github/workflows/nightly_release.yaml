@@ -11,6 +11,7 @@ on:
 
 env:
   APPLICATION_ID: ${{ vars.APPLICATION_ID }}
+  APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
   CURRENCY_SYMBOL: ${{ vars.CURRENCY_SYMBOL }}
   GAME_RESULTS_FALLBACK_URL: ${{ vars.GAME_RESULTS_FALLBACK_URL }}
   LOG_COLLECTION_EMAIL: ${{ vars.LOG_COLLECTION_EMAIL }}
@@ -219,6 +220,28 @@ jobs:
           s3_bucket: s3://polkadot-app-artefacts
           source_path: app/build/outputs/apk/gp/nightly/app-gp-nightly.apk
           destination_path: /android/nightly/polkadot-app.apk
+
+      - name: Upload vanilla to S3
+        if: steps.collect_prs.outputs.should_build == 'true'
+        uses: novasamatech/github-actions/s3-upload@v5
+        with:
+          s3_region: fr-par
+          s3_access_key: ${{ secrets.SCW_ACCESS_KEY }}
+          s3_secret_key: ${{ secrets.SCW_SECRET_KEY }}
+          s3_bucket: s3://polkadot-app-artefacts
+          source_path: app/build/outputs/apk/vanilla/nightly/app-vanilla-nightly.apk
+          destination_path: /android/nightly/polkadot-app-vanilla-${{ env.APP_VERSION_NAME }}-${{ env.APP_VERSION_CODE }}.apk
+
+      - name: Upload vanilla to S3 (static path)
+        if: steps.collect_prs.outputs.should_build == 'true'
+        uses: novasamatech/github-actions/s3-upload@v5
+        with:
+          s3_region: fr-par
+          s3_access_key: ${{ secrets.SCW_ACCESS_KEY }}
+          s3_secret_key: ${{ secrets.SCW_SECRET_KEY }}
+          s3_bucket: s3://polkadot-app-artefacts
+          source_path: app/build/outputs/apk/vanilla/nightly/app-vanilla-nightly.apk
+          destination_path: /android/nightly/polkadot-app-vanilla.apk
 
       - name: Trigger Allure TestOps tests
         if: steps.collect_prs.outputs.should_build == 'true'

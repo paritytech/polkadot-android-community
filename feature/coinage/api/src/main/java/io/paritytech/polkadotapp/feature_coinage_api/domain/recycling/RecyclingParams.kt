@@ -18,7 +18,7 @@ data class RecyclingParams(
      */
     val maxUnavailableBalance: Fraction,
     /** Coins below this age are not considered for recycling at all. */
-    val minRecyclingAge: Int,
+    val minRecyclingAge: MinRecyclingAge,
     /**
      * How full a recycler's ring must be before a voucher taken from it counts as spendable again.
      *
@@ -32,3 +32,22 @@ data class RecyclingParams(
      */
     val allowsConfirmedSpend: Boolean,
 )
+
+/**
+ * The age a preset starts recycling at, stated so that building the params needs no chain read.
+ *
+ * A preset that tracks the chain's own limit cannot name an age up front — the runtime may move it — so it
+ * describes the threshold here and the strategy resolves it when it is asked for a verdict.
+ */
+sealed interface MinRecyclingAge {
+    /**
+     * The age the chain stops accepting a coin at, divided by [divisor].
+     *
+     * A divisor of one is the limit itself. Anything softer is a share of it, so the preset stays correct
+     * relative to the chain rather than drifting when the runtime changes the limit.
+     */
+    data class UseChainLimit(val divisor: Int) : MinRecyclingAge
+
+    /** A fixed age, for a preset whose threshold is deliberately unrelated to the chain's limit. */
+    data class Override(val age: Int) : MinRecyclingAge
+}

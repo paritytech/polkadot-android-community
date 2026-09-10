@@ -6,14 +6,13 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.paramsFor
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,8 +22,8 @@ import java.math.BigInteger
 private const val FULL_RING = 767
 
 class CoinagePreClassificationTest {
-    private val minPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MIN_PRIVACY.paramsFor(FORCED_AGE))
-    private val maxPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MAX_PRIVACY.paramsFor(FORCED_AGE))
+    private val minPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MIN_PRIVACY.params, forcedAgeOf(FORCED_AGE))
+    private val maxPrivacy = ParametricRecyclingStrategy(RecyclingStrategyType.MAX_PRIVACY.params, forcedAgeOf(FORCED_AGE))
 
     @Test
     fun `a settled coin is minted`() {
@@ -50,16 +49,49 @@ class CoinagePreClassificationTest {
     }
 
     @Test
-    fun `a coin absent from chain is minting only while its mint is live`() {
+    fun `a coin absent from chain is minting until its mint fails`() {
         val arriving = coinOf(age = Coin.Age.Unknown, onChain = false, derivationIndex = 1)
         val failed = coinOf(age = Coin.Age.Unknown, onChain = false, derivationIndex = 2)
 
         val buckets = listOf(
-            tracked(arriving, minterStatus = CoinageTransactionStatus.PENDING),
-            tracked(failed, minterStatus = CoinageTransactionStatus.FAILURE),
+            tracked(arriving, minterStatus = DurableTxStatus.PENDING),
+            tracked(failed, minterStatus = DurableTxStatus.FAILURE),
         ).preClassifyCoins()
 
         assertEquals(listOf(arriving), buckets.minting)
+    }
+
+    /**
+     * Presence and minter status are written by different writers — a chain subscription and the ledger — so a
+     * mint can finalize while the coin still reads as absent. Reading finality as "no longer arriving" took the
+     * change coin out of both buckets and the money off the screen.
+     */
+    @Test
+    fun `a coin whose mint finalized before presence caught up is still minting`() {
+        val coin = coinOf(age = Coin.Age.Unknown, onChain = false)
+
+        val buckets = listOf(tracked(coin, minterStatus = DurableTxStatus.FINALIZED_SUCCESS))
+            .preClassifyCoins()
+
+        assertEquals(listOf(coin), buckets.minting)
+    }
+
+    /**
+     * The invariant both gaps broke: only a proven-impossible mint may drop a free coin from the total. Every
+     * other status has to leave it somewhere, whatever presence says.
+     */
+    @Test
+    fun `a free coin is in the total for every minter status but failure`() {
+        val counted = DurableTxStatus.entries - DurableTxStatus.FAILURE
+
+        counted.forEach { status ->
+            val onChain = coinOf(age = Coin.Age.Known(3), onChain = true, derivationIndex = 1)
+            val absent = coinOf(age = Coin.Age.Unknown, onChain = false, derivationIndex = 2)
+
+            val buckets = listOf(tracked(onChain, status), tracked(absent, status)).preClassifyCoins()
+
+            assertEquals("minter $status", listOf(onChain, absent), buckets.total)
+        }
     }
 
     /** A coin that will never arrive is not the user's money, so it is left out of the total entirely. */
@@ -67,7 +99,7 @@ class CoinagePreClassificationTest {
     fun `a coin whose mint failed is in no bucket`() {
         val failed = coinOf(age = Coin.Age.Unknown, onChain = false)
 
-        val buckets = listOf(tracked(failed, minterStatus = CoinageTransactionStatus.FAILURE)).preClassifyCoins()
+        val buckets = listOf(tracked(failed, minterStatus = DurableTxStatus.FAILURE)).preClassifyCoins()
 
         assertTrue(buckets.total.isEmpty())
     }
@@ -110,6 +142,27 @@ class CoinagePreClassificationTest {
         assertEquals(listOf(onboarding), buckets.minting)
     }
 
+    /** The voucher counterpart of the finalized-mint gap, and it drops money the same way. */
+    @Test
+    fun `a voucher whose mint finalized before its location synced is still minting`() {
+        val voucher = voucherOf(Location.Unknown)
+
+        val buckets = listOf(trackedVoucher(voucher, DurableTxStatus.FINALIZED_SUCCESS))
+            .preClassifyVouchers(minPrivacy, context())
+
+        assertEquals(listOf(voucher), buckets.minting)
+    }
+
+    @Test
+    fun `a voucher whose mint failed is in no bucket`() {
+        val voucher = voucherOf(Location.Unknown)
+
+        val buckets = listOf(trackedVoucher(voucher, DurableTxStatus.FAILURE))
+            .preClassifyVouchers(minPrivacy, context())
+
+        assertTrue(buckets.total.isEmpty())
+    }
+
     @Test
     fun `buckets never overlap`() {
         val usable = voucherOf(Location.InRecycler(RecyclerIndex(BigInteger.ONE), FULL_RING), ringVrfKeyIndex = 1)
@@ -122,17 +175,20 @@ class CoinagePreClassificationTest {
         assertEquals(2, buckets.total.size)
     }
 
-    private fun context() = VoucherUsabilityContext(ringCapacities = mapOf(ValueExponent(1) to FULL_RING))
+    private fun context() = FetchedVoucherUsabilityContext(ringCapacities = mapOf(ValueExponent(1) to FULL_RING))
 
     private fun tracked(
         coin: Coin,
-        minterStatus: CoinageTransactionStatus? = null,
+        minterStatus: DurableTxStatus? = null,
         state: CoinageAssetState = CoinageAssetState(false, minterStatus, null),
     ) = TrackedCoin(coin, state)
 
-    private fun trackedVoucher(voucher: RecyclerVoucher) = TrackedVoucher(
+    private fun trackedVoucher(
+        voucher: RecyclerVoucher,
+        minterStatus: DurableTxStatus = DurableTxStatus.PENDING,
+    ) = TrackedVoucher(
         voucher,
-        CoinageAssetState(handedOff = false, minterStatus = CoinageTransactionStatus.PENDING, consumerStatus = null),
+        CoinageAssetState(handedOff = false, minterStatus = minterStatus, consumerStatus = null),
     )
 
     private fun coinOf(age: Coin.Age, onChain: Boolean, derivationIndex: Int = 0) = Coin(

@@ -56,10 +56,6 @@ val CoinageApi.unloadTokenTimePeriodPeopleLitePeople: Long
     get() = constant("UnloadTokenTimePeriodPeopleLitePeople")
 
 context(withRuntime: WithRuntime)
-val CoinageApi.maxFreeUnloadTokensPerTimePeriod: Long
-    get() = constant("MaxFreeUnloadTokensPerTimePeriod")
-
-context(withRuntime: WithRuntime)
 val CoinageApi.recyclersCoinToRecycler: QueryableStorageEntry1<BandersnatchPublicKey, OnChainRecyclerLocation>
     get() = storage1("RecyclersCoinToRecycler")
 

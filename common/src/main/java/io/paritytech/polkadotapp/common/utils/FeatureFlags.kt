@@ -15,7 +15,9 @@ object FeatureFlags {
 
             FeatureOption.ARBITRARY_PRODUCTS,
             FeatureOption.BROWSE_TAB,
-            FeatureOption.CHAT_EXTENSIONS,
+            FeatureOption.FULL_TAB_BAR,
+            FeatureOption.ID_CARD_RANK,
+            FeatureOption.ALL_CHAT_EXTENSIONS,
             FeatureOption.LINKED_DEVICES,
             FeatureOption.PRODUCT_SETTINGS,
             FeatureOption.PERSONHOOD,
@@ -42,7 +44,15 @@ enum class FeatureOption {
     PEER_BOT_BY_DEFAULT,
     DEBUG_MENU,
     BROWSE_TAB,
-    CHAT_EXTENSIONS,
+
+    // The tab bar in its full form: item labels, and the scanner wrapped in the center pill next to the
+    // open-tabs button. Off, the bar is icons only and the scanner is a bare icon.
+    FULL_TAB_BAR,
+
+    // The rank label and value under the username on the identity card. Off, the card carries the
+    // username alone, aligned with the avatar.
+    ID_CARD_RANK,
+    ALL_CHAT_EXTENSIONS,
     LINKED_DEVICES,
     PRODUCT_SETTINGS,
     PERSONHOOD,

@@ -4,9 +4,9 @@ import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherBuckets
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
@@ -40,9 +40,9 @@ enum class SpendScope {
 class CoinageAssetSelector @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val strategyProvider: RecyclingStrategyProvider,
-    private val ringCapacityProvider: RingCapacityProvider,
     private val settings: CoinageRecyclingStrategySettings,
     private val evaluator: CoinRecyclingEvaluator,
+    private val voucherUsabilityContextFactory: VoucherUsabilityContextFactory,
 ) {
     /** Suspends until the first verdict exists, so nothing is spent before the strategy has judged it. */
     suspend fun getSelectableCoinsByScope(): Map<SpendScope, List<Coin>> {
@@ -87,9 +87,8 @@ class CoinageAssetSelector @Inject constructor(
     private suspend fun voucherBuckets(): VoucherBuckets {
         val tracked = coinageAssetsUseCase.getVouchers()
 
-        val usability = VoucherUsabilityContext(
-            ringCapacities = ringCapacityProvider.capacitiesFor(tracked.mapToSet { it.voucher.recyclerValue }),
-        )
+        val denominations = tracked.mapToSet { it.voucher.recyclerValue }
+        val usability = voucherUsabilityContextFactory.create(BalanceEvaluationMode.COMPLETE, denominations)
 
         return tracked.preClassifyVouchers(currentStrategy(), usability)
     }

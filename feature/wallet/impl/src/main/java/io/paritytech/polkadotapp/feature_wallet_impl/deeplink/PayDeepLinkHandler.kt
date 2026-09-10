@@ -25,7 +25,7 @@ internal class PayDeepLinkHandler @Inject constructor(
     private val accountRepository: AccountRepository,
     private val pocketRouter: PocketRouter,
 ) : DeepLinkHandler {
-    override fun canHandle(data: Uri): Boolean {
+    override suspend fun canHandle(data: Uri): Boolean {
         // The address-unload pay deeplink is host-only (`polkadotapp://pay?address=..`); sub-paths under
         // the `pay` host belong to other native payment flows (e.g. `pay/cheque` -> W3S coinage cheque).
         return data.scheme == DeepLinkHandler.APP_SCHEME && data.host == PAY_HOST && data.path.isNullOrEmpty()

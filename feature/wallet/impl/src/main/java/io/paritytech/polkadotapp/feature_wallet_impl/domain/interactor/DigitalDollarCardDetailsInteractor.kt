@@ -10,15 +10,12 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.RecyclerVouchersInte
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBackupService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
-import io.paritytech.polkadotapp.feature_products_api.model.KnownProductIds
+import io.paritytech.polkadotapp.feature_products_api.domain.FundingDomainProvider
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -40,15 +37,14 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     private val shareCoinageLogsUseCase: ShareCoinageLogsUseCase,
     private val coinageRecyclingUseCase: CoinageRecyclingUseCase,
     private val coinageBackupService: CoinageBackupService,
-    private val recyclingStrategySettings: CoinageRecyclingStrategySettings,
-    private val dotNsTldProvider: DotNsTldProvider
+    private val fundingDomainProvider: FundingDomainProvider
 ) {
     companion object {
         private val TOP_UP_AMOUNT = 150.toBigDecimal()
         private val NIGHTLY_TOP_UP_AMOUNT = 10.toBigDecimal()
     }
 
-    suspend fun getCashProductId(): Result<ProductId> = dotNsTldProvider.getTld().map(KnownProductIds::getCash)
+    suspend fun getCashProductId(): Result<ProductId> = fundingDomainProvider.getFundingProductId()
 
     fun observeAssetInfo(): Flow<AssetInfo> = flow {
         val asset = chainAssetProvider.asset()
@@ -63,11 +59,6 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
         .map { it.actionsEnabled() }
 
     fun observeBackupProgress(): Flow<BackupProgress> = coinageBackupService.subscribeProgress()
-
-    fun observePrivacyMode(): Flow<RecyclingStrategyType> = recyclingStrategySettings.strategyFlow()
-
-    suspend fun setPrivacyMode(mode: RecyclingStrategyType): Result<Unit> =
-        recyclingStrategySettings.setStrategy(mode)
 
     context(scope: ComputationalScope)
     fun startDeepSearch() = coinageBackupService.deepSearch()

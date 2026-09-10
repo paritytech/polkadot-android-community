@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferPlan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
@@ -62,6 +63,7 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
         else -> coinageLogE("Failed to construct transfer plan for amount: $amount", error)
     }
 
+    context(diagnostics: StalenessReportCollector)
     override suspend fun prepareMemo(plan: TransferPlan): Result<PreparedTransferMemo> {
         val chain = chainAssetProvider.chain()
 

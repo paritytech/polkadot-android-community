@@ -21,7 +21,7 @@ class SendValidation @Inject constructor(
     context(validationProcess: ValidationProcess)
     override suspend fun validate(payload: SendValidationPayload): ValidationResult<SendValidationPayload> {
         val balance = totalBalanceUseCase.getBalance()
-            .getOrElse { return ValidationResult.Error(Throwable("Can't fetch balance")) }
+            .getOrElse { return ValidationResult.Error(SendError.BalanceUnavailable) }
 
         val asset = chainAssetProvider.asset()
         val transferAmountPlanks = payload.value.planksFromAmount(asset.precision)
@@ -34,13 +34,11 @@ class SendValidation @Inject constructor(
         // Either the strategy will not part with what it is holding, or even that would not cover the
         // amount. Both are the same answer to the user: this cannot be sent.
         if (!gainingPrivacy.canSpendWithConfirmation || transferAmountPlanks > reachable) {
-            return ValidationResult.Error(Throwable("Amount exceeds available balance"))
+            return ValidationResult.Error(SendError.NotEnoughFunds)
         }
 
         val action = ConfirmGainingPrivacySpendUserAction(
             totalTransfer = tokenAmountMapper.mapFrom(transferAmountPlanks.withAsset(asset)),
-            spendable = tokenAmountMapper.mapFrom(balance.availablePrivate.withAsset(asset)),
-            gainingPrivacy = tokenAmountMapper.mapFrom((transferAmountPlanks - balance.availablePrivate).withAsset(asset)),
         )
 
         return when (validationProcess.presentUserInput(action)) {
@@ -51,13 +49,11 @@ class SendValidation @Inject constructor(
 }
 
 /**
- * [gainingPrivacy] is the part of [totalTransfer] that [spendable] cannot cover, so sending costs the
- * privacy those funds have earned so far.
+ * [totalTransfer] is the amount the user asked for. Part of it can only come from funds the privacy system
+ * has not finished processing, which is what the confirmation is about.
  */
 data class ConfirmGainingPrivacySpendUserAction(
     val totalTransfer: TokenAmountModel,
-    val spendable: TokenAmountModel,
-    val gainingPrivacy: TokenAmountModel,
 ) : ValidationUserInputAction<ConfirmGainingPrivacySpendDecision>
 
 /**

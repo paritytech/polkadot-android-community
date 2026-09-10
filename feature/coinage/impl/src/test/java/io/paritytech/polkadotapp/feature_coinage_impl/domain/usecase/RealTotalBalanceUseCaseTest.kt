@@ -13,7 +13,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
@@ -21,9 +20,12 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVouch
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.ForcedRecyclingAgeProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.test_shared.any
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -49,25 +51,29 @@ class RealTotalBalanceUseCaseTest {
     private val evaluator: CoinRecyclingEvaluator = mock()
     private val quotaTracker: UnloadQuotaTracker = mock()
 
-    private val strategyProvider = RecyclingStrategyProvider(coinRepository, quotaTracker)
+    private val strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker)
 
     private val useCase: RealTotalBalanceUseCase
 
     init {
         runBlocking {
             `when`(coinageBalanceConverterUseCase.create()).thenReturn(Result.success(testConversionContext))
-            `when`(ringCapacityProvider.capacitiesFor(any()))
+
+            // The balance asks for an IMMEDIATE context so it never waits on the chain, which makes the
+            // cached capacities — not a fetch — what it classifies vouchers against.
+            `when`(ringCapacityProvider.peekCapacitiesFor(any()))
                 .thenReturn(mapOf(ValueExponent(1) to FULL_RING, ValueExponent(2) to FULL_RING))
+
+            `when`(coinRepository.getCoinRecyclingAge()).thenReturn(Result.success(FORCED_AGE))
         }
-        `when`(coinRepository.getCoinRecyclingAge()).thenReturn(FORCED_AGE)
 
         useCase = RealTotalBalanceUseCase(
             coinageAssetsUseCase = coinageAssetsUseCase,
             coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
             strategyProvider = strategyProvider,
-            ringCapacityProvider = ringCapacityProvider,
             settings = settings,
             evaluator = evaluator,
+            usabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider),
         )
     }
 
@@ -122,7 +128,23 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.PENDING)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.PENDING)),
+            vouchers = emptyList(),
+            expected = balanceOf(pending = 1.exponentToBalance()),
+        )
+    }
+
+    /**
+     * The regression: a transfer's change coin finalized while presence still read as absent, and the total
+     * fell by the change instead of the amount sent. Total may lag into `available`, never out of existence.
+     */
+    @Test
+    fun `a coin whose mint finalized before presence caught up stays pending`() {
+        val coin = coinOf(exponent = 1, age = null, onChain = false)
+
+        assertBalance(
+            coins = listOf(coin),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.FINALIZED_SUCCESS)),
             vouchers = emptyList(),
             expected = balanceOf(pending = 1.exponentToBalance()),
         )
@@ -134,7 +156,7 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.FAILURE)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.FAILURE)),
             vouchers = emptyList(),
             expected = balanceOf(),
         )
@@ -214,7 +236,7 @@ class RealTotalBalanceUseCaseTest {
             coinStates = listOf(
                 CoinageAssetState.UNTRACKED,
                 CoinageAssetState.UNTRACKED,
-                stateWithMinter(CoinageTransactionStatus.PENDING),
+                stateWithMinter(DurableTxStatus.PENDING),
             ),
             vouchers = emptyList(),
             verdicts = mapOf(
@@ -310,7 +332,7 @@ class RealTotalBalanceUseCaseTest {
         pending = pending,
     )
 
-    private fun stateWithMinter(status: CoinageTransactionStatus) =
+    private fun stateWithMinter(status: DurableTxStatus) =
         CoinageAssetState(handedOff = false, minterStatus = status, consumerStatus = null)
 
     private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members)

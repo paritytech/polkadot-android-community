@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain
 
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.paritytech.polkadotapp.chains.util.fullId
 import io.paritytech.polkadotapp.chains.util.planksFromAmount
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
@@ -11,6 +12,8 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapResult
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatMessageSender
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
@@ -32,7 +35,9 @@ import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetPr
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.FreeTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.Fee
+import io.paritytech.polkadotapp.feature_transfers_api.data.repository.SendRecipientRepository
 import io.paritytech.polkadotapp.feature_transfers_api.data.type.TokenTransfersTypeRegistry
+import io.paritytech.polkadotapp.feature_transfers_api.domain.model.SendRecipient
 import io.paritytech.polkadotapp.feature_transfers_api.domain.model.TransferArguments
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.AvailableToSendAmount
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.SendPlan
@@ -51,6 +56,7 @@ import java.math.BigDecimal
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
+import io.paritytech.polkadotapp.common.R as RCommon
 
 interface SendEnterAmountInteractor {
     val sendValidation: Validation<SendValidationPayload>
@@ -61,6 +67,11 @@ interface SendEnterAmountInteractor {
 
     suspend fun estimateFee(recipient: AccountId, value: BigDecimal): Result<Fee>
 
+    /**
+     * Reports its progress into [diagnostics]; callers with no UI attached pass
+     * [StalenessReportCollector.NoOp].
+     */
+    context(diagnostics: StalenessReportCollector)
     fun send(value: BigDecimal, transferMethod: TransferMethod): Flow<SendState>
 
     suspend fun plan(value: BigDecimal, transferMethod: TransferMethod): SendPlan?
@@ -71,6 +82,7 @@ interface SendEnterAmountInteractor {
 class RealSendEnterAmountInteractor @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val transfersTypeRegistry: TokenTransfersTypeRegistry,
+    private val sendRecipientRepository: SendRecipientRepository,
     private val freeTransactionOrigins: FreeTransactionOrigins,
     private val chatMessageSender: ChatMessageSender,
     private val prepareCoinageTransferUseCase: PrepareCoinageTransferUseCase,
@@ -116,9 +128,20 @@ class RealSendEnterAmountInteractor @Inject constructor(
             )
     }
 
+    context(diagnostics: StalenessReportCollector)
     override fun send(value: BigDecimal, transferMethod: TransferMethod): Flow<SendState> = when (transferMethod) {
-        is TransferMethod.CoinsViaChat -> flowOf { sendCoinage(transferMethod.recipient, value).toTerminalState() }
-        is TransferMethod.UnloadIntoExternal -> flowOf { sendExternalPayment(transferMethod.recipient, value).toTerminalState() }
+        is TransferMethod.CoinsViaChat -> flowOf {
+            sendCoinage(transferMethod.recipient, value)
+                .onSuccess { rememberRecipient(transferMethod.recipient) }
+                .toTerminalState()
+        }
+
+        is TransferMethod.UnloadIntoExternal -> flowOf {
+            // Note: we don't recall a recipient for external unload
+            sendExternalPayment(transferMethod.recipient, value)
+                .toTerminalState()
+        }
+
         is TransferMethod.CoinsViaSubmitter -> sendViaSubmitterFlow(transferMethod, value)
     }.flowOn(coroutineDispatchers.computation)
 
@@ -137,11 +160,18 @@ class RealSendEnterAmountInteractor @Inject constructor(
 
     override fun observeDebugWidgetsEnabled(): Flow<Boolean> = coinageDebugSettings.widgetsEnabledFlow()
 
-    private suspend fun sendCoinage(recipient: AccountId, value: BigDecimal): Result<Unit> {
-        return prepareCoinageTransferUseCase.prepareMemo(value)
-            .map { prepared -> sendChatMessage(recipient, prepared) }
-            .onSuccess { Timber.d("CoinageTransfer: Successful") }
-            .logFailure("Coinage transfer failed")
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun sendCoinage(recipient: AccountId, value: BigDecimal): Result<Unit> =
+        diagnostics.markRegion(RCommon.string.wallet_stall_sending) {
+            prepareCoinageTransferUseCase.prepareMemo(value)
+                .map { prepared -> sendChatMessage(recipient, prepared) }
+                .onSuccess { Timber.d("CoinageTransfer: Successful") }
+                .logFailure("Coinage transfer failed")
+        }
+
+    private suspend fun rememberRecipient(recipient: AccountId) {
+        sendRecipientRepository.addSendRecipient(SendRecipient(accountId = recipient, fullChainAssetId = asset().fullId))
+            .logFailure("Failed to remember send recipient")
     }
 
     private suspend fun sendExternalPayment(recipient: AccountId, value: BigDecimal): Result<Unit> {
@@ -156,6 +186,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
             .logFailure("External payment failed")
     }
 
+    context(diagnostics: StalenessReportCollector)
     private fun sendViaSubmitterFlow(
         method: TransferMethod.CoinsViaSubmitter,
         value: BigDecimal,
@@ -166,17 +197,27 @@ class RealSendEnterAmountInteractor @Inject constructor(
             return@flow
         }
 
-        prepareCoinageTransferUseCase.prepareMemo(value)
-            .flatMap { prepared ->
-                submitter.submit(prepared.memo, value, method.submitterPayload)
-                    // The submitter took the keys, so the handoff is real from here. There is no local
-                    // transaction to tie this to, unlike the chat path, so the commit is its own step.
-                    .flatMap { prepared.handoffCommit.commit() }
-                    .map { prepared.memo }
-            }
-            .logFailure("Coins submission via '${method.submitterId}' failed")
-            .onSuccess { memo -> emitAll(settlementStates(memo)) }
-            .onFailure { emit(SendState.Failed(it)) }
+        diagnostics.markRegion(RCommon.string.wallet_stall_sending) {
+            prepareCoinageTransferUseCase.prepareMemo(value)
+                .flatMap { prepared -> handOverToSubmitter(submitter, prepared, value, method) }
+                .logFailure("Coins submission via '${method.submitterId}' failed")
+                .onSuccess { memo -> emitAll(settlementStates(memo)) }
+                .onFailure { emit(SendState.Failed(it)) }
+        }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun handOverToSubmitter(
+        submitter: CoinsSubmitter,
+        prepared: PreparedTransferMemo,
+        value: BigDecimal,
+        method: TransferMethod.CoinsViaSubmitter,
+    ): Result<TransferMemo> = diagnostics.markRegion(RCommon.string.wallet_stall_delivering) {
+        submitter.submit(prepared.memo, value, method.submitterPayload)
+            // The submitter took the keys, so the handoff is real from here. There is no local
+            // transaction to tie this to, unlike the chat path, so the commit is its own step.
+            .flatMap { prepared.handoffCommit.commit() }
+            .map { prepared.memo }
     }
 
     /**
@@ -185,20 +226,23 @@ class RealSendEnterAmountInteractor @Inject constructor(
      * The timeout bounds how long the *screen* waits, not the payment: the coins stay ours and stay
      * recoverable however long the recipient takes, so giving up here only stops watching.
      */
+    context(diagnostics: StalenessReportCollector)
     private fun settlementStates(memo: TransferMemo): Flow<SendState> = flow {
         val accountIds = memo.coins.map { it.privateKey.deriveKeypair().publicKey.intoAccountId() }
 
-        val completed = withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
-            coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
-                .transformWhile { states ->
-                    emit(states.toSendState())
-                    states.values.any { it.status.isPending }
-                }
-                .catch { error ->
-                    if (error is CancellationException) throw error
-                    emit(SendState.Failed(error))
-                }
-                .collect { emit(it) }
+        val completed = diagnostics.markRegion(RCommon.string.wallet_stall_awaiting_claim) {
+            withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
+                coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
+                    .transformWhile { states ->
+                        emit(states.toSendState())
+                        states.values.any { it.status.isPending }
+                    }
+                    .catch { error ->
+                        if (error is CancellationException) throw error
+                        emit(SendState.Failed(error))
+                    }
+                    .collect { emit(it) }
+            }
         }
 
         if (completed == null) {

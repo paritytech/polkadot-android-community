@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.compose
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +16,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
+import io.paritytech.polkadotapp.common.presentation.search.SearchState
+import io.paritytech.polkadotapp.common.utils.toSizedList
 import io.paritytech.polkadotapp.design.components.avatar.AvatarUiModel
 import io.paritytech.polkadotapp.design.components.avatar.Mock
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
@@ -33,8 +35,10 @@ import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.PaymentSearchResultUiModel
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.PaymentSearchSectionUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.SendPaymentContract
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.SendPaymentUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.compose.components.SearchResult
@@ -45,6 +49,10 @@ import io.paritytech.polkadotapp.common.R as RCommon
 @Composable
 fun SendPaymentScreen(contract: SendPaymentContract) {
     val uiState = contract.state.collectAsStateWithLifecycle().value
+
+    contract.messageEvents.collectAsEffect { context, resId ->
+        Toast.makeText(context, context.getString(resId), Toast.LENGTH_SHORT).show()
+    }
 
     SendPaymentScreenInternal(
         state = uiState,
@@ -131,17 +139,12 @@ private fun SendPaymentScreenInternal(
 
             VerticalSpacer { mediumIncreased }
 
-            when (state.loadingState) {
-                is LoadingState.Loaded -> {
-                    val result = state.loadingState.data
-
-                    if (result.isEmpty() && state.input.isNotEmpty()) {
-                        SendPaymentEmptySearch(state.input)
-                    } else {
-                        SearchResult(state.loadingState, onRecipientSelect)
-                    }
+            when (val searchState = state.searchState) {
+                is SearchState.Loaded -> SearchResult(searchState.results, onRecipientSelect)
+                SearchState.Empty -> if (state.input.isNotEmpty()) {
+                    SendPaymentEmptySearch(state.input)
                 }
-                else -> LoadingScreenState()
+                SearchState.Initial, SearchState.Loading, is SearchState.Error -> LoadingScreenState()
             }
         }
     }
@@ -154,25 +157,45 @@ private fun SendPaymentScreenPreview() {
         SendPaymentScreenInternal(
             state = SendPaymentUiState(
                 input = "alice",
-                loadingState = LoadingState.Loaded(
+                searchState = SearchState.Loaded(
                     persistentListOf(
-                        PaymentSearchResultUiModel(
-                            extractedAddress = ExtractedAddress(
-                                display = "alice.dot",
-                                type = ExtractedAddress.DisplayType.USERNAME,
-                                accountId = io.paritytech.polkadotapp.common.domain.model.AccountId(ByteArray(32))
-                            ),
-                            avatarModel = AvatarUiModel.Mock.fromName("alice.dot")
+                        PaymentSearchSectionUiModel(
+                            key = "contacts",
+                            titleRes = RCommon.string.address_section_my_contacts,
+                            items = persistentListOf(
+                                PaymentSearchResultUiModel(
+                                    extractedAddress = ExtractedAddress(
+                                        display = "bob.dot",
+                                        type = ExtractedAddress.DisplayType.USERNAME,
+                                        accountId = io.paritytech.polkadotapp.common.domain.model.AccountId(ByteArray(32))
+                                    ),
+                                    avatarModel = AvatarUiModel.Mock.fromName("bob.dot")
+                                )
+                            )
                         ),
-                        PaymentSearchResultUiModel(
-                            extractedAddress = ExtractedAddress(
-                                display = "34t834ug03u2093ru20fu230f9u2330r9u2r",
-                                type = ExtractedAddress.DisplayType.ADDRESS,
-                                accountId = io.paritytech.polkadotapp.common.domain.model.AccountId(ByteArray(32))
-                            ),
-                            avatarModel = AvatarUiModel.Mock.fromName("34t834ug03u2093ru20fu230f9u2330r9u2r")
+                        PaymentSearchSectionUiModel(
+                            key = "general",
+                            titleRes = RCommon.string.send_payment_section_global_search,
+                            items = persistentListOf(
+                                PaymentSearchResultUiModel(
+                                    extractedAddress = ExtractedAddress(
+                                        display = "alice.dot",
+                                        type = ExtractedAddress.DisplayType.USERNAME,
+                                        accountId = io.paritytech.polkadotapp.common.domain.model.AccountId(ByteArray(32))
+                                    ),
+                                    avatarModel = AvatarUiModel.Mock.fromName("alice.dot")
+                                ),
+                                PaymentSearchResultUiModel(
+                                    extractedAddress = ExtractedAddress(
+                                        display = "34t834ug03u2093ru20fu230f9u2330r9u2r",
+                                        type = ExtractedAddress.DisplayType.ADDRESS,
+                                        accountId = io.paritytech.polkadotapp.common.domain.model.AccountId(ByteArray(32))
+                                    ),
+                                    avatarModel = AvatarUiModel.Mock.fromName("34t834ug03u2093ru20fu230f9u2330r9u2r")
+                                )
+                            )
                         )
-                    )
+                    ).toSizedList()
                 )
             ),
             onInputChange = {},

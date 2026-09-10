@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket
 
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.sharing.SharingManager
 import io.paritytech.polkadotapp.common.utils.ContentSharing
@@ -9,6 +10,8 @@ import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.stateInBackground
+import io.paritytech.polkadotapp.common.utils.withLoading
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.formatFiat
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
@@ -19,11 +22,14 @@ import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.PocketInt
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketScreenState
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -40,21 +46,37 @@ class PocketViewModel @Inject constructor(
     private val selectedCardId = MutableStateFlow<String?>(null)
     private val collectiblesShown = MutableStateFlow(false)
 
-    val cards = combine(
-        interactor.observeDigitalDollarBalance(),
+    private val digitalDollarAmounts = interactor.observeDigitalDollarBalance()
+        .map { balance ->
+            PocketCardUiModel.DigitalDollar.Amounts(
+                balance = tokenAmountMapper.mapFrom(balance.total),
+                available = tokenAmountMapper.mapFrom(balance.available)
+            )
+        }
+        .withLoading("PocketViewModel: Failed to observe digital dollar balance")
+
+    // Both upstreams start unresolved so the card is on screen from the first frame, shimmering its
+    // amount, instead of appearing only once a balance arrives.
+    private val balanceCard = combine(
+        digitalDollarAmounts,
+        interactor.observeBackupProgress().onStart { emit(BackupProgress.Unknown) },
+    ) { amounts, backupProgress ->
+        PocketCardUiModel.DigitalDollar(
+            amounts = amounts,
+            syncInProgress = backupProgress.isInProgress()
+        )
+    }
+
+    private val addressCard = combine<_, _, _, PocketCardUiModel.IdCard?>(
         interactor.observeUsername(),
-        interactor.observeBackupProgress(),
         interactor.observeRank(),
         interactor.observeAddress()
-    ) { balance, username, backupProgress, rank, address ->
-        persistentListOf(
-            PocketCardUiModel.DigitalDollar(
-                balance = tokenAmountMapper.mapFrom(balance.total),
-                available = tokenAmountMapper.mapFrom(balance.available),
-                syncInProgress = backupProgress.isInProgress()
-            ),
-            PocketCardUiModel.IdCard(username = username, address = address, rank = rank)
-        )
+    ) { username, rank, address ->
+        PocketCardUiModel.IdCard(username = username, address = address, rank = rank)
+    }.onStart { emit(null) }
+
+    val cards = combine(balanceCard, addressCard) { balance, address ->
+        listOfNotNull(balance, address).toImmutableList()
     }
         .distinctUntilChangedBy { cards -> cards.map(::cardDisplayKey) }
         .inBackground()
@@ -89,12 +111,18 @@ class PocketViewModel @Inject constructor(
         )
 
     private fun cardDisplayKey(card: PocketCardUiModel): String = when (card) {
-        is PocketCardUiModel.DigitalDollar -> listOf(
-            tokenAmountFormatter.formatTokenAmount(card.balance, RoundPrecision.FIAT, withSymbol = false),
-            tokenAmountFormatter.formatFiat(card.available),
-            card.syncInProgress,
-            card.notFullyAvailable
-        ).joinToString("|")
+        is PocketCardUiModel.DigitalDollar -> {
+            val amounts = card.amounts.dataOrNull
+
+            listOf(
+                amounts?.let {
+                    tokenAmountFormatter.formatTokenAmount(it.balance, RoundPrecision.FIAT, withSymbol = false)
+                },
+                amounts?.let { tokenAmountFormatter.formatFiat(it.available) },
+                card.syncInProgress,
+                amounts?.notFullyAvailable
+            ).joinToString("|")
+        }
 
         is PocketCardUiModel.IdCard -> listOf(card.username, card.address, card.rank).joinToString("|")
     }

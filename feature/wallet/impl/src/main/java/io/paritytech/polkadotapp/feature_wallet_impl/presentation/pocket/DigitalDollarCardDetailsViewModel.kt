@@ -8,10 +8,8 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.launchUnit
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDollarCardDetailsInteractor
@@ -23,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -68,57 +67,42 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         initialValue = LoadingState.Loading
     )
 
-    val state: StateFlow<DigitalDollarCardDetailsUiState> = combine(
-        interactor.observeBackupProgress(),
-        interactor.observePrivacyMode()
-    ) { backupProgress, privacyMode ->
-        DigitalDollarCardDetailsUiState(
-            balanceRestore = backupProgress.toBalanceRestoreUiState(),
-            privacyMode = privacyMode
+    val state: StateFlow<DigitalDollarCardDetailsUiState> = interactor.observeBackupProgress()
+        .map { DigitalDollarCardDetailsUiState(balanceRestore = it.toBalanceRestoreUiState()) }
+        .stateIn(
+            scope = this,
+            started = SharingStarted.Eagerly,
+            initialValue = DigitalDollarCardDetailsUiState(
+                balanceRestore = BalanceRestoreUiState.NotDetermined
+            )
         )
-    }.stateIn(
-        scope = this,
-        started = SharingStarted.Eagerly,
-        initialValue = DigitalDollarCardDetailsUiState(
-            balanceRestore = BalanceRestoreUiState.NotDetermined,
-            privacyMode = null
-        )
-    )
 
     fun onGetCashClick() = launchUnit {
         interactor.getCashProductId()
-            .logFailure("Failed to resolve Get CASH product id")
             .onSuccess { router.openProduct(it) }
-            .onFailure { showMessage("Failed to open Get CASH") }
+            .onFailure { showPresentationError(GetCashUnavailablePresentationError(it)) }
     }
 
     fun onSendClick() {
         router.openSendPayment()
     }
 
-    fun onPrivacyModeSelected(mode: RecyclingStrategyType) = launchUnit {
-        interactor.setPrivacyMode(mode)
-            .logFailure("Failed to change payment privacy mode")
-            .onFailure { showMessage("Failed to change payment privacy mode") }
-    }
-
     fun onAutoFundClick() = launchUnit {
         if (fundInProgress.value) return@launchUnit
         fundInProgress.enable()
         interactor.testnetFund()
-            .logFailure("Failed to perform testnet fund")
-            .onFailure { showMessage("Failed to fund account") }
+            .onFailure { showPresentationError(AutoFundFailedPresentationError(it)) }
         fundInProgress.disable()
     }
 
     fun onShareLogsClick() = launchUnit {
         interactor.shareCoinageLogs()
-            .onFailure { showMessage("Failed to share coinage logs") }
+            .onFailure { showPresentationError(ShareCoinageLogsFailedPresentationError(it)) }
     }
 
     fun onForceRecycleClick(coin: Coin) = launchUnit {
         interactor.forceRecycle(coin)
-            .onFailure { showMessage("Failed to recycle coin") }
+            .onFailure { showPresentationError(ForceRecycleFailedPresentationError(it)) }
     }
 
     fun onBackupUpdateClick() {

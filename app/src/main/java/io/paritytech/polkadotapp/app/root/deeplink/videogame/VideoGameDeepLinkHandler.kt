@@ -23,7 +23,7 @@ class VideoGameDeepLinkHandler @Inject constructor(
     private val videoGameRouter: VideoGameRouter,
     private val videoGameLaunchCoordinator: VideoGameLaunchCoordinator
 ) : DeepLinkHandler {
-    override fun canHandle(data: Uri): Boolean {
+    override suspend fun canHandle(data: Uri): Boolean {
         return FeatureOption.PERSONHOOD.isEnabled &&
             data.scheme == DeepLinkHandler.APP_SCHEME &&
             data.host == WEEKLY_GAME_HOST

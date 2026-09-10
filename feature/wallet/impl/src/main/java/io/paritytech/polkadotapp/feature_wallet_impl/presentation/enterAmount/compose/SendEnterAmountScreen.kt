@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -24,6 +21,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.validation.compose.rememberValidationActionHandle
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StallReportContent
+import io.paritytech.polkadotapp.common.utils.progressStallReport.previewStallReportOperations
+import io.paritytech.polkadotapp.common.utils.progressStallReport.previewStallReportSteps
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.progress.LoadingScreenState
@@ -37,7 +37,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Local
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.balanceDetails.compose.BalanceDetailsBottomSheet
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountContract
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress
@@ -53,26 +52,20 @@ import io.paritytech.polkadotapp.common.R as RCommon
 @Composable
 internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
     val state = contract.state.collectAsStateWithLifecycle().value
-    var isBalanceDetailsVisible by remember { mutableStateOf(false) }
 
     PolkadotSurface {
         when (state) {
             is LoadingState.Loaded -> SendEnterAmountScreenInternal(
                 state = state.data,
+                stallReport = { contract.stalenessReport.DisplayReport() },
                 onAmountChange = contract::onNewInput,
                 onConfirmClick = contract::onConfirmClick,
-                onBackClick = contract::onBackClick,
-                onInfoClick = { isBalanceDetailsVisible = true }
+                onBackClick = contract::onBackClick
             )
 
             else -> LoadingScreenState()
         }
     }
-
-    BalanceDetailsBottomSheet(
-        isVisible = isBalanceDetailsVisible,
-        onDismissRequest = { isBalanceDetailsVisible = false },
-    )
 
     GainingPrivacyConfirmationHost(contract)
 }
@@ -97,9 +90,9 @@ private fun GainingPrivacyConfirmationHost(contract: SendEnterAmountContract) {
 @Composable
 private fun SendEnterAmountScreenInternal(
     state: SendEnterAmountUiState,
+    stallReport: @Composable () -> Unit,
     onAmountChange: (String) -> Unit,
     onConfirmClick: () -> Unit,
-    onInfoClick: () -> Unit,
     onBackClick: () -> Unit,
 ) {
     val formatter = LocalTokenAmountFormatter.current
@@ -146,7 +139,11 @@ private fun SendEnterAmountScreenInternal(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            EnterAmountBalance(amount, gainingPrivacy, onInfoClick)
+            EnterAmountBalance(
+                modifier = Modifier.padding(horizontal = PolkadotTheme.spacings.large),
+                amount = amount,
+                gainingPrivacy = gainingPrivacy
+            )
 
             VerticalSpacer { small }
 
@@ -164,6 +161,14 @@ private fun SendEnterAmountScreenInternal(
         }
 
         state.debugPlanInfo?.let { DebugPlanInfo(it) }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PolkadotTheme.spacings.large)
+        ) {
+            stallReport()
+        }
 
         val progress = state.sendProgress
         PolkadotTextButton(
@@ -210,6 +215,18 @@ private fun DebugPlanInfo(info: SendPlanDebugInfo) {
     }
 }
 
+/**
+ * Stands in for the real [io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport], which
+ * only renders once the operation overruns its budget - something a preview never waits for.
+ */
+@Composable
+private fun PreviewStallReport() {
+    StallReportContent(
+        runningOperations = previewStallReportOperations(),
+        steps = previewStallReportSteps(),
+    )
+}
+
 @Preview
 @Composable
 private fun SendEnterAmountScreenAllWidgetPreview() {
@@ -231,10 +248,10 @@ private fun SendEnterAmountScreenAllWidgetPreview() {
                     isAmountLocked = false,
                     recipientAvatarColor = AvatarColorScheme.Garnet
                 ),
+                stallReport = { PreviewStallReport() },
                 onAmountChange = {},
                 onConfirmClick = {},
-                onBackClick = {},
-                onInfoClick = {}
+                onBackClick = {}
             )
         }
     }

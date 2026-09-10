@@ -25,17 +25,11 @@ class RealCoinKeypairDerivation @Inject constructor(
     private val accountRepository: AccountRepository,
     private val accountSecretsStorage: AccountSecretsStorage,
 ) : CoinKeypairDerivation {
-    companion object {
-        private const val COIN_DERIVATION_PATH_BASE = "//pps//coin"
-
-        private fun getCoinDerivationPath(derivationIndex: DerivationIndex) = "$COIN_DERIVATION_PATH_BASE//$derivationIndex"
-    }
-
     override suspend fun deriveKeypair(derivationIndex: DerivationIndex): Keypair {
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
 
-        val path = getCoinDerivationPath(derivationIndex)
+        val path = getDefaultPurseDerivation(derivationIndex)
 
         val seedResult = SubstrateSeedFactory.deriveSeed32(mnemonic.words, password = null)
         val keypair = SubstrateKeypairFactory.generate(EncryptionType.SR25519, seedResult.seed, path)
@@ -48,13 +42,32 @@ class RealCoinKeypairDerivation @Inject constructor(
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
         val seedResult = SubstrateSeedFactory.deriveSeed32(mnemonic.words, password = null)
 
-        val baseCoinageKeypair = SubstrateKeypairFactory.generate(EncryptionType.SR25519, seedResult.seed, COIN_DERIVATION_PATH_BASE)
+        val pathBase = coinageDefaultPurseDerivationBase()
+        val baseCoinageKeypair = SubstrateKeypairFactory.generate(EncryptionType.SR25519, seedResult.seed, pathBase)
             as Sr25519Keypair
 
         return derivationIndices.map { derivationIndex ->
-            val junction = SubstrateJunctionDecoder.decode("//$derivationIndex").junctions.first()
+            val itemSegment = itemDerivationSegment(derivationIndex)
+            val junction = SubstrateJunctionDecoder.decode(itemSegment).junctions.first()
             Sr25519SubstrateKeypairFactory.deriveChild(baseCoinageKeypair, junction)
         }
+    }
+
+    private fun getDefaultPurseDerivation(item: Int): String = coinageDerivation(CoinageDerivationDefaults.COINAGE_MAIN_PURSE_INDEX, CoinageDerivationDefaults.COINAGE_PAGE_INDEX, item)
+
+    private fun coinageDefaultPurseDerivationBase(): String = coinageDerivationBase(CoinageDerivationDefaults.COINAGE_MAIN_PURSE_INDEX, CoinageDerivationDefaults.COINAGE_PAGE_INDEX)
+
+    @Suppress("SameParameterValue")
+    private fun coinageDerivation(purse: Long, page: Int, item: Int): String {
+        return coinageDerivationBase(purse, page) + itemDerivationSegment(item)
+    }
+
+    private fun itemDerivationSegment(item: Int): String {
+        return "/$item"
+    }
+
+    private fun coinageDerivationBase(purse: Long, page: Int): String {
+        return "//coinage//$purse//$page"
     }
 }
 

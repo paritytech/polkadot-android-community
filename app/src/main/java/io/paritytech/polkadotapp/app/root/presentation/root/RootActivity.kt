@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.app.root.presentation.root
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -29,11 +32,15 @@ import io.paritytech.polkadotapp.common.presentation.formatters.time.LocalTimeFo
 import io.paritytech.polkadotapp.common.presentation.formatters.time.TimeFormatter
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotificationHost
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotifier
+import io.paritytech.polkadotapp.common.presentation.notification.error
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
-import io.paritytech.polkadotapp.common.presentation.screens.BaseScreenDelegate
+import io.paritytech.polkadotapp.common.presentation.screens.ObserveViewModelEvents
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBarDefaults
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class RootActivity : AppCompatActivity(R.layout.activity_root) {
@@ -50,11 +57,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
     lateinit var appNotifier: AppNotifier
 
     private val viewModel by viewModels<RootViewModel>()
-
-    private val delegate = BaseScreenDelegate(
-        context = { this },
-        viewModel = ::viewModel
-    )
 
     private val navHostFragment: NavHostFragment by lazy(LazyThreadSafetyMode.NONE) {
         supportFragmentManager.findFragmentById(R.id.rootNavHost) as NavHostFragment
@@ -85,11 +87,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         setupAppNotificationOverlay()
 
         setupChatExtensionOverlay()
-        // TODO network status currently is annoying: during real reconnects it may appear and disappear a lot
-        // We need to improve stability of ConnectionStatusMonitor before bringing it back
-//        setupConnectionStatusBanner()
-
-        delegate.subscribeViewModelEvents()
+        setupChainHealthBar()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -110,7 +108,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             when (deeplinkProcessingOutcome) {
                 DeeplinkProcessingOutcome.NoOp -> {}
 
-                is DeeplinkProcessingOutcome.ShowMessage -> delegate.showMessage(
+                is DeeplinkProcessingOutcome.ShowMessage -> appNotifier.error(
                     deeplinkProcessingOutcome.message
                 )
 
@@ -139,6 +137,8 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 PolkadotTheme {
+                    ObserveViewModelEvents(viewModel, appNotifier)
+
                     AppNotificationHost(notifier = appNotifier)
                 }
             }
@@ -146,16 +146,52 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
-    private fun WindowInsetsCompat.consumeTopInsets(): WindowInsetsCompat {
-        val systemBars = getInsets(WindowInsetsCompat.Type.systemBars())
+    private fun setupChainHealthBar() {
+        // Overlaid on top like a system indicator (activity_root.xml FrameLayout).
+        findViewById<ComposeView>(R.id.connectionStatusBanner).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val model by viewModel.chainsHealth.collectAsStateWithLifecycle()
+                PolkadotTheme {
+                    ChainHealthBar(model = model)
+                }
+            }
+        }
+
+        // Push screen content below the bar by inflating its top inset; backgrounds still draw
+        // full-bleed behind it.
+        val navHost = findViewById<View>(R.id.rootNavHost)
+        val barHeightPx = (ChainHealthBarDefaults.ContentHeight.value * resources.displayMetrics.density).roundToInt()
+
+        // Insets reach the subtree two ways and both have to inflate, or the content moves between them.
+        // Animation frames (the IME sliding in) are dispatched through the animation callback and never
+        // pass through the apply listener, so without the callback below the content springs up by the
+        // bar height for the length of the keyboard animation and drops back once it settles.
+        ViewCompat.setWindowInsetsAnimationCallback(
+            navHost,
+            object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    runningAnimations: MutableList<WindowInsetsAnimationCompat>,
+                ): WindowInsetsCompat = insets.inflateTopInsets(barHeightPx)
+            },
+        )
+
+        ViewCompat.setOnApplyWindowInsetsListener(navHost) { _, insets ->
+            insets.inflateTopInsets(barHeightPx)
+        }
+    }
+
+    private fun WindowInsetsCompat.inflateTopInsets(extraTopPx: Int): WindowInsetsCompat {
+        // Inflate only the status-bar top. systemBars/safeDrawing pick this up via their union (so
+        // top-bar screens still clear the bar), while the bottom navigation-bar inset is left intact.
+        // Setting the compound systemBars type here would also clobber navigationBars.top and push
+        // bottom-anchored content (e.g. the chat input row) upward.
+        val statusBars = getInsets(WindowInsetsCompat.Type.statusBars())
         return WindowInsetsCompat.Builder(this)
             .setInsets(
-                WindowInsetsCompat.Type.systemBars(),
-                Insets.of(systemBars.left, 0, systemBars.right, systemBars.bottom),
-            )
-            .setInsets(
                 WindowInsetsCompat.Type.statusBars(),
-                Insets.of(0, 0, 0, 0),
+                Insets.of(statusBars.left, statusBars.top + extraTopPx, statusBars.right, statusBars.bottom),
             )
             .build()
     }
