@@ -13,7 +13,7 @@ fun ChainHealth.toIndicator(): ChainHealthIndicator = when (connection) {
     ChainConnectionPresentation.Connecting -> ChainHealthIndicator.Connecting
     ChainConnectionPresentation.Connected -> when {
         nodeUnresponsive() -> ChainHealthIndicator.Disconnected
-        else -> outage() ?: slowConnection() ?: ChainHealthIndicator.Healthy
+        else -> outage() ?: connectionSpeed() ?: ChainHealthIndicator.Healthy
     }
 }
 
@@ -27,13 +27,15 @@ private fun ChainHealth.outage(): ChainHealthIndicator.Outage? {
     return ChainHealthIndicator.Outage(production.recentBlocks, production.expectedBlocks)
 }
 
-private fun ChainHealth.slowConnection(): ChainHealthIndicator.SlowConnection? {
+private fun ChainHealth.connectionSpeed(): ChainHealthIndicator.ConnectionSpeed? {
     val worstScore = readings.filter { it.isConnectionSpeed() }.minOfOrNull { it.score.value } ?: return null
-    return when {
-        worstScore >= ChainHealthThresholds.CONNECTION_ADEQUATE_FROM -> null
-        worstScore < ChainHealthThresholds.CONNECTION_UNUSABLE_BELOW -> ChainHealthIndicator.SlowConnection(Speed.Unusable)
-        else -> ChainHealthIndicator.SlowConnection(Speed.Slow)
+    val speed = when {
+        worstScore >= ChainHealthThresholds.CONNECTION_HIGH_FROM -> return null
+        worstScore >= ChainHealthThresholds.CONNECTION_GOOD_FROM -> Speed.Good
+        worstScore >= ChainHealthThresholds.CONNECTION_FAIR_FROM -> Speed.Fair
+        else -> Speed.Low
     }
+    return ChainHealthIndicator.ConnectionSpeed(speed)
 }
 
 private fun ChainMetricReading.isConnectionSpeed(): Boolean = when (this) {

@@ -52,7 +52,7 @@ import io.paritytech.polkadotapp.common.R as RCommon
 private val CollectiblesSketchbookPeek = 80.dp
 
 @Composable
-fun PocketScreen(statusIndicators: @Composable () -> Unit) {
+fun PocketScreen() {
     val viewModel = hiltViewModel<PocketViewModel>()
 
     val screenState by viewModel.state.collectAsStateWithLifecycle()
@@ -66,8 +66,7 @@ fun PocketScreen(statusIndicators: @Composable () -> Unit) {
         onShareId = viewModel::onShareId,
         onSketchbookSelected = viewModel::showCollectiblesSketchbook,
         onSketchbookDismissed = viewModel::hideCollectiblesSketchbook,
-        onOpenCollectibles = viewModel::openCollectibles,
-        statusIndicators = statusIndicators,
+        onOpenCollectibles = viewModel::openCollectibles
     )
 }
 
@@ -80,8 +79,7 @@ private fun PocketScreenInternal(
     onShareId: () -> Unit,
     onSketchbookSelected: () -> Unit,
     onSketchbookDismissed: () -> Unit,
-    onOpenCollectibles: () -> Unit,
-    statusIndicators: @Composable () -> Unit,
+    onOpenCollectibles: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val transition = updateTransition(screenState, label = "pocket_card_selection")
@@ -106,8 +104,7 @@ private fun PocketScreenInternal(
                                     listState = listState,
                                     collectiblesAvailable = current.collectiblesAvailable,
                                     onCardSelected = onCardSelected,
-                                    onCollectiblesSelected = onSketchbookSelected,
-                                    statusIndicators = statusIndicators,
+                                    onCollectiblesSelected = onSketchbookSelected
                                 )
                             }
 
@@ -165,8 +162,7 @@ private fun PocketList(
     listState: LazyListState,
     collectiblesAvailable: Boolean,
     onCardSelected: (PocketCardUiModel) -> Unit,
-    onCollectiblesSelected: () -> Unit,
-    statusIndicators: @Composable () -> Unit,
+    onCollectiblesSelected: () -> Unit
 ) {
     val anchorIndex = cards.indexOfFirst { it.id == anchorCard?.id }
 
@@ -180,8 +176,7 @@ private fun PocketList(
         ) {
             PolkadotTopBar(
                 title = stringResource(RCommon.string.pocket_toolbar_title),
-                titleSize = TopBarTitleSize.Large,
-                trailingContent = statusIndicators,
+                titleSize = TopBarTitleSize.Large
             )
 
             LazyColumn(
@@ -278,8 +273,7 @@ private fun PocketScreenPreview() {
                 onShareId = {},
                 onSketchbookSelected = {},
                 onSketchbookDismissed = {},
-                onOpenCollectibles = {},
-                statusIndicators = {},
+                onOpenCollectibles = {}
             )
         }
     }

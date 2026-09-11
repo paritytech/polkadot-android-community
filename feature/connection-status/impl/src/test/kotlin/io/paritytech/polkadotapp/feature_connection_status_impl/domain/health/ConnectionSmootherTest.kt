@@ -64,6 +64,21 @@ class ConnectionSmootherTest {
     }
 
     @Test
+    fun `a settled disconnect repeated faster than the cooldown never reports disconnected`() = runTest {
+        val results = collectSmoothed()
+
+        source.emit(RawConnectivity.Connected)
+        advanceTimeBy(3_500); runCurrent()
+
+        repeat(10) {
+            source.emit(RawConnectivity.Settled); runCurrent()
+            advanceTimeBy(1_000); runCurrent()
+        }
+
+        assertEquals(ChainConnectionPresentation.Connecting, results.last())
+    }
+
+    @Test
     fun `flapping holds pending past the stability window`() = runTest {
         val results = collectSmoothed()
 

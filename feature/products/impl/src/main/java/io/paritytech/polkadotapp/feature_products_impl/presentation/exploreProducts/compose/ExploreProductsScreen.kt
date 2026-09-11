@@ -23,7 +23,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_products_impl.presentation.exploreProducts.ExploreProductsViewModel
 
 @Composable
-fun ExploreProductsScreen(statusIndicators: @Composable () -> Unit) {
+fun ExploreProductsScreen() {
     val viewModel = hiltViewModel<ExploreProductsViewModel>()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.resumeConnections() }
@@ -32,15 +32,13 @@ fun ExploreProductsScreen(statusIndicators: @Composable () -> Unit) {
     val webView by viewModel.webViewFlow.collectAsStateWithLifecycle()
 
     ExploreProductsScreenInternal(
-        webView = webView,
-        statusIndicators = statusIndicators,
+        webView = webView
     )
 }
 
 @Composable
 private fun ExploreProductsScreenInternal(
-    webView: WebView?,
-    statusIndicators: @Composable () -> Unit,
+    webView: WebView?
 ) {
     PolkadotSurface(
         modifier = Modifier.fillMaxSize(),
@@ -52,7 +50,6 @@ private fun ExploreProductsScreenInternal(
             PolkadotTopBar(
                 title = stringResource(R.string.bottom_nav_menu_explore),
                 titleSize = TopBarTitleSize.Large,
-                trailingContent = statusIndicators,
             )
 
             if (webView != null) {
@@ -70,8 +67,7 @@ private fun ExploreProductsScreenInternal(
 private fun ExploreProductsScreenPreview() {
     PolkadotTheme {
         ExploreProductsScreenInternal(
-            webView = null,
-            statusIndicators = {},
+            webView = null
         )
     }
 }

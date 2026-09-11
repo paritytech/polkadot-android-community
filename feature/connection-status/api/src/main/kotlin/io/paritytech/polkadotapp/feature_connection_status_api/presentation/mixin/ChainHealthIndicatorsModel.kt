@@ -2,9 +2,8 @@ package io.paritytech.polkadotapp.feature_connection_status_api.presentation.mix
 
 import androidx.compose.runtime.Immutable
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
-import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
-import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
 import kotlinx.collections.immutable.ImmutableList
+import kotlin.time.Duration
 
 /** Stable identity for a monitored chain's inner glyph; the widget maps each to a drawable. */
 enum class ChainGlyph {
@@ -27,20 +26,22 @@ sealed interface ChainHealthIndicator {
         val expectedBlocks: Int,
     ) : ChainHealthIndicator
 
-    /** Connected and producing blocks, but requests queue up. */
-    data class SlowConnection(
+    /** Connected and producing blocks, but requests are queuing up. */
+    data class ConnectionSpeed(
         val speed: Speed,
     ) : ChainHealthIndicator
 
     /** The socket is re-establishing. */
     data object Connecting : ChainHealthIndicator
 
-    /** No node responding, or a connected node that no longer answers requests. */
+    /** No node responding, a connected node that no longer answers, or a device with no internet. */
     data object Disconnected : ChainHealthIndicator
 
+    /** How far the chain has fallen from a speed that needs no comment; the band above these is [Healthy]. */
     enum class Speed {
-        Slow,
-        Unusable,
+        Good,
+        Fair,
+        Low,
     }
 }
 
@@ -54,7 +55,6 @@ data class ChainHealthItemModel(
     val chainId: ChainId,
     val chainName: String,
     val glyph: ChainGlyph,
-    val connection: ChainConnectionPresentation,
     val indicator: ChainHealthIndicator,
-    val readings: ImmutableList<ChainMetricReading>,
+    val expectedBlockTime: Duration,
 )
