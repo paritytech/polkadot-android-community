@@ -144,7 +144,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 61,
+    version = 62,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -275,6 +275,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 58, to = 59),
         // Add product_top_ups table (kept indefinitely and resumed on app start)
         AutoMigration(from = 59, to = 60),
+        // Add recycler_vouchers.enteredAt to preserve readiness timers across restarts
+        AutoMigration(from = 61, to = 62),
     ]
 )
 @TypeConverters(
