@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.math.BigInteger
 import javax.inject.Inject
+import kotlin.time.Instant
 
 interface VoucherRepository {
     suspend fun save(voucher: RecyclerVoucher)
@@ -100,7 +101,8 @@ class RealVoucherRepository @Inject constructor(
             RecyclerVoucherLocationUpdate(
                 ringVrfPublicKey = publicKey.value,
                 recyclerIndex = location.recyclerIndex.value.toInt(),
-                recyclerMembers = location.recyclerMembers
+                recyclerMembers = location.recyclerMembers,
+                enteredAt = location.enteredAt?.toEpochMilliseconds()
             )
         }
         recyclerVoucherDao.updateLocations(updates)
@@ -173,7 +175,8 @@ class RealVoucherRepository @Inject constructor(
 
         return RecyclerVoucher.Location.InRecycler(
             recyclerIndex = RecyclerIndex(index.toBigInteger()),
-            recyclerMembers = members
+            recyclerMembers = members,
+            enteredAt = enteredAt?.let(Instant::fromEpochMilliseconds)
         )
     }
 
@@ -186,6 +189,7 @@ class RealVoucherRepository @Inject constructor(
             recyclerValue = recyclerValue.value,
             locationRecyclerIndex = inRecycler?.recyclerIndex?.value?.toInt(),
             recyclerMembers = inRecycler?.recyclerMembers,
+            enteredAt = inRecycler?.enteredAt?.toEpochMilliseconds(),
         )
     }
 }

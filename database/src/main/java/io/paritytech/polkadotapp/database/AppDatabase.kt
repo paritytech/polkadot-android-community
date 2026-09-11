@@ -88,7 +88,7 @@ import io.paritytech.polkadotapp.database.migrations.Migration54To55Spec
 import io.paritytech.polkadotapp.database.migrations.Migration55To56
 import io.paritytech.polkadotapp.database.migrations.Migration57To58
 import io.paritytech.polkadotapp.database.migrations.Migration60To61
-import io.paritytech.polkadotapp.database.migrations.Migration61To62
+import io.paritytech.polkadotapp.database.migrations.Migration62To63
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
@@ -147,7 +147,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 62,
+    version = 63,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -279,6 +279,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 58, to = 59),
         // Add product_top_ups table (kept indefinitely and resumed on app start)
         AutoMigration(from = 59, to = 60),
+        // Add recycler_vouchers.enteredAt to preserve readiness timers across restarts
+        AutoMigration(from = 61, to = 62),
     ]
 )
 @TypeConverters(
@@ -329,7 +331,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration55To56(),
                 Migration57To58(),
                 Migration60To61(),
-                Migration61To62(),
+                Migration62To63(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }

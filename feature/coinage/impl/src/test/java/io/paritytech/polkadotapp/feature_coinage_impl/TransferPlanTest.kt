@@ -251,7 +251,7 @@ class TransferPlannerTest {
             ringVrfKeyIndex = testKey(voucherIndexCounter++),
             ringVrfPublicKey = mock(),
             recyclerValue = ValueExponent(exponent),
-            location = Location.InRecycler(index, recyclerMembers = FULL_RING),
+            location = Location.InRecycler(index, recyclerMembers = FULL_RING, enteredAt = null),
         )
     }
 

@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 // Rows already here were derived under the single `//0` page, which decodes to 32 zero bytes — exactly the id
 // they receive, so every key they name stays the key it was. Received coin inputs name no own key and keep a
 // null id, matching their null index.
-class Migration61To62 : Migration(61, 62) {
+class Migration62To63 : Migration(62, 63) {
     override fun migrate(db: SupportSQLiteDatabase) {
         recreate(
             db = db,
@@ -40,10 +40,11 @@ class Migration61To62 : Migration(61, 62) {
                     `recyclerValue` INTEGER NOT NULL,
                     `locationRecyclerIndex` INTEGER,
                     `recyclerMembers` INTEGER,
+                    `enteredAt` INTEGER,
                     PRIMARY KEY(`installationId`, `ringVrfKeyIndex`)
                 )
             """,
-            columns = "`ringVrfKeyIndex`, `ringVrfPublicKey`, `recyclerValue`, `locationRecyclerIndex`, `recyclerMembers`",
+            columns = "`ringVrfKeyIndex`, `ringVrfPublicKey`, `recyclerValue`, `locationRecyclerIndex`, `recyclerMembers`, `enteredAt`",
             installationValue = LEGACY_ZERO,
         )
 

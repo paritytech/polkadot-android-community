@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 62,
-    "identityHash": "d4f0c0d66d314b683bd27cc98c9b2e17",
+    "identityHash": "902ecca1b8c681aeb11902374340fd11",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -1662,14 +1662,8 @@
       },
       {
         "tableName": "coins",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `derivationIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `valueExponent` INTEGER NOT NULL, `ageValue` INTEGER, `onChain` INTEGER NOT NULL, PRIMARY KEY(`installationId`, `derivationIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`derivationIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `valueExponent` INTEGER NOT NULL, `ageValue` INTEGER, `onChain` INTEGER NOT NULL, PRIMARY KEY(`derivationIndex`))",
         "fields": [
-          {
-            "fieldPath": "installationId",
-            "columnName": "installationId",
-            "affinity": "BLOB",
-            "notNull": true
-          },
           {
             "fieldPath": "derivationIndex",
             "columnName": "derivationIndex",
@@ -1703,21 +1697,14 @@
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "installationId",
             "derivationIndex"
           ]
         }
       },
       {
         "tableName": "recycler_vouchers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, PRIMARY KEY(`installationId`, `ringVrfKeyIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `enteredAt` INTEGER, PRIMARY KEY(`ringVrfKeyIndex`))",
         "fields": [
-          {
-            "fieldPath": "installationId",
-            "columnName": "installationId",
-            "affinity": "BLOB",
-            "notNull": true
-          },
           {
             "fieldPath": "ringVrfKeyIndex",
             "columnName": "ringVrfKeyIndex",
@@ -1745,12 +1732,16 @@
             "fieldPath": "recyclerMembers",
             "columnName": "recyclerMembers",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "enteredAt",
+            "columnName": "enteredAt",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "installationId",
             "ringVrfKeyIndex"
           ]
         }
@@ -2791,50 +2782,8 @@
         ]
       },
       {
-        "tableName": "coinage_installations",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `isCurrent` INTEGER NOT NULL, `coinScanNextIndex` INTEGER NOT NULL, `voucherScanNextIndex` INTEGER NOT NULL, `initialScanCompleted` INTEGER NOT NULL, PRIMARY KEY(`installationId`))",
-        "fields": [
-          {
-            "fieldPath": "installationId",
-            "columnName": "installationId",
-            "affinity": "BLOB",
-            "notNull": true
-          },
-          {
-            "fieldPath": "isCurrent",
-            "columnName": "isCurrent",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "coinScanNextIndex",
-            "columnName": "coinScanNextIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "voucherScanNextIndex",
-            "columnName": "voucherScanNextIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "initialScanCompleted",
-            "columnName": "initialScanCompleted",
-            "affinity": "INTEGER",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "installationId"
-          ]
-        }
-      },
-      {
         "tableName": "coinage_entry_input",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`entryId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `assetKind` TEXT NOT NULL, `installationId` BLOB, `derivationIndex` INTEGER, `onChainKey` BLOB NOT NULL, PRIMARY KEY(`entryId`, `position`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`entryId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `assetKind` TEXT NOT NULL, `derivationIndex` INTEGER, `onChainKey` BLOB NOT NULL, PRIMARY KEY(`entryId`, `position`))",
         "fields": [
           {
             "fieldPath": "entryId",
@@ -2853,11 +2802,6 @@
             "columnName": "assetKind",
             "affinity": "TEXT",
             "notNull": true
-          },
-          {
-            "fieldPath": "installationId",
-            "columnName": "installationId",
-            "affinity": "BLOB"
           },
           {
             "fieldPath": "derivationIndex",
@@ -2901,7 +2845,7 @@
       },
       {
         "tableName": "coinage_entry_output",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`entryId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `assetKind` TEXT NOT NULL, `installationId` BLOB NOT NULL, `derivationIndex` INTEGER NOT NULL, `onChainKey` BLOB NOT NULL, PRIMARY KEY(`entryId`, `position`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`entryId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `assetKind` TEXT NOT NULL, `derivationIndex` INTEGER NOT NULL, `onChainKey` BLOB NOT NULL, PRIMARY KEY(`entryId`, `position`))",
         "fields": [
           {
             "fieldPath": "entryId",
@@ -2919,12 +2863,6 @@
             "fieldPath": "assetKind",
             "columnName": "assetKind",
             "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "installationId",
-            "columnName": "installationId",
-            "affinity": "BLOB",
             "notNull": true
           },
           {
@@ -2967,21 +2905,20 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_coinage_entry_output_entryId` ON `${TABLE_NAME}` (`entryId`)"
           },
           {
-            "name": "index_coinage_entry_output_assetKind_installationId_derivationIndex",
+            "name": "index_coinage_entry_output_assetKind_derivationIndex",
             "unique": false,
             "columnNames": [
               "assetKind",
-              "installationId",
               "derivationIndex"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_coinage_entry_output_assetKind_installationId_derivationIndex` ON `${TABLE_NAME}` (`assetKind`, `installationId`, `derivationIndex`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_coinage_entry_output_assetKind_derivationIndex` ON `${TABLE_NAME}` (`assetKind`, `derivationIndex`)"
           }
         ]
       },
       {
         "tableName": "coinage_handoff",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`onChainKey` BLOB NOT NULL, `assetKind` TEXT NOT NULL, `installationId` BLOB NOT NULL, `derivationIndex` INTEGER NOT NULL, `committed` INTEGER NOT NULL, PRIMARY KEY(`onChainKey`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`onChainKey` BLOB NOT NULL, `assetKind` TEXT NOT NULL, `derivationIndex` INTEGER NOT NULL, `committed` INTEGER NOT NULL, PRIMARY KEY(`onChainKey`))",
         "fields": [
           {
             "fieldPath": "onChainKey",
@@ -2993,12 +2930,6 @@
             "fieldPath": "assetKind",
             "columnName": "assetKind",
             "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "installationId",
-            "columnName": "installationId",
-            "affinity": "BLOB",
             "notNull": true
           },
           {
@@ -3022,15 +2953,14 @@
         },
         "indices": [
           {
-            "name": "index_coinage_handoff_assetKind_installationId_derivationIndex",
+            "name": "index_coinage_handoff_assetKind_derivationIndex",
             "unique": false,
             "columnNames": [
               "assetKind",
-              "installationId",
               "derivationIndex"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_coinage_handoff_assetKind_installationId_derivationIndex` ON `${TABLE_NAME}` (`assetKind`, `installationId`, `derivationIndex`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_coinage_handoff_assetKind_derivationIndex` ON `${TABLE_NAME}` (`assetKind`, `derivationIndex`)"
           }
         ]
       },
@@ -3084,7 +3014,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd4f0c0d66d314b683bd27cc98c9b2e17')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '902ecca1b8c681aeb11902374340fd11')"
     ]
   }
 }
