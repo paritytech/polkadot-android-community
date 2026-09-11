@@ -78,7 +78,6 @@ fun DigitalDollarCardDetails(
         onAutoFundClick = viewModel::onAutoFundClick,
         onDetailsToggled = viewModel::onDetailsToggled,
         onKeyToggled = viewModel::onKeyToggled,
-        onMakeVouchersReadyClick = viewModel::onMakeVouchersReadyClick,
         onShareLogsClick = viewModel::onShareLogsClick,
         onBackupUpdateClick = viewModel::onBackupUpdateClick,
         onBackupCloseClick = viewModel::onBackupCloseClick
@@ -97,7 +96,6 @@ private fun DigitalDollarCardDetailsContent(
     onAutoFundClick: () -> Unit,
     onDetailsToggled: () -> Unit,
     onKeyToggled: () -> Unit,
-    onMakeVouchersReadyClick: () -> Unit,
     onShareLogsClick: () -> Unit,
     onBackupUpdateClick: () -> Unit,
     onBackupCloseClick: () -> Unit
@@ -178,7 +176,6 @@ private fun DigitalDollarCardDetailsContent(
                         onAutoFundClick = onAutoFundClick,
                         onDetailsToggled = onDetailsToggled,
                         onKeyToggled = onKeyToggled,
-                        onMakeVouchersReadyClick = onMakeVouchersReadyClick,
                         onShareLogsClick = onShareLogsClick
                     )
                 }
@@ -284,7 +281,6 @@ private fun DigitalDollarCardDetailsPreview() {
                 onAutoFundClick = {},
                 onDetailsToggled = {},
                 onKeyToggled = {},
-                onMakeVouchersReadyClick = {},
                 onShareLogsClick = {},
                 onBackupUpdateClick = {},
                 onBackupCloseClick = {}

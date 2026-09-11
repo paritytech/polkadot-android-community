@@ -126,7 +126,7 @@ class CoinPresenceSyncServiceTest {
         startSync()
 
         assertEquals(
-            listOf(Hop.Transfer(bundleSize = 1), Hop.Transfer(bundleSize = 1), Hop.Transfer(bundleSize = 4)),
+            listOf(Hop.Transfer.of(bundleSize = 1), Hop.Transfer.of(bundleSize = 1), Hop.Transfer.of(bundleSize = 4)),
             hopsWritten.flatMap { it.values }.single()
         )
     }

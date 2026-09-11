@@ -17,7 +17,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetPr
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.CoinageHoldingsInfo
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.toHoldingsInfo
-import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.withAllVouchersReady
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -47,9 +46,9 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
      * Deliberately not two streams: the composition bar is a picture of the same numbers printed above it,
      * so reading them a tick apart is the one way they could ever disagree.
      */
-    fun observeHoldings(forceVouchersReady: Boolean): Flow<Result<CoinageHoldingsInfo>> =
+    fun observeHoldings(): Flow<Result<CoinageHoldingsInfo>> =
         coinageHoldingsUseCase.subscribeHoldings()
-            .map { holdingsInfoOf(it, forceVouchersReady) }
+            .map { holdingsInfoOf(it) }
             .logFailure("DigitalDollarCardDetailsInteractor: Failed to classify coinage holdings")
 
     fun observeActionsEnabled(): Flow<Boolean> = coinageBackupService.subscribeProgress()
@@ -78,13 +77,8 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
 
     private fun BackupProgress.actionsEnabled() = this !is BackupProgress.Initial && this !is BackupProgress.Deep
 
-    private suspend fun holdingsInfoOf(
-        holdings: CoinageHoldings,
-        forceVouchersReady: Boolean
-    ): Result<CoinageHoldingsInfo> =
+    private suspend fun holdingsInfoOf(holdings: CoinageHoldings): Result<CoinageHoldingsInfo> =
         coinageBalanceConverterUseCase.create().map { conversion ->
-            val classified = if (forceVouchersReady) holdings.withAllVouchersReady() else holdings
-
-            with(conversion) { classified.toHoldingsInfo() }
+            with(conversion) { holdings.toHoldingsInfo() }
         }
 }

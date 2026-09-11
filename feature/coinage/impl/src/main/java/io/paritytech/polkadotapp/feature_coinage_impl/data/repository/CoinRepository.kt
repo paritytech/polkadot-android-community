@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.common.data.memory.SingleValueCache
 import io.paritytech.polkadotapp.common.data.memory.getCatching
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.database.dao.CoinDao
 import io.paritytech.polkadotapp.database.dao.CoinHopsUpdateLocal
@@ -209,7 +210,11 @@ class RealCoinRepository @Inject constructor(
             accountId = accountId.intoAccountId(),
             provenance = CoinProvenance(
                 recyclerFungibility = recyclerFungibility?.let(RecyclerFungibility::ofPercent),
-                hops = hops.decodeCoinHops(),
+                // A corrupt blob costs one details row its circles; failing here would take down the balance
+                // stream this mapper sits inside, so the row is drawn as though the coin had no history.
+                hops = hops.decodeCoinHops()
+                    .logFailure("Can't decode hops of coin $derivationIndex")
+                    .getOrDefault(emptyList()),
                 incomingBundleSize = incomingBundleSize,
             )
         )

@@ -18,20 +18,6 @@ data class CoinageHoldingsInfo(
     val holdings: List<CoinageHolding>
 )
 
-/**
- * Moves every voucher that is gaining privacy into the usable bucket.
- *
- * Applied before the balance is computed rather than to the rows afterwards, so the figures, the bar and the
- * row colours all move together — a debug switch that made the list disagree with the total above it would
- * be worse than no switch.
- */
-fun CoinageHoldings.withAllVouchersReady(): CoinageHoldings = copy(
-    vouchers = vouchers.copy(
-        usable = vouchers.usable + vouchers.gainingPrivacy,
-        gainingPrivacy = emptyList()
-    )
-)
-
 /** Both halves of what the card shows, from one classification — see [CoinageHoldingsInfo]. */
 context(conversion: CoinageBalanceConversionContext)
 fun CoinageHoldings.toHoldingsInfo() = CoinageHoldingsInfo(

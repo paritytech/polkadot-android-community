@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -39,22 +38,13 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     private val fundInProgress = MutableStateFlow(false)
 
     /**
-     * Null when the real wallet is on show. A fresh seed each time the toggle is switched on, which is what
-     * re-randomises the data rather than showing the same invented wallet again.
-     */
-    private val vouchersForcedReady = MutableStateFlow(false)
-
-    /**
      * Owned here rather than remembered in the card, so an expanded key or details list outlives the
      * holdings updating underneath it.
      */
     private val detailsVisible = MutableStateFlow(false)
     private val keyVisible = MutableStateFlow(false)
 
-    private val holdingsFlow: Flow<Result<CoinageHoldingsInfo>> =
-        vouchersForcedReady.flatMapLatest { forceReady ->
-            interactor.observeHoldings(forceVouchersReady = forceReady)
-        }
+    private val holdingsFlow: Flow<Result<CoinageHoldingsInfo>> = interactor.observeHoldings()
 
     private val cardToggles = combine(detailsVisible, keyVisible, ::Pair)
 
@@ -126,10 +116,6 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
 
     fun onKeyToggled() {
         keyVisible.value = !keyVisible.value
-    }
-
-    fun onMakeVouchersReadyClick() {
-        vouchersForcedReady.value = true
     }
 
     fun onShareLogsClick() = launchUnit {

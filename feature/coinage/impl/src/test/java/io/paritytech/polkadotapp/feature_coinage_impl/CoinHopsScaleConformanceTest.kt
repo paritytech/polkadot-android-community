@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Hop
 import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.decodeCoinHops
 import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.encodeCoinHops
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -26,19 +27,24 @@ class CoinHopsScaleConformanceTest {
 
     @Test
     fun `stored hops decode back to what was written`() {
-        assertEquals(mixedHops, MIXED_HOPS.fromHex().decodeCoinHops())
-        assertEquals(emptyList<Hop>(), EMPTY_HOPS.fromHex().decodeCoinHops())
+        assertEquals(mixedHops, MIXED_HOPS.fromHex().decodeCoinHops().getOrThrow())
+        assertEquals(emptyList<Hop>(), EMPTY_HOPS.fromHex().decodeCoinHops().getOrThrow())
     }
 
-    /** A column that predates the hops blob, and a row whose blob failed to write, are both "no hops". */
+    /** A column that predates the hops blob is "no hops" rather than a failure. */
     @Test
-    fun `an absent or unreadable blob decodes as no hops`() {
-        assertEquals(emptyList<Hop>(), null.decodeCoinHops())
-        assertEquals(emptyList<Hop>(), byteArrayOf().decodeCoinHops())
-        assertEquals(emptyList<Hop>(), byteArrayOf(0x7f, 0x7f, 0x7f).decodeCoinHops())
+    fun `an absent blob decodes as no hops`() {
+        assertEquals(emptyList<Hop>(), null.decodeCoinHops().getOrThrow())
+        assertEquals(emptyList<Hop>(), byteArrayOf().decodeCoinHops().getOrThrow())
     }
 
-    private val mixedHops = listOf(Hop.Transfer(bundleSize = 1), Hop.Split(fanout = 3), Hop.Transfer(bundleSize = 255))
+    /** Corruption is reported rather than swallowed: what to do about it is the caller's decision. */
+    @Test
+    fun `an unreadable blob decodes as a failure`() {
+        assertTrue(byteArrayOf(0x7f, 0x7f, 0x7f).decodeCoinHops().isFailure)
+    }
+
+    private val mixedHops = listOf(Hop.Transfer.of(bundleSize = 1), Hop.Split.of(fanout = 3), Hop.Transfer.of(bundleSize = 255))
 
     private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
 

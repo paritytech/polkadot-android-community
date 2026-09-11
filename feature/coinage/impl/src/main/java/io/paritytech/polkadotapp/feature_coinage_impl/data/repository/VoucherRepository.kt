@@ -9,7 +9,9 @@ import io.paritytech.polkadotapp.chains.storage.source.query.metadata
 import io.paritytech.polkadotapp.chains.storage.source.queryCatching
 import io.paritytech.polkadotapp.chains.storage.source.subscribeCatching
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.utils.ensureKeysWithDefault
 import io.paritytech.polkadotapp.common.utils.mapList
+import io.paritytech.polkadotapp.common.utils.mapValuesNotNull
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherLocationUpdate
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
@@ -22,9 +24,9 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.filterInRecycler
+import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.RecyclerStorageKey
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclerAliasStates
-import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclerStorageKey
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclersCoinToRecycler
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.recyclersUnloadedCount
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.queryPerInstallation
@@ -143,7 +145,7 @@ class RealVoucherRepository @Inject constructor(
 
         val instanceIdKey = instanceId.toLong().toBigInteger()
         val byStorageKey = keys.associateBy { key ->
-            recyclerStorageKey(
+            RecyclerStorageKey(
                 instanceId = instanceIdKey,
                 denomination = key.exponent.value.toBigInteger(),
                 ringIndex = key.recyclerIndex.value
@@ -155,9 +157,9 @@ class RealVoucherRepository @Inject constructor(
         }.map { result ->
             result.map { counts ->
                 // Absent means nothing has been unloaded, so every requested key still gets an answer.
-                byStorageKey.entries.associate { (storageKey, recyclerKey) ->
-                    recyclerKey to (counts[storageKey]?.toInt() ?: 0)
-                }
+                counts.mapValuesNotNull { (_, count) -> count?.toInt() }
+                    .ensureKeysWithDefault(byStorageKey.keys, default = NOTHING_UNLOADED)
+                    .mapKeys { (storageKey, _) -> byStorageKey.getValue(storageKey) }
             }
         }
     }
@@ -251,3 +253,6 @@ class RealVoucherRepository @Inject constructor(
         )
     }
 }
+
+/** A recycler the runtime holds no counter for has had nothing unloaded from it. */
+private const val NOTHING_UNLOADED = 0

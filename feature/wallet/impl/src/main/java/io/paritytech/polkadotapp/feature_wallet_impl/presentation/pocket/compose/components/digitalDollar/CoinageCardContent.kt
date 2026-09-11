@@ -17,7 +17,6 @@ fun CoinageCardContent(
     onAutoFundClick: () -> Unit,
     onDetailsToggled: () -> Unit,
     onKeyToggled: () -> Unit,
-    onMakeVouchersReadyClick: () -> Unit,
     onShareLogsClick: () -> Unit
 ) {
     Column {
@@ -41,7 +40,6 @@ fun CoinageCardContent(
                 onDetailsToggled = onDetailsToggled,
                 onKeyToggled = onKeyToggled,
                 shareLogsEnabled = state.shareLogsEnabled,
-                onMakeVouchersReadyClick = onMakeVouchersReadyClick,
                 onShareLogsClick = onShareLogsClick
             )
         }

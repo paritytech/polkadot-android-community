@@ -64,7 +64,6 @@ internal fun CoinageStateCard(
     shareLogsEnabled: Boolean,
     onDetailsToggled: () -> Unit,
     onKeyToggled: () -> Unit,
-    onMakeVouchersReadyClick: () -> Unit,
     onShareLogsClick: () -> Unit
 ) {
     val colors = rememberHoldingColors()
@@ -100,15 +99,8 @@ internal fun CoinageStateCard(
 
             CategoryLegend(state = state, stripePhase = stripePhase, colors = colors)
 
-            PolkadotTextButton(
-                modifier = Modifier.fillMaxWidth(),
-                text = stringResource(RCommon.string.pocket_coinage_make_vouchers_ready),
-                style = PolkadotButtonStyle.secondary(),
-                onClick = onMakeVouchersReadyClick
-            )
-
-            // Beside the other debug action rather than at the foot of the card: everything below this is
-            // the details disclosure, and a button after it would move whenever the list opened.
+            // Above the details disclosure rather than at the foot of the card: everything below this is
+            // the disclosure, and a button after it would move whenever the list opened.
             if (shareLogsEnabled) {
                 PolkadotTextButton(
                     modifier = Modifier.fillMaxWidth(),
@@ -293,7 +285,6 @@ private fun CoinageStateCardPreview() {
                 shareLogsEnabled = true,
                 onDetailsToggled = {},
                 onKeyToggled = {},
-                onMakeVouchersReadyClick = {},
                 onShareLogsClick = {}
             )
         }
