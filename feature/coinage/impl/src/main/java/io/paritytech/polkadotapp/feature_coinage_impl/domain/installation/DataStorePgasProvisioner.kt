@@ -10,10 +10,14 @@ import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleC
 import io.paritytech.polkadotapp.feature_pgas_api.domain.OnExistingAllocationStrategy
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasChainAssetProvider
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasClaimer
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.minutes
 
 class DataStorePgasShortError(required: Balance, available: Balance) :
     Exception("Data store account holds $available PGAS after a top-up, $required required")
+
+class DataStorePgasClaimTimeoutError : Exception("PGAS claim did not report back in time")
 
 // The data store account pays both the fee and the storage deposit in PGAS. Claiming takes a ring proof, so a
 // claim waits for this person to be included in the ring first — a fresh account simply waits here.
@@ -49,8 +53,17 @@ class DataStorePgasProvisioner @Inject constructor(
         val collection = activePeopleCollectionUseCase.getActivePeopleCollection()
 
         return peopleCheckMemberInRingUseCase.awaitIncluded(collection).flatMap {
-            with(StalenessReportCollector.NoOp) { pgasClaimer.claim(account, strategy) }
+            // The claim waits for inclusion with no bound of its own, and a status stream that goes quiet would hold
+            // the registration forever. Giving up is safe: a retry reads the balance first, and a claim for the same
+            // slot proves the same alias, which the chain accepts once.
+            withTimeoutOrNull(CLAIM_TIMEOUT) {
+                with(StalenessReportCollector.NoOp) { pgasClaimer.claim(account, strategy) }
+            } ?: Result.failure(DataStorePgasClaimTimeoutError())
         }
+    }
+
+    private companion object {
+        val CLAIM_TIMEOUT = 2.minutes
     }
 
     private suspend fun pgasBalance(account: AccountId): Result<Balance> = runCatching {

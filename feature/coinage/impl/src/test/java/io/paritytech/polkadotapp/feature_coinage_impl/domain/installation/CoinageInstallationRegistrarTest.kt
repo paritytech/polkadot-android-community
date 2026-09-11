@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.installation
 
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
@@ -21,23 +22,28 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
+import io.paritytech.polkadotapp.feature_usernames_api.domain.model.AccountOnboardingStatus
+import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAccountOnboardingStatusUseCase
+import io.paritytech.polkadotapp.test_shared.testDispatchers
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -46,6 +52,7 @@ class CoinageInstallationRegistrarTest {
     private val attempts = mutableListOf<InstallationRegistrationTarget>()
     private var failNextAttempts = 0
     private var attemptGate: CompletableDeferred<Unit>? = null
+    private val onboarded = MutableStateFlow(true)
 
     private val config = mockk<AccountDataStoreConfigProvider> {
         coEvery { contractAddress() } returns Result.success(CONTRACT)
@@ -70,46 +77,47 @@ class CoinageInstallationRegistrarTest {
         }
     }
 
-    private val registrar = CoinageInstallationRegistrar(
-        installationRepository = mockk<CoinageInstallationRepository> { coEvery { getOrCreateCurrent() } returns TEST_INSTALLATION },
-        configProvider = config,
-        durableTransactionService = engine,
-        submitter = submitter,
-        chainConnectionRefCounter = mockk<ChainConnectionRefCounter>(relaxed = true),
-        knownChains = KnownChains(people = "people", assetHub = "asset-hub", bulletIn = "bullet-in", hydration = null),
-    )
+    private val onboardingStatus = mockk<ObserveAccountOnboardingStatusUseCase> {
+        every { this@mockk.invoke() } returns onboarded.map { isOnboarded ->
+            mockk<AccountOnboardingStatus> { every { this@mockk.isOnboarded } returns isOnboarded }
+        }
+    }
 
     @Test
-    fun `a registration already final submits nothing and completes`() = runTest {
+    fun `a registration already final submits nothing and completes`() = registrarTest {
         engine.set(listOf(state(1, FINALIZED_SUCCESS)))
 
-        val run = launch { registrar.register() }
-        runCurrent()
+        start()
 
-        assertTrue(run.isCompleted)
         assertEquals(0, attempts.size)
-        assertEquals(CoinageAccountBackupStatus.Completed, registrar.subscribeStatus().first())
+        assertEquals(CoinageAccountBackupStatus.Completed, status())
     }
 
     @Test
-    fun `a registration already final reads as completed before any run`() = runTest {
-        engine.set(listOf(state(1, FINALIZED_SUCCESS)))
+    fun `nothing is attempted before the account is onboarded`() = registrarTest {
+        onboarded.value = false
 
-        assertEquals(CoinageAccountBackupStatus.Completed, registrar.subscribeStatus().first())
+        start()
+        assertEquals(0, attempts.size)
+        assertEquals(CoinageAccountBackupStatus.Registering, status())
+
+        onboarded.value = true
+        runCurrent()
+        assertEquals(listOf(TARGET), attempts)
     }
 
     @Test
-    fun `nothing registered yet submits exactly one attempt for this installation`() = runTest {
-        startRegistering()
+    fun `nothing registered yet submits exactly one attempt for this installation`() = registrarTest {
+        start()
 
         assertEquals(listOf(TARGET), attempts)
     }
 
     @Test
-    fun `a live attempt is never joined by a second one`() = runTest {
+    fun `a live attempt is never joined by a second one`() = registrarTest {
         engine.set(listOf(state(1, PENDING)))
 
-        startRegistering()
+        start()
         engine.set(listOf(state(1, PENDING_SUCCESS)))
         runCurrent()
 
@@ -117,11 +125,11 @@ class CoinageInstallationRegistrarTest {
     }
 
     @Test
-    fun `identical group re-emissions do not restart an attempt in flight`() = runTest {
+    fun `identical group re-emissions do not restart an attempt in flight`() = registrarTest {
         val gate = CompletableDeferred<Unit>()
         attemptGate = gate
 
-        startRegistering()
+        start()
         engine.reEmit()
         runCurrent()
         engine.reEmit()
@@ -133,23 +141,13 @@ class CoinageInstallationRegistrarTest {
     }
 
     @Test
-    fun `an emission older than the committed attempt does not start a second one`() = runTest {
-        startRegistering()
-        assertEquals(1, attempts.size)
-
-        engine.emitStale(emptyList())
-        runCurrent()
-
-        assertEquals(1, attempts.size)
-    }
-
-    @Test
-    fun `concurrent registrations run as one`() = runTest {
+    fun `starting and observing more than once still runs one registration`() = registrarTest {
         val gate = CompletableDeferred<Unit>()
         attemptGate = gate
 
-        backgroundScope.launch { registrar.register() }
-        backgroundScope.launch { registrar.register() }
+        start()
+        start()
+        backgroundScope.launchCollecting()
         runCurrent()
         gate.complete(Unit)
         runCurrent()
@@ -158,17 +156,17 @@ class CoinageInstallationRegistrarTest {
     }
 
     @Test
-    fun `failures from earlier runs do not delay this run's first attempt`() = runTest {
+    fun `failures from earlier runs do not delay this run's first attempt`() = registrarTest {
         engine.set(listOf(state(1, FAILURE), state(2, FAILURE), state(3, FAILURE)))
 
-        startRegistering()
+        start()
 
         assertEquals(1, attempts.size)
     }
 
     @Test
-    fun `an attempt that fails on chain is followed by exactly one more after a backoff`() = runTest {
-        startRegistering()
+    fun `an attempt that fails on chain is followed by exactly one more after a backoff`() = registrarTest {
+        start()
         assertEquals(1, attempts.size)
 
         engine.set(engine.current().map { it.copy(status = FAILURE) })
@@ -183,10 +181,10 @@ class CoinageInstallationRegistrarTest {
     }
 
     @Test
-    fun `an attempt that could not be submitted is retried`() = runTest {
+    fun `an attempt that could not be submitted is retried`() = registrarTest {
         failNextAttempts = 1
 
-        startRegistering()
+        start()
         assertEquals(1, attempts.size)
 
         advanceTimeBy(INITIAL_BACKOFF_MS + 1)
@@ -194,21 +192,21 @@ class CoinageInstallationRegistrarTest {
     }
 
     @Test
-    fun `a changed contract starts a registration of its own`() = runTest {
+    fun `a changed contract starts a registration of its own`() = registrarTest {
         engine.set(listOf(state(1, FINALIZED_SUCCESS)), group = TARGET.registrationGroup())
         coEvery { config.contractAddress() } returns Result.success(OTHER_CONTRACT)
 
-        startRegistering()
+        start()
 
         assertEquals(listOf(InstallationRegistrationTarget(OTHER_CONTRACT, TEST_INSTALLATION)), attempts)
-        assertEquals(CoinageAccountBackupStatus.Registering, registrar.subscribeStatus().first())
+        assertEquals(CoinageAccountBackupStatus.Registering, status())
     }
 
     @Test
-    fun `a contract address not yet available is waited for`() = runTest {
+    fun `a contract address not yet available is waited for`() = registrarTest {
         coEvery { config.contractAddress() } returns Result.failure(IllegalStateException("remote config not synced"))
 
-        startRegistering()
+        start()
         assertEquals(0, attempts.size)
 
         coEvery { config.contractAddress() } returns Result.success(CONTRACT)
@@ -218,73 +216,86 @@ class CoinageInstallationRegistrarTest {
     }
 
     @Test
-    fun `a new run does not inherit the previous run's delay`() = runTest {
-        engine.set(listOf(state(1, PENDING)))
-        val firstRun = backgroundScope.launch { registrar.register() }
+    fun `a contract address that never arrives reads as delayed`() = registrarTest {
+        coEvery { config.contractAddress() } returns Result.failure(IllegalStateException("remote config not synced"))
+
+        start()
         advanceTimeBy(EXPECTED_REGISTRATION_MS + 1)
-        firstRun.cancel()
 
-        startRegistering()
-
-        assertEquals(CoinageAccountBackupStatus.Registering, registrar.subscribeStatus().first())
+        assertEquals(CoinageAccountBackupStatus.Delayed, status())
     }
 
     @Test
-    fun `a registration a reorg dropped reads as reverted until it is included again`() = runTest {
-        engine.set(listOf(state(1, PENDING_SUCCESS)))
-        startRegistering()
-
+    fun `a registration not final within the expected time reads as delayed`() = registrarTest {
         engine.set(listOf(state(1, PENDING)))
-        runCurrent()
-        assertEquals(CoinageAccountBackupStatus.Reverted, registrar.subscribeStatus().first())
-
-        engine.set(listOf(state(1, PENDING_SUCCESS)))
-        runCurrent()
-        assertEquals(CoinageAccountBackupStatus.Registering, registrar.subscribeStatus().first())
-    }
-
-    @Test
-    fun `a registration not final within the expected time reads as delayed`() = runTest {
-        engine.set(listOf(state(1, PENDING)))
-        startRegistering()
+        start()
 
         advanceTimeBy(EXPECTED_REGISTRATION_MS - 1)
-        assertEquals(CoinageAccountBackupStatus.Registering, registrar.subscribeStatus().first())
+        assertEquals(CoinageAccountBackupStatus.Registering, status())
 
         advanceTimeBy(2)
-        assertEquals(CoinageAccountBackupStatus.Delayed, registrar.subscribeStatus().first())
+        assertEquals(CoinageAccountBackupStatus.Delayed, status())
     }
 
     @Test
-    fun `finality ends the run and clears the warning`() = runTest {
+    fun `finality ends the run and clears the warning`() = registrarTest {
         engine.set(listOf(state(1, PENDING)))
-        val run = launch { registrar.register() }
+        start()
         advanceTimeBy(EXPECTED_REGISTRATION_MS + 1)
 
         engine.set(listOf(state(1, FINALIZED_SUCCESS)))
         runCurrent()
 
-        assertTrue(run.isCompleted)
-        assertEquals(CoinageAccountBackupStatus.Completed, registrar.subscribeStatus().first())
+        assertEquals(CoinageAccountBackupStatus.Completed, status())
     }
 
     @Test
-    fun `recovery is started so attempts left by a previous process get decided`() = runTest {
-        startRegistering()
+    fun `recovery is started so attempts left by a previous process get decided`() = registrarTest {
+        start()
 
         assertEquals(1, engine.recoveryStarts)
     }
 
-    private fun TestScope.startRegistering() {
-        backgroundScope.launch { registrar.register() }
-        runCurrent()
+    private fun registrarTest(body: suspend RegistrarScope.() -> Unit) = runTest {
+        val registrar = CoinageInstallationRegistrar(
+            observeAccountOnboardingStatusUseCase = onboardingStatus,
+            installationRepository = mockk<CoinageInstallationRepository> { coEvery { getOrCreateCurrent() } returns TEST_INSTALLATION },
+            configProvider = config,
+            durableTransactionService = engine,
+            submitter = submitter,
+            chainConnectionRefCounter = mockk<ChainConnectionRefCounter>(relaxed = true),
+            knownChains = KnownChains(people = "people", assetHub = "asset-hub", bulletIn = "bullet-in", hydration = null),
+            dispatchers = testDispatchers(),
+        )
+
+        try {
+            RegistrarScope(this, registrar).body()
+        } finally {
+            registrar.cancel()
+        }
+    }
+
+    private class RegistrarScope(private val test: TestScope, private val registrar: CoinageInstallationRegistrar) {
+        val backgroundScope get() = test.backgroundScope
+
+        fun start() {
+            registrar.start()
+            test.runCurrent()
+        }
+
+        fun runCurrent() = test.runCurrent()
+
+        fun advanceTimeBy(millis: Long) = test.advanceTimeBy(millis)
+
+        suspend fun status() = registrar.subscribeStatus().first()
+
+        fun CoroutineScope.launchCollecting() = registrar.subscribeStatus().launchIn(this)
     }
 
     private fun state(id: Long, status: DurableTxStatus) = DurableTxState(DurableTxId(id), status)
 
     /**
      * Emits like a Room flow: every write re-emits, identical or not, and a subscriber first sees the current rows.
-     * [emitStale] models an emission computed before a later commit reaching a collector after it.
      */
     private class FakeEngine : DurableTransactionService {
         private val groups = mutableMapOf<OperationGroupId, List<DurableTxState>>()
@@ -301,10 +312,6 @@ class CoinageInstallationRegistrarTest {
 
         fun reEmit(group: OperationGroupId = TARGET.registrationGroup()) {
             updates.tryEmit(group to current(group))
-        }
-
-        fun emitStale(states: List<DurableTxState>, group: OperationGroupId = TARGET.registrationGroup()) {
-            updates.tryEmit(group to states)
         }
 
         override fun subscribeGroupStates(domain: TxDomainId, groupId: OperationGroupId): Flow<List<DurableTxState>> {

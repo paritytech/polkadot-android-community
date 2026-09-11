@@ -8,14 +8,11 @@ package io.paritytech.polkadotapp.feature_coinage_api.domain.model
 sealed interface CoinageAccountBackupStatus {
     data object Registering : CoinageAccountBackupStatus
 
-    /** Not final within the expected time. */
+    /** Not final within the expected time, or a reorg dropped it after it was included. */
     data object Delayed : CoinageAccountBackupStatus
-
-    /** Was included, then a reorg dropped it; it is being registered again. */
-    data object Reverted : CoinageAccountBackupStatus
 
     data object Completed : CoinageAccountBackupStatus
 }
 
 val CoinageAccountBackupStatus.needsAttention: Boolean
-    get() = this is CoinageAccountBackupStatus.Delayed || this is CoinageAccountBackupStatus.Reverted
+    get() = this is CoinageAccountBackupStatus.Delayed

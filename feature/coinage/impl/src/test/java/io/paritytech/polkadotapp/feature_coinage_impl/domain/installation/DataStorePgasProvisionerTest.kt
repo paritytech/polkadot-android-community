@@ -19,6 +19,9 @@ import io.paritytech.polkadotapp.feature_pgas_api.domain.OnExistingAllocationStr
 import io.paritytech.polkadotapp.feature_pgas_api.domain.OnExistingAllocationStrategy.INCREASE
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasChainAssetProvider
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasClaimer
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,12 +35,14 @@ class DataStorePgasProvisionerTest {
     private val collections = mockk<ActivePeopleCollectionUseCase>()
     private val ring = mockk<PeopleCheckMemberInRingUseCase>()
     private val claims = mutableListOf<Pair<AccountId, OnExistingAllocationStrategy>>()
+    private var claimNeverReportsBack = false
 
     // mockk resolves a Result return through kotlin-reflect, which rejects context-parameter functions.
     private val claimer = object : PgasClaimer {
         context(diagnostics: StalenessReportCollector)
         override suspend fun claim(destinationAccountId: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit> {
             claims += destinationAccountId to strategy
+            if (claimNeverReportsBack) awaitCancellation()
             balance += topUp
             return Result.success(Unit)
         }
@@ -123,7 +128,20 @@ class DataStorePgasProvisionerTest {
         assertTrue(claims.isEmpty())
     }
 
+    @Test
+    fun `a claim that never reports back fails the attempt instead of holding it forever`() = runTest {
+        claimNeverReportsBack = true
+
+        val result = async { provisioner.ensureCovers(ACCOUNT, REQUIRED) }
+        advanceTimeBy(CLAIM_TIMEOUT_MS + 1)
+
+        assertTrue("the attempt is still waiting on the claim", result.isCompleted)
+        assertTrue(result.await().isFailure)
+    }
+
     private companion object {
+        const val CLAIM_TIMEOUT_MS = 2 * 60_000L
+
         val ACCOUNT = ByteArray(32) { 0x0a }.intoAccountId()
         val REQUIRED: Balance = 500_000_000.intoBalance()
         val CLAIM_AMOUNT: Balance = 10_000_000_000L.intoBalance()

@@ -27,10 +27,10 @@ class RealCoinageServiceStarter @Inject constructor(
         scope.launch { coinPresenceSyncService.start() }
         scope.launch { voucherLocationService.start() }
         coinRecyclingEvaluator.start()
+        installationRegistrar.start()
         scope.launch {
             observeAccountOnboardingStatusUseCase().filter { it.isOnboarded }.first()
             coinageBackupService.start()
-            launch { installationRegistrar.register() }
         }
         scope.launch {
             // A reservation that never became a payment: its keys never left, so the assets come back.
