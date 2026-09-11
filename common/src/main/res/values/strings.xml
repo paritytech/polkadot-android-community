@@ -1223,7 +1223,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="asset_details_transfer_button">Transfer</string>
     <string name="asset_details_actions_disabled">Actions will be available after you finish updating your balance</string>
     <string name="asset_details_backup_in_progress">Updating balance</string>
-    <string name="pocket_digital_dollar_account_backup_pending">Account backup pending</string>
+    <string name="pocket_digital_dollar_account_backup_pending">Account backup is still in progress…</string>
     <string name="asset_details_backup_in_progress_subsequent">Continue updating balance</string>
     <string name="asset_details_balance_restored">Balance restored</string>
     <string name="asset_details_balance_restored_description">If it differs from the previous value, press Update until correct</string>
