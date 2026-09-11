@@ -118,6 +118,9 @@ class CoinDaoTest {
         valueExponent = valueExponent,
         ageValue = ageValue,
         onChain = onChain,
+        recyclerFungibility = recyclerFungibility,
+        hops = hops,
+        incomingBundleSize = incomingBundleSize,
     )
 
     private fun coinAt(installation: ByteArray, derivationIndex: Int) = CoinLocal(
@@ -127,6 +130,9 @@ class CoinDaoTest {
         valueExponent = 3,
         ageValue = null,
         onChain = false,
+        recyclerFungibility = null,
+        hops = null,
+        incomingBundleSize = null,
     )
 
     private suspend fun givenCoin(ageValue: Int?, onChain: Boolean) {

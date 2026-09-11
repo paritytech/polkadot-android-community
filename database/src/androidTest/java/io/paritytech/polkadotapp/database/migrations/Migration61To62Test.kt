@@ -40,7 +40,7 @@ class Migration61To62Test {
                     )
                 }
             )
-            database.recyclerVoucherDao().updateLocation(byteArrayOf(7), 2, 32, 1_000L)
+            database.recyclerVoucherDao().updateLocation(byteArrayOf(7), 2, 32, 1_000L, null, null)
         } finally {
             database.close()
         }
@@ -56,7 +56,7 @@ class Migration61To62Test {
         InstrumentationRegistry.getInstrumentation().targetContext,
         AppDatabase::class.java,
         TEST_DB
-    ).addMigrations(Migration62To63()).build()
+    ).addMigrations(Migration62To63(), Migration63To64()).build()
 
     private companion object {
         const val TEST_DB = "voucher-migration-test"
