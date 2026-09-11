@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentError
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentKey
+import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlanner
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
@@ -41,6 +42,7 @@ fun CoinageBalance.spendableByProducts(): Balance = availablePrivate + gainingPr
 
 class RealRequestPaymentUseCase @Inject constructor(
     private val externalPaymentService: ExternalPaymentService,
+    private val externalPaymentPlanner: ExternalPaymentPlanner,
     private val totalBalanceUseCase: TotalBalanceUseCase,
     private val permissionGuard: ProductPermissionGuard,
     private val whitelistedProductsProvider: WhitelistedProductsProvider,
@@ -74,13 +76,23 @@ class RealRequestPaymentUseCase @Inject constructor(
     private suspend fun authorize(productId: ProductId, amount: Balance, balance: CoinageBalance): Result<Unit> {
         if (balance.spendableByProducts() < amount) return Result.failure(insufficientBalanceError(productId))
 
-        val steps = buildList {
-            if (productId !in whitelistedProductsProvider.whitelistedProducts()) add(PaymentRequestStep.Confirm)
-            if (amount > balance.availablePrivate && recyclingStrategySettings.getStrategy() != RecyclingStrategyType.MIN_PRIVACY) {
-                add(PaymentRequestStep.PrivacyWarning)
+        return privacyWarningNeeded(amount).flatMap { warn ->
+            val steps = buildList {
+                if (productId !in whitelistedProductsProvider.whitelistedProducts()) add(PaymentRequestStep.Confirm)
+                if (warn) add(PaymentRequestStep.PrivacyWarning)
             }
-        }
 
+            prompt(productId, amount, steps)
+        }
+    }
+
+    private suspend fun privacyWarningNeeded(amount: Balance): Result<Boolean> {
+        if (recyclingStrategySettings.getStrategy() == RecyclingStrategyType.MIN_PRIVACY) return Result.success(false)
+
+        return externalPaymentPlanner.canPayPrivately(amount).map { !it }
+    }
+
+    private suspend fun prompt(productId: ProductId, amount: Balance, steps: List<PaymentRequestStep>): Result<Unit> {
         if (steps.isEmpty()) return Result.success(Unit)
 
         val context = PaymentRequestContext(productId = productId, amount = amount, steps = steps)

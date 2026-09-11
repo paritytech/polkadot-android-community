@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentError
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentKey
+import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlanner
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
@@ -31,10 +32,12 @@ import org.junit.Test
  * What a product has to get past before its payment is registered: an id it has not used, a balance that covers
  * the amount, and whichever of the two prompts apply.
  *
- * The user holds 10 private planks and 20 more that are still gaining privacy.
+ * The user holds 10 private planks and 20 more that are still gaining privacy. Whether private vouchers alone
+ * cover the amount is the planner's answer, stated per test.
  */
 class RealRequestPaymentUseCaseTest {
     private val externalPaymentService: ExternalPaymentService = mockk()
+    private val planner: ExternalPaymentPlanner = mockk()
     private val totalBalanceUseCase: TotalBalanceUseCase = mockk {
         coEvery { getBalance() } returns Result.success(balance(availablePrivate = 10, gainingPrivacy = 20))
     }
@@ -46,6 +49,7 @@ class RealRequestPaymentUseCaseTest {
 
     private val useCase = RealRequestPaymentUseCase(
         externalPaymentService = externalPaymentService,
+        externalPaymentPlanner = planner,
         totalBalanceUseCase = totalBalanceUseCase,
         permissionGuard = permissionGuard,
         whitelistedProductsProvider = whitelistedProductsProvider,
@@ -64,8 +68,8 @@ class RealRequestPaymentUseCaseTest {
     // ---- prompts ----
 
     @Test
-    fun `a whitelisted product paying from private funds is not prompted at all`() = runBlocking<Unit> {
-        givenProduct(whitelisted = true, strategy = RecyclingStrategyType.BALANCED)
+    fun `a whitelisted product paying from private vouchers is not prompted at all`() = runBlocking<Unit> {
+        givenProduct(whitelisted = true, strategy = RecyclingStrategyType.BALANCED, privateVouchersCover = true)
         givenNewPaymentRegisters()
 
         val result = useCase.requestPayment(product, id, planks(10), destination)
@@ -101,7 +105,7 @@ class RealRequestPaymentUseCaseTest {
 
     @Test
     fun `spending funds still gaining privacy warns even a whitelisted product's user`() = runBlocking<Unit> {
-        givenProduct(whitelisted = true, strategy = RecyclingStrategyType.BALANCED)
+        givenProduct(whitelisted = true, strategy = RecyclingStrategyType.BALANCED, privateVouchersCover = false)
         givenUserAnswers(approve = true)
         givenNewPaymentRegisters()
 
@@ -110,10 +114,25 @@ class RealRequestPaymentUseCaseTest {
         assertEquals(listOf(listOf(PaymentRequestStep.PrivacyWarning)), shownSteps)
     }
 
+    /**
+     * The amount fits in the private balance, but part of that balance is coins: a coin loaded only to be
+     * unloaded again gives up as much privacy as a voucher still gaining it.
+     */
+    @Test
+    fun `private coins do not spare the warning`() = runBlocking<Unit> {
+        givenProduct(whitelisted = true, strategy = RecyclingStrategyType.BALANCED, privateVouchersCover = false)
+        givenUserAnswers(approve = true)
+        givenNewPaymentRegisters()
+
+        useCase.requestPayment(product, id, planks(10), destination)
+
+        assertEquals(listOf(listOf(PaymentRequestStep.PrivacyWarning)), shownSteps)
+    }
+
     /** Unlike a wallet send, a product payment may spend privacy-gaining funds under MAX_PRIVACY once warned. */
     @Test
     fun `a product payment under maximum privacy is confirmed, then warned about`() = runBlocking<Unit> {
-        givenProduct(whitelisted = false, strategy = RecyclingStrategyType.MAX_PRIVACY)
+        givenProduct(whitelisted = false, strategy = RecyclingStrategyType.MAX_PRIVACY, privateVouchersCover = false)
         givenUserAnswers(approve = true)
         givenNewPaymentRegisters()
 
@@ -125,7 +144,7 @@ class RealRequestPaymentUseCaseTest {
 
     @Test
     fun `a user who declines rejects the payment`() = runBlocking<Unit> {
-        givenProduct(whitelisted = false, strategy = RecyclingStrategyType.BALANCED)
+        givenProduct(whitelisted = false, strategy = RecyclingStrategyType.BALANCED, privateVouchersCover = true)
         givenUserAnswers(approve = false)
 
         val result = useCase.requestPayment(product, id, planks(10), destination)
@@ -192,7 +211,8 @@ class RealRequestPaymentUseCaseTest {
         assertTrue(error is PaymentRequestError.NotFound)
     }
 
-    private fun givenProduct(whitelisted: Boolean, strategy: RecyclingStrategyType) {
+    private fun givenProduct(whitelisted: Boolean, strategy: RecyclingStrategyType, privateVouchersCover: Boolean = true) {
+        coEvery { planner.canPayPrivately(any()) } returns Result.success(privateVouchersCover)
         coEvery { externalPaymentService.exists(key) } returns Result.success(false)
         coEvery { whitelistedProductsProvider.whitelistedProducts() } returns if (whitelisted) setOf(product) else emptySet()
         coEvery { strategySettings.getStrategy() } returns strategy

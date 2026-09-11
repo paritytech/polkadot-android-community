@@ -21,8 +21,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Which funds pay an external payment. Private funds come first; anything else the chain accepts is only
- * reached for when they fall short, because by then the user has confirmed giving up the privacy.
+ * Which funds pay an external payment: private vouchers, then any voucher, then coins recycled for the rest.
+ * Anything beyond private vouchers is only reached for once the user has confirmed giving up the privacy.
  *
  * A voucher or coin of exponent `e` is worth 2^e planks.
  */
@@ -48,71 +48,76 @@ class RealExternalPaymentPlannerTest {
         assertEquals(planks(2), plan.offboarding.surplus)
     }
 
-    /** Coins are recycled for the difference, and every private voucher is offboarded next to what they become. */
-    @Test
-    fun `private coins make up what private vouchers lack`() = runBlocking<Unit> {
-        val privateVoucher = voucher(1, exponent = 2)
-        val coinToLoad = coin(2, exponent = 3)
-        givenFunds(privateVouchers = listOf(privateVoucher), privateCoins = listOf(coin(3, exponent = 1), coinToLoad))
-
-        val plan = planner.plan(planks(10)).getOrThrow()
-
-        assertTrue(plan is ExternalPaymentPlan.LoadCoins)
-        plan as ExternalPaymentPlan.LoadCoins
-        assertEquals(listOf(coinToLoad), plan.coinsToLoad)
-        assertEquals(listOf(privateVoucher), plan.exactVouchers)
-    }
-
     /**
-     * Privacy-gaining vouchers alone would pay at once, but private coins can pay too, at the cost of waiting for
-     * them to be recycled. Waiting costs nothing but time; spending the vouchers costs the user privacy.
+     * A coin loaded only to be unloaded right away is no more private than a voucher still gaining privacy, so
+     * the vouchers pay and no coin waits on a recycling round.
      */
     @Test
-    fun `private funds are preferred even when privacy-gaining vouchers would pay at once`() = runBlocking<Unit> {
+    fun `vouchers still gaining privacy pay before any coin is loaded`() = runBlocking<Unit> {
         val privateVoucher = voucher(1, exponent = 2)
+        val gainingPrivacy = voucher(2, exponent = 4)
         givenFunds(
             privateVouchers = listOf(privateVoucher),
-            privateCoins = listOf(coin(2, exponent = 3)),
-            onChainVouchers = listOf(privateVoucher, voucher(3, exponent = 4)),
+            onChainVouchers = listOf(privateVoucher, gainingPrivacy),
+            recyclableCoins = listOf(coin(3, exponent = 3)),
         )
 
         val plan = planner.plan(planks(10)).getOrThrow()
 
-        assertTrue(plan is ExternalPaymentPlan.LoadCoins)
-        coVerify(exactly = 0) { assetSelector.getOnChainSpendableVouchers() }
+        assertTrue(plan is ExternalPaymentPlan.Ready)
+        coVerify(exactly = 0) { assetSelector.getRecyclableCoins() }
     }
 
+    /** Largest-first alone would take both 8s; starting from the private 4 gives up the privacy of only one. */
     @Test
-    fun `vouchers still gaining privacy pay when private funds fall short`() = runBlocking<Unit> {
-        val privateVoucher = voucher(1, exponent = 1)
+    fun `private vouchers are spent before those still gaining privacy`() = runBlocking<Unit> {
+        val privateVoucher = voucher(1, exponent = 2)
         val gainingPrivacy = voucher(2, exponent = 3)
-        givenFunds(privateVouchers = listOf(privateVoucher), onChainVouchers = listOf(privateVoucher, gainingPrivacy))
+        givenFunds(
+            privateVouchers = listOf(privateVoucher),
+            onChainVouchers = listOf(voucher(3, exponent = 3), privateVoucher, gainingPrivacy),
+        )
 
-        val plan = planner.plan(planks(8)).getOrThrow()
+        val plan = planner.plan(planks(12)).getOrThrow()
 
         assertTrue(plan is ExternalPaymentPlan.Ready)
         plan as ExternalPaymentPlan.Ready
-        assertEquals(listOf(gainingPrivacy), plan.offboarding.vouchers)
+        assertEquals(privateVoucher, plan.offboarding.vouchers.first())
+        assertEquals(2, plan.offboarding.vouchers.size)
+        assertEquals(planks(0), plan.offboarding.surplus)
     }
 
-    /** A coin the strategy wanted recycled for privacy is still money the chain accepts. */
+    /** Every voucher is offboarded as it is, and coins are recycled only for what they lack together. */
     @Test
-    fun `any coin the chain accepts makes up the rest`() = runBlocking<Unit> {
-        val onChainVoucher = voucher(1, exponent = 1)
-        val coinHeldBack = coin(2, exponent = 3)
-        givenFunds(onChainVouchers = listOf(onChainVoucher), onChainCoins = listOf(coinHeldBack))
+    fun `recyclable coins make up what all vouchers lack`() = runBlocking<Unit> {
+        val privateVoucher = voucher(1, exponent = 1)
+        val gainingPrivacy = voucher(2, exponent = 2)
+        val coinToLoad = coin(3, exponent = 3)
+        givenFunds(
+            privateVouchers = listOf(privateVoucher),
+            onChainVouchers = listOf(privateVoucher, gainingPrivacy),
+            recyclableCoins = listOf(coin(4, exponent = 1), coinToLoad),
+        )
 
-        val plan = planner.plan(planks(9)).getOrThrow()
+        val plan = planner.plan(planks(12)).getOrThrow()
 
         assertTrue(plan is ExternalPaymentPlan.LoadCoins)
         plan as ExternalPaymentPlan.LoadCoins
-        assertEquals(listOf(coinHeldBack), plan.coinsToLoad)
-        assertEquals(listOf(onChainVoucher), plan.exactVouchers)
+        assertEquals(listOf(coinToLoad), plan.coinsToLoad)
+        assertEquals(listOf(privateVoucher, gainingPrivacy), plan.exactVouchers)
+    }
+
+    @Test
+    fun `only private vouchers pay privately`() = runBlocking<Unit> {
+        givenFunds(privateVouchers = listOf(voucher(1, exponent = 3)))
+
+        assertTrue(planner.canPayPrivately(planks(8)).getOrThrow())
+        assertTrue(!planner.canPayPrivately(planks(9)).getOrThrow())
     }
 
     @Test
     fun `an amount nothing covers is reported with what there was`() = runBlocking<Unit> {
-        givenFunds(onChainVouchers = listOf(voucher(1, exponent = 1)), onChainCoins = listOf(coin(2, exponent = 2)))
+        givenFunds(onChainVouchers = listOf(voucher(1, exponent = 1)), recyclableCoins = listOf(coin(2, exponent = 2)))
 
         val plan = planner.plan(planks(16)).getOrThrow()
 
@@ -128,14 +133,12 @@ class RealExternalPaymentPlannerTest {
 
     private fun givenFunds(
         privateVouchers: List<RecyclerVoucher> = emptyList(),
-        privateCoins: List<Coin> = emptyList(),
         onChainVouchers: List<RecyclerVoucher> = privateVouchers,
-        onChainCoins: List<Coin> = privateCoins,
+        recyclableCoins: List<Coin> = emptyList(),
     ) {
         coEvery { assetSelector.getSelectableVouchers(SpendScope.SPENDABLE) } returns privateVouchers
-        coEvery { assetSelector.getSelectableCoins(SpendScope.SPENDABLE) } returns privateCoins
         coEvery { assetSelector.getOnChainSpendableVouchers() } returns onChainVouchers
-        coEvery { assetSelector.getOnChainSpendableCoins() } returns onChainCoins
+        coEvery { assetSelector.getRecyclableCoins() } returns recyclableCoins
     }
 
     private fun voucher(index: Int, exponent: Int) = RecyclerVoucher(
