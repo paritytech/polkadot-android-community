@@ -264,7 +264,8 @@ private fun PocketScreenPreview() {
                         amounts = LoadingState.Loaded(
                             PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
                         ),
-                        syncInProgress = false
+                        syncInProgress = false,
+                        accountBackupPending = false,
                     ),
                     PocketCardUiModel.IdCard("username.99", "15oF4u...zaC1Ap", PocketRank.Basic)
                 ),

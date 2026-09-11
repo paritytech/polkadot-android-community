@@ -115,6 +115,7 @@ class LedgerAtomicityTest {
         entryId = entryId,
         position = 0,
         assetKind = CoinageAssetKindLocal.COIN,
+        installationId = INSTALLATION,
         derivationIndex = derivationIndex,
         onChainKey = keyOf(derivationIndex),
     )
@@ -122,6 +123,7 @@ class LedgerAtomicityTest {
     private fun handoff(derivationIndex: Int) = CoinageHandoffLocal(
         onChainKey = keyOf(derivationIndex),
         assetKind = CoinageAssetKindLocal.COIN,
+        installationId = INSTALLATION,
         derivationIndex = derivationIndex,
         committed = false,
     )
@@ -130,5 +132,7 @@ class LedgerAtomicityTest {
 
     private companion object {
         const val COINAGE = "coinage"
+
+        val INSTALLATION = ByteArray(32)
     }
 }

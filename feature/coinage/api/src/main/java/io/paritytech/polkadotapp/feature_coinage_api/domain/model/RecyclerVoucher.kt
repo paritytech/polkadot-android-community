@@ -4,11 +4,10 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
 import kotlin.time.Instant
 
-typealias RingVrfIndex = Int
 typealias RecyclerIndex = RingIndex
 
 data class RecyclerVoucher(
-    val ringVrfKeyIndex: RingVrfIndex,
+    val ringVrfKeyIndex: CoinageKeyIndex,
     val ringVrfPublicKey: BandersnatchPublicKey,
     val recyclerValue: ValueExponent,
     val location: Location,

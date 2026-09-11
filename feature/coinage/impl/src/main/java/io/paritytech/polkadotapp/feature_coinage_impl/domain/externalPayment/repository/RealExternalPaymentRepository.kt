@@ -1,12 +1,11 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.repository
 
-import com.google.gson.Gson
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.database.dao.ExternalPaymentDao
 import io.paritytech.polkadotapp.database.model.ExternalPaymentLocal
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.SelectedVoucherKeysCodec
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.model.ExternalPayment
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,7 +13,7 @@ import javax.inject.Inject
 
 class RealExternalPaymentRepository @Inject constructor(
     private val dao: ExternalPaymentDao,
-    private val gson: Gson,
+    private val selectedVoucherKeysCodec: SelectedVoucherKeysCodec,
 ) : ExternalPaymentRepository {
     override suspend fun insert(payment: ExternalPayment) {
         dao.insert(payment.toLocal())
@@ -28,7 +27,7 @@ class RealExternalPaymentRepository @Inject constructor(
 
     private fun ExternalPaymentLocal.toDomain(): ExternalPayment {
         val surplus = surplusPlanks?.intoBalance()
-        val selected = selectedVoucherKeys?.let(::deserializeKeys)
+        val selected = selectedVoucherKeys?.let(selectedVoucherKeysCodec::decode)
         val stage: ExternalPayment.Stage = when (stage) {
             ExternalPaymentLocal.Stage.ENSURE_VOUCHERS -> ExternalPayment.Stage.EnsureVouchers
             ExternalPaymentLocal.Stage.OFFBOARD_VOUCHERS -> ExternalPayment.Stage.OffboardVouchers(
@@ -67,16 +66,11 @@ class RealExternalPaymentRepository @Inject constructor(
         )
     }
 
-    private fun serializeKeys(keys: List<RingVrfIndex>): String = gson.toJson(keys)
-
-    private fun deserializeKeys(json: String): List<RingVrfIndex> =
-        gson.fromJson(json, IntArray::class.java).toList()
-
     private fun ExternalPayment.Stage.toRowFields(): RowStageFields = when (this) {
         ExternalPayment.Stage.EnsureVouchers -> RowStageFields(ExternalPaymentLocal.Stage.ENSURE_VOUCHERS)
         is ExternalPayment.Stage.OffboardVouchers -> RowStageFields(
             stage = ExternalPaymentLocal.Stage.OFFBOARD_VOUCHERS,
-            selectedVoucherKeys = serializeKeys(selectedVoucherKeys),
+            selectedVoucherKeys = selectedVoucherKeysCodec.encode(selectedVoucherKeys),
             surplusPlanks = surplus.value,
         )
         ExternalPayment.Stage.Completed -> RowStageFields(ExternalPaymentLocal.Stage.COMPLETED)

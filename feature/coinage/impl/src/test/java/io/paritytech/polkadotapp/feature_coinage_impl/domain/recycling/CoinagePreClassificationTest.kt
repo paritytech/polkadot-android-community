@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassif
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -250,7 +251,7 @@ class CoinagePreClassificationTest {
     )
 
     private fun coinOf(age: Coin.Age, onChain: Boolean, derivationIndex: Int = 0) = Coin(
-        derivationIndex = derivationIndex,
+        derivationIndex = testKey(derivationIndex),
         valueExponent = ValueExponent(1),
         age = age,
         isOnChain = onChain,
@@ -258,7 +259,7 @@ class CoinagePreClassificationTest {
     )
 
     private fun voucherOf(location: Location, ringVrfKeyIndex: Int = 0) = RecyclerVoucher(
-        ringVrfKeyIndex = ringVrfKeyIndex,
+        ringVrfKeyIndex = testKey(ringVrfKeyIndex),
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = location,

@@ -60,6 +60,7 @@ class RecyclerVoucherDaoTest {
     private fun dao() = database.recyclerVoucherDao()
 
     private fun voucher(ring: Int?, members: Int?, enteredAt: Long?) = RecyclerVoucherLocal(
+        installationId = ByteArray(32),
         ringVrfKeyIndex = 1,
         ringVrfPublicKey = publicKey,
         recyclerValue = 3,

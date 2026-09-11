@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainAliasSta
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.AssetPublicKey
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingPosition
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
@@ -238,7 +239,7 @@ class CoinageFuzzDriver(private val harness: DurabilityHarness) {
         }
 
         is FuzzAction.HandOff -> {
-            harness.service.preCommitHandoff(listOf(OwnAsset.Coin(action.coin)))
+            harness.service.preCommitHandoff(listOf(OwnAsset.Coin(testKey(action.coin))))
                 .getOrNull()
                 ?.commit()
                 ?.onSuccess { committedMarks += coinKeyOf(action.coin) }
@@ -589,7 +590,7 @@ class CoinageFuzzDriver(private val harness: DurabilityHarness) {
         }
 
     /** Only ever called for an asset the ledger recorded as a voucher of ours, which always carries one. */
-    private fun LedgerAsset.voucherIndex(): Int = (asset as OwnAsset.Voucher).ringVrfIndex
+    private fun LedgerAsset.voucherIndex(): Int = (asset as OwnAsset.Voucher).ringVrfIndex.item
 
     private fun isOnboardingOnBestChain(voucher: Int) =
         bestState()?.ringPositions?.get(voucherKeyOf(voucher)) is RingPosition.Onboarding

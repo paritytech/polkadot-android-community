@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ow
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
@@ -302,7 +303,7 @@ class RealCoinageRecyclingUseCaseTest {
 
     private fun createCoin(exponent: Int): Coin {
         return Coin(
-            derivationIndex = exponent,
+            derivationIndex = testKey(exponent),
             valueExponent = ValueExponent(exponent),
             age = Coin.Age.Known(recyclingAge),
             isOnChain = true,
@@ -312,7 +313,7 @@ class RealCoinageRecyclingUseCaseTest {
 
     private fun createVoucher(ringVrfKeyIndex: Int, exponent: Int): RecyclerVoucher {
         return RecyclerVoucher(
-            ringVrfKeyIndex = ringVrfKeyIndex,
+            ringVrfKeyIndex = testKey(ringVrfKeyIndex),
             ringVrfPublicKey = byteArrayOf(ringVrfKeyIndex.toByte()).toDataByteArray(),
             recyclerValue = ValueExponent(exponent),
             location = RecyclerVoucher.Location.Unknown,

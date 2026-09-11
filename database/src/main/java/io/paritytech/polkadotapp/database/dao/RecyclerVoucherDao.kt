@@ -19,6 +19,10 @@ interface RecyclerVoucherDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vouchers: List<RecyclerVoucherLocal>)
 
+    // A freshly allocated key must never land on an existing row: that row's key may already be handed off.
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertNew(vouchers: List<RecyclerVoucherLocal>)
+
     @Query("SELECT * FROM recycler_vouchers")
     fun subscribeAll(): Flow<List<RecyclerVoucherLocal>>
 
@@ -46,11 +50,11 @@ interface RecyclerVoucherDao {
         }
     }
 
-    @Query("SELECT * FROM recycler_vouchers WHERE ringVrfKeyIndex IN (:indices)")
-    suspend fun getByRingVrfKeyIndices(indices: List<Int>): List<RecyclerVoucherLocal>
+    @Query("SELECT * FROM recycler_vouchers WHERE installationId = :installationId AND ringVrfKeyIndex IN (:indices)")
+    suspend fun getByRingVrfKeyIndices(installationId: ByteArray, indices: List<Int>): List<RecyclerVoucherLocal>
 
-    @Query("SELECT MAX(ringVrfKeyIndex) FROM recycler_vouchers")
-    suspend fun getMaxRingVrfKeyIndex(): Int?
+    @Query("SELECT MAX(ringVrfKeyIndex) FROM recycler_vouchers WHERE installationId = :installationId")
+    suspend fun getMaxRingVrfKeyIndex(installationId: ByteArray): Int?
 
     @Query(VOUCHERS_IN_RECYCLER_QUERY)
     suspend fun getVouchersInRecycler(): List<RecyclerVoucherLocal>

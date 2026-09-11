@@ -36,6 +36,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenRe
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RecyclerProofDataProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.CoinageSigningContextProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
@@ -354,15 +355,15 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
     private fun entry(status: DurableTxStatus) = CoinageTransactionState(
         id = CoinageTransactionId(status.ordinal.toLong()),
         status = status,
-        inputs = listOf(CoinageInput.Voucher(status.ordinal)),
-        outputs = listOf(OwnAsset.Voucher(status.ordinal)),
+        inputs = listOf(CoinageInput.Voucher(testKey(status.ordinal))),
+        outputs = listOf(OwnAsset.Voucher(testKey(status.ordinal))),
     )
 
     private fun voucherInRecycler(index: Int, recycler: Int = index) =
         voucherOf(index, Location.InRecycler(RecyclerIndex(BigInteger.valueOf(recycler.toLong())), recyclerMembers = 767, enteredAt = null))
 
     private fun voucherOf(index: Int, location: Location) = RecyclerVoucher(
-        ringVrfKeyIndex = index,
+        ringVrfKeyIndex = testKey(index),
         ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
         recyclerValue = ValueExponent(1),
         location = location,

@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ow
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
@@ -745,7 +746,7 @@ class RealClaimReceivedCoinsUseCaseTest {
         id = CoinageTransactionId(claiming.value.first().toLong() * 10 + status.ordinal),
         status = status,
         inputs = listOf(CoinageInput.Coin.Received(claiming)),
-        outputs = List(outputs) { OwnAsset.Coin(it) },
+        outputs = List(outputs) { OwnAsset.Coin(testKey(it)) },
     )
 
     private companion object {

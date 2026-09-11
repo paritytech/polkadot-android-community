@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.toRingCollectionId
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingCollectionIdWithIndex
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingPosition
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingStatus
@@ -44,7 +45,7 @@ class VoucherLocationServiceTest {
         val statuses = MutableStateFlow<Result<Map<RingCollectionIdWithIndex, RingStatus?>>>(
             Result.success(mapOf(ringKey to RingStatus(total = 100, included = 31)))
         )
-        val vouchers = MutableStateFlow(listOf(RecyclerVoucher(1, publicKey, value, RecyclerVoucher.Location.Unknown)))
+        val vouchers = MutableStateFlow(listOf(RecyclerVoucher(testKey(1), publicKey, value, RecyclerVoucher.Location.Unknown)))
         val updates = mutableListOf<Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler>>()
         var now = Instant.fromEpochMilliseconds(1_000L)
         whenever(chainAssetProvider.chainId()).thenReturn("chain")

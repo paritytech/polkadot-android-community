@@ -46,7 +46,7 @@ class Migration61To62Test {
         }
         val reopenedDatabase = openDatabase()
         try {
-            assertEquals(1_000L, reopenedDatabase.recyclerVoucherDao().getByRingVrfKeyIndices(listOf(1)).single().enteredAt)
+            assertEquals(1_000L, reopenedDatabase.recyclerVoucherDao().getByRingVrfKeyIndices(ByteArray(32), listOf(1)).single().enteredAt)
         } finally {
             reopenedDatabase.close()
         }
@@ -56,7 +56,7 @@ class Migration61To62Test {
         InstrumentationRegistry.getInstrumentation().targetContext,
         AppDatabase::class.java,
         TEST_DB
-    ).build()
+    ).addMigrations(Migration62To63()).build()
 
     private companion object {
         const val TEST_DB = "voucher-migration-test"

@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
@@ -21,6 +22,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVouch
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
 import io.paritytech.polkadotapp.feature_coinage_impl.data.source.ClockChangesSource
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealTotalBalanceUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.CompletableDeferred
@@ -60,13 +62,13 @@ class VoucherReadinessUpdatesTest {
         runCurrent()
 
         assertEquals(listOf(fixture.balanceOf(ready = false), fixture.balanceOf(ready = true)), balances)
-        assertEquals(listOf(emptyMap<Int, CoinRecyclingState>()), verdicts)
+        assertEquals(listOf(emptyMap<CoinageKeyIndex, CoinRecyclingState>()), verdicts)
     }
 
     @Test
     fun `maturity frees recycling budget without an asset event`() = runTest {
         val fixture = WalletFixture(this, RecyclingStrategyType.BALANCED)
-        val coin = Coin(0, ValueExponent(1), Coin.Age.Known(5), true, mock())
+        val coin = Coin(testKey(0), ValueExponent(1), Coin.Age.Known(5), true, mock())
         fixture.coins.value = listOf(TrackedCoin(coin, CoinageAssetState.UNTRACKED))
         val recycled = mutableListOf<List<Coin>>()
         whenever(fixture.recycling.recycle(any())).thenAnswer { invocation ->
@@ -85,7 +87,7 @@ class VoucherReadinessUpdatesTest {
         runCurrent()
 
         assertEquals(listOf(listOf(coin)), recycled)
-        assertEquals(CoinRecyclingState.TO_RECYCLE, verdicts.last().getValue(0))
+        assertEquals(CoinRecyclingState.TO_RECYCLE, verdicts.last().getValue(testKey(0)))
     }
 
     @Test
@@ -285,7 +287,7 @@ class VoucherReadinessUpdatesTest {
     private companion object {
         fun voucher(enteredAt: Instant = Instant.fromEpochMilliseconds(0)) = TrackedVoucher(
             RecyclerVoucher(
-                ringVrfKeyIndex = 0,
+                ringVrfKeyIndex = testKey(0),
                 ringVrfPublicKey = mock(),
                 recyclerValue = ValueExponent(1),
                 location = RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), 32, enteredAt),
