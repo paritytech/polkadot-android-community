@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.BoltCircleFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldHalf
@@ -21,8 +22,13 @@ internal data class ModeAppearance(
     val accessibilityDescription: String,
     val icon: ImageVector,
     val colors: ModeColors,
-    val glowSize: Dp,
-    val glowCornerRadius: Dp
+    val glowGeometry: GlowGeometry
+)
+
+@Immutable
+internal data class GlowGeometry(
+    val size: Dp,
+    val cornerRadius: Dp
 )
 
 @Composable
@@ -33,8 +39,7 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
         accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_fastest_accessibility),
         icon = NovaIcons.BoltCircleFilled,
         colors = PrivacyModeColors.Fastest,
-        glowSize = GLOW_SIZE,
-        glowCornerRadius = GLOW_CORNER_RADIUS
+        glowGeometry = WIDE_GLOW
     )
 
     RecyclingStrategyType.BALANCED -> ModeAppearance(
@@ -43,8 +48,7 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
         accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_balanced_accessibility),
         icon = NovaIcons.ShieldHalf,
         colors = PrivacyModeColors.Balanced,
-        glowSize = BALANCED_GLOW_SIZE,
-        glowCornerRadius = BALANCED_GLOW_CORNER_RADIUS
+        glowGeometry = DISC_GLOW
     )
 
     RecyclingStrategyType.MAX_PRIVACY -> ModeAppearance(
@@ -55,8 +59,7 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
         ),
         icon = NovaIcons.VisibilityOffOutlined,
         colors = PrivacyModeColors.MostPrivate,
-        glowSize = GLOW_SIZE,
-        glowCornerRadius = GLOW_CORNER_RADIUS
+        glowGeometry = WIDE_GLOW
     )
 }
 
@@ -82,3 +85,6 @@ internal fun ModeAppearance.circleBorderBrush(selection: Float): Brush = Brush.v
 // has fully become this mode.
 internal fun ModeAppearance.blendedFrom(previous: ModeAppearance, fraction: Float): ModeAppearance =
     if (fraction >= 1f) this else copy(colors = previous.colors.blendedTo(colors, fraction))
+
+private val WIDE_GLOW = GlowGeometry(size = 56.dp, cornerRadius = 24.dp)
+private val DISC_GLOW = GlowGeometry(size = 40.dp, cornerRadius = 20.dp)

@@ -48,14 +48,14 @@ import androidx.compose.ui.util.lerp as lerpFloat
 // A dragged circle is a single circle that adopts each mode as it passes the midpoint towards it, so
 // [appearance] changes under it mid-gesture and is cross-faded rather than swapped — see [fadeMillis].
 // The glow and the ring are what say a mode has been settled on rather than merely passed over, so they are
-// [hasGlow]'s to decide and not the selected size's: a circle under a finger is grown but unlit and unringed.
+// [isSettled]'s to decide and not the selected size's: a circle under a finger is grown but unlit and unringed.
 // The box is wider than the circle so the ring and its shadow have room without being clipped by the layout.
 @Composable
 internal fun ModeCircle(
     modifier: Modifier,
     appearance: ModeAppearance,
     isSelected: Boolean,
-    hasGlow: Boolean,
+    isSettled: Boolean,
     fadeMillis: () -> Int,
     interactionSource: MutableInteractionSource? = null
 ) {
@@ -65,7 +65,7 @@ internal fun ModeCircle(
         label = "circleSelection"
     )
     val glow by animateFloatAsState(
-        targetValue = if (hasGlow) 1f else 0f,
+        targetValue = if (isSettled) 1f else 0f,
         animationSpec = SELECTION_ANIMATION,
         label = "circleGlow"
     )
@@ -102,8 +102,7 @@ internal fun ModeCircle(
     val shadowAlpha = lerpFloat(UNSELECTED_SHADOW_ALPHA, SELECTED_SHADOW_ALPHA, selection)
 
     // Held across frames and reconfigured in place: the circle's size animates, which rebuilds the draw
-    // cache on every frame of a selection change, and allocating paints or filters there would allocate
-    // per frame.
+    // cache on every frame of a selection change, so anything created there is created per frame.
     val density = LocalDensity.current
     val shadowBlur = remember(density) {
         with(density) { BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL) }
@@ -123,10 +122,11 @@ internal fun ModeCircle(
             maskFilter = glowBlur
         }
     }
-    val ringShadowPaint = remember(shadowBlur) {
+    val ringShadowPaint = remember(shadowBlur, density) {
         Paint().apply {
             isAntiAlias = true
             style = Paint.Style.STROKE
+            strokeWidth = with(density) { RING_STROKE.toPx() }
             maskFilter = shadowBlur
         }
     }
@@ -156,7 +156,6 @@ internal fun ModeCircle(
                 val ringSize = Size(half * 2f, half * 2f)
 
                 ringShadowPaint.color = shadowColor.copy(alpha = glow * SELECTED_SHADOW_ALPHA).toArgb()
-                ringShadowPaint.strokeWidth = RING_STROKE.toPx()
 
                 onDrawWithContent {
                     drawContent()
@@ -197,8 +196,8 @@ internal fun ModeCircle(
                     val centreX = size.width / 2f
                     val centreY = size.height / 2f
                     val shadowOffset = SHADOW_OFFSET.toPx()
-                    val glowHalf = blended.glowSize.toPx() / 2f
-                    val glowCorner = blended.glowCornerRadius.toPx()
+                    val glowHalf = blended.glowGeometry.size.toPx() / 2f
+                    val glowCorner = blended.glowGeometry.cornerRadius.toPx()
 
                     shadowPaint.color = shadowColor.copy(alpha = shadowAlpha).toArgb()
                     glowPaint.color = glowColor.copy(alpha = glow * GLOW_ALPHA).toArgb()
@@ -278,12 +277,6 @@ private val RING_STROKE = 2.dp
 private val GLOW_BLUR = 20.dp
 private const val GLOW_ALPHA = 0.5f
 
-// The design gives Balanced a disc-sized glow and the other two modes a wider, squarer one.
-internal val GLOW_SIZE = 56.dp
-internal val GLOW_CORNER_RADIUS = 24.dp
-internal val BALANCED_GLOW_SIZE = 40.dp
-internal val BALANCED_GLOW_CORNER_RADIUS = BALANCED_GLOW_SIZE / 2
-
 private val SHADOW_BLUR = 4.dp
 private val SHADOW_OFFSET = 4.dp
 
@@ -294,7 +287,7 @@ private const val UNSELECTED_SHADOW_ALPHA = 0.5f
 
 internal val CIRCLE_BOX_SIZE = RING_OUTER_SIZE + (SHADOW_OFFSET + SHADOW_BLUR) * 2
 
-// Where the ring's stroke centreline starts inside the box; the gradient spans the ring, not the box.
+// The ring's gradient spans the ring, not the box it sits in.
 private val RING_TOP_INSET = (CIRCLE_BOX_SIZE - RING_OUTER_SIZE + RING_STROKE) / 2
 
 // Share of the circle the glyph takes up; the rest is the inset around it.
