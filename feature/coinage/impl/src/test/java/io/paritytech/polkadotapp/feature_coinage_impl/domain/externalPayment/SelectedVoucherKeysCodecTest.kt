@@ -15,7 +15,7 @@ class SelectedVoucherKeysCodecTest {
         val keys = listOf(
             CoinageKeyIndex(TEST_INSTALLATION, 7),
             CoinageKeyIndex(OTHER_INSTALLATION, 0),
-            CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 1_234_567),
+            CoinageKeyIndex(INSTALLATION_5A, 1_234_567),
         )
 
         assertEquals(keys, codec.decode(codec.encode(keys)))
@@ -24,14 +24,6 @@ class SelectedVoucherKeysCodecTest {
     @Test
     fun `no keys survive a round trip`() {
         assertEquals(emptyList<CoinageKeyIndex>(), codec.decode(codec.encode(emptyList())))
-    }
-
-    @Test
-    fun `rows written as bare ring indices read back under the legacy page`() {
-        assertEquals(
-            listOf(CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 3), CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 12)),
-            codec.decode("[3,12]"),
-        )
     }
 
     @Test

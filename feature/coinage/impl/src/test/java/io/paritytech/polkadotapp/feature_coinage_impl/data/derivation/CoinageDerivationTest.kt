@@ -1,8 +1,8 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.data.derivation
 
-import io.novasama.substrate_sdk_android.encrypt.junction.JunctionType
 import io.novasama.substrate_sdk_android.encrypt.junction.SubstrateJunctionDecoder
 import io.novasama.substrate_sdk_android.encrypt.mnemonic.MnemonicCreator
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.blake2b256
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.AccountSecretsStorage
@@ -31,15 +31,6 @@ class CoinageDerivationTest {
     }
 
     @Test
-    fun `the legacy page decodes to the same chain code as the old page-zero segment`() {
-        val legacy = decodePage("//" + CoinageInstallationId.LEGACY_ZERO.asPageSegment())
-        val old = decodePage("//0")
-
-        assertEquals(JunctionType.HARD, legacy.type)
-        assertArrayEquals(old.chaincode, legacy.chaincode)
-    }
-
-    @Test
     fun `an installation page is used as the chain code unchanged`() {
         val page = decodePage("//" + TEST_INSTALLATION.asPageSegment())
 
@@ -47,27 +38,27 @@ class CoinageDerivationTest {
     }
 
     @Test
-    fun `a voucher under the legacy page derives exactly the key the old page-zero path did`() = runBlocking<Unit> {
-        val derived = voucherDerivation.deriveBandersnatch(CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 7))
+    fun `a voucher derives along its installation's page`() = runBlocking<Unit> {
+        val derived = voucherDerivation.deriveBandersnatch(CoinageKeyIndex(TEST_INSTALLATION, 7))
 
-        assertArrayEquals(oldPathEntropy("//coinage-ring-vrf//4294967295//0//7"), derived.value)
+        assertArrayEquals(pathEntropy("//coinage-ring-vrf//4294967295//${TEST_INSTALLATION.asPageSegment()}//7"), derived.value)
     }
 
     @Test
     fun `the same item under two installations is two keys`() = runBlocking<Unit> {
-        val legacy = voucherDerivation.deriveBandersnatch(CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 7))
+        val other = voucherDerivation.deriveBandersnatch(CoinageKeyIndex(OTHER_INSTALLATION, 7))
         val current = voucherDerivation.deriveBandersnatch(CoinageKeyIndex(TEST_INSTALLATION, 7))
 
-        assertNotEquals(legacy.value.toList(), current.value.toList())
+        assertNotEquals(other.value.toList(), current.value.toList())
     }
 
     @Test
     fun `a batch spanning installations comes back in input order`() = runBlocking<Unit> {
         val indices = listOf(
             CoinageKeyIndex(TEST_INSTALLATION, 3),
-            CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 3),
+            CoinageKeyIndex(OTHER_INSTALLATION, 3),
             CoinageKeyIndex(TEST_INSTALLATION, 0),
-            CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 9),
+            CoinageKeyIndex(OTHER_INSTALLATION, 9),
         )
 
         val batch = voucherDerivation.deriveBandersnatchBatch(indices).map { it.value.toList() }
@@ -78,7 +69,7 @@ class CoinageDerivationTest {
 
     private fun decodePage(segment: String) = SubstrateJunctionDecoder.decode(segment).junctions.single()
 
-    private fun oldPathEntropy(path: String): ByteArray {
+    private fun pathEntropy(path: String): ByteArray {
         return SubstrateJunctionDecoder.decode(path).junctions.fold(MNEMONIC.entropy) { entropy, junction ->
             entropy.blake2b256(junction.chaincode)
         }
@@ -93,6 +84,8 @@ class CoinageDerivationTest {
 
     private companion object {
         const val WALLET_ID = 1L
+
+        val OTHER_INSTALLATION = CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES) { 0x11 }.toDataByteArray())
 
         val MNEMONIC = MnemonicCreator.fromWords(
             "bottom drive obey lake curtain smoke basket hold race lonely fit walk"

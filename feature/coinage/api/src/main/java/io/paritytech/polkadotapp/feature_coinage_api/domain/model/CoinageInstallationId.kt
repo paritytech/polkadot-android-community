@@ -18,9 +18,6 @@ value class CoinageInstallationId(val value: DataByteArray) {
     companion object {
         const val SIZE_BYTES = 32
 
-        /** The page every key lived under before installations existed: `//0` decodes to 32 zero bytes. */
-        val LEGACY_ZERO = CoinageInstallationId(ByteArray(SIZE_BYTES).toDataByteArray())
-
         fun random(): CoinageInstallationId {
             val bytes = ByteArray(SIZE_BYTES).also { SecureRandom().nextBytes(it) }
             return CoinageInstallationId(bytes.toDataByteArray())

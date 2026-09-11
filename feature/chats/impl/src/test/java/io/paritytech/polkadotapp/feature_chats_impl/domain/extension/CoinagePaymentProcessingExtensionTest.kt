@@ -564,7 +564,7 @@ class CoinagePaymentProcessingExtensionTest {
     private fun accountId(seed: Int): AccountId = byteArrayOf(seed.toByte()).toDataByteArray()
 
     private fun stateOf(status: CoinagePaymentStatus) = CoinagePaymentState(
-        coin = Coin(derivationIndex = CoinageKeyIndex(CoinageInstallationId.LEGACY_ZERO, 0), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = accountId(0)),
+        coin = Coin(derivationIndex = CoinageKeyIndex(CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES).toDataByteArray()), 0), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = accountId(0)),
         status = status,
     )
 

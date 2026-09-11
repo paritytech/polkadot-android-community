@@ -10,8 +10,8 @@ object CoinageDerivationDefaults {
     const val COINAGE_MAIN_PURSE_INDEX = 4_294_967_295L
 }
 
-// Hex keeps the 32 bytes intact: the junction decoder maps a hex segment straight to the raw chain code, so
-// [CoinageInstallationId.LEGACY_ZERO] lands on exactly the chain code the old `//0` page decoded to.
+// Hex keeps the 32 bytes intact: the junction decoder maps a hex segment straight to the raw chain code, where any
+// other encoding would be hashed or length-prefixed first.
 fun CoinageInstallationId.asPageSegment(): String = value.value.toHexString(withPrefix = true)
 
 // Derives every index against its own installation's base, one base per installation, in input order.

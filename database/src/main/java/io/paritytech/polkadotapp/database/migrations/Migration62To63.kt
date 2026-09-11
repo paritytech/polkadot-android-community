@@ -3,19 +3,20 @@ package io.paritytech.polkadotapp.database.migrations
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-// Coinage keys become scoped to the installation that allocated them, so every own-asset row gains the
-// installation id its key is derived under.
-//
-// Rows already here were derived under the single `//0` page, which decodes to 32 zero bytes — exactly the id
-// they receive, so every key they name stays the key it was. Received coin inputs name no own key and keep a
-// null id, matching their null index.
+// Coinage keys become scoped to the installation that allocated them. Legacy state is dropped rather than re-keyed:
+// its keys sit on the single `//0` page every earlier install of the seed allocated in, so any key next to them
+// could collide with one another install already handed off. Everything that points at such an asset goes with it —
+// the ledger rows, coinage's durable transactions and external payments holding voucher keys.
 class Migration62To63 : Migration(62, 63) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        recreate(
+        db.execSQL("DELETE FROM `durable_tx` WHERE `domainId` = 'coinage'")
+        db.execSQL("DELETE FROM `external_payments`")
+
+        recreateEmpty(
             db = db,
             table = "coins",
             createSql = """
-                CREATE TABLE `coins_new` (
+                CREATE TABLE `coins` (
                     `installationId` BLOB NOT NULL,
                     `derivationIndex` INTEGER NOT NULL,
                     `accountId` BLOB NOT NULL,
@@ -25,15 +26,13 @@ class Migration62To63 : Migration(62, 63) {
                     PRIMARY KEY(`installationId`, `derivationIndex`)
                 )
             """,
-            columns = "`derivationIndex`, `accountId`, `valueExponent`, `ageValue`, `onChain`",
-            installationValue = LEGACY_ZERO,
         )
 
-        recreate(
+        recreateEmpty(
             db = db,
             table = "recycler_vouchers",
             createSql = """
-                CREATE TABLE `recycler_vouchers_new` (
+                CREATE TABLE `recycler_vouchers` (
                     `installationId` BLOB NOT NULL,
                     `ringVrfKeyIndex` INTEGER NOT NULL,
                     `ringVrfPublicKey` BLOB NOT NULL,
@@ -44,15 +43,13 @@ class Migration62To63 : Migration(62, 63) {
                     PRIMARY KEY(`installationId`, `ringVrfKeyIndex`)
                 )
             """,
-            columns = "`ringVrfKeyIndex`, `ringVrfPublicKey`, `recyclerValue`, `locationRecyclerIndex`, `recyclerMembers`, `enteredAt`",
-            installationValue = LEGACY_ZERO,
         )
 
-        recreate(
+        recreateEmpty(
             db = db,
             table = "coinage_entry_input",
             createSql = """
-                CREATE TABLE `coinage_entry_input_new` (
+                CREATE TABLE `coinage_entry_input` (
                     `entryId` INTEGER NOT NULL,
                     `position` INTEGER NOT NULL,
                     `assetKind` TEXT NOT NULL,
@@ -62,17 +59,15 @@ class Migration62To63 : Migration(62, 63) {
                     PRIMARY KEY(`entryId`, `position`)
                 )
             """,
-            columns = "`entryId`, `position`, `assetKind`, `derivationIndex`, `onChainKey`",
-            installationValue = "CASE WHEN `derivationIndex` IS NULL THEN NULL ELSE $LEGACY_ZERO END",
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_coinage_entry_input_onChainKey` ON `coinage_entry_input` (`onChainKey`)")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_coinage_entry_input_entryId` ON `coinage_entry_input` (`entryId`)")
 
-        recreate(
+        recreateEmpty(
             db = db,
             table = "coinage_entry_output",
             createSql = """
-                CREATE TABLE `coinage_entry_output_new` (
+                CREATE TABLE `coinage_entry_output` (
                     `entryId` INTEGER NOT NULL,
                     `position` INTEGER NOT NULL,
                     `assetKind` TEXT NOT NULL,
@@ -82,8 +77,6 @@ class Migration62To63 : Migration(62, 63) {
                     PRIMARY KEY(`entryId`, `position`)
                 )
             """,
-            columns = "`entryId`, `position`, `assetKind`, `derivationIndex`, `onChainKey`",
-            installationValue = LEGACY_ZERO,
         )
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_coinage_entry_output_onChainKey` ON `coinage_entry_output` (`onChainKey`)")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_coinage_entry_output_entryId` ON `coinage_entry_output` (`entryId`)")
@@ -92,11 +85,11 @@ class Migration62To63 : Migration(62, 63) {
                 "ON `coinage_entry_output` (`assetKind`, `installationId`, `derivationIndex`)"
         )
 
-        recreate(
+        recreateEmpty(
             db = db,
             table = "coinage_handoff",
             createSql = """
-                CREATE TABLE `coinage_handoff_new` (
+                CREATE TABLE `coinage_handoff` (
                     `onChainKey` BLOB NOT NULL,
                     `assetKind` TEXT NOT NULL,
                     `installationId` BLOB NOT NULL,
@@ -105,8 +98,6 @@ class Migration62To63 : Migration(62, 63) {
                     PRIMARY KEY(`onChainKey`)
                 )
             """,
-            columns = "`onChainKey`, `assetKind`, `derivationIndex`, `committed`",
-            installationValue = LEGACY_ZERO,
         )
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS `index_coinage_handoff_assetKind_installationId_derivationIndex` " +
@@ -127,20 +118,8 @@ class Migration62To63 : Migration(62, 63) {
         )
     }
 
-    private fun recreate(
-        db: SupportSQLiteDatabase,
-        table: String,
-        createSql: String,
-        columns: String,
-        installationValue: String,
-    ) {
-        db.execSQL(createSql.trimIndent())
-        db.execSQL("INSERT INTO `${table}_new` (`installationId`, $columns) SELECT $installationValue, $columns FROM `$table`")
+    private fun recreateEmpty(db: SupportSQLiteDatabase, table: String, createSql: String) {
         db.execSQL("DROP TABLE `$table`")
-        db.execSQL("ALTER TABLE `${table}_new` RENAME TO `$table`")
-    }
-
-    private companion object {
-        const val LEGACY_ZERO = "zeroblob(32)"
+        db.execSQL(createSql.trimIndent())
     }
 }

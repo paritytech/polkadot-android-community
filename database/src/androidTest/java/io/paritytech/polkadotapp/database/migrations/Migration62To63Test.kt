@@ -8,21 +8,15 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.paritytech.polkadotapp.database.AppDatabase
 import org.junit.After
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Own-asset rows gaining the installation their keys are derived under, with rows in the tables.
- *
- * Every existing key was derived under the `//0` page, so every existing own row must land on 32 zero bytes —
- * anything else would silently re-point a row at a different key.
- */
+// Legacy coinage state is dropped, not re-keyed: its keys sit on the one page every earlier install shared, so
+// allocating next to them risks a collision no installation id can prevent. Anything that points at such an
+// asset has to go with it.
 @RunWith(AndroidJUnit4::class)
 class Migration62To63Test {
 
@@ -46,7 +40,45 @@ class Migration62To63Test {
     }
 
     @Test
-    fun coinsKeepEveryColumnUnderTheLegacyPage() {
+    fun everyLegacyCoinageRowIsDropped() {
+        givenLegacyCoinageState()
+
+        val migrated = migrate()
+
+        COINAGE_TABLES.forEach { table -> assertEquals("$table still holds legacy rows", 0, migrated.count(table)) }
+    }
+
+    @Test
+    fun onlyCoinageTransactionsLeaveTheDurableLedger() {
+        givenLegacyCoinageState()
+        insertDurableTx(id = 2, domainId = "other-domain")
+
+        val migrated = migrate()
+
+        assertEquals(1, migrated.count("durable_tx"))
+        assertEquals("other-domain", migrated.string("SELECT domainId FROM durable_tx"))
+    }
+
+    @Test
+    fun externalPaymentsAreDroppedWithTheVouchersTheyReference() {
+        db.insert(
+            "external_payments",
+            ContentValues().apply {
+                put("id", "payment")
+                put("origin", "product")
+                put("amountPlanks", "100")
+                put("destination", byteArrayOf(0x0a))
+                put("stage", "OFFBOARD")
+                put("selectedVoucherKeys", "[2]")
+                put("createdAt", 1L)
+                put("updatedAt", 1L)
+            }
+        )
+
+        assertEquals(0, migrate().count("external_payments"))
+    }
+
+    private fun givenLegacyCoinageState() {
         db.insert(
             "coins",
             ContentValues().apply {
@@ -57,21 +89,6 @@ class Migration62To63Test {
                 put("onChain", 1)
             }
         )
-
-        val row = migrate().query("SELECT installationId, derivationIndex, accountId, valueExponent, ageValue, onChain FROM coins")
-
-        assertTrue(row.moveToFirst())
-        assertArrayEquals(LEGACY_ZERO, row.getBlob(0))
-        assertEquals(5, row.getInt(1))
-        assertArrayEquals(byteArrayOf(0x05), row.getBlob(2))
-        assertEquals(3, row.getInt(3))
-        assertEquals(9, row.getInt(4))
-        assertEquals(1, row.getInt(5))
-        row.close()
-    }
-
-    @Test
-    fun recyclerVouchersKeepEveryColumnUnderTheLegacyPage() {
         db.insert(
             "recycler_vouchers",
             ContentValues().apply {
@@ -83,42 +100,17 @@ class Migration62To63Test {
                 put("enteredAt", 1_757_000_000_000L)
             }
         )
-
-        val row = migrate().query(
-            "SELECT installationId, ringVrfKeyIndex, ringVrfPublicKey, recyclerValue, locationRecyclerIndex, recyclerMembers, enteredAt " +
-                "FROM recycler_vouchers"
+        insertDurableTx(id = 1, domainId = "coinage")
+        db.insert(
+            "coinage_entry_input",
+            ContentValues().apply {
+                put("entryId", 1)
+                put("position", 0)
+                put("assetKind", "COIN")
+                put("derivationIndex", 5)
+                put("onChainKey", byteArrayOf(0x05))
+            }
         )
-
-        assertTrue(row.moveToFirst())
-        assertArrayEquals(LEGACY_ZERO, row.getBlob(0))
-        assertEquals(2, row.getInt(1))
-        assertArrayEquals(byteArrayOf(0x02), row.getBlob(2))
-        assertEquals(4, row.getInt(3))
-        assertEquals(1, row.getInt(4))
-        assertEquals(12, row.getInt(5))
-        assertEquals(1_757_000_000_000L, row.getLong(6))
-        row.close()
-    }
-
-    @Test
-    fun ownInputsGetTheLegacyPageWhileReceivedInputsStayUnowned() {
-        db.insertInput(entryId = 1, position = 0, derivationIndex = 4, key = byteArrayOf(0x04))
-        db.insertInput(entryId = 1, position = 1, derivationIndex = null, key = byteArrayOf(0x7F))
-
-        val rows = migrate().query("SELECT position, installationId, derivationIndex FROM coinage_entry_input ORDER BY position")
-
-        assertTrue(rows.moveToFirst())
-        assertArrayEquals(LEGACY_ZERO, rows.getBlob(1))
-        assertEquals(4, rows.getInt(2))
-
-        assertTrue(rows.moveToNext())
-        assertNull(rows.getBlob(1))
-        assertTrue(rows.isNull(2))
-        rows.close()
-    }
-
-    @Test
-    fun outputsAndHandoffsGetTheLegacyPage() {
         db.insert(
             "coinage_entry_output",
             ContentValues().apply {
@@ -138,47 +130,40 @@ class Migration62To63Test {
                 put("committed", 1)
             }
         )
-
-        val migrated = migrate()
-
-        assertArrayEquals(LEGACY_ZERO, migrated.blob("SELECT installationId FROM coinage_entry_output WHERE derivationIndex = 6"))
-        assertArrayEquals(LEGACY_ZERO, migrated.blob("SELECT installationId FROM coinage_handoff WHERE derivationIndex = 8"))
     }
 
-    @Test
-    fun theInstallationsTableStartsEmpty() {
-        val cursor = migrate().query("SELECT COUNT(*) FROM coinage_installations")
-
-        assertTrue(cursor.moveToFirst())
-        assertEquals(0, cursor.getInt(0))
-        cursor.close()
-    }
-
-    // ---- fixtures ----
-
-    private fun SupportSQLiteDatabase.insert(table: String, values: ContentValues) {
-        insert(table, SQLiteDatabase.CONFLICT_NONE, values)
-    }
-
-    private fun SupportSQLiteDatabase.insertInput(entryId: Long, position: Int, derivationIndex: Int?, key: ByteArray) {
-        insert(
-            "coinage_entry_input",
+    private fun insertDurableTx(id: Long, domainId: String) {
+        db.insert(
+            "durable_tx",
             ContentValues().apply {
-                put("entryId", entryId)
-                put("position", position)
-                put("assetKind", "COIN")
-                put("derivationIndex", derivationIndex)
-                put("onChainKey", key)
+                put("id", id)
+                put("domainId", domainId)
+                put("txHash", "0x$id")
+                put("mortalityBlocks", 64)
+                put("status", "PENDING")
+                put("checkpointblockNumber", 100)
+                put("checkpointblockHash", "0xcheckpoint")
             }
         )
     }
 
-    private fun SupportSQLiteDatabase.blob(sql: String): ByteArray {
+    private fun SupportSQLiteDatabase.insert(table: String, values: ContentValues) {
+        insert(table, SQLiteDatabase.CONFLICT_ABORT, values)
+    }
+
+    private fun SupportSQLiteDatabase.count(table: String): Int {
+        val cursor = query("SELECT COUNT(*) FROM `$table`")
+        cursor.moveToFirst()
+        val count = cursor.getInt(0)
+        cursor.close()
+        return count
+    }
+
+    private fun SupportSQLiteDatabase.string(sql: String): String {
         val cursor = query(sql)
         cursor.moveToFirst()
-        val value = cursor.getBlob(0)
+        val value = cursor.getString(0)
         cursor.close()
-
         return value
     }
 
@@ -192,6 +177,13 @@ class Migration62To63Test {
     private companion object {
         const val TEST_DB = "migration-62-to-63-test"
 
-        val LEGACY_ZERO = ByteArray(32)
+        val COINAGE_TABLES = listOf(
+            "coins",
+            "recycler_vouchers",
+            "coinage_entry_input",
+            "coinage_entry_output",
+            "coinage_handoff",
+            "coinage_installations",
+        )
     }
 }
