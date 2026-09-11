@@ -25,9 +25,19 @@ class PermissionPromptViewModel @Inject constructor(
 
     override fun onDenyClicked() = deliver(PermissionDecision.Deny)
 
+    private var deciding = false
+
+    // A second tap would pop whatever is under the sheet.
     private fun deliver(decision: PermissionDecision) = launchUnit {
+        if (deciding) return@launchUnit
+        deciding = true
         permissionContext.deliver(decision)
         router.back()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        permissionContext.onAbandoned()
     }
 }
 

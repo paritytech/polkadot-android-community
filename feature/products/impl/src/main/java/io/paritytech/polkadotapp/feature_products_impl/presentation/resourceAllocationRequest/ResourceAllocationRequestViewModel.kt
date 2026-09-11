@@ -53,25 +53,30 @@ class ResourceAllocationRequestViewModel @Inject constructor(
         allocating.value = true
 
         launchWithDiagnostics(stalenessReport) {
-            interactor.allocateAll(context.productId, context.resources, context.onExisting)
-                .onSuccess(context::deliver)
-                // The product is waiting on this prompt alone, so an unexpected failure still has to answer it
-                .onFailure { context.deliverAll(ApAllocationOutcome.NotAvailable) }
+            context.approve(::allocate)
 
             router.back()
         }
     }
 
+    // A method reference rather than an inline lambda: a lambda inside the
+    // launchWithDiagnostics block captures its anonymous context parameter
+    // under a name D8 rejects. The collector is stalenessReport itself, so it
+    // is re-supplied here.
+    private suspend fun allocate(): Result<List<ApAllocationOutcome>> = with(stalenessReport) {
+        interactor.allocateAll(context.productId, context.resources, context.onExisting)
+    }
+
     override fun onRejectClicked() = launchUnit {
-        context.deliverAll(ApAllocationOutcome.Rejected)
+        context.reject()
         router.back()
     }
 
     override fun onCleared() {
         super.onCleared()
-        // This prompt owns the allocation, so once it is gone nobody else is left to answer the product
-        context.deliverAll(ApAllocationOutcome.NotAvailable)
-        holder.clear()
+        // Once the prompt is gone nobody else is left to answer the caller
+        context.onAbandoned()
+        holder.clear(context)
     }
 }
 

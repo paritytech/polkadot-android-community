@@ -182,7 +182,7 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
         }
 
         override suspend fun confirmUserAction(review: UserConfirmationReview): Boolean =
-            confirmationLauncher.decide(review, requesterFallback = callingProductId.value)
+            confirmationLauncher.decide(review, requesterFallback = callingProductId)
 
         override suspend fun devicePermission(request: HostDevicePermissionRequest): Boolean =
             hostApiInteractor
@@ -318,7 +318,7 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
  */
 internal suspend fun TrUAPIConfirmationLauncher.decide(
     review: UserConfirmationReview,
-    requesterFallback: String,
+    requesterFallback: ProductId,
 ): Boolean {
     val confirmation = runCatching { review.toConfirmation(requesterFallback) }
         .getOrElse {

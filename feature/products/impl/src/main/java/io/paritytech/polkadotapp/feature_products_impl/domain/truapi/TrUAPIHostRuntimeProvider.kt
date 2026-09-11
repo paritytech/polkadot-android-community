@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.common.presentation.AppLifecycleObserver
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.di.TrUAPIChainHttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -212,7 +213,7 @@ class TrUAPIHostRuntimeProvider @Inject constructor(
 
     private companion object {
         const val HOST_NAME = "Polkadot"
-        const val HOST_REQUESTER = "host"
+        val HOST_REQUESTER = ProductId.fromStoredValue("host")
     }
 }
 

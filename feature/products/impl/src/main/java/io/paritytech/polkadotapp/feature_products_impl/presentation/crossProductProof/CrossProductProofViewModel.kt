@@ -28,19 +28,24 @@ class CrossProductProofViewModel @Inject constructor(
             )
         )
 
-    fun onApproveClicked() = launchUnit {
-        context.deliverApproved()
-        router.back()
-    }
+    private var deciding = false
 
-    fun onRejectClicked() = launchUnit {
-        context.deliverRejected()
+    fun onApproveClicked() = decide(context::deliverApproved)
+
+    fun onRejectClicked() = decide(context::deliverRejected)
+
+    // A second tap would pop whatever is under the sheet.
+    private fun decide(answer: () -> Unit) = launchUnit {
+        if (deciding) return@launchUnit
+        deciding = true
+        answer()
         router.back()
     }
 
     override fun onCleared() {
         super.onCleared()
-        holder.clear()
+        context.onAbandoned()
+        holder.clear(context)
     }
 }
 
