@@ -3,7 +3,7 @@ package io.paritytech.polkadotapp.feature_products_impl.domain.paymentRequest
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.flatRecover
+import io.paritytech.polkadotapp.common.utils.mapErrorInstance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentError
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlanner
@@ -64,9 +64,7 @@ class RealRequestPaymentUseCase @Inject constructor(
             }
             .flatMap { balance -> authorize(productId, amount, balance) }
             .flatMap { externalPaymentService.initiatePayment(key, amount, destination) }
-            .flatRecover { error ->
-                Result.failure(if (error is ExternalPaymentError.AlreadyExists) PaymentRequestError.AlreadyExists(id) else error)
-            }
+            .mapErrorInstance<_, ExternalPaymentError.AlreadyExists> { PaymentRequestError.AlreadyExists(id) }
     }
 
     override fun subscribeStatus(productId: ProductId, id: ProductPaymentRequestId): Flow<PaymentStatus> =

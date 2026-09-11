@@ -7,8 +7,8 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.utils.HexString
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.flatRecover
 import io.paritytech.polkadotapp.common.utils.flowOfAll
+import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentStatus
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.ProductsBotApi
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
@@ -98,7 +98,7 @@ private fun TopUpStatus.toDto(): PaymentTopUpStatusDto = when (this) {
     TopUpStatus.NotClaimed -> PaymentTopUpStatusDto(tag = "NotClaimed")
 }
 
-private fun <T> Result<T>.mapPaymentRequestError(): Result<T> = flatRecover { Result.failure(it.asPaymentRequestHostCall()) }
+private fun <T> Result<T>.mapPaymentRequestError(): Result<T> = mapError { it.asPaymentRequestHostCall() }
 
 private fun Throwable.asPaymentRequestHostCall(): HostCallException {
     val code = when (this) {

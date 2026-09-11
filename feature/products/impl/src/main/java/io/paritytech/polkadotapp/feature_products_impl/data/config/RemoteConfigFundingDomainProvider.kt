@@ -4,6 +4,7 @@ import androidx.core.net.toUri
 import io.paritytech.polkadotapp.common.data.memory.SingleValueCache
 import io.paritytech.polkadotapp.common.data.memory.getCatching
 import io.paritytech.polkadotapp.common.utils.Urls
+import io.paritytech.polkadotapp.common.utils.combineResults
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
@@ -28,8 +29,8 @@ internal class RemoteConfigFundingDomainProvider @Inject constructor(
     override suspend fun getFundingProductIds(): Result<Set<ProductId>> {
         return getFundingConfig().flatMap { config ->
             dotNsTldProvider.getTld().flatMap { tld ->
-                config.onrampUrl.toProductId(tld).flatMap { onramp ->
-                    config.offrampUrl.toProductId(tld).map { offramp -> setOf(onramp, offramp) }
+                combineResults(config.onrampUrl.toProductId(tld), config.offrampUrl.toProductId(tld)) { onramp, offramp ->
+                    setOf(onramp, offramp)
                 }
             }
         }
