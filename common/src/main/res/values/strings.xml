@@ -1489,6 +1489,14 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
     <string name="pocket_digital_dollar_advanced">Advanced</string>
+    <string name="pocket_coinage_balance_title">Coinage Balance</string>
+    <string name="pocket_coinage_total_balance">Total Balance</string>
+    <string name="pocket_coinage_spendable_balance">Spendable Balance</string>
+    <string name="pocket_coinage_gaining_privacy">Gaining Privacy</string>
+    <string name="pocket_coinage_pending">Pending</string>
+    <string name="pocket_coinage_coins">Coins</string>
+    <string name="pocket_coinage_vouchers">Vouchers</string>
+    <string name="pocket_coinage_share_logs">Share Coinage Logs</string>
     <string name="pocket_error_get_cash_unavailable">Get %1$s isn\'t available right now. Try again later.</string>
     <string name="pocket_error_auto_fund_failed">Couldn\'t add test funds to this account. Try again.</string>
     <string name="pocket_error_share_coinage_logs_failed">Couldn\'t share the coinage logs. Try again.</string>
