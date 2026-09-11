@@ -93,6 +93,7 @@ dependencies {
 
     testImplementation(project(":test-shared"))
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
 
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

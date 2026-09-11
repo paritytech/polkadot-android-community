@@ -15,6 +15,13 @@ class GetCashUnavailablePresentationError(cause: Throwable) : PresentationThrowa
     }
 }
 
+class WithdrawUnavailablePresentationError(cause: Throwable) : PresentationThrowable(cause) {
+    @Composable
+    override fun message(): String {
+        return stringResource(RCommon.string.pocket_error_withdraw_unavailable, CurrencyConfig.symbol)
+    }
+}
+
 class AutoFundFailedPresentationError(cause: Throwable) :
     PresentationThrowable(cause),
     PresentationError by StringResPresentationError(RCommon.string.pocket_error_auto_fund_failed)

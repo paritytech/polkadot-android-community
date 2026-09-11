@@ -78,9 +78,15 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         )
 
     fun onGetCashClick() = launchUnit {
-        interactor.getCashProductId()
-            .onSuccess { router.openProduct(it) }
+        interactor.getFundingConfig()
+            .onSuccess { router.openSpaSheet(it.onrampUrl) }
             .onFailure { showPresentationError(GetCashUnavailablePresentationError(it)) }
+    }
+
+    fun onWithdrawClick() = launchUnit {
+        interactor.getFundingConfig()
+            .onSuccess { router.openSpaSheet(it.offrampUrl) }
+            .onFailure { showPresentationError(WithdrawUnavailablePresentationError(it)) }
     }
 
     fun onSendClick() {

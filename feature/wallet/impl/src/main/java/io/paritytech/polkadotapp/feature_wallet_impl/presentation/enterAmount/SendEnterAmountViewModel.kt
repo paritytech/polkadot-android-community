@@ -297,12 +297,8 @@ private fun ExternalPaymentPlan.toDebugInfo(): SendPlanDebugInfo.External = when
             coinsToLoad.forEach { c ->
                 add("  idx=${c.derivationIndex.item}  exp=2^${c.valueExponent.value}")
             }
+            add("exactVouchers=${exactVouchers.size}")
         },
-    )
-
-    is ExternalPaymentPlan.NeedsDelayedRetry -> SendPlanDebugInfo.External(
-        strategyName = "NeedsDelayedRetry",
-        details = listOf("reason=${reason.name}"),
     )
 
     is ExternalPaymentPlan.NotEnoughAmount -> SendPlanDebugInfo.External(
