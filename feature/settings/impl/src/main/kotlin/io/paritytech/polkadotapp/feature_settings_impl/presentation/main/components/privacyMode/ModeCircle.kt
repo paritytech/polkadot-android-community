@@ -49,7 +49,7 @@ import androidx.compose.ui.util.lerp as lerpFloat
 // [appearance] changes under it mid-gesture and is cross-faded rather than swapped — see [fadeMillis].
 // The glow and the ring are what say a mode has been settled on rather than merely passed over, so they are
 // [isSettled]'s to decide and not the selected size's: a circle under a finger is grown but unlit and unringed.
-// The box is wider than the circle so the ring and its shadow have room without being clipped by the layout.
+// The box reserves row height for the ring and its shadow and sizes the touch row; the glow may spill past it.
 @Composable
 internal fun ModeCircle(
     modifier: Modifier,

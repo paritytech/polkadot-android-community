@@ -212,8 +212,6 @@ private fun ModeSelector(
                             },
                         appearance = appearances[index],
                         isSelected = index == highlightedIndex,
-                        // A mode lights up once the selection has settled on it, so nothing glows while a
-                        // finger is still choosing.
                         isSettled = !isDragging && index == selectedIndex,
                         fadeMillis = { dragFade.millis },
                         interactionSource = interactionSources[index]
