@@ -29,20 +29,22 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import androidx.compose.ui.util.lerp as lerpFloat
 
 // One mode as it sits on the track. Selecting a mode grows its circle and lights it; the mode losing the
 // selection shrinks back in the same motion, so a tap reads as the selection passing between two circles
 // rather than one circle travelling along the track.
 // A dragged circle is a single circle that adopts each mode as it passes the midpoint towards it, so
 // [appearance] changes under it mid-gesture and is cross-faded rather than swapped — see [fadeMillis].
-// The glow is what says a mode has been settled on rather than merely passed over, so it is [hasGlow]'s to
-// decide and not the selected size's: a circle under a finger is grown but unlit.
-// The box is wider than the circle so the glow has room to spread without being clipped by the layout.
+// The glow and the ring are what say a mode has been settled on rather than merely passed over, so they are
+// [hasGlow]'s to decide and not the selected size's: a circle under a finger is grown but unlit and unringed.
+// The box is wider than the circle so the ring and its shadow have room without being clipped by the layout.
 @Composable
 internal fun ModeCircle(
     modifier: Modifier,
@@ -86,18 +88,99 @@ internal fun ModeCircle(
         fade.isRunning -> fade.value
         else -> 0f
     }
-    val blended = appearance.accentBlendedFrom(fadeFrom, progress)
+    val blended = appearance.blendedFrom(fadeFrom, progress)
 
     val diameter = lerp(CIRCLE_SIZE, SELECTED_CIRCLE_SIZE, selection)
-    val glowColor = blended.accentColor
+    val glowColor = blended.colors.glow
+    val ringColor = blended.colors.ring
     val shadowColor = PolkadotTheme.colors.shadow.medium
+    val shadowAlpha = lerpFloat(UNSELECTED_SHADOW_ALPHA, SELECTED_SHADOW_ALPHA, selection)
 
     // Held across frames and reconfigured in place: the circle's size animates, which rebuilds the draw
-    // cache on every frame of a selection change, and allocating paints there would allocate per frame.
-    val shadowPaint = remember { Paint().apply { isAntiAlias = true } }
-    val glowPaint = remember { Paint().apply { isAntiAlias = true } }
+    // cache on every frame of a selection change, and allocating paints or filters there would allocate
+    // per frame.
+    val density = LocalDensity.current
+    val shadowBlur = remember(density) {
+        with(density) { BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL) }
+    }
+    val glowBlur = remember(density) {
+        with(density) { BlurMaskFilter(GLOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL) }
+    }
+    val shadowPaint = remember(shadowBlur) {
+        Paint().apply {
+            isAntiAlias = true
+            maskFilter = shadowBlur
+        }
+    }
+    val glowPaint = remember(glowBlur) {
+        Paint().apply {
+            isAntiAlias = true
+            maskFilter = glowBlur
+        }
+    }
+    val ringPaint = remember {
+        Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+        }
+    }
+    val ringShadowPaint = remember(shadowBlur) {
+        Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            maskFilter = shadowBlur
+        }
+    }
 
-    Box(modifier = Modifier.size(CIRCLE_BOX_SIZE).then(modifier), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .size(CIRCLE_BOX_SIZE)
+            .then(modifier)
+            // The ring sits above the disc in the design, so its shadow falls onto the disc's lower edge.
+            .drawWithCache {
+                val centreX = size.width / 2f
+                val centreY = size.height / 2f
+                val half = (RING_OUTER_SIZE - RING_STROKE).toPx() / 2f
+                val corner = (RING_CORNER_RADIUS - RING_STROKE / 2).toPx()
+                val shadowOffset = SHADOW_OFFSET.toPx()
+
+                ringPaint.color = ringColor.copy(alpha = glow).toArgb()
+                ringPaint.strokeWidth = RING_STROKE.toPx()
+
+                ringShadowPaint.color = shadowColor.copy(alpha = glow * SELECTED_SHADOW_ALPHA).toArgb()
+                ringShadowPaint.strokeWidth = RING_STROKE.toPx()
+
+                onDrawWithContent {
+                    drawContent()
+
+                    if (glow > 0f) {
+                        drawIntoCanvas { canvas ->
+                            val native = canvas.nativeCanvas
+
+                            native.drawRoundRect(
+                                centreX - half,
+                                centreY - half + shadowOffset,
+                                centreX + half,
+                                centreY + half + shadowOffset,
+                                corner,
+                                corner,
+                                ringShadowPaint
+                            )
+                            native.drawRoundRect(
+                                centreX - half,
+                                centreY - half,
+                                centreX + half,
+                                centreY + half,
+                                corner,
+                                corner,
+                                ringPaint
+                            )
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
         Spacer(
             modifier = Modifier
                 .size(diameter)
@@ -105,22 +188,30 @@ internal fun ModeCircle(
                     val radius = size.minDimension / 2f
                     val centreX = size.width / 2f
                     val centreY = size.height / 2f
-
-                    shadowPaint.color = shadowColor.copy(alpha = SHADOW_ALPHA).toArgb()
-                    shadowPaint.maskFilter = BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
-
-                    glowPaint.color = glowColor.copy(alpha = glow * GLOW_ALPHA).toArgb()
-                    glowPaint.maskFilter = BlurMaskFilter(GLOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
-
                     val shadowOffset = SHADOW_OFFSET.toPx()
+                    val glowHalf = blended.glowSize.toPx() / 2f
+                    val glowCorner = blended.glowCornerRadius.toPx()
+
+                    shadowPaint.color = shadowColor.copy(alpha = shadowAlpha).toArgb()
+                    glowPaint.color = glowColor.copy(alpha = glow * GLOW_ALPHA).toArgb()
 
                     onDrawBehind {
                         drawIntoCanvas { canvas ->
-                            canvas.nativeCanvas.drawCircle(centreX, centreY + shadowOffset, radius, shadowPaint)
+                            val native = canvas.nativeCanvas
 
                             if (glow > 0f) {
-                                canvas.nativeCanvas.drawCircle(centreX, centreY, radius, glowPaint)
+                                native.drawRoundRect(
+                                    centreX - glowHalf,
+                                    centreY - glowHalf,
+                                    centreX + glowHalf,
+                                    centreY + glowHalf,
+                                    glowCorner,
+                                    glowCorner,
+                                    glowPaint
+                                )
                             }
+
+                            native.drawCircle(centreX, centreY + shadowOffset, radius, shadowPaint)
                         }
                     }
                 }
@@ -130,7 +221,7 @@ internal fun ModeCircle(
             modifier = Modifier.size(diameter),
             shape = CircleShape,
             brush = blended.circleBrush(selection),
-            border = BorderStroke(CIRCLE_BORDER, blended.circleBorderBrush())
+            border = BorderStroke(CIRCLE_BORDER, blended.circleBorderBrush(selection))
         ) {
             val ripple = if (interactionSource != null) {
                 Modifier.indication(interactionSource, LocalIndication.current)
@@ -152,41 +243,49 @@ internal fun ModeCircle(
                     NovaIcon(
                         modifier = Modifier.size(iconSize).alpha(1f - progress),
                         imageVector = fadeFrom.icon,
-                        tint = fadeFrom.iconColor
+                        tint = PrivacyModeColors.Glyph
                     )
                 }
 
                 NovaIcon(
                     modifier = Modifier.size(iconSize).alpha(progress),
                     imageVector = appearance.icon,
-                    tint = appearance.iconColor
+                    tint = PrivacyModeColors.Glyph
                 )
             }
         }
     }
 }
 
-internal val CIRCLE_SIZE = 28.dp
-internal val SELECTED_CIRCLE_SIZE = 40.dp
+private val CIRCLE_SIZE = 28.dp
+private val SELECTED_CIRCLE_SIZE = 50.dp
 
 private val CIRCLE_BORDER = 1.dp
 
-private val GLOW_BLUR = 12.dp
+private val RING_OUTER_SIZE = 62.dp
+private val RING_CORNER_RADIUS = 24.dp
+private val RING_STROKE = 2.dp
 
-// The glow is a halo, not a second light source: at full opacity the accent bleeds over the whole track.
-internal const val GLOW_ALPHA = 0.45f
+private val GLOW_BLUR = 12.dp
+private const val GLOW_ALPHA = 0.5f
+
+// The design gives Balanced a disc-sized glow and the other two modes a wider, squarer one.
+internal val GLOW_SIZE = 56.dp
+internal val GLOW_CORNER_RADIUS = 24.dp
+internal val BALANCED_GLOW_SIZE = 40.dp
+internal val BALANCED_GLOW_CORNER_RADIUS = BALANCED_GLOW_SIZE / 2
 
 private val SHADOW_BLUR = 4.dp
 private val SHADOW_OFFSET = 4.dp
 
-// The palette's shadow colour is black at 48% and the design asks for 70% here, with nothing darker in the
-// set to reach for; the token supplies the colour and this supplies the depth the design drew.
-private const val SHADOW_ALPHA = 0.7f
+// The palette's shadow colour is black at 48%; the design asks for these depths, with nothing darker in the
+// set to reach for, so the token supplies the colour and the alphas supply the depth the design drew.
+private const val SELECTED_SHADOW_ALPHA = 0.7f
+private const val UNSELECTED_SHADOW_ALPHA = 0.5f
 
-// Selected circle plus the glow spreading either side of it.
-internal val CIRCLE_BOX_SIZE = SELECTED_CIRCLE_SIZE + GLOW_BLUR * 2
+internal val CIRCLE_BOX_SIZE = RING_OUTER_SIZE + (SHADOW_OFFSET + SHADOW_BLUR) * 2
 
 // Share of the circle the glyph takes up; the rest is the inset around it.
-private const val MODE_ICON_SIZE_FRACTION = 0.6f
+private const val MODE_ICON_SIZE_FRACTION = 0.64f
 
 internal val SELECTION_ANIMATION = tween<Float>(durationMillis = 200, easing = FastOutSlowInEasing)

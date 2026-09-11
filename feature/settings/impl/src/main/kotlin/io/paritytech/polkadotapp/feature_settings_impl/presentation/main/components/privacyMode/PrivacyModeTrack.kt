@@ -177,10 +177,10 @@ private fun buildTicks(
     return path
 }
 
-// Half the selected circle, so the outer modes sit fully inside the groove.
-internal val TRACK_INSET = 20.dp
-
 internal val TRACK_HEIGHT = 40.dp
+
+// The outer modes are centred on the groove's end caps.
+internal val TRACK_INSET = TRACK_HEIGHT / 2
 
 private val TICK_WIDTH = 2.dp
 private val TICK_HEIGHT = 6.dp

@@ -48,7 +48,6 @@ import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -86,7 +85,7 @@ fun PaymentPrivacyModeSelector(
         ) {
             Header()
 
-            VerticalSpacer { small }
+            VerticalSpacer { extraMedium }
 
             ModeSelector(
                 selectedMode = selectedMode,
@@ -149,7 +148,7 @@ private fun ModeSelector(
     }
 
     // Outside a drag the selected mode is the truth; only while a finger is down does the nearest one lead,
-    // so the circles, markers and labels follow the dragged circle rather than the mode still committed.
+    // so the circles and the description follow the dragged circle rather than the mode still committed.
     val highlightedIndex = if (isDragging) nearestIndex else selectedIndex
 
     // A tap never slides the selection along the track: the position jumps, and the two circles animate
@@ -313,22 +312,14 @@ private fun ModeSelector(
             }
         }
 
-        ModeMarkers(
-            appearances = appearances,
-            nearestIndex = { highlightedIndex },
-            trackWidth = { trackWidth }
-        )
-
-        ModeLabels(appearances = appearances, highlightedIndex = highlightedIndex)
-
         VerticalSpacer { small }
 
         SelectedModeDescription(appearance = appearances[highlightedIndex])
     }
 }
 
-// Modes are pinned centre-to-centre: half a selected circle of inset at each end, then an equal step between
-// neighbours. [position] is a fractional mode index, so the selection tracks a finger continuously.
+// Modes are pinned centre-to-centre: [TRACK_INSET] at each end, then an equal step between neighbours.
+// [position] is a fractional mode index, so the selection tracks a finger continuously.
 private fun centreOffset(
     position: () -> Float,
     trackWidth: () -> Int,
@@ -359,30 +350,6 @@ private fun markIndexOf(
     return if (markStep > 0f) floor(offsetFromScaleStart / markStep).toInt() else 0
 }
 
-@Composable
-private fun ModeMarkers(
-    appearances: ImmutableList<ModeAppearance>,
-    nearestIndex: () -> Int,
-    trackWidth: () -> Int
-) {
-    Box(modifier = Modifier.fillMaxWidth().height(MARKER_BOX_SIZE)) {
-        appearances.forEachIndexed { index, appearance ->
-            ModeMarker(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset {
-                        val inset = TRACK_INSET.toPx()
-                        val centre = inset + index * trackStep(trackWidth(), inset, appearances.lastIndex)
-
-                        IntOffset(x = (centre - MARKER_BOX_SIZE.toPx() / 2f).roundToInt(), y = 0)
-                    },
-                appearance = appearance,
-                isSelected = index == nearestIndex()
-            )
-        }
-    }
-}
-
 // The cross-fades a crossing starts run for as long as the gesture that triggered them warrants: a flick
 // must not leave the previous glyph hanging behind the finger, while a slow drag has room for a gentler
 // dissolve. Both ends stay well clear of the instant swap this replaces.
@@ -408,8 +375,6 @@ private const val FADE_SMOOTHING = 0.4f
 private const val MILLIS_IN_SECOND = 1000f
 
 private val HEADER_ICON_SIZE = 24.dp
-
-private val DESCRIPTION_RADIUS = 12.dp
 
 @Preview
 @Composable
