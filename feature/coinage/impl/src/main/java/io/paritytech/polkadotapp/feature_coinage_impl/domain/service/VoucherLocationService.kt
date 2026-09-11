@@ -55,7 +55,9 @@ class VoucherLocationService @Inject constructor(
                     .map { statuses -> positions to statuses }
             }
             .onEach { (positions, ringStatuses) ->
-                voucherRepository.updateLocations(resolveLocations(positions, ringStatuses))
+                membersRepository.getRingKeysPageSize(chainId)
+                    .logFailure("Can't fetch ring keys page size for voucher locations")
+                    .onSuccess { keysPerPage -> voucherRepository.updateLocations(resolveLocations(positions, ringStatuses, keysPerPage)) }
             }
             .launchIn(scope)
     }
@@ -105,13 +107,14 @@ class VoucherLocationService @Inject constructor(
     private fun resolveLocations(
         positions: VoucherPositions,
         ringStatuses: RingStatuses,
+        keysPerPage: Int,
     ): Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler> {
         return positions.mapValuesNotNull { (voucherKey, voucherPosition) ->
             val position = voucherPosition?.includedOrNull() ?: return@mapValuesNotNull null
             val ringStatusKey = voucherKey.first to position.ringIndex
             val ringStatus = ringStatuses[ringStatusKey] ?: return@mapValuesNotNull null
 
-            if (ringStatus.includesKey(position)) {
+            if (ringStatus.includesKey(position, keysPerPage)) {
                 // included, not total: a proof only verifies against the keys baked into the ring root, so
                 // that is the set this voucher actually hides in.
                 RecyclerVoucher.Location.InRecycler(position.ringIndex, ringStatus.included, timeProvider.now())

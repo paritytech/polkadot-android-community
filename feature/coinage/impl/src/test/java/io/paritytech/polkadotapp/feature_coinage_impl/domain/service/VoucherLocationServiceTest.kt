@@ -55,6 +55,7 @@ class VoucherLocationServiceTest {
             Result.success(mapOf((collectionId to publicKey) to RingPosition.Included(ringIndex, 0, 31)))
         ))
         whenever(membersRepository.subscribeRingStatuses(any(), any())).thenReturn(statuses)
+        whenever(membersRepository.getRingKeysPageSize(any())).thenReturn(Result.success(255))
         whenever(timeProvider.now()).thenAnswer { now }
         whenever(voucherRepository.updateLocations(any())).thenAnswer {
             updates += it.getArgument<Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler>>(0)
