@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -49,7 +50,7 @@ class RecyclingStrategyLimitsTest {
     @Test
     fun `a coin of unknown age is never forced`() {
         val unknown = Coin(
-            derivationIndex = 0,
+            derivationIndex = testKey(0),
             valueExponent = ValueExponent(1),
             age = Coin.Age.Unknown,
             isOnChain = true,
@@ -162,7 +163,7 @@ class RecyclingStrategyLimitsTest {
     }
 
     private fun coinOf(age: Int, derivationIndex: Int = 0) = Coin(
-        derivationIndex = derivationIndex,
+        derivationIndex = testKey(derivationIndex),
         valueExponent = ValueExponent(1),
         age = Coin.Age.Known(age),
         isOnChain = true,

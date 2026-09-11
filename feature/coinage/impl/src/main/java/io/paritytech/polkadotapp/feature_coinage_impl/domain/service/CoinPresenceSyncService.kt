@@ -6,7 +6,7 @@ import io.paritytech.polkadotapp.common.utils.getOrEmpty
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinUpdate
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Hop
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.transferHop
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
@@ -74,7 +74,7 @@ class CoinPresenceSyncService @Inject constructor(
      */
     private fun List<Coin>.toHopUpdates(
         onChainData: Map<AccountId, OnChainCoinInfo?>
-    ): Map<DerivationIndex, List<Hop>> {
+    ): Map<CoinageKeyIndex, List<Hop>> {
         return filter { it.provenance.isUnobserved }
             .mapNotNull { coin ->
                 val age = onChainData[coin.accountId]?.age ?: return@mapNotNull null

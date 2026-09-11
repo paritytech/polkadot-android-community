@@ -113,10 +113,10 @@ class VoucherBatchDistributionTest {
     private var voucherIndexCounter = 0
 
     private fun voucher(exponent: Int, ring: Int): RecyclerVoucher = RecyclerVoucher(
-        ringVrfKeyIndex = voucherIndexCounter++,
+        ringVrfKeyIndex = testKey(voucherIndexCounter++),
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(exponent),
-        location = Location.InRecycler(RingIndex(ring.toBigInteger()), recyclerMembers = FULL_RING),
+        location = Location.InRecycler(RingIndex(ring.toBigInteger()), recyclerMembers = FULL_RING, enteredAt = null),
         recyclerFungibility = RecyclerFungibility.NONE,
         maxRecyclerFungibility = RecyclerFungibility.NONE,
     )

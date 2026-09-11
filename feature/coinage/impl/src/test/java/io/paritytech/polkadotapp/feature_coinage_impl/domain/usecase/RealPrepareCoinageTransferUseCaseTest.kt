@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPla
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinageAssetSelector
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.SpendScope
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.whenever
@@ -108,7 +109,7 @@ class RealPrepareCoinageTransferUseCaseTest {
     private fun <T> failure(): Result<T> = Result.failure(InsufficientBalanceException())
 
     private fun coinOf(derivationIndex: Int) = Coin(
-        derivationIndex = derivationIndex,
+        derivationIndex = testKey(derivationIndex),
         valueExponent = ValueExponent(1),
         age = Coin.Age.Known(3),
         isOnChain = true,

@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.chains.util.amountFromPlanks
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.validation.onError
 import io.paritytech.polkadotapp.common.domain.validation.onSuccess
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
@@ -40,6 +41,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.Se
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendEnterAmountInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.asSendError
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -175,8 +177,9 @@ class SendEnterAmountViewModel @Inject constructor(
 
             val payload = SendValidationPayload(amount.amount, transferMethod)
 
-            sendValidationMixin.runValidation(interactor.sendValidation, payload)
-                .onSuccess { sendValidatedTransfer(it) }
+            val validationResult = sendValidationMixin.runValidation(interactor.sendValidation, payload)
+            validationResult.onSuccess { sendValidatedTransfer(it) }
+            validationResult.onError { showPresentationError(it.asSendError().toPresentationError()) }
 
             sendProgress.value = SendProgress.Idle
         }
@@ -201,7 +204,7 @@ class SendEnterAmountViewModel @Inject constructor(
             payload.showTransactionResult && error != null -> walletRouter.openFailure()
 
             !payload.showTransactionResult && error != null -> {
-                showError(error)
+                showPresentationError(error.asSendError().toPresentationError())
                 walletRouter.back()
             }
 
@@ -263,13 +266,13 @@ private fun TransferPlan.toDebugInfo(): SendPlanDebugInfo.Coinage {
             is StrategyType.UnloadAndSplit -> {
                 add("Vouchers to unload:")
                 st.vouchersToUnload.forEach { v ->
-                    add("  idx=${v.ringVrfKeyIndex}  exp=2^${v.recyclerValue.value}")
+                    add("  idx=${v.ringVrfKeyIndex.item}  exp=2^${v.recyclerValue.value}")
                 }
             }
 
             is StrategyType.Split -> {
                 add("Coins for split:")
-                add("  idx=${st.splitFrom.derivationIndex}  exp=2^${st.splitFrom.valueExponent.value}")
+                add("  idx=${st.splitFrom.derivationIndex.item}  exp=2^${st.splitFrom.valueExponent.value}")
             }
 
             is StrategyType.ExactCoins -> Unit
@@ -292,7 +295,7 @@ private fun ExternalPaymentPlan.toDebugInfo(): SendPlanDebugInfo.External = when
         details = buildList {
             add("coinsToLoad=${coinsToLoad.size}")
             coinsToLoad.forEach { c ->
-                add("  idx=${c.derivationIndex}  exp=2^${c.valueExponent.value}")
+                add("  idx=${c.derivationIndex.item}  exp=2^${c.valueExponent.value}")
             }
         },
     )

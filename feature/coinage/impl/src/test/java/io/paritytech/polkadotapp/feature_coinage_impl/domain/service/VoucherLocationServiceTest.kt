@@ -6,6 +6,7 @@ import io.mockk.mockk
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstanceId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
@@ -18,6 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanc
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRecyclerUpdate
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingCollectionId
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingPosition
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingStatus
@@ -25,6 +27,7 @@ import io.paritytech.polkadotapp.feature_members_api.data.repository.MembersRepo
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -33,6 +36,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.time.Instant
 
 /**
  * Keeping each voucher's ring position and fungibility current.
@@ -47,13 +51,15 @@ class VoucherLocationServiceTest {
     private val membersRepository: MembersRepository = mockk()
     private val instanceIdProvider: CoinageInstanceIdProvider = mockk()
     private val ringCapacityProvider: RingCapacityProvider = mockk()
+    private val timeProvider: TimeProvider = mockk()
 
     private val service = VoucherLocationService(
         chainAssetProvider,
         voucherRepository,
         membersRepository,
         instanceIdProvider,
-        ringCapacityProvider
+        ringCapacityProvider,
+        timeProvider
     )
 
     private val written = mutableListOf<Map<BandersnatchPublicKey, VoucherRecyclerUpdate>>()
@@ -141,6 +147,44 @@ class VoucherLocationServiceTest {
         assertTrue(written.single().values.all { it.recyclerFungibility == null })
     }
 
+    /**
+     * The clock is read per tick, not per voucher: the DAO keeps the earlier instant while a voucher stays
+     * in the same ring, and takes this one when it moves — so what the service must supply is simply *now*.
+     */
+    @Test
+    fun `the written location carries the moment the ring was read`() = runTest {
+        givenChain()
+        givenVoucherIncludedInRing()
+        givenRingStatus(included = RING_MEMBERS)
+        givenCapacityReadable()
+        givenUnloadedCounts(Result.success(mapOf(recyclerKey() to 0)))
+
+        startService()
+
+        assertEquals(NOW, written.single().values.single().location.enteredAt)
+    }
+
+    /** A voucher whose stored entry time was cleared is re-read, so a restore starts its wait again. */
+    @Test
+    fun `a voucher that lost its entry time is written again`() = runTest {
+        givenChain()
+        val vouchers = MutableStateFlow(listOf(voucher()))
+        every { voucherRepository.subscribeAllVouchers() } returns vouchers
+        givenIncludedPosition()
+        givenRingStatus(included = RING_MEMBERS)
+        givenCapacityReadable()
+        givenUnloadedCounts(Result.success(mapOf(recyclerKey() to 0)))
+
+        startService()
+        val located = written.single().values.single().location
+        vouchers.value = listOf(voucher().copy(location = located))
+        val beforeRestore = written.size
+        vouchers.value = listOf(voucher().copy(location = located.copy(enteredAt = null)))
+
+        assertEquals("clearing the entry time must re-read the ring", beforeRestore + 1, written.size)
+        assertEquals(NOW, written.last().values.single().location.enteredAt)
+    }
+
     private suspend fun startService() {
         with(ComputationalScope(scope)) { service.start() }
     }
@@ -153,11 +197,16 @@ class VoucherLocationServiceTest {
         coEvery { voucherRepository.updateRecyclerState(any()) } answers {
             written += firstArg<Map<BandersnatchPublicKey, VoucherRecyclerUpdate>>()
         }
+        every { timeProvider.now() } returns NOW
     }
 
     private fun givenVoucherIncludedInRing() {
         every { voucherRepository.subscribeAllVouchers() } returns flowOf(listOf(voucher()))
 
+        givenIncludedPosition()
+    }
+
+    private fun givenIncludedPosition() {
         val position = RingPosition.Included(
             ringIndex = RecyclerIndex(RING_INDEX.toBigInteger()),
             ringPage = 0,
@@ -193,7 +242,7 @@ class VoucherLocationServiceTest {
     private fun collectionId(): RingCollectionId = DENOMINATION.toRingCollectionId(INSTANCE_ID)
 
     private fun voucher() = RecyclerVoucher(
-        ringVrfKeyIndex = 0,
+        ringVrfKeyIndex = testKey(0),
         ringVrfPublicKey = VOUCHER_KEY,
         recyclerValue = DENOMINATION,
         location = RecyclerVoucher.Location.Unknown,
@@ -207,6 +256,7 @@ class VoucherLocationServiceTest {
         const val RING_MEMBERS = 400
         const val RING_INDEX = 3
         val INSTANCE_ID: CoinageInstanceId = 1u
+        val NOW: Instant = Instant.fromEpochMilliseconds(1_000L)
         val DENOMINATION = ValueExponent(3)
         val VOUCHER_KEY: BandersnatchPublicKey = ByteArray(32) { 7 }.toDataByteArray()
     }

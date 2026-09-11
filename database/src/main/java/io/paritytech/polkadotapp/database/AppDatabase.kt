@@ -25,8 +25,10 @@ import io.paritytech.polkadotapp.database.dao.ChatRoomDao
 import io.paritytech.polkadotapp.database.dao.ChatSearchRecentDao
 import io.paritytech.polkadotapp.database.dao.CoinDao
 import io.paritytech.polkadotapp.database.dao.CoinageEntryDao
+import io.paritytech.polkadotapp.database.dao.CoinageInstallationDao
 import io.paritytech.polkadotapp.database.dao.ContactDao
 import io.paritytech.polkadotapp.database.dao.ContactDeviceDao
+import io.paritytech.polkadotapp.database.dao.DurableTxDao
 import io.paritytech.polkadotapp.database.dao.ExternalPaymentDao
 import io.paritytech.polkadotapp.database.dao.FileDownloadDao
 import io.paritytech.polkadotapp.database.dao.FileUploadDao
@@ -39,6 +41,7 @@ import io.paritytech.polkadotapp.database.dao.ProductDao
 import io.paritytech.polkadotapp.database.dao.ProductFundingOperationDao
 import io.paritytech.polkadotapp.database.dao.ProductIntegrationDao
 import io.paritytech.polkadotapp.database.dao.ProductPermissionGrantDao
+import io.paritytech.polkadotapp.database.dao.ProductTopUpDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RemovedChatDao
 import io.paritytech.polkadotapp.database.dao.RingVrfKeyRegistrationDao
@@ -84,7 +87,9 @@ import io.paritytech.polkadotapp.database.migrations.Migration48To49
 import io.paritytech.polkadotapp.database.migrations.Migration54To55Spec
 import io.paritytech.polkadotapp.database.migrations.Migration55To56
 import io.paritytech.polkadotapp.database.migrations.Migration57To58
-import io.paritytech.polkadotapp.database.migrations.Migration59To60
+import io.paritytech.polkadotapp.database.migrations.Migration60To61
+import io.paritytech.polkadotapp.database.migrations.Migration62To63
+import io.paritytech.polkadotapp.database.migrations.Migration63To64
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
@@ -99,11 +104,12 @@ import io.paritytech.polkadotapp.database.model.ChatRoomLocal
 import io.paritytech.polkadotapp.database.model.ChatSearchRecentLocal
 import io.paritytech.polkadotapp.database.model.CoinLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
-import io.paritytech.polkadotapp.database.model.CoinageEntryLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
 import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
+import io.paritytech.polkadotapp.database.model.CoinageInstallationLocal
 import io.paritytech.polkadotapp.database.model.ContactDeviceLocal
 import io.paritytech.polkadotapp.database.model.ContactLocal
+import io.paritytech.polkadotapp.database.model.DurableTxLocal
 import io.paritytech.polkadotapp.database.model.ExternalPaymentLocal
 import io.paritytech.polkadotapp.database.model.FileDownloadLocal
 import io.paritytech.polkadotapp.database.model.FileUploadLocal
@@ -116,6 +122,7 @@ import io.paritytech.polkadotapp.database.model.ProductFundingOperationLocal
 import io.paritytech.polkadotapp.database.model.ProductIntegrationLocal
 import io.paritytech.polkadotapp.database.model.ProductLocal
 import io.paritytech.polkadotapp.database.model.ProductPermissionGrantLocal
+import io.paritytech.polkadotapp.database.model.ProductTopUpLocal
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
 import io.paritytech.polkadotapp.database.model.RemovedChatLocal
 import io.paritytech.polkadotapp.database.model.RingVrfKeyRegistrationLocal
@@ -141,7 +148,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 60,
+    version = 64,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -193,10 +200,12 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         BrowserTabLocal::class,
         ChatSearchRecentLocal::class,
         RingVrfKeyRegistrationLocal::class,
-        CoinageEntryLocal::class,
+        DurableTxLocal::class,
+        CoinageInstallationLocal::class,
         CoinageEntryInputLocal::class,
         CoinageEntryOutputLocal::class,
         CoinageHandoffLocal::class,
+        ProductTopUpLocal::class,
     ],
     autoMigrations = [
         // Add ChatMessageReactionLocal
@@ -269,6 +278,10 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 56, to = 57),
         // Add product_funding_operations table (open funding operations, resumed on app start)
         AutoMigration(from = 58, to = 59),
+        // Add product_top_ups table (kept indefinitely and resumed on app start)
+        AutoMigration(from = 59, to = 60),
+        // Add recycler_vouchers.enteredAt to preserve readiness timers across restarts
+        AutoMigration(from = 61, to = 62),
     ]
 )
 @TypeConverters(
@@ -285,7 +298,7 @@ abstract class AppDatabase : RoomDatabase() {
             chatMessageContentMigrations: Set<ChatMessageContentMigration<*, *>> = emptySet(),
         ): AppDatabase {
             return Room
-                .databaseBuilder(context.applicationContext, AppDatabase::class.java, "app.db")
+                .databaseBuilder(context.applicationContext, AppDatabase::class.java, "app_v2.db")
                 .addAppMigrations(preferences, chatMessageContentMigrations)
                 .build()
         }
@@ -318,7 +331,9 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration48To49(),
                 Migration55To56(),
                 Migration57To58(),
-                Migration59To60(),
+                Migration60To61(),
+                Migration62To63(),
+                Migration63To64(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }
@@ -372,6 +387,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     abstract fun productFundingOperationDao(): ProductFundingOperationDao
 
+    abstract fun productTopUpDao(): ProductTopUpDao
+
     abstract fun chatRequestDao(): ChatRequestDao
 
     abstract fun chatRequestSyncStateDao(): ChatRequestSyncStateDao
@@ -411,4 +428,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chatSearchRecentDao(): ChatSearchRecentDao
 
     abstract fun ringVrfKeyRegistrationDao(): RingVrfKeyRegistrationDao
+
+    abstract fun durableTxDao(): DurableTxDao
+
+    abstract fun coinageInstallationDao(): CoinageInstallationDao
 }

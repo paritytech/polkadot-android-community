@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 60,
-    "identityHash": "07ea57a4687ac901821e39f63f23dd7f",
+    "identityHash": "4b12acfa6fa4680f42447253f1ec5c32",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -1662,7 +1662,7 @@
       },
       {
         "tableName": "coins",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`derivationIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `valueExponent` INTEGER NOT NULL, `ageValue` INTEGER, `onChain` INTEGER NOT NULL, `recyclerFungibility` INTEGER, `hops` BLOB, `incomingBundleSize` INTEGER, PRIMARY KEY(`derivationIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`derivationIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `valueExponent` INTEGER NOT NULL, `ageValue` INTEGER, `onChain` INTEGER NOT NULL, PRIMARY KEY(`derivationIndex`))",
         "fields": [
           {
             "fieldPath": "derivationIndex",
@@ -1692,21 +1692,6 @@
             "columnName": "onChain",
             "affinity": "INTEGER",
             "notNull": true
-          },
-          {
-            "fieldPath": "recyclerFungibility",
-            "columnName": "recyclerFungibility",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "hops",
-            "columnName": "hops",
-            "affinity": "BLOB"
-          },
-          {
-            "fieldPath": "incomingBundleSize",
-            "columnName": "incomingBundleSize",
-            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -1718,7 +1703,7 @@
       },
       {
         "tableName": "recycler_vouchers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `recyclerFungibility` INTEGER NOT NULL DEFAULT 0, `maxRecyclerFungibility` INTEGER, PRIMARY KEY(`ringVrfKeyIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, PRIMARY KEY(`ringVrfKeyIndex`))",
         "fields": [
           {
             "fieldPath": "ringVrfKeyIndex",
@@ -1746,18 +1731,6 @@
           {
             "fieldPath": "recyclerMembers",
             "columnName": "recyclerMembers",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "recyclerFungibility",
-            "columnName": "recyclerFungibility",
-            "affinity": "INTEGER",
-            "notNull": true,
-            "defaultValue": "0"
-          },
-          {
-            "fieldPath": "maxRecyclerFungibility",
-            "columnName": "maxRecyclerFungibility",
             "affinity": "INTEGER"
           }
         ],
@@ -2977,11 +2950,58 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_coinage_handoff_assetKind_derivationIndex` ON `${TABLE_NAME}` (`assetKind`, `derivationIndex`)"
           }
         ]
+      },
+      {
+        "tableName": "product_top_ups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`productId` TEXT NOT NULL, `topUpId` TEXT NOT NULL, `amountPlanks` TEXT NOT NULL, `startedAtMillis` INTEGER NOT NULL, `outcome` TEXT, `actualClaimedPlanks` TEXT, PRIMARY KEY(`productId`, `topUpId`))",
+        "fields": [
+          {
+            "fieldPath": "productId",
+            "columnName": "productId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "topUpId",
+            "columnName": "topUpId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountPlanks",
+            "columnName": "amountPlanks",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtMillis",
+            "columnName": "startedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outcome",
+            "columnName": "outcome",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "actualClaimedPlanks",
+            "columnName": "actualClaimedPlanks",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "productId",
+            "topUpId"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '07ea57a4687ac901821e39f63f23dd7f')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4b12acfa6fa4680f42447253f1ec5c32')"
     ]
   }
 }

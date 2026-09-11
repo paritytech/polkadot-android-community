@@ -16,11 +16,14 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherReadinessUpdates
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.withReadinessUpdates
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import org.jetbrains.annotations.VisibleForTesting
 import javax.inject.Inject
 
@@ -35,15 +38,24 @@ class RealTotalBalanceUseCase @Inject constructor(
     private val settings: CoinageRecyclingStrategySettings,
     private val evaluator: CoinRecyclingEvaluator,
     private val usabilityContextFactory: VoucherUsabilityContextFactory,
+    private val readinessUpdates: VoucherReadinessUpdates,
 ) : TotalBalanceUseCase {
+    private data class Input(
+        val coins: List<TrackedCoin>,
+        val vouchers: List<TrackedVoucher>,
+        val strategyType: RecyclingStrategyType,
+        val verdicts: RecyclingVerdicts,
+    )
+
     override fun subscribeTotalBalance(): Flow<Result<CoinageBalance>> = combine(
         coinageAssetsUseCase.subscribeCoins(),
         coinageAssetsUseCase.subscribeVouchers(),
         settings.strategyFlow(),
         evaluator.verdicts,
-    ) { coins, vouchers, strategyType, verdicts ->
-        calculateCoinageBalance(coins, vouchers, strategyType, verdicts)
-    }.distinctUntilChanged()
+        ::Input,
+    ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.strategyType })
+        .map { calculateCoinageBalance(it.coins, it.vouchers, it.strategyType, it.verdicts) }
+        .distinctUntilChanged()
 
     override suspend fun getBalance(): Result<CoinageBalance> {
         return calculateCoinageBalance(

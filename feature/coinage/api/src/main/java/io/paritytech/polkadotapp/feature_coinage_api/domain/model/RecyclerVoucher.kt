@@ -2,12 +2,12 @@ package io.paritytech.polkadotapp.feature_coinage_api.domain.model
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
+import kotlin.time.Instant
 
-typealias RingVrfIndex = Int
 typealias RecyclerIndex = RingIndex
 
 data class RecyclerVoucher(
-    val ringVrfKeyIndex: RingVrfIndex,
+    val ringVrfKeyIndex: CoinageKeyIndex,
     val ringVrfPublicKey: BandersnatchPublicKey,
     val recyclerValue: ValueExponent,
     val location: Location,
@@ -36,6 +36,11 @@ data class RecyclerVoucher(
              * the anonymity this voucher really has, not how many keys the ring has been offered.
              */
             val recyclerMembers: Int,
+            /**
+             * When the app first confirmed this voucher in the ring root.
+             * Null until confirmed. Saved across restarts and reset on restore.
+             */
+            val enteredAt: Instant?,
         ) : Location
     }
 }

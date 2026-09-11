@@ -14,13 +14,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * A voucher's frozen maximum fungibility is written exactly once, and its current one may be left alone.
+ * What one UPDATE has to guarantee about a voucher's ring: when its timer starts, and when its fungibility
+ * may be left alone.
  *
- * Both guarantees live entirely in one SQL statement, which is why they are pinned here. The maximum records
- * the anonymity a ring offered when the voucher arrived; it is what makes a later, higher current fungibility
- * legible as the overloaded state the UI absorbs rather than as corruption. If it could move, that reading
- * would be gone. And a null parameter has to leave a stored fungibility standing, because the value needs
- * two chain reads that can fail independently of the location written alongside it.
+ * The frozen maximum records the anonymity a ring offered when the voucher arrived; it is what makes a later,
+ * higher current fungibility legible as the overloaded state the UI absorbs rather than as corruption. If it
+ * could move, that reading would be gone. And a null parameter has to leave a stored fungibility standing,
+ * because the value needs two chain reads that can fail independently of the location written alongside it.
  */
 @RunWith(AndroidJUnit4::class)
 class RecyclerVoucherDaoTest {
@@ -41,8 +41,42 @@ class RecyclerVoucherDaoTest {
     fun tearDown() = database.close()
 
     @Test
+    fun repeatedObservationsKeepTheFirstConfirmedInclusionTime() = runBlocking {
+        givenVoucher()
+
+        update(enteredAt = 1_000L, recyclerMembers = 31)
+        update(enteredAt = 601_000L, recyclerMembers = 32)
+
+        assertEquals(1_000L, storedVoucher().enteredAt)
+    }
+
+    @Test
+    fun movingToAnotherRingStartsANewTimer() = runBlocking {
+        givenVoucher(ring = RING_INDEX, members = 32, enteredAt = 1_000L)
+
+        update(recyclerIndex = RING_INDEX + 1, enteredAt = 601_000L, recyclerMembers = 40)
+
+        val voucher = storedVoucher()
+        assertEquals(RING_INDEX + 1, voucher.locationRecyclerIndex)
+        assertEquals(601_000L, voucher.enteredAt)
+    }
+
+    @Test
+    fun restoreRestartsTheTimerAtTheNextConfirmedObservation() = runBlocking {
+        givenVoucher(ring = RING_INDEX, members = 32, enteredAt = 1_000L)
+        // What a restore leaves behind: the ring is known again, the time in it is not.
+        dao().insertAll(listOf(voucherRow(ring = RING_INDEX, members = 0, enteredAt = null)))
+        assertNull(storedVoucher().enteredAt)
+
+        update(enteredAt = 61_000L, recyclerMembers = 32)
+        update(enteredAt = 121_000L, recyclerMembers = 33)
+
+        assertEquals(61_000L, storedVoucher().enteredAt)
+    }
+
+    @Test
     fun theFirstUpdateFreezesTheMaximum() = runBlocking {
-        givenVoucherOutsideRing()
+        givenVoucher()
 
         update(recyclerFungibility = 90, maxRecyclerFungibility = 90)
 
@@ -51,7 +85,7 @@ class RecyclerVoucherDaoTest {
 
     @Test
     fun alaterUpdateLeavesTheFrozenMaximumAlone() = runBlocking {
-        givenVoucherOutsideRing()
+        givenVoucher()
 
         update(recyclerFungibility = 90, maxRecyclerFungibility = 90)
         update(recyclerFungibility = 40, maxRecyclerFungibility = 40)
@@ -68,7 +102,7 @@ class RecyclerVoucherDaoTest {
      */
     @Test
     fun afrozenMaximumOfZeroIsStillFrozen() = runBlocking {
-        givenVoucherOutsideRing()
+        givenVoucher()
 
         update(recyclerFungibility = 0, maxRecyclerFungibility = 0)
         update(recyclerFungibility = 70, maxRecyclerFungibility = 70)
@@ -78,14 +112,14 @@ class RecyclerVoucherDaoTest {
 
     @Test
     fun aVoucherThatHasNeverBeenInARingHasNoMaximum() = runBlocking {
-        givenVoucherOutsideRing()
+        givenVoucher()
 
         assertNull(storedVoucher().maxRecyclerFungibility)
     }
 
     @Test
     fun anUnreadableFungibilityLeavesTheStoredValuesStanding() = runBlocking {
-        givenVoucherOutsideRing()
+        givenVoucher()
         update(recyclerFungibility = 55, maxRecyclerFungibility = 55)
 
         update(recyclerFungibility = null, maxRecyclerFungibility = null)
@@ -98,7 +132,7 @@ class RecyclerVoucherDaoTest {
     /** A failed fungibility read must never cost the voucher the member count that decides spendability. */
     @Test
     fun anUnreadableFungibilityStillRecordsTheLocation() = runBlocking {
-        givenVoucherOutsideRing()
+        givenVoucher()
 
         update(recyclerFungibility = null, maxRecyclerFungibility = null, recyclerMembers = 512)
 
@@ -109,36 +143,42 @@ class RecyclerVoucherDaoTest {
 
     private fun dao() = database.recyclerVoucherDao()
 
-    private suspend fun givenVoucherOutsideRing() {
-        dao().insert(
-            RecyclerVoucherLocal(
-                ringVrfKeyIndex = 0,
-                ringVrfPublicKey = publicKey,
-                recyclerValue = 3,
-                locationRecyclerIndex = null,
-                recyclerMembers = null,
-                recyclerFungibility = 0,
-                maxRecyclerFungibility = null
-            )
-        )
+    private suspend fun givenVoucher(ring: Int? = null, members: Int? = null, enteredAt: Long? = null) {
+        dao().insert(voucherRow(ring, members, enteredAt))
     }
 
+    private fun voucherRow(ring: Int?, members: Int?, enteredAt: Long?) = RecyclerVoucherLocal(
+        installationId = INSTALLATION_ID,
+        ringVrfKeyIndex = 0,
+        ringVrfPublicKey = publicKey,
+        recyclerValue = 3,
+        locationRecyclerIndex = ring,
+        recyclerMembers = members,
+        enteredAt = enteredAt,
+        recyclerFungibility = 0,
+        maxRecyclerFungibility = null
+    )
+
     private suspend fun update(
-        recyclerFungibility: Int?,
-        maxRecyclerFungibility: Int?,
-        recyclerMembers: Int = 400
+        recyclerIndex: Int = RING_INDEX,
+        recyclerMembers: Int = 400,
+        enteredAt: Long? = null,
+        recyclerFungibility: Int? = null,
+        maxRecyclerFungibility: Int? = null
     ) = dao().updateLocation(
         ringVrfPublicKey = publicKey,
-        recyclerIndex = RING_INDEX,
+        recyclerIndex = recyclerIndex,
         recyclerMembers = recyclerMembers,
+        enteredAt = enteredAt,
         recyclerFungibility = recyclerFungibility,
         maxRecyclerFungibility = maxRecyclerFungibility
     )
 
     private suspend fun storedVoucher(): RecyclerVoucherLocal =
-        dao().getByRingVrfKeyIndices(listOf(0)).single()
+        dao().getByRingVrfKeyIndices(INSTALLATION_ID, listOf(0)).single()
 
     private companion object {
         const val RING_INDEX = 3
+        val INSTALLATION_ID = ByteArray(32)
     }
 }

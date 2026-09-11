@@ -2,15 +2,16 @@ package io.paritytech.polkadotapp.database.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 
-@Entity(tableName = "recycler_vouchers")
+@Entity(tableName = "recycler_vouchers", primaryKeys = ["installationId", "ringVrfKeyIndex"])
 class RecyclerVoucherLocal(
-    @PrimaryKey val ringVrfKeyIndex: Int,
+    val installationId: ByteArray,
+    val ringVrfKeyIndex: Int,
     val ringVrfPublicKey: ByteArray,
     val recyclerValue: Int,
     val locationRecyclerIndex: Int?,
     val recyclerMembers: Int?,
+    val enteredAt: Long?,
     /** Percentage in `0..100`, kept current while the voucher sits in a ring. */
     @ColumnInfo(defaultValue = UNKNOWN_FUNGIBILITY)
     val recyclerFungibility: Int,
@@ -25,5 +26,5 @@ class RecyclerVoucherLocal(
     val maxRecyclerFungibility: Int?,
 )
 
-/** Must match the `DEFAULT` in `Migration59To60`, or Room's schema validation rejects a migrated database. */
+/** Must match the `DEFAULT` in `Migration63To64`, or Room's schema validation rejects a migrated database. */
 private const val UNKNOWN_FUNGIBILITY = "0"

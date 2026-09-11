@@ -10,12 +10,13 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinUpdate
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Hop
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
@@ -42,7 +43,7 @@ class CoinPresenceSyncServiceTest {
     private val service = CoinPresenceSyncService(chainAssetProvider, coinRepository)
 
     private val written = mutableListOf<List<CoinUpdate>>()
-    private val hopsWritten = mutableListOf<Map<DerivationIndex, List<Hop>>>()
+    private val hopsWritten = mutableListOf<Map<CoinageKeyIndex, List<Hop>>>()
     private val scope = CoroutineScope(UnconfinedTestDispatcher())
 
     @After
@@ -165,7 +166,7 @@ class CoinPresenceSyncServiceTest {
         every { coinRepository.subscribeAllCoins() } returns flowOf(coins.toList())
         coEvery { coinRepository.updateCoins(any()) } answers { written += firstArg<List<CoinUpdate>>() }
         coEvery { coinRepository.updateCoinHops(any()) } answers {
-            hopsWritten += firstArg<Map<DerivationIndex, List<Hop>>>()
+            hopsWritten += firstArg<Map<CoinageKeyIndex, List<Hop>>>()
         }
     }
 
@@ -182,7 +183,7 @@ class CoinPresenceSyncServiceTest {
         onChain: Boolean,
         provenance: CoinProvenance = CoinProvenance.UNKNOWN
     ) = Coin(
-        derivationIndex = 0,
+        derivationIndex = testKey(0),
         valueExponent = ValueExponent(3),
         age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
         isOnChain = onChain,

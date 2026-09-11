@@ -1,26 +1,21 @@
 package io.paritytech.polkadotapp.feature_backup_impl.recover
 
-import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.launchUnit
-import io.paritytech.polkadotapp.feature_backup_api.domain.error.ImportFromBackupError
 import io.paritytech.polkadotapp.feature_backup_api.presentation.RecoverOptionsPayload
 import io.paritytech.polkadotapp.feature_backup_impl.BackupRouter
+import io.paritytech.polkadotapp.feature_backup_impl.presentation.error.toImportFromBackupPresentationError
 import io.paritytech.polkadotapp.feature_backup_impl.recover.domain.RecoverOptionsInteractor
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
-import io.paritytech.polkadotapp.common.R as RCommon
 
 @HiltViewModel
 class RecoverOptionsViewModel @Inject constructor(
     private val router: BackupRouter,
-    private val interactor: RecoverOptionsInteractor,
-    @ApplicationContext
-    private val context: Context
+    private val interactor: RecoverOptionsInteractor
 ) : BaseViewModel(), RecoverOptionsContract {
     override val isRecovering = MutableStateFlow(false)
 
@@ -36,13 +31,7 @@ class RecoverOptionsViewModel @Inject constructor(
             .onFailure { t ->
                 isRecovering.disable()
 
-                when (t) {
-                    ImportFromBackupError.Cancelled -> Unit
-                    ImportFromBackupError.NotFound -> showError(context.getString(RCommon.string.backup_not_found_error))
-                    ImportFromBackupError.Corrupted -> showError(context.getString(RCommon.string.backup_corrupted_error))
-                    is ImportFromBackupError.Unknown -> showError(t.original)
-                    else -> showError(t)
-                }
+                showPresentationError(t.toImportFromBackupPresentationError())
             }
     }
 

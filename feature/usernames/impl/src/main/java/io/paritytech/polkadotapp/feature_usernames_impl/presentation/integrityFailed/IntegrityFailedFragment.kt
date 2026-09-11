@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeFragment
-import io.paritytech.polkadotapp.common.presentation.tabbar.HideTabBar
 import io.paritytech.polkadotapp.feature_usernames_impl.presentation.integrityFailed.compose.IntegrityFailedScreen
 
 @AndroidEntryPoint
@@ -13,7 +12,6 @@ class IntegrityFailedFragment : BaseComposeFragment<IntegrityFailedViewModel>() 
 
     @Composable
     override fun Screen() {
-        HideTabBar()
         IntegrityFailedScreen(viewModel)
     }
 }

@@ -12,7 +12,7 @@ class NavigationHolder @Inject constructor(val contextManager: ContextManager) {
         private set
 
     val currentTab: StateFlow<BottomTab>
-        field = MutableStateFlow(BottomTab.WALLET)
+        field = MutableStateFlow(BottomTab.CHATS)
 
     fun attach(navController: NavController) {
         this.navController = navController

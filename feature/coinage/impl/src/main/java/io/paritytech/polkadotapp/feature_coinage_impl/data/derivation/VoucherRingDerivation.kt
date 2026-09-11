@@ -12,62 +12,53 @@ import io.paritytech.polkadotapp.common.utils.blake2b256
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.AccountSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.requireMetaAccountPassphrase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import javax.inject.Inject
 
 interface VoucherRingDerivation {
-    suspend fun deriveBandersnatch(derivationIndex: DerivationIndex): BandersnatchEntropy
+    suspend fun deriveBandersnatch(derivationIndex: CoinageKeyIndex): BandersnatchEntropy
 
-    suspend fun deriveBandersnatchBatch(derivationIndices: List<DerivationIndex>): List<BandersnatchEntropy>
+    suspend fun deriveBandersnatchBatch(derivationIndices: List<CoinageKeyIndex>): List<BandersnatchEntropy>
 
     /**
      * This and [aliasOf] are interface members rather than top-level extensions so we can fake them in tests - JVM tests cant access Bandersnatch
      * Mocking via mockStatic is not an option - its too slow for the fuzzer
      */
-    suspend fun memberKeyOf(derivationIndex: DerivationIndex): BandersnatchPublicKey
+    suspend fun memberKeyOf(derivationIndex: CoinageKeyIndex): BandersnatchPublicKey
 
-    suspend fun aliasOf(derivationIndex: DerivationIndex, context: BandersnatchContext): BandersnatchAlias
+    suspend fun aliasOf(derivationIndex: CoinageKeyIndex, context: BandersnatchContext): BandersnatchAlias
 }
 
 class RealVoucherRingDerivation @Inject constructor(
     private val accountRepository: AccountRepository,
     private val accountSecretsStorage: AccountSecretsStorage,
 ) : VoucherRingDerivation {
-    companion object {
-        private const val DERIVATION_PATH_BASE = "//pps//ring-vrf"
+    override suspend fun deriveBandersnatch(derivationIndex: CoinageKeyIndex): BandersnatchEntropy {
+        val path = ringVrfDerivationBase(derivationIndex.installation) + itemDerivationSegment(derivationIndex.item)
 
-        private fun getDerivationPath(derivationIndex: DerivationIndex) = "$DERIVATION_PATH_BASE//$derivationIndex"
+        return deriveBandersnatch(rootEntropy(), path)
     }
 
-    override suspend fun deriveBandersnatch(derivationIndex: DerivationIndex): BandersnatchEntropy {
-        val accountId = accountRepository.getWalletAccount().id
-        val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
-
-        return deriveBandersnatchFromEntropy(mnemonic.entropy, derivationIndex)
-    }
-
-    override suspend fun memberKeyOf(derivationIndex: DerivationIndex): BandersnatchPublicKey =
+    override suspend fun memberKeyOf(derivationIndex: CoinageKeyIndex): BandersnatchPublicKey =
         deriveBandersnatch(derivationIndex).memberKey()
 
-    override suspend fun aliasOf(derivationIndex: DerivationIndex, context: BandersnatchContext): BandersnatchAlias =
+    override suspend fun aliasOf(derivationIndex: CoinageKeyIndex, context: BandersnatchContext): BandersnatchAlias =
         deriveBandersnatch(derivationIndex).aliasInContext(context)
 
-    override suspend fun deriveBandersnatchBatch(derivationIndices: List<DerivationIndex>): List<BandersnatchEntropy> {
-        val accountId = accountRepository.getWalletAccount().id
-        val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
+    override suspend fun deriveBandersnatchBatch(derivationIndices: List<CoinageKeyIndex>): List<BandersnatchEntropy> {
+        val entropy = rootEntropy()
 
-        val base = deriveBandersnatch(mnemonic.entropy, DERIVATION_PATH_BASE)
-
-        return derivationIndices.map { derivationIndex ->
-            val individualPath = "//$derivationIndex"
-            deriveBandersnatch(base.value, individualPath)
-        }
+        return derivationIndices.deriveGroupedByInstallation(
+            base = { installation -> deriveBandersnatch(entropy, ringVrfDerivationBase(installation)) },
+            child = { base, item -> deriveBandersnatch(base.value, itemDerivationSegment(item)) }
+        )
     }
 
-    private fun deriveBandersnatchFromEntropy(entropy: ByteArray, derivationIndex: DerivationIndex): BandersnatchEntropy {
-        val path = getDerivationPath(derivationIndex)
-        return deriveBandersnatch(entropy, path)
+    private suspend fun rootEntropy(): ByteArray {
+        val accountId = accountRepository.getWalletAccount().id
+        return accountSecretsStorage.requireMetaAccountPassphrase(accountId).entropy
     }
 
     private fun deriveBandersnatch(entropy: ByteArray, derivationPath: String): BandersnatchEntropy {
@@ -84,12 +75,21 @@ class RealVoucherRingDerivation @Inject constructor(
 
         return BandersnatchEntropy(derivedEntropy)
     }
+
+    // Unlike coinage keys, the item junction is hard - ring-vrf entropy derivation is a blake2b chaincode chain with no soft variant
+    private fun itemDerivationSegment(item: Int): String {
+        return "//$item"
+    }
+
+    private fun ringVrfDerivationBase(installation: CoinageInstallationId): String {
+        return "//coinage-ring-vrf//${CoinageDerivationDefaults.COINAGE_MAIN_PURSE_INDEX}//${installation.asPageSegment()}"
+    }
 }
 
-suspend fun VoucherRingDerivation.getDerivedMemberKey(derivationIndex: DerivationIndex) =
+suspend fun VoucherRingDerivation.getDerivedMemberKey(derivationIndex: CoinageKeyIndex) =
     deriveBandersnatch(derivationIndex).memberKey()
 
-suspend fun VoucherRingDerivation.getDerivedMemberKeys(derivationIndices: List<DerivationIndex>) =
+suspend fun VoucherRingDerivation.getDerivedMemberKeys(derivationIndices: List<CoinageKeyIndex>) =
     deriveBandersnatchBatch(derivationIndices).map { it.memberKey() }
 
 suspend fun VoucherRingDerivation.deriveBandersnatchForVouchers(vouchers: List<RecyclerVoucher>) = vouchers.map {

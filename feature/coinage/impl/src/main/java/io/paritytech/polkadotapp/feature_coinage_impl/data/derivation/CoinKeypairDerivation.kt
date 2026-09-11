@@ -12,53 +12,58 @@ import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.AccountSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.requireMetaAccountPassphrase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import javax.inject.Inject
 
 interface CoinKeypairDerivation {
-    suspend fun deriveKeypair(derivationIndex: DerivationIndex): Keypair
+    suspend fun deriveKeypair(derivationIndex: CoinageKeyIndex): Keypair
 
-    suspend fun deriveKeypairs(derivationIndices: List<DerivationIndex>): List<Keypair>
+    suspend fun deriveKeypairs(derivationIndices: List<CoinageKeyIndex>): List<Keypair>
 }
 
 class RealCoinKeypairDerivation @Inject constructor(
     private val accountRepository: AccountRepository,
     private val accountSecretsStorage: AccountSecretsStorage,
 ) : CoinKeypairDerivation {
-    companion object {
-        private const val COIN_DERIVATION_PATH_BASE = "//pps//coin"
+    override suspend fun deriveKeypair(derivationIndex: CoinageKeyIndex): Keypair {
+        val seed = rootSeed()
+        val path = coinageDerivationBase(derivationIndex.installation) + itemDerivationSegment(derivationIndex.item)
 
-        private fun getCoinDerivationPath(derivationIndex: DerivationIndex) = "$COIN_DERIVATION_PATH_BASE//$derivationIndex"
+        return SubstrateKeypairFactory.generate(EncryptionType.SR25519, seed, path)
     }
 
-    override suspend fun deriveKeypair(derivationIndex: DerivationIndex): Keypair {
+    override suspend fun deriveKeypairs(derivationIndices: List<CoinageKeyIndex>): List<Keypair> {
+        val seed = rootSeed()
+
+        return derivationIndices.deriveGroupedByInstallation(
+            base = { installation ->
+                SubstrateKeypairFactory.generate(EncryptionType.SR25519, seed, coinageDerivationBase(installation)) as Sr25519Keypair
+            },
+            child = { base, item ->
+                val junction = SubstrateJunctionDecoder.decode(itemDerivationSegment(item)).junctions.first()
+                Sr25519SubstrateKeypairFactory.deriveChild(base, junction)
+            }
+        )
+    }
+
+    private suspend fun rootSeed(): ByteArray {
         val accountId = accountRepository.getWalletAccount().id
         val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
 
-        val path = getCoinDerivationPath(derivationIndex)
-
-        val seedResult = SubstrateSeedFactory.deriveSeed32(mnemonic.words, password = null)
-        val keypair = SubstrateKeypairFactory.generate(EncryptionType.SR25519, seedResult.seed, path)
-
-        return keypair
+        return SubstrateSeedFactory.deriveSeed32(mnemonic.words, password = null).seed
     }
 
-    override suspend fun deriveKeypairs(derivationIndices: List<DerivationIndex>): List<Keypair> {
-        val accountId = accountRepository.getWalletAccount().id
-        val mnemonic = accountSecretsStorage.requireMetaAccountPassphrase(accountId)
-        val seedResult = SubstrateSeedFactory.deriveSeed32(mnemonic.words, password = null)
+    private fun itemDerivationSegment(item: Int): String {
+        return "/$item"
+    }
 
-        val baseCoinageKeypair = SubstrateKeypairFactory.generate(EncryptionType.SR25519, seedResult.seed, COIN_DERIVATION_PATH_BASE)
-            as Sr25519Keypair
-
-        return derivationIndices.map { derivationIndex ->
-            val junction = SubstrateJunctionDecoder.decode("//$derivationIndex").junctions.first()
-            Sr25519SubstrateKeypairFactory.deriveChild(baseCoinageKeypair, junction)
-        }
+    private fun coinageDerivationBase(installation: CoinageInstallationId): String {
+        return "//coinage//${CoinageDerivationDefaults.COINAGE_MAIN_PURSE_INDEX}//${installation.asPageSegment()}"
     }
 }
 
-suspend fun CoinKeypairDerivation.getDerivedAccountId(derivationIndex: DerivationIndex) = deriveKeypair(derivationIndex).publicKey.intoAccountId()
+suspend fun CoinKeypairDerivation.getDerivedAccountId(derivationIndex: CoinageKeyIndex) = deriveKeypair(derivationIndex).publicKey.intoAccountId()
 
-suspend fun CoinKeypairDerivation.getDerivedAccountIds(derivationIndices: List<DerivationIndex>) =
+suspend fun CoinKeypairDerivation.getDerivedAccountIds(derivationIndices: List<CoinageKeyIndex>) =
     deriveKeypairs(derivationIndices).map { it.publicKey.intoAccountId() }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Builds the sample product and publishes the bundle as a GitHub gist. stdout is exactly the raw
- * content URL to paste into the app's debug menu; all progress goes to stderr.
+ * Builds the sample product and publishes the bundle as a GitHub gist. stdout is exactly the URL to
+ * paste into the app's debug menu; all progress goes to stderr.
  *
  * The gist file is named after the current git branch, so each branch owns one deploy. Any earlier
  * gist carrying that same file name is deleted, leaving exactly one gist per branch.
@@ -81,7 +81,7 @@ function scriptNameFromBranch() {
 function build(minify) {
     const script = minify ? 'build:prod:minified' : 'build:prod';
     console.error(`→ npm run ${script}`);
-    // esbuild reports to stdout; redirect it to fd 2 so stdout carries only the raw URL.
+    // esbuild reports to stdout; redirect it to fd 2 so stdout carries only the URL.
     run('npm', ['run', script], { stdio: ['ignore', 2, 'inherit'] });
 }
 
@@ -134,4 +134,7 @@ const staleGistIds = findGistsNamed(scriptName);
 const gist = createGist(scriptName, content, args.public);
 staleGistIds.forEach(deleteGist);
 
-console.log(`https://gist.githubusercontent.com/${gist.owner.login}/${gist.id}/raw/${scriptName}`);
+// githack, not the gist raw host: the latter serves text/plain, which the WebView rejects under
+// strict MIME checking for module scripts. This is githack's uncached endpoint, so a redeploy is
+// picked up immediately.
+console.log(`https://gist.githack.com/${gist.owner.login}/${gist.id}/raw/${scriptName}`);

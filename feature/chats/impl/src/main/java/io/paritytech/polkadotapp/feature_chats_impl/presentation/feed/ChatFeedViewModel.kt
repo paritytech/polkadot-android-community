@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.common.presentation.loading.awaitLoaded
 import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
 import io.paritytech.polkadotapp.common.presentation.loading.onLoaded
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.OneShotEventChannel
 import io.paritytech.polkadotapp.common.utils.collectionIndexOrNull
@@ -44,9 +45,13 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageRev
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.isUnread
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.toOpenChatRequest
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
+import io.paritytech.polkadotapp.feature_chats_impl.domain.error.asAttachmentError
+import io.paritytech.polkadotapp.feature_chats_impl.domain.error.asChatRequestError
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatFeedInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatUserInputState
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.InitiateCallResult
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.BusyInAnotherChatPresentationError
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.draft.ChatDraftController
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.mappers.ChatMessageUiMapper
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatInputUiState
@@ -396,7 +401,7 @@ class ChatFeedViewModel @Inject constructor(
     override fun onLeaveChatConfirm() = launchUnit {
         interactor.leaveChat(chatId)
             .onSuccess { router.back() }
-            .onFailure(::showError)
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     override fun onBlockUserRequest() = launchUnit {
@@ -407,12 +412,12 @@ class ChatFeedViewModel @Inject constructor(
     override fun onBlockUserConfirm() = launchUnit {
         interactor.blockUser(chatId)
             .onSuccess { router.back() }
-            .onFailure(::showError)
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     override fun onUnblockUserClick() = launchUnit {
         interactor.unblockUser(chatId)
-            .onFailure(::showError)
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     override fun onStartCallClick(withVideo: Boolean) = launchUnit {
@@ -426,7 +431,8 @@ class ChatFeedViewModel @Inject constructor(
             val username = chatDisplay.awaitLoaded().username
             when (interactor.initiateCall(chatId, username, withVideo)) {
                 InitiateCallResult.DONE -> Unit
-                InitiateCallResult.BUSY_IN_ANOTHER_CHAT -> showMessage("You have an ongoing call in another chat")
+                InitiateCallResult.BUSY_IN_ANOTHER_CHAT ->
+                    showPresentationError(BusyInAnotherChatPresentationError())
             }
         }
 
@@ -514,7 +520,7 @@ class ChatFeedViewModel @Inject constructor(
         interactor.acceptIncomingRequest(contactAccountId)
             .onFailure {
                 chatRequestAnswerProgress.value = ChatRequestAnswerProgress.None
-                showError(it)
+                showPresentationError(it.asChatRequestError().toPresentationError())
             }
     }
 
@@ -527,7 +533,7 @@ class ChatFeedViewModel @Inject constructor(
             .onSuccess { router.back() }
             .onFailure {
                 chatRequestAnswerProgress.value = ChatRequestAnswerProgress.None
-                showError(it)
+                showPresentationError(it.asChatRequestError().toPresentationError())
             }
     }
 
@@ -548,7 +554,7 @@ class ChatFeedViewModel @Inject constructor(
                 sendAttachmentMessage(attachmentResult, text, replyToMessageId)
             }
             .onFailure {
-                showError(it)
+                showPresentationError(it.asAttachmentError().toPresentationError())
             }
     }
 
@@ -565,7 +571,7 @@ class ChatFeedViewModel @Inject constructor(
             text = text,
             replyToMessageId = replyToMessageId
         ).onFailure {
-            showError(it)
+            showPresentationError(it.asAttachmentError().toPresentationError())
         }
     }
 
@@ -578,7 +584,7 @@ class ChatFeedViewModel @Inject constructor(
 
         interactor.sendContactRequest(openChatRequest, welcomeText)
             .logFailure("Failed to send contact request")
-            .onFailure(::showError)
+            .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
     private suspend fun sendMessageToActiveChat(messageText: String, relation: InputMessageRelation) {

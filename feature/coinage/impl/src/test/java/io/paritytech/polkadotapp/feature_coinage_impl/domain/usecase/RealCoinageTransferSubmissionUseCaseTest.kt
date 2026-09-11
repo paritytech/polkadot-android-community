@@ -20,6 +20,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransactionAssets
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import kotlinx.coroutines.runBlocking
@@ -66,7 +67,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
     fun `a key with no coin on chain is skipped rather than claimed`() = runBlocking<Unit> {
         val present = keypairOf(1)
         val missing = keypairOf(2)
-        givenTransactionMints(Coin(derivationIndex = 9, valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
+        givenTransactionMints(Coin(derivationIndex = testKey(9), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
         givenExtrinsicBuilds()
         givenSubmissionSucceeds()
 
@@ -79,7 +80,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
     @Test
     fun `every claim is registered together, under the group the caller passed`() = runBlocking<Unit> {
         val keypairs = listOf(keypairOf(1), keypairOf(2))
-        givenTransactionMints(Coin(derivationIndex = 9, valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
+        givenTransactionMints(Coin(derivationIndex = testKey(9), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
         givenExtrinsicBuilds()
         givenSubmissionSucceeds()
 
@@ -93,7 +94,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
     @Test
     fun `a claim consumes the peer's key and mints a coin of ours`() = runBlocking<Unit> {
         val keypair = keypairOf(1)
-        val minted = Coin(derivationIndex = 9, valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN)
+        val minted = Coin(derivationIndex = testKey(9), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN)
         givenTransactionMints(minted)
         givenExtrinsicBuilds()
         givenSubmissionSucceeds()
@@ -107,7 +108,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
     @Test
     fun `a claim whose extrinsic cannot be built fails the call`() = runBlocking<Unit> {
         val keypair = keypairOf(1)
-        givenTransactionMints(Coin(derivationIndex = 9, valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
+        givenTransactionMints(Coin(derivationIndex = testKey(9), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
         coEvery { extrinsicService.buildExtrinsic(any(), any(), any(), any()) } returns
             Result.failure(IllegalStateException("no runtime"))
 
@@ -120,7 +121,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
     @Test
     fun `a claim the ledger refuses fails the call`() = runBlocking<Unit> {
         val keypair = keypairOf(1)
-        givenTransactionMints(Coin(derivationIndex = 9, valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
+        givenTransactionMints(Coin(derivationIndex = testKey(9), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
         givenExtrinsicBuilds()
         coEvery { transactionService.submitTransactions(any(), any()) } returns
             Result.failure(IllegalStateException("already claimed"))

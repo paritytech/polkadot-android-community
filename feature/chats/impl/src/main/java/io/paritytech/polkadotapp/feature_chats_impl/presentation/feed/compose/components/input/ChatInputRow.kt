@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,11 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.paritytech.polkadotapp.common.presentation.tabbar.LocalTabBarOffset
-import io.paritytech.polkadotapp.common.presentation.tabbar.TabBarBaseInset
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButtonSize
@@ -79,15 +74,9 @@ internal fun ChatInputRow(
     onHeightChanged: (Dp) -> Unit,
 ) {
     val density = LocalDensity.current
-    // The input keeps a fixed width (parent - the 16dp nub on the left). As the bar pulls out from the left,
-    // it slides right by the extra intrusion instead of shrinking. The offset is read inside the layout
-    // lambda so the per-frame pull updates never recompose this row.
-    val tabBarOffset by LocalTabBarOffset.current.collectAsStateWithLifecycle(initialValue = TabBarBaseInset)
     PolkadotSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = TabBarBaseInset)
-            .offset { IntOffset((tabBarOffset - TabBarBaseInset).coerceAtLeast(0.dp).roundToPx(), 0) }
             .onSizeChanged { size -> onHeightChanged(with(density) { size.height.toDp() }) },
         brush = footerBackgroundBrush(inputState)
     ) {

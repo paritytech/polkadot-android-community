@@ -4,10 +4,15 @@ import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
+import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.mapError
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.ResourcesRepository
-import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.requireConsumerInfo
+import io.paritytech.polkadotapp.feature_chain_resources_api.domain.model.ConsumerInfo
+import io.paritytech.polkadotapp.feature_chats_api.domain.error.StartChatError
+import io.paritytech.polkadotapp.feature_chats_api.domain.error.asStartChatError
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactOrigins
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.StartChatData
@@ -29,20 +34,31 @@ class StartChatDataUseCase @Inject constructor(
             return Result.success(StartChatData.ExistingChat(contactAccountId))
         }
 
-        return resourcesRepository
-            .requireConsumerInfo(chainRegistry.getChain(chainId), contactAccountId)
-            .mapCatching { consumerInfo ->
-                val walletAccount = accountRepository.getWalletAccount()
+        val peopleChain = chainRegistry.getChain(chainId)
 
-                StartChatData.NewChat(
-                    contactAccountId = contactAccountId,
-                    username = Username.fromFullValue(consumerInfo.username),
-                    avatar = null,
-                    chatKey = consumerInfo.identifierKey.x25519OrNull() ?: error("Peer account uses an unsupported chat encryption key type"),
-                    sharedSecretDerivationDomain = SharedSecretDerivationDomain.CHAT,
-                    ourMetaAccountId = walletAccount.id,
-                    origin = ContactOrigins.CONTACT_CHAT
-                )
+        return resourcesRepository.consumerInfo(peopleChain.id, contactAccountId)
+            .mapError(Throwable::asStartChatError)
+            .flatMap { consumerInfo ->
+                if (consumerInfo == null) {
+                    Result.failure(StartChatError.PeerNotRegistered)
+                } else {
+                    runCancellableCatching { newChat(contactAccountId, consumerInfo) }
+                        .mapError(Throwable::asStartChatError)
+                }
             }
+    }
+
+    private suspend fun newChat(contactAccountId: AccountId, consumerInfo: ConsumerInfo): StartChatData {
+        val walletAccount = accountRepository.getWalletAccount()
+
+        return StartChatData.NewChat(
+            contactAccountId = contactAccountId,
+            username = Username.fromFullValue(consumerInfo.username),
+            avatar = null,
+            chatKey = consumerInfo.identifierKey.x25519OrNull() ?: error("Peer account uses an unsupported chat encryption key type"),
+            sharedSecretDerivationDomain = SharedSecretDerivationDomain.CHAT,
+            ourMetaAccountId = walletAccount.id,
+            origin = ContactOrigins.CONTACT_CHAT
+        )
     }
 }

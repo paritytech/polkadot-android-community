@@ -5,7 +5,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanc
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.balance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.hops
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerFungibility
@@ -71,7 +71,7 @@ private fun CoinageHoldings.toRows(): List<CoinageHolding> {
  * balance takes. A coin held back for privacy is spendable only where the strategy sells that privacy back.
  */
 private fun RecyclingVerdicts.allowsSpending(
-    derivationIndex: DerivationIndex,
+    derivationIndex: CoinageKeyIndex,
     canSpendWithConfirmation: Boolean
 ) = when (this[derivationIndex]) {
     CoinRecyclingState.ALLOW_USE -> true

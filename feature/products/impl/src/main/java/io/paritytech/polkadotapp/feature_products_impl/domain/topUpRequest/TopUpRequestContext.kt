@@ -27,8 +27,8 @@ class TopUpRequestContext(
 sealed interface TopUpAcknowledgement {
     val productId: ProductId
 
-    /** The claim failed; [message] is the failure reason shown to the user. */
-    data class Failure(override val productId: ProductId, val message: String) : TopUpAcknowledgement
+    /** Nothing was claimed, and nothing more will be tried. */
+    data class Failure(override val productId: ProductId) : TopUpAcknowledgement
 
     /** The claim succeeded but [credited] funds were accepted instead of the [requested] amount. */
     data class PartialPayment(

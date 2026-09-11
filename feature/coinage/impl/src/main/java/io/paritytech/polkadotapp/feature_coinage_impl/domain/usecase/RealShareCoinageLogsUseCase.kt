@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.COINAGE_LOG_TAG
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DURABILITY_LOG_TAG
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -28,7 +29,9 @@ class RealShareCoinageLogsUseCase @Inject constructor(
             writer.appendLine("=== COINAGE TRANSACTION LOGS ===")
             if (appLogFile.exists()) {
                 appLogFile.useLines { lines ->
-                    lines.filter { COINAGE_LOG_TAG in it }
+                    // Durability lines carry the engine's tag: the verdicts and the reads behind them live
+                    // there now, and a coinage export without them shows a status changing for no reason.
+                    lines.filter { COINAGE_LOG_TAG in it || DURABILITY_LOG_TAG in it }
                         .forEach { writer.appendLine(it) }
                 }
             }

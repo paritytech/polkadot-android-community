@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.domain.model
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Hop
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 
@@ -16,8 +18,8 @@ sealed interface CoinageHolding {
     val value: Balance
     val isSpendable: Boolean
 
-    /** Derivation index, used only as a stable last tie-break so equal-valued rows keep their order. */
-    val derivationIndex: Int
+    /** Key index, used only as a stable last tie-break so equal-valued rows keep their order. */
+    val derivationIndex: CoinageKeyIndex
 
     /**
      * Sort rank for rows of equal value: a coin the user can spend, then a voucher, then a coin they cannot.
@@ -28,7 +30,7 @@ sealed interface CoinageHolding {
     data class CoinHolding(
         override val value: Balance,
         override val isSpendable: Boolean,
-        override val derivationIndex: Int,
+        override val derivationIndex: CoinageKeyIndex,
         val hops: List<Hop>,
         /** Null when the coin's origin was never observed — see `CoinProvenance`. */
         val recyclerFungibility: RecyclerFungibility?,
@@ -39,7 +41,7 @@ sealed interface CoinageHolding {
     data class VoucherHolding(
         override val value: Balance,
         override val isSpendable: Boolean,
-        override val derivationIndex: Int,
+        override val derivationIndex: CoinageKeyIndex,
         val recyclerFungibility: RecyclerFungibility,
         /** Null until the voucher's first tick in a ring froze one. */
         val maxRecyclerFungibility: RecyclerFungibility?,
@@ -52,7 +54,9 @@ sealed interface CoinageHolding {
 fun List<CoinageHolding>.sortedForDisplay(): List<CoinageHolding> = sortedWith(
     compareByDescending<CoinageHolding> { it.value }
         .thenBy { it.classRank }
-        .thenBy { it.derivationIndex }
+        // Rows from two installations can share an item number, so both halves of the key are read.
+        .then(DataByteArray.compareByBytes(unsigned = true) { it.derivationIndex.installation.value.value })
+        .thenBy { it.derivationIndex.item }
 )
 
 private const val SPENDABLE_COIN_RANK = 0

@@ -17,6 +17,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -41,7 +42,7 @@ class RealDotNsContractApiTest {
         stubContentHash(NAME_RESOLVER, CONTENT_HASH)
 
         assertArrayEquals(CONTENT_HASH, contractApi.resolveContentHash(NAME).getOrThrow())
-        verify(reviveContractApi, never()).callReadOnly(eq(CHAIN_ID), eq(FIXED_RESOLVER), any())
+        verify(reviveContractApi, never()).callReadOnly(eq(CHAIN_ID), eq(FIXED_RESOLVER), any(), isNull())
     }
 
     @Test
@@ -88,7 +89,7 @@ class RealDotNsContractApiTest {
             listOf(Address("0x" + address.toHexString())),
             listOf(object : TypeReference<Address>() {})
         )
-        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(REGISTRY), any()))
+        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(REGISTRY), any(), isNull()))
             .thenReturn(Result.success(output.toDataByteArray()))
     }
 
@@ -97,13 +98,13 @@ class RealDotNsContractApiTest {
             listOf(DynamicBytes(EIP_1577_IPFS_PREFIX + contentHash)),
             listOf(object : TypeReference<DynamicBytes>() {})
         )
-        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(resolver), any()))
+        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(resolver), any(), isNull()))
             .thenReturn(Result.success(output.toDataByteArray()))
     }
 
     // A resolver that does not implement the call reverts, which surfaces as an empty output.
     private fun stubEmptyOutput(resolver: AccountId) = runBlocking {
-        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(resolver), any()))
+        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(resolver), any(), isNull()))
             .thenReturn(Result.success(DataByteArray.empty()))
     }
 

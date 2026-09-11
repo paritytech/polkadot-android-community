@@ -3,16 +3,16 @@
   "descriptorPath": ".papi/descriptors",
   "entries": {
     "pop": {
-      "wsUrl": "wss://previewnet.example/people",
+      "wsUrl": "wss://paseo-people-next-system-rpc.polkadot.io",
       "metadata": ".papi/metadata/pop.scale",
-      "genesis": "0x3389bc9179d3be32568c67278bd080d05631ac71982d28a3fe545421147b311e",
-      "codeHash": "0x39cb1b8b283ca6d9e05636ffc6236b82ab78c7f3bfddcde49acf37a073f1a208"
+      "genesis": "0x4a2b5b737de1da59e209b0000a876ec2fa20035dc34fd292a848da32d255ad48",
+      "codeHash": "0x12c3c05947a1043efc4002dc82f25fed18cc0c78aff9b153db62b432a7602f1d"
     },
     "assetHub": {
-      "wsUrl": "wss://previewnet.example/asset-hub",
+      "wsUrl": "wss://paseo-asset-hub-next-rpc.polkadot.io",
       "metadata": ".papi/metadata/assetHub.scale",
-      "genesis": "0x29f7b15e6227f86b90bf5199b5c872c28649a30e5f15fae6dd8fa9d5d48d6fbb",
-      "codeHash": "0x3521279624c17a7e210faacec28ca938bfa37500ef440374ef3361433006b91e"
+      "genesis": "0x4349b00e54897e21196fd331015fc5be0f14e118beb0375ed2bb1793737bb57a",
+      "codeHash": "0x8b7a385c789fa051fee48f72492f08b6f031cf67fa8ee996d599d3c6c981ea59"
     }
   }
 }

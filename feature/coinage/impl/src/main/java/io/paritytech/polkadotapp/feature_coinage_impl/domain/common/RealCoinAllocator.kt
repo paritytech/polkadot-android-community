@@ -3,9 +3,11 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.common
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.CoinKeypairDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.getDerivedAccountId
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.ExponentBoundsRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.validateValueExponent
@@ -18,6 +20,7 @@ import javax.inject.Inject
 
 class RealCoinAllocator @Inject constructor(
     private val coinRepository: CoinRepository,
+    private val installationRepository: CoinageInstallationRepository,
     private val keypairDerivation: CoinKeypairDerivation,
     private val boundsRepository: ExponentBoundsRepository,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider
@@ -27,10 +30,11 @@ class RealCoinAllocator @Inject constructor(
     override suspend fun allocate(valueExponent: ValueExponent, provenance: CoinProvenance): Result<Coin> =
         allocationMutex.withLock {
             boundsRepository.validateValueExponent(chainAssetProvider.chainId(), valueExponent)
-                .map { validExponent ->
-                    val derivationIndex = coinRepository.getNextDerivationIndex()
+                .mapCatching { validExponent ->
+                    val installation = installationRepository.getOrCreateCurrent()
+                    val derivationIndex = CoinageKeyIndex(installation, coinRepository.getNextDerivationIndex(installation))
                     val coin = createCoin(derivationIndex, validExponent, provenance)
-                    coin.apply { coinRepository.save(this) }
+                    coin.apply { coinRepository.saveNew(this) }
                 }
         }
 
@@ -39,25 +43,26 @@ class RealCoinAllocator @Inject constructor(
         provenance: CoinProvenance
     ): Result<List<Coin>> = allocationMutex.withLock {
         boundsRepository.validateValueExponents(chainAssetProvider.chainId(), valueExponents)
-            .map { validExponents ->
-                val nextDerivationIndex = coinRepository.getNextDerivationIndex()
+            .mapCatching { validExponents ->
+                val installation = installationRepository.getOrCreateCurrent()
+                val nextDerivationIndex = coinRepository.getNextDerivationIndex(installation)
 
                 val coins = validExponents.mapIndexed { index, value ->
                     createCoin(
-                        derivationIndex = nextDerivationIndex + index,
+                        derivationIndex = CoinageKeyIndex(installation, nextDerivationIndex + index),
                         valueExponent = value,
                         provenance = provenance
                     )
                 }
 
-                coinRepository.saveAll(coins)
+                coinRepository.saveNew(coins)
 
                 coins
             }
     }
 
     private suspend fun createCoin(
-        derivationIndex: Int,
+        derivationIndex: CoinageKeyIndex,
         valueExponent: ValueExponent,
         provenance: CoinProvenance
     ): Coin = Coin(

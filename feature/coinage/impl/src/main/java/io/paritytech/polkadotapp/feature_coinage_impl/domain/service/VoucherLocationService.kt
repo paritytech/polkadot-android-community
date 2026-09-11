@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.getOrEmpty
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapToSet
@@ -51,6 +52,7 @@ class VoucherLocationService @Inject constructor(
     private val membersRepository: MembersRepository,
     private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
     private val ringCapacityProvider: RingCapacityProvider,
+    private val timeProvider: TimeProvider,
 ) {
     context(scope: ComputationalScope)
     fun start() {
@@ -75,7 +77,9 @@ class VoucherLocationService @Inject constructor(
         // in it, and the member count is what the strategies read to decide when it may be spent.
         return voucherRepository.subscribeAllVouchers()
             .filter { it.isNotEmpty() }
-            .distinctUntilChangedBy { vouchers -> vouchers.mapToSet { it.ringVrfPublicKey } }
+            .distinctUntilChangedBy { vouchers ->
+                vouchers.mapToSet { it.ringVrfPublicKey to (it.location as? RecyclerVoucher.Location.InRecycler)?.enteredAt }
+            }
             .flatMapLatest { vouchers ->
                 val instanceId = coinageInstanceIdProvider.instanceId()
                     .getOrElse { return@flatMapLatest flowOf(Result.failure(it)) }
@@ -174,7 +178,11 @@ class VoucherLocationService @Inject constructor(
                 recyclerKey = ringStatusKey.toRecyclerKey(),
                 // included, not total: a proof only verifies against the keys baked into the ring root, so
                 // that is the set this voucher actually hides in.
-                location = RecyclerVoucher.Location.InRecycler(position.ringIndex, ringStatus.included),
+                location = RecyclerVoucher.Location.InRecycler(
+                    recyclerIndex = position.ringIndex,
+                    recyclerMembers = ringStatus.included,
+                    enteredAt = timeProvider.now()
+                ),
             )
         }
     }
