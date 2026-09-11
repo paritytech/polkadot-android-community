@@ -194,6 +194,7 @@ class VoucherLocationServiceTest {
         every { asset.chainId } returns CHAIN_ID
         every { chainAssetProvider.chainId() } returns CHAIN_ID
         coEvery { instanceIdProvider.instanceId() } returns Result.success(INSTANCE_ID)
+        coEvery { membersRepository.getRingKeysPageSize(any()) } returns Result.success(RING_KEYS_PER_PAGE)
         coEvery { voucherRepository.updateRecyclerState(any()) } answers {
             written += firstArg<Map<BandersnatchPublicKey, VoucherRecyclerUpdate>>()
         }
@@ -255,6 +256,7 @@ class VoucherLocationServiceTest {
         const val RING_CAPACITY = 767
         const val RING_MEMBERS = 400
         const val RING_INDEX = 3
+        const val RING_KEYS_PER_PAGE = 255
         val INSTANCE_ID: CoinageInstanceId = 1u
         val NOW: Instant = Instant.fromEpochMilliseconds(1_000L)
         val DENOMINATION = ValueExponent(3)

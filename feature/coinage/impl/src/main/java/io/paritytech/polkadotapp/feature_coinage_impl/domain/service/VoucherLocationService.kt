@@ -68,7 +68,7 @@ class VoucherLocationService @Inject constructor(
                     subscribeUnloadedCountsFor(chainId, located),
                 ) { statuses, unloadedCounts -> RingReadings(located, statuses, unloadedCounts) }
             }
-            .onEach { readings -> voucherRepository.updateRecyclerState(readings.resolveRecyclerState()) }
+            .onEach { readings -> voucherRepository.updateRecyclerState(readings.resolveRecyclerState(chainId)) }
             .launchIn(scope)
     }
 
@@ -135,8 +135,17 @@ class VoucherLocationService @Inject constructor(
             .distinct()
     }
 
-    private suspend fun RingReadings.resolveRecyclerState(): Map<BandersnatchPublicKey, VoucherRecyclerUpdate> {
-        val vouchers = resolveVouchersInRecycler()
+    private suspend fun RingReadings.resolveRecyclerState(
+        chainId: ChainId
+    ): Map<BandersnatchPublicKey, VoucherRecyclerUpdate> {
+        // Nothing can be judged included without it, so a failed read writes nothing at all — unlike a
+        // failed fungibility read, which still lets the location through.
+        val keysPerPage = membersRepository.getRingKeysPageSize(chainId)
+            .logFailure("Can't fetch ring keys page size for voucher locations")
+            .getOrNull()
+            ?: return emptyMap()
+
+        val vouchers = resolveVouchersInRecycler(keysPerPage)
         if (vouchers.isEmpty()) return emptyMap()
 
         val capacities = ringCapacityProvider.capacitiesFor(vouchers.mapToSet { it.recyclerKey.exponent })
@@ -165,13 +174,13 @@ class VoucherLocationService @Inject constructor(
         }
     }
 
-    private fun RingReadings.resolveVouchersInRecycler(): List<VoucherInRecycler> {
+    private fun RingReadings.resolveVouchersInRecycler(keysPerPage: Int): List<VoucherInRecycler> {
         return located.positions.mapNotNull { (voucherKey, voucherPosition) ->
             val position = voucherPosition?.includedOrNull() ?: return@mapNotNull null
             val ringStatusKey = voucherKey.first to position.ringIndex
             val ringStatus = ringStatuses[ringStatusKey] ?: return@mapNotNull null
 
-            if (!ringStatus.includesKey(position)) return@mapNotNull null
+            if (!ringStatus.includesKey(position, keysPerPage)) return@mapNotNull null
 
             VoucherInRecycler(
                 publicKey = voucherKey.second,
