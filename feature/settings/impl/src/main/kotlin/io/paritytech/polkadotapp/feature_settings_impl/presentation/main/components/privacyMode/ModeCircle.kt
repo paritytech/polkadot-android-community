@@ -26,6 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -92,7 +97,7 @@ internal fun ModeCircle(
 
     val diameter = lerp(CIRCLE_SIZE, SELECTED_CIRCLE_SIZE, selection)
     val glowColor = blended.colors.glow
-    val ringColor = blended.colors.ring
+    val ringColors = blended.colors.selected
     val shadowColor = PolkadotTheme.colors.shadow.medium
     val shadowAlpha = lerpFloat(UNSELECTED_SHADOW_ALPHA, SELECTED_SHADOW_ALPHA, selection)
 
@@ -118,17 +123,21 @@ internal fun ModeCircle(
             maskFilter = glowBlur
         }
     }
-    val ringPaint = remember {
-        Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.STROKE
-        }
-    }
     val ringShadowPaint = remember(shadowBlur) {
         Paint().apply {
             isAntiAlias = true
             style = Paint.Style.STROKE
             maskFilter = shadowBlur
+        }
+    }
+    val ringStroke = remember(density) { with(density) { Stroke(width = RING_STROKE.toPx()) } }
+    val ringBrush = remember(ringColors, density) {
+        with(density) {
+            Brush.verticalGradient(
+                colors = listOf(ringColors.rimTop, ringColors.rimBottom),
+                startY = RING_TOP_INSET.toPx(),
+                endY = (RING_TOP_INSET + RING_OUTER_SIZE - RING_STROKE).toPx()
+            )
         }
     }
 
@@ -143,9 +152,8 @@ internal fun ModeCircle(
                 val half = (RING_OUTER_SIZE - RING_STROKE).toPx() / 2f
                 val corner = (RING_CORNER_RADIUS - RING_STROKE / 2).toPx()
                 val shadowOffset = SHADOW_OFFSET.toPx()
-
-                ringPaint.color = ringColor.copy(alpha = glow).toArgb()
-                ringPaint.strokeWidth = RING_STROKE.toPx()
+                val ringTopLeft = Offset(centreX - half, centreY - half)
+                val ringSize = Size(half * 2f, half * 2f)
 
                 ringShadowPaint.color = shadowColor.copy(alpha = glow * SELECTED_SHADOW_ALPHA).toArgb()
                 ringShadowPaint.strokeWidth = RING_STROKE.toPx()
@@ -166,16 +174,16 @@ internal fun ModeCircle(
                                 corner,
                                 ringShadowPaint
                             )
-                            native.drawRoundRect(
-                                centreX - half,
-                                centreY - half,
-                                centreX + half,
-                                centreY + half,
-                                corner,
-                                corner,
-                                ringPaint
-                            )
                         }
+
+                        drawRoundRect(
+                            brush = ringBrush,
+                            topLeft = ringTopLeft,
+                            size = ringSize,
+                            cornerRadius = CornerRadius(corner),
+                            alpha = glow,
+                            style = ringStroke
+                        )
                     }
                 }
             },
@@ -266,7 +274,8 @@ private val RING_OUTER_SIZE = 62.dp
 private val RING_CORNER_RADIUS = 24.dp
 private val RING_STROKE = 2.dp
 
-private val GLOW_BLUR = 12.dp
+// Figma blurs the glow with a Gaussian sigma of ~12dp; BlurMaskFilter's radius is ~1.7x the sigma it yields.
+private val GLOW_BLUR = 20.dp
 private const val GLOW_ALPHA = 0.5f
 
 // The design gives Balanced a disc-sized glow and the other two modes a wider, squarer one.
@@ -284,6 +293,9 @@ private const val SELECTED_SHADOW_ALPHA = 0.7f
 private const val UNSELECTED_SHADOW_ALPHA = 0.5f
 
 internal val CIRCLE_BOX_SIZE = RING_OUTER_SIZE + (SHADOW_OFFSET + SHADOW_BLUR) * 2
+
+// Where the ring's stroke centreline starts inside the box; the gradient spans the ring, not the box.
+private val RING_TOP_INSET = (CIRCLE_BOX_SIZE - RING_OUTER_SIZE + RING_STROKE) / 2
 
 // Share of the circle the glyph takes up; the rest is the inset around it.
 private const val MODE_ICON_SIZE_FRACTION = 0.64f

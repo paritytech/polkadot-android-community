@@ -23,14 +23,12 @@ internal fun CircleColors.blendedTo(other: CircleColors, fraction: Float): Circl
 internal data class ModeColors(
     val selected: CircleColors,
     val unselected: CircleColors,
-    val ring: Color,
     val glow: Color
 )
 
 internal fun ModeColors.blendedTo(other: ModeColors, fraction: Float): ModeColors = ModeColors(
     selected = selected.blendedTo(other.selected, fraction),
     unselected = unselected.blendedTo(other.unselected, fraction),
-    ring = lerp(ring, other.ring, fraction),
     glow = lerp(glow, other.glow, fraction)
 )
 
@@ -51,7 +49,6 @@ internal object PrivacyModeColors {
             rimTop = Color(0xFFCFA155),
             rimBottom = Color(0xFF5B3C07)
         ),
-        ring = Color(0xFFFFCE2B),
         glow = Color(0xFFF59E0B)
     )
 
@@ -68,7 +65,6 @@ internal object PrivacyModeColors {
             rimTop = Color(0xFF90BA89),
             rimBottom = Color(0xFF90BA89)
         ),
-        ring = Color(0xFF4FD05C),
         glow = Color(0xFF7EEC6A)
     )
 
@@ -85,7 +81,6 @@ internal object PrivacyModeColors {
             rimTop = Color(0xFF876CB4),
             rimBottom = Color(0xFF28134A)
         ),
-        ring = Color(0xFFBC93FF),
         glow = Color(0xFF8640FF)
     )
 }
