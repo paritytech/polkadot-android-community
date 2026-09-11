@@ -273,12 +273,16 @@ class UnloadAndSplitVouchersStrategy(
     /**
      * Coins leaving a recycler come out with that recycler's anonymity and no history yet.
      *
-     * A batch is one recycler by construction, so every voucher in it carries the same fungibility and the
-     * first one answers for all of them. Batches are deliberately not reconciled against each other: a coin
-     * from a fuller ring is genuinely more private than one from an emptier ring in the same transfer.
+     * A batch is one recycler, and one tick writes the same fungibility to every voucher in a ring, so these
+     * normally all agree. They can still disagree across ticks: a voucher that landed while the capacity or
+     * unloaded-count read was failing keeps the default until a later tick fills it in. The lowest answers
+     * for the batch rather than an arbitrary member, because understating privacy is the safe direction.
+     *
+     * Batches are deliberately not reconciled against each other: a coin from a fuller ring is genuinely
+     * more private than one from an emptier ring in the same transfer.
      */
     private fun VoucherBatch.unloadProvenance(): CoinProvenance {
-        val fungibility = vouchers.first().recyclerFungibility
+        val fungibility = vouchers.minOf { it.recyclerFungibility }
 
         return CoinProvenance.fromRecycler(fungibility)
     }
