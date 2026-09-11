@@ -46,6 +46,10 @@ fun TrUAPIConfirmation.Prompt.toUiState(): TrUAPIConfirmationUiState = when (thi
         RCommon.string.truapi_confirm_title_account_access,
         detail(RCommon.string.truapi_confirm_label_target_product, targetProductId),
     )
+
+    is TrUAPIConfirmation.ProductSubtree -> build(
+        RCommon.string.truapi_confirm_title_product_subtree,
+    )
 }
 
 private fun TrUAPIConfirmation.Prompt.build(

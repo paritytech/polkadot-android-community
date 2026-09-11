@@ -84,6 +84,9 @@ fun UserConfirmationReview.toConfirmation(callingProductId: String): TrUAPIConfi
             requesterProductId = v1.requestingProductId,
             targetProductId = v1.targetProductId,
         )
+
+    is UserConfirmationReview.ProductSubtree ->
+        TrUAPIConfirmation.ProductSubtree(requesterProductId = v1.productId)
 }
 
 @OptIn(ExperimentalStdlibApi::class)
