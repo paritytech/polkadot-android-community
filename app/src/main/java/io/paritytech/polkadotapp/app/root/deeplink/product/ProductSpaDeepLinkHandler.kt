@@ -34,11 +34,11 @@ internal class ProductSpaDeepLinkHandler @Inject constructor(
         return FeatureOption.ARBITRARY_PRODUCTS.isEnabled || data.isBuiltInProduct(tld)
     }
 
-    // The app still owns its own dotNS destinations when arbitrary ones are off, so Get CASH links keep working.
+    // The app still owns its own dotNS destinations when arbitrary ones are off, so funding links keep working.
     private suspend fun Uri.isBuiltInProduct(tld: DotNsTld): Boolean {
-        val fundingProductId = fundingDomainProvider.getFundingProductId().getOrNull() ?: return false
+        val fundingProductIds = fundingDomainProvider.getFundingProductIds().getOrNull() ?: return false
 
-        return ProductId.fromUrl(asWebUri(), tld).getOrNull() == fundingProductId
+        return ProductId.fromUrl(asWebUri(), tld).getOrNull() in fundingProductIds
     }
 
     // Swaps the scheme rather than prefixing it: ensureHttpsProtocol would mangle a polkadotapp:// deeplink.

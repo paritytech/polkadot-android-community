@@ -70,6 +70,8 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.operation.ProductO
 import io.paritytech.polkadotapp.feature_products_impl.domain.operation.RealProductOperationService
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.ProductAccountOrigins
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.RealProductAccountOrigins
+import io.paritytech.polkadotapp.feature_products_impl.domain.paymentRequest.RealRequestPaymentUseCase
+import io.paritytech.polkadotapp.feature_products_impl.domain.paymentRequest.RequestPaymentUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.AutoAllowProductPermissionRequester
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRepository
@@ -308,6 +310,9 @@ internal interface ProductsModule {
     @Binds
     @Singleton
     fun bindTopUpService(impl: RealTopUpService): TopUpService
+
+    @Binds
+    fun bindRequestPaymentUseCase(impl: RealRequestPaymentUseCase): RequestPaymentUseCase
 
     companion object {
         @Provides

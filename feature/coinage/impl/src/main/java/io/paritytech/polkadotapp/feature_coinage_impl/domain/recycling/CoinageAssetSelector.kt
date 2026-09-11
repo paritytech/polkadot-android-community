@@ -73,6 +73,24 @@ class CoinageAssetSelector @Inject constructor(
 
     suspend fun getVouchersGainingPrivacy(): List<RecyclerVoucher> = voucherBuckets().gainingPrivacy
 
+    /**
+     * Every judged coin the chain would still accept, whatever the strategy thinks of it. Only for an operation
+     * whose user accepted the privacy loss up front, which is why it is not a [SpendScope]: no strategy can
+     * narrow it.
+     */
+    suspend fun getOnChainSpendableCoins(): List<Coin> {
+        val verdicts = evaluator.verdicts.first()
+
+        return coinageAssetsUseCase.getCoins().preClassifyCoins().minted.filter { it.derivationIndex in verdicts }
+    }
+
+    /** Vouchers counterpart of [getOnChainSpendableCoins]. */
+    suspend fun getOnChainSpendableVouchers(): List<RecyclerVoucher> {
+        val buckets = voucherBuckets()
+
+        return buckets.usable + buckets.gainingPrivacy
+    }
+
     private fun allowedStates(scope: SpendScope, offerAllowed: Boolean): Set<CoinRecyclingState> = when {
         scope.widens(offerAllowed) -> setOf(CoinRecyclingState.ALLOW_USE, CoinRecyclingState.TO_RECYCLE)
         else -> setOf(CoinRecyclingState.ALLOW_USE)

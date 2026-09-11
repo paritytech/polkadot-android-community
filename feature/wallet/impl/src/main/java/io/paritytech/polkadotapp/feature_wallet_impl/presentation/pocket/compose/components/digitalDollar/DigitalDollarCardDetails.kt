@@ -36,6 +36,7 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Add
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowDownward
+import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpRight
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpwards
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
@@ -79,6 +80,7 @@ fun DigitalDollarCardDetails(
         state = state,
         onSendClick = viewModel::onSendClick,
         onGetCashClick = viewModel::onGetCashClick,
+        onWithdrawClick = viewModel::onWithdrawClick,
         onAutoFundClick = viewModel::onAutoFundClick,
         onShareLogsClick = viewModel::onShareLogsClick,
         onForceRecycleClick = viewModel::onForceRecycleClick,
@@ -96,6 +98,7 @@ private fun DigitalDollarCardDetailsContent(
     state: DigitalDollarCardDetailsUiState,
     onSendClick: () -> Unit,
     onGetCashClick: () -> Unit,
+    onWithdrawClick: () -> Unit,
     onAutoFundClick: () -> Unit,
     onShareLogsClick: () -> Unit,
     onForceRecycleClick: (Coin) -> Unit,
@@ -141,7 +144,8 @@ private fun DigitalDollarCardDetailsContent(
                         BalanceRestoreUiState.SendCash -> SendCashActions(
                             modifier = Modifier.fillMaxWidth(),
                             onSendClick = onSendClick,
-                            onGetCashClick = onGetCashClick
+                            onGetCashClick = onGetCashClick,
+                            onWithdrawClick = onWithdrawClick
                         )
 
                         is BalanceRestoreUiState.Restore -> {
@@ -231,7 +235,8 @@ private fun ColumnScope.Coinage(
 private fun SendCashActions(
     modifier: Modifier = Modifier,
     onSendClick: () -> Unit,
-    onGetCashClick: () -> Unit
+    onGetCashClick: () -> Unit,
+    onWithdrawClick: () -> Unit
 ) {
     Row(
         modifier = modifier.height(IntrinsicSize.Min),
@@ -249,6 +254,16 @@ private fun SendCashActions(
                 .aspectRatio(1f),
             icon = NovaIcons.Add,
             onClick = onGetCashClick,
+            shape = PolkadotButtonShape.pill,
+            size = PolkadotIconButtonSize.medium()
+        )
+
+        PolkadotIconButton(
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f),
+            icon = NovaIcons.ArrowUpRight,
+            onClick = onWithdrawClick,
             shape = PolkadotButtonShape.pill,
             size = PolkadotIconButtonSize.medium()
         )
@@ -319,6 +334,7 @@ private fun DigitalDollarCardDetailsPreview() {
                 ),
                 onSendClick = {},
                 onGetCashClick = {},
+                onWithdrawClick = {},
                 onAutoFundClick = {},
                 onShareLogsClick = {},
                 onForceRecycleClick = {},
