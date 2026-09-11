@@ -42,9 +42,8 @@ internal class RealChainHealthMixin(
         chainId = health.chainId,
         chainName = health.chainName,
         glyph = glyphFor(health.chainId),
-        connection = health.connection,
         indicator = health.toIndicator(),
-        readings = health.readings.toImmutableList(),
+        expectedBlockTime = health.expectedBlockTime,
     )
 
     private fun glyphFor(chainId: ChainId): ChainGlyph = when (chainId) {

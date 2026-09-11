@@ -51,11 +51,18 @@ class ChainHealthIndicatorMapperTest {
 
     @Test
     fun `connection speed is graded by the worst of pending and response`() {
-        assertEquals(ChainHealthIndicator.Healthy, connected(pending(70), response(100)).toIndicator())
-        assertEquals(slow(Speed.Slow), connected(pending(100), response(69)).toIndicator())
-        assertEquals(slow(Speed.Slow), connected(pending(40)).toIndicator())
-        assertEquals(slow(Speed.Unusable), connected(pending(39)).toIndicator())
-        assertEquals(slow(Speed.Unusable), connected(response(0)).toIndicator())
+        assertEquals(ChainHealthIndicator.Healthy, connected(pending(90), response(100)).toIndicator())
+        assertEquals(speed(Speed.Good), connected(pending(100), response(89)).toIndicator())
+        assertEquals(speed(Speed.Good), connected(pending(70)).toIndicator())
+        assertEquals(speed(Speed.Fair), connected(pending(69)).toIndicator())
+        assertEquals(speed(Speed.Fair), connected(pending(40)).toIndicator())
+        assertEquals(speed(Speed.Low), connected(pending(39)).toIndicator())
+        assertEquals(speed(Speed.Low), connected(response(0)).toIndicator())
+    }
+
+    @Test
+    fun `an outage wins over any speed band`() {
+        assertEquals(ChainHealthIndicator.Outage(3, 5), connected(blocks(3, 5), pending(75)).toIndicator())
     }
 
     @Test
@@ -69,7 +76,7 @@ class ChainHealthIndicatorMapperTest {
         assertEquals(ChainHealthIndicator.Healthy, health.toIndicator())
     }
 
-    private fun slow(speed: Speed) = ChainHealthIndicator.SlowConnection(speed)
+    private fun speed(speed: Speed) = ChainHealthIndicator.ConnectionSpeed(speed)
 
     private fun connected(vararg readings: ChainMetricReading): ChainHealth =
         health(ChainConnectionPresentation.Connected, *readings)
@@ -79,6 +86,7 @@ class ChainHealthIndicatorMapperTest {
             chainId = "people",
             chainName = "People",
             connection = connection,
+            expectedBlockTime = 6.seconds,
             readings = readings.toList(),
         )
 

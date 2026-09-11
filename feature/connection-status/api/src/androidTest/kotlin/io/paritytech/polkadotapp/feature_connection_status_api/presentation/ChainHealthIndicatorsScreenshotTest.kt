@@ -20,7 +20,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.colors.PolkadotColorsPalette
-import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
@@ -33,6 +32,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.seconds
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -50,18 +50,23 @@ class ChainHealthIndicatorsScreenshotTest {
         renderAndAssert("outage", ChainHealthIndicator.Outage(recentBlocks = 3, expectedBlocks = 5), PARTIAL_ARC) { it.fg.error }
 
     @Test
-    fun slowConnectionIsAFullWarningRing() =
-        renderAndAssert("slow", ChainHealthIndicator.SlowConnection(Speed.Slow), FULL_RING) { it.fg.warning }
+    fun goodSpeedIsAFullColourlessRing() =
+        renderAndAssert("speed-good", ChainHealthIndicator.ConnectionSpeed(Speed.Good), FULL_RING) { it.fg.primary }
 
     @Test
-    fun unusableConnectionIsAFullErrorRing() =
-        renderAndAssert("unusable", ChainHealthIndicator.SlowConnection(Speed.Unusable), FULL_RING) { it.fg.error }
+    fun fairSpeedIsAFullWarningRing() =
+        renderAndAssert("speed-fair", ChainHealthIndicator.ConnectionSpeed(Speed.Fair), FULL_RING) { it.fg.warning }
 
     @Test
-    fun connectingIsATertiaryRing() = renderAndAssert("connecting", ChainHealthIndicator.Connecting, FULL_RING) { it.fg.tertiary }
+    fun lowSpeedIsAFullErrorRing() =
+        renderAndAssert("speed-low", ChainHealthIndicator.ConnectionSpeed(Speed.Low), FULL_RING) { it.fg.error }
 
     @Test
-    fun disconnectedIsADisabledRing() = renderAndAssert("disconnected", ChainHealthIndicator.Disconnected, FULL_RING) { it.fg.disabled }
+    fun connectingIsAColourlessRing() = renderAndAssert("connecting", ChainHealthIndicator.Connecting, FULL_RING) { it.stroke.secondary }
+
+    @Test
+    fun disconnectedIsAColourlessRing() =
+        renderAndAssert("disconnected", ChainHealthIndicator.Disconnected, FULL_RING) { it.stroke.secondary }
 
     private fun renderAndAssert(
         name: String,
@@ -106,9 +111,8 @@ class ChainHealthIndicatorsScreenshotTest {
         chainId = id,
         chainName = id,
         glyph = glyph,
-        connection = ChainConnectionPresentation.Connected,
         indicator = indicator,
-        readings = persistentListOf(),
+        expectedBlockTime = 6.seconds,
     )
 
     private fun surroundShare(image: ImageBitmap, expected: Color): Float {

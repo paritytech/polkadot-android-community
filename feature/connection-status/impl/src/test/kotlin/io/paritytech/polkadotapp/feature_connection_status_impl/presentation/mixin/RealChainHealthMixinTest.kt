@@ -50,6 +50,7 @@ class RealChainHealthMixinTest {
 
         assertEquals(ChainGlyph.AssetHub, item.glyph)
         assertEquals(ChainHealthIndicator.Healthy, item.indicator)
+        assertEquals(6.seconds, item.expectedBlockTime)
     }
 
     @Test
@@ -94,6 +95,7 @@ class RealChainHealthMixinTest {
         chainId = chainId,
         chainName = chainId,
         connection = ChainConnectionPresentation.Connected,
+        expectedBlockTime = 6.seconds,
         readings = emptyList(),
     )
 

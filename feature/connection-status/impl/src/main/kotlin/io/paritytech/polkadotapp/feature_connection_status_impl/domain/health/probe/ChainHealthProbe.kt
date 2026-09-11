@@ -23,9 +23,9 @@ data class ChainMetricContext(
 )
 
 /**
- * The extensibility seam: one probe per health metric. Bind a new probe with `@Binds @IntoSet` and its
- * reading shows in the details popover with no further wiring; which readings colour the indicator is
- * decided by the presentation mapper, so a new metric that should also colour it needs a branch there.
+ * The extensibility seam: one probe per health metric. Binding a new probe with `@Binds @IntoSet` puts
+ * its reading on the chain's health, but nothing displays readings directly — a metric reaches the UI only
+ * through the presentation mapper, so a new one that should show up needs a branch there.
  */
 interface ChainHealthProbe {
     fun observe(context: ChainMetricContext): Flow<ChainMetricReading>

@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
 
-import io.novasama.substrate_sdk_android.wsrpc.state.SocketStateMachine.State
 import io.novasama.substrate_sdk_android.wsrpc.state.pendingRequests
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
@@ -10,6 +9,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.connection.ConnectionPool
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
 import io.paritytech.polkadotapp.common.utils.combine
+import io.paritytech.polkadotapp.common.utils.network.NetworkStateService
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealth
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainHeadDataSource
@@ -45,6 +45,7 @@ class RealChainHealthMonitor @Inject constructor(
     private val chainHeadDataSource: ChainHeadDataSource,
     private val connectionRefCounter: ChainConnectionRefCounter,
     private val connectionSmoother: ConnectionSmoother,
+    private val networkStateService: NetworkStateService,
     private val probes: Set<@JvmSuppressWildcards ChainHealthProbe>,
 ) : ChainHealthMonitor {
     override fun observeChainsHealth(): Flow<List<ChainHealth>> =
@@ -84,6 +85,7 @@ class RealChainHealthMonitor @Inject constructor(
                     chainId = chainId,
                     chainName = chain.name,
                     connection = presentation,
+                    expectedBlockTime = blockTime,
                     readings = readingList,
                 )
             }.collect { send(it) }
@@ -95,7 +97,7 @@ class RealChainHealthMonitor @Inject constructor(
             .map { connectionPool.getConnectionOrNull(chainId) }
             .distinctUntilChanged()
             .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
-            .map { it.toRawConnectivity() }
+            .let { socketStates -> rawConnectivity(socketStates, networkStateService.isNetworkAvailable) }
 
     private fun observePendingRequests(chainId: ChainId): Flow<Set<Any>> =
         chainRegistry.chainsById
@@ -103,12 +105,6 @@ class RealChainHealthMonitor @Inject constructor(
             .distinctUntilChanged()
             .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
             .map { state -> state?.pendingRequests.orEmpty() }
-
-    private fun State?.toRawConnectivity(): RawConnectivity = when (this) {
-        is State.Connected -> RawConnectivity.Connected
-        is State.Connecting, is State.WaitingForReconnect -> RawConnectivity.Pending
-        null, is State.Disconnected, is State.Paused -> RawConnectivity.Settled
-    }
 
     private suspend fun resolveBlockTime(chainId: ChainId): Duration =
         runCatching { chainStateRepository.expectedBlockTime(chainId) }
