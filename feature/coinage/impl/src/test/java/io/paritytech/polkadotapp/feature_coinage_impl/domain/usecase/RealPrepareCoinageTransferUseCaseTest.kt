@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferPlan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -113,5 +114,6 @@ class RealPrepareCoinageTransferUseCaseTest {
         age = Coin.Age.Known(3),
         isOnChain = true,
         accountId = mock(),
+        provenance = CoinProvenance.UNKNOWN,
     )
 }

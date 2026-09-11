@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -54,6 +55,7 @@ class RecyclingStrategyLimitsTest {
             age = Coin.Age.Unknown,
             isOnChain = true,
             accountId = mock(),
+            provenance = CoinProvenance.UNKNOWN,
         )
 
         val verdicts = evaluate(chainLimited(RecyclingStrategyType.MAX_PRIVACY), listOf(unknown))
@@ -166,5 +168,6 @@ class RecyclingStrategyLimitsTest {
         age = Coin.Age.Known(age),
         isOnChain = true,
         accountId = mock(),
+        provenance = CoinProvenance.UNKNOWN,
     )
 }

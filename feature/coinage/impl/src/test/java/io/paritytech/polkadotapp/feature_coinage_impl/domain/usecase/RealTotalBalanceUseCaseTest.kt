@@ -4,8 +4,10 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
@@ -350,6 +352,7 @@ class RealTotalBalanceUseCaseTest {
         age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
         isOnChain = onChain,
         accountId = mock(),
+        provenance = CoinProvenance.UNKNOWN,
     )
 
     private fun voucherOf(exponent: Int, location: Location) = RecyclerVoucher(
@@ -357,6 +360,8 @@ class RealTotalBalanceUseCaseTest {
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(exponent),
         location = location,
+        recyclerFungibility = RecyclerFungibility.NONE,
+        maxRecyclerFungibility = RecyclerFungibility.NONE,
     )
 
     private fun Int.exponentToBalance() = testConversionContext.formatExponentToBalance(ValueExponent(this))

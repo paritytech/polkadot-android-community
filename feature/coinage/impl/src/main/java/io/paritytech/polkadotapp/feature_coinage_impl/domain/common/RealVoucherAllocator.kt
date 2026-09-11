@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.common
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.VoucherAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
@@ -61,6 +62,11 @@ class RealVoucherAllocator @Inject constructor(
             ringVrfPublicKey = publicKey,
             location = RecyclerVoucher.Location.Unknown,
             recyclerValue = valueExponent,
+            // A voucher outside a ring hides in nothing, so zero is the truth rather than a stand-in. The
+            // max is a different matter: it needs a ring index the chain has not assigned yet, so it stays
+            // unfrozen until the location service sees the voucher land.
+            recyclerFungibility = RecyclerFungibility.NONE,
+            maxRecyclerFungibility = null,
         )
     }
 }

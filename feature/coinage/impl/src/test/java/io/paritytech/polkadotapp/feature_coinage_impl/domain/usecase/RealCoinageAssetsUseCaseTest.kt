@@ -2,6 +2,8 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -154,6 +156,7 @@ class RealCoinageAssetsUseCaseTest {
         age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
         isOnChain = age != null,
         accountId = mock(),
+        provenance = CoinProvenance.UNKNOWN,
     )
 
     private fun voucherOf(ringVrfKeyIndex: Int, location: Location) = RecyclerVoucher(
@@ -161,6 +164,8 @@ class RealCoinageAssetsUseCaseTest {
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = location,
+        recyclerFungibility = RecyclerFungibility.NONE,
+        maxRecyclerFungibility = RecyclerFungibility.NONE,
     )
 
     private companion object {

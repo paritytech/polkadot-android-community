@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -199,6 +200,7 @@ class CoinageBackupServiceTest {
         age = Coin.Age.Known(0),
         isOnChain = true,
         accountId = byteArrayOf(key.item.toByte()).toDataByteArray(),
+        provenance = CoinProvenance.UNKNOWN,
     )
 
     private class InMemoryInstallations(private val current: CoinageInstallationId) : CoinageInstallationRepository {

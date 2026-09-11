@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.common
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.CoinKeypairDerivation
@@ -26,18 +27,21 @@ class RealCoinAllocator @Inject constructor(
 ) : CoinAllocator {
     private val allocationMutex = Mutex()
 
-    override suspend fun allocate(valueExponent: ValueExponent): Result<Coin> =
+    override suspend fun allocate(valueExponent: ValueExponent, provenance: CoinProvenance): Result<Coin> =
         allocationMutex.withLock {
             boundsRepository.validateValueExponent(chainAssetProvider.chainId(), valueExponent)
                 .mapCatching { validExponent ->
                     val installation = installationRepository.getOrCreateCurrent()
                     val derivationIndex = CoinageKeyIndex(installation, coinRepository.getNextDerivationIndex(installation))
-                    val coin = createCoin(derivationIndex, validExponent)
+                    val coin = createCoin(derivationIndex, validExponent, provenance)
                     coin.apply { coinRepository.saveNew(this) }
                 }
         }
 
-    override suspend fun allocateAll(valueExponents: List<ValueExponent>): Result<List<Coin>> = allocationMutex.withLock {
+    override suspend fun allocateAll(
+        valueExponents: List<ValueExponent>,
+        provenance: CoinProvenance
+    ): Result<List<Coin>> = allocationMutex.withLock {
         boundsRepository.validateValueExponents(chainAssetProvider.chainId(), valueExponents)
             .mapCatching { validExponents ->
                 val installation = installationRepository.getOrCreateCurrent()
@@ -46,7 +50,8 @@ class RealCoinAllocator @Inject constructor(
                 val coins = validExponents.mapIndexed { index, value ->
                     createCoin(
                         derivationIndex = CoinageKeyIndex(installation, nextDerivationIndex + index),
-                        valueExponent = value
+                        valueExponent = value,
+                        provenance = provenance
                     )
                 }
 
@@ -58,13 +63,15 @@ class RealCoinAllocator @Inject constructor(
 
     private suspend fun createCoin(
         derivationIndex: CoinageKeyIndex,
-        valueExponent: ValueExponent
+        valueExponent: ValueExponent,
+        provenance: CoinProvenance
     ): Coin = Coin(
         derivationIndex = derivationIndex,
         valueExponent = valueExponent,
         // Freshly allocated: nothing has minted it yet, so the chain has never held it.
         age = Coin.Age.Unknown,
         isOnChain = false,
-        accountId = keypairDerivation.getDerivedAccountId(derivationIndex)
+        accountId = keypairDerivation.getDerivedAccountId(derivationIndex),
+        provenance = provenance
     )
 }

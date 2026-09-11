@@ -4,9 +4,11 @@ import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
@@ -68,7 +70,7 @@ class VoucherReadinessUpdatesTest {
     @Test
     fun `maturity frees recycling budget without an asset event`() = runTest {
         val fixture = WalletFixture(this, RecyclingStrategyType.BALANCED)
-        val coin = Coin(testKey(0), ValueExponent(1), Coin.Age.Known(5), true, mock())
+        val coin = Coin(testKey(0), ValueExponent(1), Coin.Age.Known(5), true, mock(), CoinProvenance.UNKNOWN)
         fixture.coins.value = listOf(TrackedCoin(coin, CoinageAssetState.UNTRACKED))
         val recycled = mutableListOf<List<Coin>>()
         whenever(fixture.recycling.recycle(any())).thenAnswer { invocation ->
@@ -291,6 +293,8 @@ class VoucherReadinessUpdatesTest {
                 ringVrfPublicKey = mock(),
                 recyclerValue = ValueExponent(1),
                 location = RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), 32, enteredAt),
+                recyclerFungibility = RecyclerFungibility.NONE,
+                maxRecyclerFungibility = null,
             ),
             CoinageAssetState.UNTRACKED,
         )

@@ -19,6 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAmountBre
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
@@ -706,6 +707,8 @@ class RealOnboardingUseCaseTest {
         ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
         recyclerValue = denomination,
         location = RecyclerVoucher.Location.Unknown,
+        recyclerFungibility = RecyclerFungibility.NONE,
+        maxRecyclerFungibility = null,
     )
 
     private fun balanceUpdate(transferable: Balance): AccountBalanceUpdate {

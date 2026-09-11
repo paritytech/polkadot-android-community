@@ -20,6 +20,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage.Cont
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
@@ -564,7 +565,7 @@ class CoinagePaymentProcessingExtensionTest {
     private fun accountId(seed: Int): AccountId = byteArrayOf(seed.toByte()).toDataByteArray()
 
     private fun stateOf(status: CoinagePaymentStatus) = CoinagePaymentState(
-        coin = Coin(derivationIndex = CoinageKeyIndex(CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES).toDataByteArray()), 0), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = accountId(0)),
+        coin = Coin(derivationIndex = CoinageKeyIndex(CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES).toDataByteArray()), 0), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = accountId(0), provenance = CoinProvenance.UNKNOWN),
         status = status,
     )
 

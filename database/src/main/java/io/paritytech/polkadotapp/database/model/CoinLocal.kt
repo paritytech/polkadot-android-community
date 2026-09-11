@@ -12,4 +12,13 @@ class CoinLocal(
     val ageValue: Int?,
     /** Whether the chain holds the coin right now. Kept apart from [ageValue] on purpose. */
     val onChain: Boolean,
+    /** Percentage in `0..100`, or null when the coin's origin was never observed. */
+    val recyclerFungibility: Int?,
+    /**
+     * SCALE-encoded `Vec<CoinHopLocal>`. Null reads back as no hops, which is why a coin minted before this
+     * column existed needs no backfill.
+     */
+    val hops: ByteArray?,
+    /** How many coins were claimed alongside this one, kept until [hops] can be built from the coin's age. */
+    val incomingBundleSize: Int?,
 )

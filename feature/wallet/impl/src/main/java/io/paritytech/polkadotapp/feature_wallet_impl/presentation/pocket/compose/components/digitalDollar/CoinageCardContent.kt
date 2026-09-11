@@ -1,22 +1,13 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import io.paritytech.polkadotapp.design.components.bottomsheet.NovaModalBottomSheet
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -24,12 +15,11 @@ import io.paritytech.polkadotapp.common.R as RCommon
 fun CoinageCardContent(
     state: CoinageUiState,
     onAutoFundClick: () -> Unit,
-    onShareLogsClick: () -> Unit,
-    onForceRecycleClick: (Coin) -> Unit
+    onDetailsToggled: () -> Unit,
+    onKeyToggled: () -> Unit,
+    onShareLogsClick: () -> Unit
 ) {
     Column {
-        var details by remember { mutableStateOf<CoinageDetails?>(null) }
-
         if (state.autoFundAvailable) {
             FaucetTopUpButton(
                 modifier = Modifier.fillMaxWidth(),
@@ -37,34 +27,21 @@ fun CoinageCardContent(
                 actionsEnabled = state.actionsEnabled,
                 onClick = onAutoFundClick
             )
+
+            VerticalSpacer { mediumIncreased }
         }
 
         if (state.coinageWidgetsEnabled) {
-            VerticalSpacer { mediumIncreased }
-
             CoinageStateCard(
+                modifier = Modifier.fillMaxWidth(),
                 state = state.tokensState,
-                onCoinsClick = { details = CoinageDetails.COINS },
-                onVouchersClick = { details = CoinageDetails.VOUCHERS },
+                detailsVisible = state.detailsVisible,
+                keyVisible = state.keyVisible,
+                onDetailsToggled = onDetailsToggled,
+                onKeyToggled = onKeyToggled,
+                shareLogsEnabled = state.shareLogsEnabled,
                 onShareLogsClick = onShareLogsClick
             )
-
-            NovaModalBottomSheet(
-                isVisible = details == CoinageDetails.COINS,
-                onDismissRequest = { details = null }
-            ) {
-                CoinsListSheetContent(
-                    coins = state.tokensState.coinList,
-                    onForceRecycleClick = onForceRecycleClick
-                )
-            }
-
-            NovaModalBottomSheet(
-                isVisible = details == CoinageDetails.VOUCHERS,
-                onDismissRequest = { details = null }
-            ) {
-                VouchersListSheetContent(vouchers = state.tokensState.voucherList)
-            }
         }
     }
 }
