@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.common.utils.Fraction.Companion.percents
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.InstallationRegistrationCall
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
 import io.paritytech.polkadotapp.feature_revive_api.calls.call
 import io.paritytech.polkadotapp.feature_revive_api.calls.revive
@@ -69,10 +70,10 @@ class RealInstallationRegistrationSubmitter @Inject constructor(
             val formExtrinsic = call.formExtrinsic(dryRun.weightRequired.withMargin(), dryRun.storageDeposit.withMargin())
 
             extrinsicService.estimateFee(chain, call.origin(), formExtrinsic = formExtrinsic).map { fee ->
-                RegistrationCost(
-                    formExtrinsic = formExtrinsic,
-                    required = dryRun.storageDeposit.withMargin().intoBalance() + fee.amount,
-                )
+                val required = dryRun.storageDeposit.withMargin().intoBalance() + fee.amount
+                coinageLogI("Installation registration: dry-run deposit=${dryRun.storageDeposit} fee=${fee.amount} required=$required")
+
+                RegistrationCost(formExtrinsic = formExtrinsic, required = required)
             }
         }
     }
@@ -83,8 +84,11 @@ class RealInstallationRegistrationSubmitter @Inject constructor(
         cost: RegistrationCost,
         target: InstallationRegistrationTarget,
     ): Result<DurableTxId> {
+        coinageLogI("Installation registration: calling contract, ${target.logDescription()}")
+
         return extrinsicService.buildExtrinsic(chain, call.origin(), ExtrinsicService.SubmissionOptions(), cost.formExtrinsic)
             .flatMap { extrinsic -> durableTransactionService.submit(COINAGE_INSTALLATION_DOMAIN, extrinsic, target.registrationGroup()) {} }
+            .onSuccess { id -> coinageLogI("Installation registration: submitted as durable tx ${id.value}") }
     }
 
     private fun InstallationRegistrationCall.origin(): TransactionOrigin = SignedTransactionOrigin(

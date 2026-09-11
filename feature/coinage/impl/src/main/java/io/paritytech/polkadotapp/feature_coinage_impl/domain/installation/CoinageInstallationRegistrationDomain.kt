@@ -37,4 +37,11 @@ fun OperationGroupId.registrationTargetOrNull(): InstallationRegistrationTarget?
     }.getOrNull()
 }
 
+// Enough to tell installations apart in a shared log, not enough to stand in for the id.
+fun CoinageInstallationId.logId(): String = value.value.copyOf(LOG_ID_BYTES).toHexString(withPrefix = true) + "…"
+
+fun InstallationRegistrationTarget.logDescription(): String =
+    "installation=${installation.logId()} contract=${contract.value.toHexString(withPrefix = true)}"
+
 private const val GROUP_SEPARATOR = "/"
+private const val LOG_ID_BYTES = 4

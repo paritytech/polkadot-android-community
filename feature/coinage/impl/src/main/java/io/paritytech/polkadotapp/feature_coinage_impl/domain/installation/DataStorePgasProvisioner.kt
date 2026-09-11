@@ -5,6 +5,8 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_balances_api.data.type.TokenBalanceTypeRegistry
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCheckMemberInRingUseCase
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
 import io.paritytech.polkadotapp.feature_pgas_api.domain.OnExistingAllocationStrategy
@@ -31,19 +33,33 @@ class DataStorePgasProvisioner @Inject constructor(
     // An empty account cannot even be simulated against: the dry-run fails on the deposit it cannot reserve.
     suspend fun ensureFunded(account: AccountId): Result<Unit> {
         return pgasBalance(account).flatMap { transferable ->
-            if (transferable > Balance.ZERO) Result.success(Unit) else claim(account, OnExistingAllocationStrategy.IGNORE)
+            if (transferable > Balance.ZERO) {
+                coinageLogI("Installation registration: PGAS funding skipped, data store account holds $transferable")
+                Result.success(Unit)
+            } else {
+                coinageLogI("Installation registration: data store account is empty, claiming PGAS")
+                claim(account, OnExistingAllocationStrategy.IGNORE)
+                    .onSuccess { coinageLogI("Installation registration: PGAS claimed for the data store account") }
+            }
         }
     }
 
     suspend fun ensureCovers(account: AccountId, required: Balance): Result<Unit> {
         return pgasBalance(account).flatMap { transferable ->
             if (transferable >= required) {
+                coinageLogI("Installation registration: PGAS covers the call, holds $transferable, needs $required")
                 Result.success(Unit)
             } else {
+                coinageLogI("Installation registration: PGAS short, holds $transferable, needs $required, topping up")
                 claim(account, OnExistingAllocationStrategy.INCREASE)
                     .flatMap { pgasBalance(account) }
                     .flatMap { topped ->
-                        if (topped >= required) Result.success(Unit) else Result.failure(DataStorePgasShortError(required, topped))
+                        if (topped >= required) {
+                            coinageLogI("Installation registration: PGAS topped up to $topped")
+                            Result.success(Unit)
+                        } else {
+                            Result.failure(DataStorePgasShortError(required, topped))
+                        }
                     }
             }
         }
@@ -58,7 +74,10 @@ class DataStorePgasProvisioner @Inject constructor(
             // slot proves the same alias, which the chain accepts once.
             withTimeoutOrNull(CLAIM_TIMEOUT) {
                 with(StalenessReportCollector.NoOp) { pgasClaimer.claim(account, strategy) }
-            } ?: Result.failure(DataStorePgasClaimTimeoutError())
+            } ?: run {
+                coinageLogW("Installation registration: PGAS claim did not report back within $CLAIM_TIMEOUT")
+                Result.failure(DataStorePgasClaimTimeoutError())
+            }
         }
     }
 

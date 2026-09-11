@@ -4,11 +4,13 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageAccountBackupObserver
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxState
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,6 +65,7 @@ class CoinageInstallationRegistrar @Inject constructor(
         emitAll(combine(completed, overdueAfter(EXPECTED_REGISTRATION_TIME), ::statusOf))
     }
         .distinctUntilChanged()
+        .onEach { status -> coinageLogI("Installation registration status=$status") }
         .shareIn(this, SharingStarted.Lazily, replay = 1)
 
     override fun subscribeStatus(): Flow<CoinageAccountBackupStatus> = registration
@@ -71,6 +75,7 @@ class CoinageInstallationRegistrar @Inject constructor(
     }
 
     private suspend fun registerUntilFinalized(target: InstallationRegistrationTarget) {
+        coinageLogI("Installation registration starting, ${target.logDescription()}")
         durableTransactionService.startRecovery()
 
         chainConnectionRefCounter.withConnectionEnabled(knownChains.assetHub, CONNECTION_LABEL) {
@@ -80,13 +85,22 @@ class CoinageInstallationRegistrar @Inject constructor(
                 val settled = awaitNoLiveAttempt(target)
 
                 // An attempt finalized. Registration finished.
-                if (settled.any { it.status == DurableTxStatus.FINALIZED_SUCCESS }) break
+                if (settled.any { it.status == DurableTxStatus.FINALIZED_SUCCESS }) {
+                    coinageLogI("Installation registration finalized after $attempts attempt(s) in this run, ${target.logDescription()}")
+                    break
+                }
 
                 // Only attempts of this run count: failures an earlier launch left behind say nothing about now.
-                if (attempts > 0) delay(backoffFor(attempts))
+                if (attempts > 0) {
+                    val backoff = backoffFor(attempts)
+                    coinageLogW("Installation registration attempt $attempts did not land, retrying in $backoff")
+                    delay(backoff)
+                }
 
                 attempts++
-                submitter.submitAttempt(target).logFailure("Installation registration attempt could not be submitted")
+                coinageLogI("Installation registration attempt $attempts")
+                submitter.submitAttempt(target)
+                    .onFailure { coinageLogE("Installation registration attempt $attempts could not be submitted", it) }
             }
         }
     }
@@ -102,7 +116,7 @@ class CoinageInstallationRegistrar @Inject constructor(
 
         while (true) {
             configProvider.contractAddress()
-                .logFailure("Data store contract address is not available")
+                .onFailure { coinageLogW("Installation registration: data store contract address is not available yet") }
                 .onSuccess { contract -> return InstallationRegistrationTarget(contract, installation) }
 
             delay(INITIAL_BACKOFF)

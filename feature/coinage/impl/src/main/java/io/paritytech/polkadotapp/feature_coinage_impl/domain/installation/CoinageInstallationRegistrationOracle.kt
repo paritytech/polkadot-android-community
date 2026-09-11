@@ -4,12 +4,12 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_revive_api.EvmAccountId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.MonotoneEffectOracle
-import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,7 +40,7 @@ class CoinageInstallationRegistrationOracle @Inject constructor(
 
     private suspend fun registeredIn(contract: EvmAccountId, at: CheckpointBlock): Set<CoinageInstallationId>? {
         return dataStoreRepository.fetchRegisteredInstallations(contract, at.blockHash)
-            .onFailure { Timber.w(it, "Could not read registered installations at ${at.blockNumber}") }
+            .onFailure { coinageLogW("Installation registration oracle: could not read registered installations at ${at.blockNumber}: ${it.message}") }
             .getOrNull()
     }
 }

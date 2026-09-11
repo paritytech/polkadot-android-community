@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.service
 
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.measureExecution
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
@@ -14,12 +13,15 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.Previous
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.DeepRecoveryCompletedStorage
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.logId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 // Recovers balance held under the subtrees of this seed's previous installations.
@@ -50,7 +52,11 @@ class RealCoinageBackupService @Inject constructor(
             if (progress.value.isInProgress()) return@launch
 
             progress.value = BackupProgress.Deep.Syncing
-            installationRepository.getPrevious().forEach { deepScan(it) }
+
+            val previous = installationRepository.getPrevious()
+            val recovered = previous.map { deepScan(it) }
+            coinageLogI("Deep recovery finished: ${recovered.describe()} across ${previous.size} installation(s)")
+
             progress.value = BackupProgress.Deep.Completed
         }
     }
@@ -69,15 +75,24 @@ class RealCoinageBackupService @Inject constructor(
         // A failed read only delays discovery: installations found on an earlier launch are still scanned.
         dataStoreConfigProvider.contractAddress()
             .flatMap { contract -> dataStoreRepository.fetchRegisteredInstallations(contract, at = null) }
-            .onSuccess { installationRepository.addPrevious(it) }
-            .onFailure { Timber.w(it, "Could not read registered installations, scanning the ones already known") }
+            .onSuccess { registered ->
+                coinageLogI("Recovery: contract lists ${registered.size} installation(s) for this seed")
+                installationRepository.addPrevious(registered)
+            }
+            .onFailure { coinageLogW("Recovery: could not read registered installations, scanning the ones already known: ${it.message}") }
 
         val previous = installationRepository.getPrevious()
         val pending = previous.filterNot { it.initialScanCompleted }
 
-        if (pending.isNotEmpty()) {
+        if (pending.isEmpty()) {
+            coinageLogI("Recovery: nothing new to scan, ${previous.size} previous installation(s) already scanned")
+        } else {
+            coinageLogI("Recovery: scanning ${pending.size} of ${previous.size} previous installation(s)")
             progress.value = BackupProgress.Initial.Syncing
-            pending.forEach { initialScan(it) }
+
+            val recovered = pending.map { initialScan(it) }
+            coinageLogI("Recovery finished: ${recovered.describe()} across ${pending.size} installation(s)")
+
             // Newly found balance is worth another look, even if the last one was acknowledged.
             deepRecoveryCompletedStorage.saveValue(false)
         }
@@ -89,61 +104,88 @@ class RealCoinageBackupService @Inject constructor(
         }
     }
 
-    private suspend fun initialScan(installation: PreviousInstallation) = coroutineScope {
+    private suspend fun initialScan(installation: PreviousInstallation): RecoveredAssets = coroutineScope {
         val coins = async { gapScanCoins(installation.id, installation.coinScanNextIndex, ScanLimit.UntilGap) }
         val vouchers = async { gapScanVouchers(installation.id, installation.voucherScanNextIndex, ScanLimit.UntilGap) }
 
-        val coinsScanned = coins.await()
-        val vouchersScanned = vouchers.await()
+        val recovered = RecoveredAssets(coins = coins.await(), vouchers = vouchers.await())
+        coinageLogI("Recovery: installation=${installation.id.logId()} ${recovered.describe()}")
 
-        if (coinsScanned && vouchersScanned) installationRepository.markInitialScanCompleted(installation.id)
+        if (recovered.isComplete) installationRepository.markInitialScanCompleted(installation.id)
+
+        recovered
     }
 
-    private suspend fun deepScan(installation: PreviousInstallation) = coroutineScope {
-        launch { gapScanCoins(installation.id, installation.coinScanNextIndex, ScanLimit.Batches(DEEP_SEARCH_BATCH_COUNT)) }
-        launch { gapScanVouchers(installation.id, installation.voucherScanNextIndex, ScanLimit.Batches(DEEP_SEARCH_BATCH_COUNT)) }
+    private suspend fun deepScan(installation: PreviousInstallation): RecoveredAssets = coroutineScope {
+        val coins = async { gapScanCoins(installation.id, installation.coinScanNextIndex, ScanLimit.Batches(DEEP_SEARCH_BATCH_COUNT)) }
+        val vouchers = async { gapScanVouchers(installation.id, installation.voucherScanNextIndex, ScanLimit.Batches(DEEP_SEARCH_BATCH_COUNT)) }
+
+        RecoveredAssets(coins = coins.await(), vouchers = vouchers.await())
+            .also { coinageLogI("Deep recovery: installation=${installation.id.logId()} ${it.describe()}") }
     }
 
-    private suspend fun gapScanCoins(installation: CoinageInstallationId, startIndex: Int, limit: ScanLimit): Boolean {
+    private suspend fun gapScanCoins(installation: CoinageInstallationId, startIndex: Int, limit: ScanLimit): Result<Int> {
         return gapScan(startIndex, limit) { batchStart ->
             assetScanner.scanCoins(installation, batchStart, BATCH_SIZE)
                 .onSuccess { coinsRepository.saveAll(it) }
-                .map { it.isNotEmpty() }
+                .map { it.size }
         }
-            .onSuccess { installationRepository.updateCoinScanNextIndex(installation, it) }
-            .logFailure("Failed to recover coins of a previous installation")
-            .isSuccess
+            .onSuccess { installationRepository.updateCoinScanNextIndex(installation, it.nextIndex) }
+            .onFailure { coinageLogE("Recovery: coin scan of installation=${installation.logId()} failed", it) }
+            .map { it.found }
     }
 
-    private suspend fun gapScanVouchers(installation: CoinageInstallationId, startIndex: Int, limit: ScanLimit): Boolean {
+    private suspend fun gapScanVouchers(installation: CoinageInstallationId, startIndex: Int, limit: ScanLimit): Result<Int> {
         return gapScan(startIndex, limit) { batchStart ->
             assetScanner.scanVouchers(installation, batchStart, BATCH_SIZE)
                 .onSuccess { voucherRepository.saveAll(it) }
-                .map { it.isNotEmpty() }
+                .map { it.size }
         }
-            .onSuccess { installationRepository.updateVoucherScanNextIndex(installation, it) }
-            .logFailure("Failed to recover vouchers of a previous installation")
-            .isSuccess
+            .onSuccess { installationRepository.updateVoucherScanNextIndex(installation, it.nextIndex) }
+            .onFailure { coinageLogE("Recovery: voucher scan of installation=${installation.logId()} failed", it) }
+            .map { it.found }
     }
 
     private suspend fun gapScan(
         startIndex: Int,
         limit: ScanLimit,
-        scanBatch: suspend (batchStart: Int) -> Result<Boolean>,
-    ): Result<Int> {
+        scanBatch: suspend (batchStart: Int) -> Result<Int>,
+    ): Result<GapScanResult> {
         var nextIndex = startIndex
         var batches = 0
         var emptyBatchesInARow = 0
+        var found = 0
 
         while (!limit.isReached(batches, emptyBatchesInARow)) {
-            val found = scanBatch(nextIndex).getOrElse { return Result.failure(it) }
+            val foundInBatch = scanBatch(nextIndex).getOrElse { return Result.failure(it) }
 
-            emptyBatchesInARow = if (found) 0 else emptyBatchesInARow + 1
+            found += foundInBatch
+            emptyBatchesInARow = if (foundInBatch > 0) 0 else emptyBatchesInARow + 1
             batches += 1
             nextIndex += BATCH_SIZE
         }
 
-        return Result.success(nextIndex)
+        return Result.success(GapScanResult(nextIndex = nextIndex, found = found))
+    }
+
+    private class GapScanResult(val nextIndex: Int, val found: Int)
+
+    // A failed scan counts nothing and leaves the installation for the next launch to finish.
+    private class RecoveredAssets(val coins: Result<Int>, val vouchers: Result<Int>) {
+        val isComplete: Boolean
+            get() = coins.isSuccess && vouchers.isSuccess
+
+        fun describe(): String = "coins=${coins.describeCount()} vouchers=${vouchers.describeCount()}"
+
+        private fun Result<Int>.describeCount(): String = getOrNull()?.toString() ?: "failed"
+    }
+
+    private fun List<RecoveredAssets>.describe(): String {
+        val coins = sumOf { it.coins.getOrDefault(0) }
+        val vouchers = sumOf { it.vouchers.getOrDefault(0) }
+        val failed = count { !it.isComplete }
+
+        return "$coins coin(s) and $vouchers voucher(s) recovered" + if (failed > 0) ", $failed installation(s) incomplete" else ""
     }
 
     private sealed interface ScanLimit {
