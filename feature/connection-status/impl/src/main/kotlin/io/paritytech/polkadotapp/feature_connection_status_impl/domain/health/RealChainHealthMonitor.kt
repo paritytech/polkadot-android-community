@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
 
-import io.novasama.substrate_sdk_android.wsrpc.state.SocketStateMachine.State
 import io.novasama.substrate_sdk_android.wsrpc.state.pendingRequests
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
