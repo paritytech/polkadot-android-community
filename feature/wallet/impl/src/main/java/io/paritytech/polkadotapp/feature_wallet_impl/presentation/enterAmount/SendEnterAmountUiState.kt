@@ -9,6 +9,9 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 data class SendEnterAmountUiState(
     val input: String,
     val available: TokenAmountModel,
+    val spendable: TokenAmountModel,
+    /** Null when the strategy is holding nothing back, or will not part with it. */
+    val gainingPrivacy: TokenAmountModel?,
     val showBalanceError: Boolean,
     val recipient: String?,
     val recipientType: ExtractedAddress.DisplayType?,

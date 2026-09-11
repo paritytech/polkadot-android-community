@@ -325,10 +325,10 @@ For resources that need cleanup, prefer an explicit `dispose()` (or `close()`) m
 // ✓ — owner controls lifecycle
 class ProductTrUAPIHostBridge(...) {
     fun stop() {
-        chainProvider.closeAll()
         chainProvider.detach()
-        core?.stopWsBridge()
-        core?.disconnect()
+        chainProvider.closeAll()
+        execution?.stopWsBridge()
+        execution?.close()
     }
 }
 

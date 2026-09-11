@@ -63,13 +63,10 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermissionDeniedException
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.RemotePermissionRequest
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ProductSigningScreenLauncher
-import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.ExecuteTopUpUseCase
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpId
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpSource
-import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpAcknowledgement
-import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpClaimResult
-import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpRequestContext
-import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpRequestContextHolder
-import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpSource
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpService
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpStatus
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
 import io.paritytech.polkadotapp.feature_statement_store_api.data.StatementStoreService
@@ -105,8 +102,7 @@ class HostApiInteractor @Inject constructor(
     private val totalBalanceUseCase: TotalBalanceUseCase,
     private val externalPaymentService: ExternalPaymentService,
     private val paymentRequestContextHolder: PaymentRequestContextHolder,
-    private val topUpRequestContextHolder: TopUpRequestContextHolder,
-    private val executeTopUpUseCase: ExecuteTopUpUseCase,
+    private val topUpService: TopUpService,
     private val productsRouter: ProductsRouter,
     private val signedOrigins: SignedOrigins,
     private val accountsProtocol: AccountsProtocol,
@@ -361,7 +357,7 @@ class HostApiInteractor @Inject constructor(
         amount: Balance,
     ): Result<Unit> {
         val balance = totalBalanceUseCase.getBalance().getOrElse { return Result.failure(it) }
-        if (balance.spendableBalance.total >= amount) return Result.success(Unit)
+        if (balance.availablePrivate >= amount) return Result.success(Unit)
 
         val hasBalanceAccess = permissionGuard.check(callingProductId, ProductPermission.BalanceAccess)
         return if (hasBalanceAccess) {
@@ -401,69 +397,21 @@ class HostApiInteractor @Inject constructor(
         )
     }
 
+    /**
+     * Registers the top-up and returns; it is followed through [subscribeTopUpStatus], not waited on here.
+     * The id is the product's, so a product killed mid-top-up can still name the operation it started.
+     */
     suspend fun topUp(
         callingProductId: ProductId,
+        id: PaymentTopUpId,
         amount: Balance,
         source: PaymentTopUpSource,
     ): Result<Unit> {
-        val contextSource = resolveTopUpSource(callingProductId, source)
-            .getOrElse { return Result.failure(it) }
-
-        // Claim silently — only surface the prompt to acknowledge a failure or an amount mismatch.
-        return executeTopUpUseCase.claim(contextSource, amount).fold(
-            onSuccess = { result -> handleTopUpSuccess(amount, callingProductId, result) },
-            onFailure = { reason -> handleTopUpFailure(reason, callingProductId) },
-        )
+        return topUpService.start(callingProductId, id, amount, source)
     }
 
-    private suspend fun handleTopUpFailure(reason: Throwable, productId: ProductId): Result<Unit> {
-        val error = reason.message ?: reason::class.simpleName.orEmpty()
-        acknowledge(TopUpAcknowledgement.Failure(productId, error))
-        return Result.failure(reason)
-    }
-
-    private suspend fun handleTopUpSuccess(
-        expected: Balance,
-        productId: ProductId,
-        result: TopUpClaimResult
-    ): Result<Unit> {
-        return when (result) {
-            TopUpClaimResult.Exact -> Result.success(Unit)
-
-            is TopUpClaimResult.Partial -> {
-                acknowledge(
-                    TopUpAcknowledgement.PartialPayment(
-                        productId = productId,
-                        requested = expected,
-                        credited = result.credited,
-                    )
-                )
-                Result.failure(PaymentTopUpPartialPaymentException(result.credited))
-            }
-        }
-    }
-
-    private suspend fun acknowledge(acknowledgement: TopUpAcknowledgement) {
-        val context = TopUpRequestContext(acknowledgement)
-        topUpRequestContextHolder.set(context)
-        productsRouter.openTopUpRequestPrompt()
-        context.awaitDismissed()
-    }
-
-    private suspend fun resolveTopUpSource(
-        callingProductId: ProductId,
-        source: PaymentTopUpSource,
-    ): Result<TopUpSource> = when (source) {
-        is PaymentTopUpSource.ProductAccount -> {
-            val productAccountId = ProductAccountId(productId = callingProductId.value, index = source.index)
-            productAccountDerivationUseCase.deriveTransactionSignerSource(productAccountId)
-                .map { TopUpSource.Onboard(it) }
-        }
-
-        is PaymentTopUpSource.PrivateKey -> signedOrigins.signedTransactionSourceSr25519PrivateKey(source.key)
-            .map { TopUpSource.Onboard(it) }
-
-        is PaymentTopUpSource.Coins -> Result.success(TopUpSource.Coins(source.secretKeys))
+    fun subscribeTopUpStatus(callingProductId: ProductId, id: PaymentTopUpId): Flow<TopUpStatus> {
+        return topUpService.status(callingProductId, id)
     }
 
     suspend fun deriveEntropy(callingProductId: ProductId, key: ByteArray): Result<ByteArray> {
@@ -480,7 +428,7 @@ class HostApiInteractor @Inject constructor(
             .mapNotNull { it.getOrNull() }
             // Only what can actually be spent: a product that tops up against this number must not be
             // told about balance still waiting on a transaction of ours.
-            .map { PaymentBalance(available = it.spendableBalance.total) }
+            .map { PaymentBalance(available = it.availablePrivate) }
     }
 
     suspend fun registerRingVrfKey(
@@ -551,13 +499,6 @@ private val Color.isLight: Boolean
 object InsufficientBalanceException : RuntimeException("insufficient balance")
 
 object PaymentRejectedException : RuntimeException("payment rejected")
-
-/**
- * Message must be literal "PartialPayment:<credited-planks>" — load-bearing token matched and
- * parsed by JS-side `handlePaymentTopUp` to rebuild `PaymentTopUpErr.PartialPayment`.
- */
-class PaymentTopUpPartialPaymentException(val credited: Balance) :
-    RuntimeException("PartialPayment:${credited.value}")
 
 class AllowanceDeniedException(val kind: AllowanceResourceKind) :
     RuntimeException("allowance allocation rejected by user for $kind")

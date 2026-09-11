@@ -30,7 +30,7 @@ interface ProductBotManagementInteractor {
 
     suspend fun installChatIntegration(productId: ProductId): Result<Unit>
 
-    fun currentTld(): DotNsTld
+    fun currentTld(): DotNsTld?
 }
 
 /** Debug menu: a user-entered URL becomes the product's worker location via `userWorkerUrl`. */
@@ -82,7 +82,7 @@ class RealProductBotManagementInteractor @Inject constructor(
         }
     }
 
-    override fun currentTld(): DotNsTld {
-        return dotNsTldProvider.currentTldOrNull() ?: DotNsTld.FALLBACK
+    override fun currentTld(): DotNsTld? {
+        return dotNsTldProvider.currentTldOrNull()
     }
 }

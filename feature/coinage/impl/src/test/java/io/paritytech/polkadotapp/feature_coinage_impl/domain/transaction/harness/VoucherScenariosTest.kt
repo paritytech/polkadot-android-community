@@ -1,12 +1,12 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FAILURE
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.FINALIZED
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.IN_BEST
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -17,7 +17,7 @@ import org.junit.Test
  *
  * A voucher is the only asset with positive consumption proof: its recycler alias reads as unloaded. A coin
  * has nothing equivalent — its absence is the strongest signal there is — so every rule that turns on
- * `provenConsumedOnChain` or `provenNotUnloaded` is exercised here and nowhere else.
+ * `provenConsumedOnChain` or `provenNotConsumed` is exercised here and nowhere else.
  */
 class VoucherScenariosTest {
     @Test

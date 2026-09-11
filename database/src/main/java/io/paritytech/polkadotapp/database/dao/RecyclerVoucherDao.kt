@@ -24,44 +24,22 @@ interface RecyclerVoucherDao {
 
     @Query(
         """
-        SELECT * FROM recycler_vouchers
-        WHERE locationRecyclerIndex IS NULL
-        """
-    )
-    fun subscribeNotInRecycler(): Flow<List<RecyclerVoucherLocal>>
-
-    @Query(
-        """
         UPDATE recycler_vouchers
-        SET locationRecyclerIndex = :recyclerIndex
+        SET locationRecyclerIndex = :recyclerIndex,
+            recyclerMembers = :recyclerMembers
         WHERE ringVrfPublicKey = :ringVrfPublicKey
         """
     )
     suspend fun updateLocation(
         ringVrfPublicKey: ByteArray,
-        recyclerIndex: Int
+        recyclerIndex: Int,
+        recyclerMembers: Int
     )
 
     @Transaction
     suspend fun updateLocations(updates: List<RecyclerVoucherLocationUpdate>) {
         updates.forEach { update ->
-            updateLocation(update.ringVrfPublicKey, update.recyclerIndex)
-        }
-    }
-
-    @Query(
-        """
-        UPDATE recycler_vouchers
-        SET ringHasEnoughRingMembersToWithdraw = :hasEnough
-        WHERE ringVrfKeyIndex = :ringVrfKeyIndex
-        """
-    )
-    suspend fun updateRingMemberStatus(ringVrfKeyIndex: Int, hasEnough: Boolean)
-
-    @Transaction
-    suspend fun updateRingMemberStatuses(updates: List<RingMemberStatusUpdate>) {
-        updates.forEach { update ->
-            updateRingMemberStatus(update.ringVrfKeyIndex, update.hasEnough)
+            updateLocation(update.ringVrfPublicKey, update.recyclerIndex, update.recyclerMembers)
         }
     }
 
@@ -86,10 +64,6 @@ interface RecyclerVoucherDao {
 
 class RecyclerVoucherLocationUpdate(
     val ringVrfPublicKey: ByteArray,
-    val recyclerIndex: Int
-)
-
-class RingMemberStatusUpdate(
-    val ringVrfKeyIndex: Int,
-    val hasEnough: Boolean
+    val recyclerIndex: Int,
+    val recyclerMembers: Int
 )

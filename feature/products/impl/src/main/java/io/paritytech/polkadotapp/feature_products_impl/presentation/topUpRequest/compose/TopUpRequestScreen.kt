@@ -86,7 +86,7 @@ private fun FailureContent(state: TopUpRequestUiState.Failure) {
     VerticalSpacer { mediumIncreased }
 
     NovaText(
-        text = state.errorMessage,
+        text = stringResource(RCommon.string.product_top_up_failed_message),
         style = PolkadotTheme.typography.body.medium,
         color = PolkadotTheme.colors.fg.error,
         textAlign = TextAlign.Center,
@@ -153,10 +153,7 @@ private fun PartialPaymentContent(state: TopUpRequestUiState.PartialPayment) {
 private fun TopUpRequestFailurePreview() {
     PolkadotTheme {
         TopUpRequestScreenInternal(
-            state = TopUpRequestUiState.Failure(
-                productId = "alice.dot",
-                errorMessage = "Failed to move coins into the user's coin set",
-            ),
+            state = TopUpRequestUiState.Failure(productId = "alice.dot"),
             onDismiss = {},
         )
     }

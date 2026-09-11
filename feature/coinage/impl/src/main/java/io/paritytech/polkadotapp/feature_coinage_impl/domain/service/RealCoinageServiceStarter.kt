@@ -3,9 +3,9 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.service
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBackupService
-import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageRecyclingSyncManager
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServiceStarter
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAccountOnboardingStatusUseCase
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -16,8 +16,7 @@ class RealCoinageServiceStarter @Inject constructor(
     private val coinageBackupService: CoinageBackupService,
     private val voucherLocationService: VoucherLocationService,
     private val coinPresenceSyncService: CoinPresenceSyncService,
-    private val voucherRingMembersService: VoucherRingMembersService,
-    private val coinageRecyclingSyncManager: CoinageRecyclingSyncManager,
+    private val coinRecyclingEvaluator: CoinRecyclingEvaluator,
     private val observeAccountOnboardingStatusUseCase: ObserveAccountOnboardingStatusUseCase,
     private val coinageTransactionService: CoinageTransactionService,
 ) : CoinageServiceStarter {
@@ -25,7 +24,7 @@ class RealCoinageServiceStarter @Inject constructor(
     override fun start() {
         scope.launch { coinPresenceSyncService.start() }
         scope.launch { voucherLocationService.start() }
-        scope.launch { voucherRingMembersService.start() }
+        coinRecyclingEvaluator.start()
         scope.launch {
             observeAccountOnboardingStatusUseCase().filter { it.isOnboarded }.first()
             coinageBackupService.start()
@@ -39,6 +38,5 @@ class RealCoinageServiceStarter @Inject constructor(
             // Entries left live by a previous process are decided from the chain, not resumed.
             coinageTransactionService.startRecovery()
         }
-        coinageRecyclingSyncManager.recycleAndSchedule()
     }
 }

@@ -1,10 +1,10 @@
 package io.paritytech.polkadotapp.feature_people_impl.data.personSetup.state
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.common.data.worker.stateMachine.WorkerStateFactory
 import io.paritytech.polkadotapp.common.data.worker.stateMachine.WorkerStateStore
 import io.paritytech.polkadotapp.common.data.worker.stateMachine.getParams
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
+import io.paritytech.polkadotapp.feature_people_api.data.AliasContextProvider
 import io.paritytech.polkadotapp.feature_people_api.data.SetAliasContext
 import io.paritytech.polkadotapp.feature_people_api.data.repository.PersonIdRepository
 import io.paritytech.polkadotapp.feature_people_impl.data.notifications.BecomeCitizenNotificationPublisher
@@ -16,7 +16,7 @@ class PersonSetupStateFactory @Inject constructor(
     private val personIdStorage: PersonIdStorage,
     private val accountRepository: AccountRepository,
     private val becomeCitizenNotificationPublisher: BecomeCitizenNotificationPublisher,
-    @SetAliasContext private val assignableContexts: Set<@JvmSuppressWildcards BandersnatchContext>
+    @SetAliasContext private val assignableContexts: Set<@JvmSuppressWildcards AliasContextProvider>
 ) : WorkerStateFactory<PersonSetupState> {
     override fun createState(
         stateId: String,

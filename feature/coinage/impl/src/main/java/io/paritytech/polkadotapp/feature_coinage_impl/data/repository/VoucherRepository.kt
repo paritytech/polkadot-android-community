@@ -4,14 +4,15 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.chains.di.RemoteSourceQualifier
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.storage.source.StorageDataSource
+import io.paritytech.polkadotapp.chains.storage.source.query.api.StorageKey4
 import io.paritytech.polkadotapp.chains.storage.source.query.metadata
 import io.paritytech.polkadotapp.chains.storage.source.queryCatching
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherLocationUpdate
-import io.paritytech.polkadotapp.database.dao.RingMemberStatusUpdate
 import io.paritytech.polkadotapp.database.model.RecyclerVoucherLocal
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstanceId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.DerivationIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
@@ -32,8 +33,6 @@ interface VoucherRepository {
 
     fun subscribeAllVouchers(): Flow<List<RecyclerVoucher>>
 
-    fun subscribeVouchersNotInRecycler(): Flow<List<RecyclerVoucher>>
-
     suspend fun updateLocations(locations: Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler>)
 
     suspend fun getNextDerivationIndex(): DerivationIndex
@@ -45,9 +44,11 @@ interface VoucherRepository {
 
     suspend fun getAllVouchers(): List<RecyclerVoucher>
 
-    suspend fun updateRingMemberStatuses(updates: Map<Int, Boolean>)
-
-    suspend fun fetchValuesForKeys(chainId: ChainId, voucherKeys: List<BandersnatchPublicKey>): Result<Map<BandersnatchPublicKey, ValueExponent>>
+    suspend fun fetchValuesForKeys(
+        chainId: ChainId,
+        instanceId: CoinageInstanceId,
+        voucherKeys: List<BandersnatchPublicKey>
+    ): Result<Map<BandersnatchPublicKey, ValueExponent>>
 
     suspend fun getByRingVrfKeyIndices(indices: List<DerivationIndex>): List<RecyclerVoucher>
 
@@ -55,7 +56,7 @@ interface VoucherRepository {
 
     suspend fun fetchRecyclerAliasStates(
         chainId: ChainId,
-        keys: List<Triple<BigInteger, BigInteger, ByteArray>>
+        keys: List<StorageKey4<BigInteger, BigInteger, BigInteger, ByteArray>>
     ): Result<Map<String, OnChainAliasState?>>
 }
 
@@ -79,15 +80,12 @@ class RealVoucherRepository @Inject constructor(
         return recyclerVoucherDao.subscribeAll().mapList { it.toDomain() }
     }
 
-    override fun subscribeVouchersNotInRecycler(): Flow<List<RecyclerVoucher>> {
-        return recyclerVoucherDao.subscribeNotInRecycler().mapList { it.toDomain() }
-    }
-
     override suspend fun updateLocations(locations: Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler>) {
         val updates = locations.map { (publicKey, location) ->
             RecyclerVoucherLocationUpdate(
                 ringVrfPublicKey = publicKey.value,
-                recyclerIndex = location.recyclerIndex.value.toInt()
+                recyclerIndex = location.recyclerIndex.value.toInt(),
+                recyclerMembers = location.recyclerMembers
             )
         }
         recyclerVoucherDao.updateLocations(updates)
@@ -103,13 +101,13 @@ class RealVoucherRepository @Inject constructor(
 
     override suspend fun fetchRecyclerAliasStates(
         chainId: ChainId,
-        keys: List<Triple<BigInteger, BigInteger, ByteArray>>
+        keys: List<StorageKey4<BigInteger, BigInteger, BigInteger, ByteArray>>
     ): Result<Map<String, OnChainAliasState?>> {
         return remoteStorageSource.queryCatching(chainId) {
             metadata.coinage.recyclerAliasStates.entries(keys)
         }
             .map {
-                it.mapKeys { (key, _) -> key.third.toDataByteArray().toString() }
+                it.mapKeys { (key, _) -> key.fourth.toDataByteArray().toString() }
             }
     }
 
@@ -121,22 +119,23 @@ class RealVoucherRepository @Inject constructor(
         return recyclerVoucherDao.getAllVouchers().map { it.toDomain() }
     }
 
-    override suspend fun updateRingMemberStatuses(updates: Map<Int, Boolean>) {
-        val daoUpdates = updates.map { (ringVrfKeyIndex, hasEnough) ->
-            RingMemberStatusUpdate(ringVrfKeyIndex, hasEnough)
-        }
-        recyclerVoucherDao.updateRingMemberStatuses(daoUpdates)
-    }
-
     override fun subscribeVouchersInRecycler(): Flow<List<RecyclerVoucher>> {
         return recyclerVoucherDao.subscribeVouchersInRecycler().mapList { it.toDomain() }
     }
 
-    override suspend fun fetchValuesForKeys(chainId: ChainId, voucherKeys: List<BandersnatchPublicKey>): Result<Map<BandersnatchPublicKey, ValueExponent>> {
+    override suspend fun fetchValuesForKeys(
+        chainId: ChainId,
+        instanceId: CoinageInstanceId,
+        voucherKeys: List<BandersnatchPublicKey>
+    ): Result<Map<BandersnatchPublicKey, ValueExponent>> {
         return remoteStorageSource.queryCatching(chainId) {
             metadata.coinage.recyclersCoinToRecycler.entries(voucherKeys)
         }
-            .map { it.mapValues { (_, value) -> ValueExponent(value.toInt()) } }
+            .map { entries ->
+                entries
+                    .filterValues { location -> location.instanceId.toUInt() == instanceId }
+                    .mapValues { (_, location) -> ValueExponent(location.value) }
+            }
     }
 
     private fun RecyclerVoucherLocal.toDomain(): RecyclerVoucher {
@@ -145,15 +144,20 @@ class RealVoucherRepository @Inject constructor(
             ringVrfPublicKey = ringVrfPublicKey.toDataByteArray(),
             recyclerValue = ValueExponent(recyclerValue),
             location = toDomainLocation(),
-            allocatedAt = allocatedAt,
-            delayUnloadUntil = delayUnloadUntil,
-            ringHasEnoughRingMembersToWithdraw = ringHasEnoughRingMembersToWithdraw,
         )
     }
 
     private fun RecyclerVoucherLocal.toDomainLocation(): RecyclerVoucher.Location {
         val index = locationRecyclerIndex ?: return RecyclerVoucher.Location.Unknown
-        return RecyclerVoucher.Location.InRecycler(recyclerIndex = RecyclerIndex(index.toBigInteger()))
+
+        // Written together by the location service, so one without the other is a corrupt row rather than a
+        // state worth guessing at.
+        val members = requireNotNull(recyclerMembers) { "Voucher in recycler $index has no member count" }
+
+        return RecyclerVoucher.Location.InRecycler(
+            recyclerIndex = RecyclerIndex(index.toBigInteger()),
+            recyclerMembers = members
+        )
     }
 
     private fun RecyclerVoucher.toLocal(): RecyclerVoucherLocal {
@@ -163,9 +167,7 @@ class RealVoucherRepository @Inject constructor(
             ringVrfPublicKey = ringVrfPublicKey.value,
             recyclerValue = recyclerValue.value,
             locationRecyclerIndex = inRecycler?.recyclerIndex?.value?.toInt(),
-            allocatedAt = allocatedAt,
-            delayUnloadUntil = delayUnloadUntil,
-            ringHasEnoughRingMembersToWithdraw = ringHasEnoughRingMembersToWithdraw,
+            recyclerMembers = inRecycler?.recyclerMembers,
         )
     }
 }

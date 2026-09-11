@@ -60,6 +60,7 @@ class TrUAPIConfirmationLauncherTest {
             TrUAPIConfirmation.StatementSign(caller, target) to ProductPermission.AccountAccess("target.dot"),
             TrUAPIConfirmation.AccountAlias(caller, target) to ProductPermission.AccountAccess("target.dot"),
             TrUAPIConfirmation.IdentityDisclosure(caller) to ProductPermission.UserIdentityAccess,
+            TrUAPIConfirmation.ProductSubtree(caller) to ProductPermission.AccountAccess("caller.dot"),
         )
 
         cases.forEach { (confirmation, permission) ->

@@ -88,8 +88,7 @@ class TrUAPIDiagnosticsTest {
             override fun chainClose(connectionId: UInt) = chainProvider.close(connectionId)
         }
 
-        val config = RuntimeConfig(
-            productId = "dotli.dot",
+        val config = HostRuntimeConfig(
             hostName = "Polkadot Android (diagnostics)",
             hostIcon = "https://dot.li/dotli.png",
             peopleChainGenesisHash = ByteArray(32),
@@ -100,12 +99,16 @@ class TrUAPIDiagnosticsTest {
             localSessionLiteUsername = "android-diag",
         )
 
-        val core = TrUAPIHostCore(bridge, config)
-        chainProvider.attach(
-            onResponse = core::notifyChainResponse,
-            onClosed = core::notifyChainClosed,
+        val runtime = TrUAPIHostRuntime(bridge, config)
+        val execution = runtime.openProductExecution(
+            bridge = bridge,
+            configuration = ProductExecutionConfig("dotli.dot", ProductExecutionKind.APP),
         )
-        val endpoint = core.startWsBridge()
+        chainProvider.attach(
+            onResponse = execution::notifyChainResponse,
+            onClosed = execution::notifyChainClosed,
+        )
+        val endpoint = execution.startWsBridge()
         assertTrue("ws bridge port must be assigned", endpoint.port.toInt() > 0)
         assertTrue("ws bridge token must be non-empty", endpoint.token.isNotEmpty())
 
@@ -116,7 +119,8 @@ class TrUAPIDiagnosticsTest {
         }
         assertTrue("expected a Connected auth state from the local session", sawConnected)
 
-        val bootstrap = LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token)
+        // Diagnostics never negotiate WebRTC, so the policy the bootstrap bakes in is a plain no.
+        val bootstrap = LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token, webRtcAllowed = false)
         val url = args.getString("truapi.playgroundUrl") ?: "http://localhost:3000/"
 
         // The playground is a static export; a `?e2e` query param does not
@@ -158,11 +162,12 @@ class TrUAPIDiagnosticsTest {
         instrumentation.runOnMainSync { webViewRef.get().destroy() }
         // Teardown order matters: stop feeding the core from socket callbacks
         // (detach) and close sockets before closing the core, so no chain
-        // callback races with core.close().
+        // callback races with execution.close().
         chainProvider.closeAll()
         chainProvider.detach()
-        core.stopWsBridge()
-        core.close()
+        execution.stopWsBridge()
+        execution.close()
+        runtime.close()
 
         assertTrue(
             "product never reached connected; logs=${synchronized(logs) { logs.toList() }}",

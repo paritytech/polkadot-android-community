@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_wallet_impl
 
 import io.paritytech.polkadotapp.common.presentation.navigation.ReturnableRouter
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.SendEnterAmountPayload
 
 interface PocketRouter : ReturnableRouter {
@@ -16,7 +17,7 @@ interface PocketRouter : ReturnableRouter {
 
     fun openScanAddressQr()
 
-    fun openSelectFundAsset()
-
     fun openCollectibles()
+
+    fun openProduct(productId: ProductId)
 }

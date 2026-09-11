@@ -24,8 +24,10 @@ import io.paritytech.polkadotapp.database.dao.FileDownloadDao
 import io.paritytech.polkadotapp.database.dao.FileUploadDao
 import io.paritytech.polkadotapp.database.dao.GamePlayersDao
 import io.paritytech.polkadotapp.database.dao.ProductDao
+import io.paritytech.polkadotapp.database.dao.ProductFundingOperationDao
 import io.paritytech.polkadotapp.database.dao.ProductIntegrationDao
 import io.paritytech.polkadotapp.database.dao.ProductPermissionGrantDao
+import io.paritytech.polkadotapp.database.dao.ProductTopUpDao
 import io.paritytech.polkadotapp.database.dao.RecyclerVoucherDao
 import io.paritytech.polkadotapp.database.dao.RemovedChatDao
 import io.paritytech.polkadotapp.database.dao.RingVrfKeyRegistrationDao
@@ -107,6 +109,10 @@ class DbModule {
 
     @Provides
     @Singleton
+    fun provideDurableTxDao(appDatabase: AppDatabase) = appDatabase.durableTxDao()
+
+    @Provides
+    @Singleton
     fun provideVideoGameVoteDao(appDatabase: AppDatabase) = appDatabase.videoGameVoteDao()
 
     @Provides
@@ -149,6 +155,16 @@ class DbModule {
     @Provides
     @Singleton
     fun provideBrowserTabDao(appDatabase: AppDatabase): BrowserTabDao = appDatabase.browserTabDao()
+
+    @Provides
+    @Singleton
+    fun provideProductFundingOperationDao(appDatabase: AppDatabase): ProductFundingOperationDao =
+        appDatabase.productFundingOperationDao()
+
+    @Provides
+    @Singleton
+    fun provideProductTopUpDao(appDatabase: AppDatabase): ProductTopUpDao =
+        appDatabase.productTopUpDao()
 
     @Provides
     @Singleton

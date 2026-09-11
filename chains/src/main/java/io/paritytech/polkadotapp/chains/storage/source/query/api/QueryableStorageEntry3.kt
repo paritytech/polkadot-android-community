@@ -6,11 +6,16 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.encode
 import io.novasama.substrate_sdk_android.runtime.metadata.module.StorageEntry
 import io.paritytech.polkadotapp.chains.storage.source.query.StorageKeyComponents
 import io.paritytech.polkadotapp.chains.storage.source.query.StorageQueryContext
+import io.paritytech.polkadotapp.chains.storage.source.query.WithRawValue
+import kotlinx.coroutines.flow.Flow
 import kotlin.reflect.KType
 
 interface QueryableStorageEntry3<I1, I2, I3, T> {
     context(storage: StorageQueryContext)
     suspend fun query(key1: I1, key2: I2, key3: I3): T?
+
+    context(storage: StorageQueryContext)
+    fun observeWithRaw(key1: I1, key2: I2, key3: I3): Flow<WithRawValue<T?>>
 
     context(storage: StorageQueryContext)
     suspend fun entries(key1: I1, key2: I2): Map<Triple<I1, I2, I3>, T?>
@@ -39,6 +44,18 @@ class RealQueryableStorageEntry3<I1, I2, I3, T>(
     override suspend fun query(key1: I1, key2: I2, key3: I3): T? {
         return with(storage) {
             storageEntry.query(
+                Scale.encode(key1Type, key1),
+                Scale.encode(key2Type, key2),
+                Scale.encode(key3Type, key3),
+                binding = { decoded -> decoded?.let { Scale.decode(valueType, it) } }
+            )
+        }
+    }
+
+    context(storage: StorageQueryContext)
+    override fun observeWithRaw(key1: I1, key2: I2, key3: I3): Flow<WithRawValue<T?>> {
+        return with(storage) {
+            storageEntry.observeWithRaw(
                 Scale.encode(key1Type, key1),
                 Scale.encode(key2Type, key2),
                 Scale.encode(key3Type, key3),

@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.main
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -18,11 +19,13 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.BlockOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.FileOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.GridOutlined
+import io.paritytech.polkadotapp.design.components.icon.vectors.Language
 import io.paritytech.polkadotapp.design.components.icon.vectors.LaptopOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.NotificationsBellOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.PaletteOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.Settings
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuList
+import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuListCustomItem
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
@@ -30,9 +33,11 @@ import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleSize
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.AppDeviceInfoSection
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.BackupSettingsMenuItem
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.SettingsMenuItem
+import io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode.PaymentPrivacyModeSelector
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -43,7 +48,9 @@ fun SettingsScreen() {
     SettingsScreenInternal(
         state = state,
         onNotificationsClick = viewModel::onNotificationsClick,
+        onLanguageClick = viewModel::onLanguageClick,
         onThemeClick = viewModel::onThemeClick,
+        onPrivacyModeSelected = viewModel::onPrivacyModeSelected,
         onBackupClick = viewModel::onBackupClick,
         onProductsClick = viewModel::onProductsClick,
         onBlockedUsersClick = viewModel::onBlockedUsersClick,
@@ -58,7 +65,9 @@ fun SettingsScreen() {
 private fun SettingsScreenInternal(
     state: SettingsUiState,
     onNotificationsClick: () -> Unit,
+    onLanguageClick: () -> Unit,
     onThemeClick: () -> Unit,
+    onPrivacyModeSelected: (RecyclingStrategyType) -> Unit,
     onBackupClick: () -> Unit,
     onProductsClick: () -> Unit,
     onBlockedUsersClick: () -> Unit,
@@ -101,6 +110,13 @@ private fun SettingsScreenInternal(
                         title = stringResource(RCommon.string.settings_notifications),
                         onClick = onNotificationsClick
                     )
+                    if (state.isLanguageSettingsAvailable) {
+                        SettingsMenuItem(
+                            icon = NovaIcons.Language,
+                            title = stringResource(RCommon.string.settings_language),
+                            onClick = onLanguageClick
+                        )
+                    }
                 }
 
                 VerticalSpacer { large }
@@ -108,25 +124,39 @@ private fun SettingsScreenInternal(
                 PolkadotMenuList(
                     headerText = stringResource(RCommon.string.settings_section_security)
                 ) {
+                    state.privacyMode?.let { privacyMode ->
+                        PolkadotMenuListCustomItem { shape ->
+                            PaymentPrivacyModeSelector(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = shape,
+                                selectedMode = privacyMode,
+                                onModeSelected = onPrivacyModeSelected
+                            )
+                        }
+                    }
                     BackupSettingsMenuItem(
                         onClick = onBackupClick,
                         isBackupMissing = state.isBackupMissing
                     )
-                    SettingsMenuItem(
-                        icon = NovaIcons.GridOutlined,
-                        title = stringResource(RCommon.string.settings_products),
-                        onClick = onProductsClick
-                    )
+                    if (state.productSettingsEnabled) {
+                        SettingsMenuItem(
+                            icon = NovaIcons.GridOutlined,
+                            title = stringResource(RCommon.string.settings_products),
+                            onClick = onProductsClick
+                        )
+                    }
                     SettingsMenuItem(
                         icon = NovaIcons.BlockOutlined,
                         title = stringResource(RCommon.string.settings_blocked_contacts),
                         onClick = onBlockedUsersClick
                     )
-                    SettingsMenuItem(
-                        icon = NovaIcons.LaptopOutlined,
-                        title = stringResource(RCommon.string.settings_connected_devices),
-                        onClick = onConnectedDevicesClick
-                    )
+                    if (state.linkedDevicesEnabled) {
+                        SettingsMenuItem(
+                            icon = NovaIcons.LaptopOutlined,
+                            title = stringResource(RCommon.string.settings_connected_devices),
+                            onClick = onConnectedDevicesClick
+                        )
+                    }
                 }
 
                 VerticalSpacer { large }
@@ -148,7 +178,7 @@ private fun SettingsScreenInternal(
 
                 VerticalSpacer { large }
 
-                if (state.isDebug) {
+                if (state.debugMenuEnabled) {
                     PolkadotMenuList(
                         headerText = stringResource(RCommon.string.settings_section_debug)
                     ) {
@@ -175,12 +205,19 @@ private fun SettingsScreenPreview() {
         SettingsScreenInternal(
             state = SettingsUiState(
                 isDebug = true,
+                debugMenuEnabled = true,
+                linkedDevicesEnabled = true,
+                productSettingsEnabled = true,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
+                privacyMode = RecyclingStrategyType.BALANCED,
+                isLanguageSettingsAvailable = true,
                 isBackupMissing = false,
                 hasBlockedUsers = false
             ),
             onNotificationsClick = {},
+            onLanguageClick = {},
             onThemeClick = {},
+            onPrivacyModeSelected = {},
             onBackupClick = {},
             onProductsClick = {},
             onBlockedUsersClick = {},

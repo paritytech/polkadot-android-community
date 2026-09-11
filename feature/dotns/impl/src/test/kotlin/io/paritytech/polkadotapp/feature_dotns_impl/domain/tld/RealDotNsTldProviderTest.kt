@@ -2,7 +2,7 @@ package io.paritytech.polkadotapp.feature_dotns_impl.domain.tld
 
 import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
-import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.DotNsContractApi
+import io.paritytech.polkadotapp.feature_dotns_impl.data.repository.NetworkSuffixRepository
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.DotNsTldStorage
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
@@ -14,36 +14,32 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 
+private val PASEO = DotNsTld.parse("paseo")!!
+
 class RealDotNsTldProviderTest {
-    private val contractApi: DotNsContractApi = mock(DotNsContractApi::class.java)
+    private val networkSuffixRepository: NetworkSuffixRepository = mock(NetworkSuffixRepository::class.java)
     private val storage = FakeDotNsTldStorage()
 
     private val provider by lazy {
-        RealDotNsTldProvider(contractApi, storage, RealCoroutineDispatchers())
+        RealDotNsTldProvider(networkSuffixRepository, storage, RealCoroutineDispatchers())
     }
 
     @Test
-    fun `settles and persists the reported suffix when the registry answers a valid tld`() = runBlocking<Unit> {
-        withReportedTld(".paseo")
+    fun `settles and persists the suffix the chain reports`() = runBlocking<Unit> {
+        withReportedSuffix(PASEO)
 
         val result = provider.getTld()
 
-        assertEquals(".paseo", result.getOrThrow().suffix)
-        assertEquals(".paseo", storage.stored?.suffix)
+        assertEquals(PASEO, result.getOrThrow())
+        assertEquals(PASEO, storage.stored)
     }
 
     @Test
-    fun `settles the fallback when the registry answers empty`() = runBlocking<Unit> {
-        withReportedTld(null)
+    fun `fails without settling when the chain reports no usable suffix`() = runBlocking<Unit> {
+        withReportedSuffix(null)
 
-        assertEquals(DotNsTld.FALLBACK, provider.getTld().getOrThrow())
-    }
-
-    @Test
-    fun `settles the fallback when the registry answers an invalid label`() = runBlocking<Unit> {
-        withReportedTld("not a label")
-
-        assertEquals(DotNsTld.FALLBACK, provider.getTld().getOrThrow())
+        assertTrue(provider.getTld().isFailure)
+        assertNull(storage.stored)
     }
 
     @Test
@@ -53,28 +49,28 @@ class RealDotNsTldProviderTest {
         assertTrue(provider.getTld().isFailure)
         assertNull(storage.stored)
 
-        withReportedTld(".paseo")
+        withReportedSuffix(PASEO)
 
-        assertEquals(".paseo", provider.getTld().getOrThrow().suffix)
+        assertEquals(PASEO, provider.getTld().getOrThrow())
     }
 
     @Test
     fun `serves the settled value without a second read`() = runBlocking<Unit> {
-        withReportedTld(".paseo")
+        withReportedSuffix(PASEO)
 
         provider.getTld()
         provider.getTld()
 
-        verify(contractApi, times(1)).readTld()
-        assertEquals(".paseo", provider.currentTldOrNull()?.suffix)
+        verify(networkSuffixRepository, times(1)).networkSuffix()
+        assertEquals(PASEO, provider.currentTldOrNull())
     }
 
     @Test
     fun `currentTldOrNull serves the persisted value before the first read settles`() = runBlocking<Unit> {
         withFailingRead()
-        storage.putTld(DotNsTld.parse("paseo")!!)
+        storage.putTld(PASEO)
 
-        assertEquals(".paseo", provider.currentTldOrNull()?.suffix)
+        assertEquals(PASEO, provider.currentTldOrNull())
     }
 
     @Test
@@ -84,12 +80,12 @@ class RealDotNsTldProviderTest {
         assertNull(provider.currentTldOrNull())
     }
 
-    private suspend fun withReportedTld(rawSuffix: String?) {
-        whenever(contractApi.readTld()).thenReturn(Result.success(rawSuffix))
+    private suspend fun withReportedSuffix(tld: DotNsTld?) {
+        whenever(networkSuffixRepository.networkSuffix()).thenReturn(Result.success(tld))
     }
 
     private suspend fun withFailingRead() {
-        whenever(contractApi.readTld()).thenReturn(Result.failure(IllegalStateException("rpc down")))
+        whenever(networkSuffixRepository.networkSuffix()).thenReturn(Result.failure(IllegalStateException("rpc down")))
     }
 
     private class FakeDotNsTldStorage : DotNsTldStorage {

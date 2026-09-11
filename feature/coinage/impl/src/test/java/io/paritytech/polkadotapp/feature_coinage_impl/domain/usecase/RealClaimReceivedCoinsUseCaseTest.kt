@@ -21,16 +21,16 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FAILURE
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
@@ -664,7 +664,7 @@ class RealClaimReceivedCoinsUseCaseTest {
                     emit(
                         read.map { present ->
                             requested.associateWith { accountId ->
-                                OnChainCoinInfo(value = 3, age = 0).takeIf { accountId in present }
+                                OnChainCoinInfo(instanceId = 0, value = 3, age = 0).takeIf { accountId in present }
                             }
                         }
                     )
@@ -681,7 +681,7 @@ class RealClaimReceivedCoinsUseCaseTest {
             flow {
                 looks.forEach { present ->
                     emit(Result.success(requested.associateWith { accountId ->
-                        OnChainCoinInfo(value = 3, age = 0).takeIf { accountId in present }
+                        OnChainCoinInfo(instanceId = 0, value = 3, age = 0).takeIf { accountId in present }
                     }))
                 }
                 awaitCancellation()
@@ -691,7 +691,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
     /** A ledger that registers what it is handed, so a submission changes what the next pass reads. */
     private fun givenLedgerRegistersOnSubmit(
-        status: CoinageTransactionStatus,
+        status: DurableTxStatus,
         claiming: AccountId,
         signal: CompletableDeferred<Unit>,
     ) {
@@ -717,7 +717,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     private fun givenChainSeesAgainAfter(attempted: CompletableDeferred<Unit>) {
         coEvery { coinRepository.subscribeCoinsInfoFor(any(), any()) } answers {
             val requested = secondArg<List<AccountId>>()
-            val present = Result.success(requested.associateWith { OnChainCoinInfo(value = 3, age = 0) })
+            val present = Result.success(requested.associateWith { OnChainCoinInfo(instanceId = 0, value = 3, age = 0) })
 
             flow {
                 emit(present)
@@ -738,7 +738,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     private fun noEntries() = emptyList<CoinageTransactionState>()
 
     private fun entry(
-        status: CoinageTransactionStatus,
+        status: DurableTxStatus,
         claiming: AccountId,
         outputs: Int = 1,
     ) = CoinageTransactionState(

@@ -4,17 +4,17 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The active network's dotNS TLD, successfully read once per process from the protocol registry
- * contract. Failed reads are not cached.
+ * The active network's dotNS TLD, successfully read once per process from the people chain's
+ * network suffix. Failed reads are not cached.
  *
- * A deployment that reports no TLD (or a config without a registry address) settles
- * [DotNsTld.FALLBACK]; only transport failures leave the value unsettled.
+ * A chain that reports no usable suffix leaves the value unsettled, exactly as a transport failure
+ * does - there is no substitute for a TLD the network did not report.
  */
 interface DotNsTldProvider {
     /**
      * The settled TLD, else the value persisted by a previous process, else `null`.
      * A `null` answer kicks a background refresh; callers must treat it as
-     * "not a dotNS decision", never substitute [DotNsTld.FALLBACK] for it.
+     * "not a dotNS decision", never substitute a guess for it.
      */
     fun currentTldOrNull(): DotNsTld?
 

@@ -5,8 +5,8 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 sealed interface TopUpRequestUiState {
     val productId: String
 
-    /** The claim failed; [errorMessage] is the failure reason shown to the user. */
-    data class Failure(override val productId: String, val errorMessage: String) : TopUpRequestUiState
+    /** Nothing was claimed, and nothing more will be tried. */
+    data class Failure(override val productId: String) : TopUpRequestUiState
 
     /** The claim succeeded but [creditedAmount] funds were accepted instead of [requestedAmount]. */
     data class PartialPayment(

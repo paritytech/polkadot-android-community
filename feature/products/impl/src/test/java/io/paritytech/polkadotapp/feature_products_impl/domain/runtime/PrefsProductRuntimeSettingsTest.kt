@@ -9,25 +9,27 @@ class PrefsProductRuntimeSettingsTest {
     private val prefs = MapSharedPreferences()
 
     @Test
-    fun `defaults to native`() {
+    fun `defaults to the TrUAPI runtime`() {
         val settings = PrefsProductRuntimeSettings(prefs, isDebugBuild = true)
-
-        assertFalse(settings.isTrUAPIRuntimeEnabled())
-    }
-
-    @Test
-    fun `persists the toggle`() {
-        val settings = PrefsProductRuntimeSettings(prefs, isDebugBuild = true)
-
-        settings.setTrUAPIRuntimeEnabled(true)
 
         assertTrue(settings.isTrUAPIRuntimeEnabled())
-        assertTrue(PrefsProductRuntimeSettings(prefs, isDebugBuild = true).isTrUAPIRuntimeEnabled())
     }
 
     @Test
-    fun `release builds ignore the stored value`() {
+    fun `persists an opt-out to the native host`() {
+        val settings = PrefsProductRuntimeSettings(prefs, isDebugBuild = true)
+
+        settings.setTrUAPIRuntimeEnabled(false)
+
+        assertFalse(settings.isTrUAPIRuntimeEnabled())
+        assertFalse(PrefsProductRuntimeSettings(prefs, isDebugBuild = true).isTrUAPIRuntimeEnabled())
+    }
+
+    @Test
+    fun `release builds run native despite the TrUAPI default`() {
         val settings = PrefsProductRuntimeSettings(prefs, isDebugBuild = false)
+
+        assertFalse(settings.isTrUAPIRuntimeEnabled())
 
         settings.setTrUAPIRuntimeEnabled(true)
 

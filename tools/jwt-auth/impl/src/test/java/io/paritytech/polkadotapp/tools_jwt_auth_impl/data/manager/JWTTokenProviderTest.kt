@@ -1,7 +1,8 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.manager
 
 import com.google.gson.Gson
-import io.paritytech.polkadotapp.tools_integrity_api.exception.IntegrityException
+import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
+import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.AuthError
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.DelayableAuthTokenApi
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.FakeTimeProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.api.AuthTokenApi
@@ -297,14 +298,14 @@ class JWTTokenProviderTest {
     // MARK: - Attestation error classification
 
     @Test
-    fun `attestation 403 with INTEGRITY_FAILED code throws IntegrityException`() = runTest {
+    fun `attestation 403 with INTEGRITY_FAILED code throws AttestationRejected`() = runTest {
         timeProvider.nowSeconds = 1_000_000_000L
         `when`(authTokenApi.fetchToken(JwtRequest))
             .thenThrow(httpException(403, """{"error":"INTEGRITY_FAILED","message":"attestation rejected"}"""))
 
         val error = runCatching { manager.validToken() }.exceptionOrNull()
 
-        assertTrue("expected IntegrityException but was $error", error is IntegrityException)
+        assertEquals(AuthError.Integrity(IntegrityError.AttestationRejected), error)
     }
 
     @Test
@@ -332,7 +333,7 @@ class JWTTokenProviderTest {
     }
 
     @Test
-    fun `attestation 503 CRL unavailable on retry propagates HttpException`() = runTest {
+    fun `attestation 503 CRL unavailable on retry throws AttestationTransient`() = runTest {
         timeProvider.nowSeconds = 1_000_000_000L
         `when`(authTokenApi.fetchToken(JwtRequest))
             .thenThrow(
@@ -342,7 +343,9 @@ class JWTTokenProviderTest {
 
         val error = runCatching { manager.validToken() }.exceptionOrNull()
 
-        assertTrue("expected HttpException but was $error", error is HttpException)
+        // The retry is spent, but the failure is still the retryable kind - the user should be
+        // told to try again, not that their device is rooted.
+        assertEquals(AuthError.Integrity(IntegrityError.AttestationTransient), error)
     }
 
     private fun httpException(code: Int, body: String): HttpException {

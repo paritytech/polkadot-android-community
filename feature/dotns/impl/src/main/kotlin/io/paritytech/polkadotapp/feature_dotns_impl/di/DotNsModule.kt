@@ -14,6 +14,8 @@ import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.DotNsContractA
 import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.RealDotNsContractApi
 import io.paritytech.polkadotapp.feature_dotns_impl.data.ipfs.CarFetcher
 import io.paritytech.polkadotapp.feature_dotns_impl.data.ipfs.RealCarFetcher
+import io.paritytech.polkadotapp.feature_dotns_impl.data.repository.NetworkSuffixRepository
+import io.paritytech.polkadotapp.feature_dotns_impl.data.repository.RealNetworkSuffixRepository
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.ContentHashOverrides
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.DotNsContentStorage
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.DotNsTldStorage
@@ -54,6 +56,9 @@ internal interface DotNsModule {
 
     @Binds
     @Singleton
+    fun bindNetworkSuffixRepository(impl: RealNetworkSuffixRepository): NetworkSuffixRepository
+
+    @Binds
     fun bindDotNsTldProvider(impl: RealDotNsTldProvider): DotNsTldProvider
 
     @Binds

@@ -9,9 +9,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.common.BuildConfig
+import io.paritytech.polkadotapp.common.presentation.AppInitializer
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.search.ChatSearchResultProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
+import io.paritytech.polkadotapp.feature_products_api.domain.FundingDomainProvider
 import io.paritytech.polkadotapp.feature_products_api.domain.ProductAccountIdProvider
 import io.paritytech.polkadotapp.feature_products_api.domain.ProductRequestAccountResolver
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.AccountsProtocol
@@ -23,20 +27,27 @@ import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.Preimage
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.StatementStoreSubmissionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.TransactionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.presentation.spaHost.SpaHost
+import io.paritytech.polkadotapp.feature_products_impl.data.config.RemoteConfigFundingDomainProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.BrowserTabRepository
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductFundingOperationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductIntegrationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealBrowserTabRepository
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealProductFundingOperationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealProductIntegrationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealProductRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealRingVrfKeyRegistrationRepository
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.RealTopUpRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.RingVrfKeyRegistrationRepository
+import io.paritytech.polkadotapp.feature_products_impl.data.repository.TopUpRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.scheduledNotification.RealScheduledProductNotificationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.scheduledNotification.ScheduledProductNotificationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.AssetContainerScriptProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ContainerScriptProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.ProductLocalStorage
 import io.paritytech.polkadotapp.feature_products_impl.data.storage.RealProductLocalStorage
+import io.paritytech.polkadotapp.feature_products_impl.data.storage.RealTopUpSourceStorage
+import io.paritytech.polkadotapp.feature_products_impl.data.storage.TopUpSourceStorage
 import io.paritytech.polkadotapp.feature_products_impl.domain.ProductAccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.RealProductRequestAccountResolver
 import io.paritytech.polkadotapp.feature_products_impl.domain.accountsProtocol.RealAccountsProtocol
@@ -61,14 +72,19 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.sponsoring
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.sponsoring.SponsorReviveCallsWithPgas
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.ProductNotificationScheduler
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.RealProductNotificationScheduler
+import io.paritytech.polkadotapp.feature_products_impl.domain.operation.ProductOperationService
+import io.paritytech.polkadotapp.feature_products_impl.domain.operation.RealProductOperationService
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.ProductAccountOrigins
 import io.paritytech.polkadotapp.feature_products_impl.domain.origin.RealProductAccountOrigins
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.AutoAllowProductPermissionRequester
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRepository
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionRequester
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealProductPermissionRepository
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealProductPermissionRequester
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.RealWhitelistedProductsProvider
+import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.WhitelistedProductsProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.AccountAccessPermissionHandler
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.BalanceAccessPermissionHandler
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.DeviceCapabilityPermissionHandler
@@ -90,9 +106,18 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.spaBrowser.RealSpa
 import io.paritytech.polkadotapp.feature_products_impl.domain.spaBrowser.SpaBrowserInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.ExecuteTopUpUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.RealExecuteTopUpUseCase
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.RealTopUpService
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpService
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.RealResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.ProductServingHostResolver
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorkerRefCounter
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.RealProductWorkerRefCounter
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.RealWorkerBootFactory
+import io.paritytech.polkadotapp.feature_products_impl.domain.worker.WorkerBootFactory
+import io.paritytech.polkadotapp.feature_products_impl.presentation.initialization.ProductWorkerInitializer
+import io.paritytech.polkadotapp.feature_products_impl.presentation.initialization.TopUpResumeInitializer
+import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaHost.RuntimeSelectingSpaHost
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -101,30 +126,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal interface ProductsModule {
-    companion object {
-        @Provides
-        @Singleton
-        @TrUAPIChainHttpClient
-        fun provideTrUAPIChainHttpClient(shared: OkHttpClient): OkHttpClient =
-            shared.newBuilder()
-                // Chain sockets are long-lived subscriptions: the shared client's
-                // read timeout would kill them when idle, so detect dead peers
-                // with pings instead. newBuilder keeps the shared pool/dispatcher.
-                .readTimeout(0, TimeUnit.SECONDS)
-                .pingInterval(CHAIN_SOCKET_PING_SECONDS, TimeUnit.SECONDS)
-                .build()
-
-        private const val CHAIN_SOCKET_PING_SECONDS = 30L
-
-        @Provides
-        @Singleton
-        fun provideProductRuntimeSettings(@ApplicationContext context: Context): ProductRuntimeSettings =
-            PrefsProductRuntimeSettings(
-                prefs = context.getSharedPreferences("product_runtime_settings", Context.MODE_PRIVATE),
-                isDebugBuild = BuildConfig.DEBUG,
-            )
-    }
-
     @Binds
     @Singleton
     fun bindWidgetSerializer(impl: ScaleWidgetSerializer): JsWidgetSerializer
@@ -170,11 +171,35 @@ internal interface ProductsModule {
     fun bindProductExternalExtensionProvider(impl: ProductExternalExtensionProvider): ExternalExtensionProvider
 
     @Binds
-    @IntoSet
-    fun bindProductChatSearchResultProvider(impl: ProductChatSearchResultProvider): ChatSearchResultProvider
+    fun bindProductLocalStorage(impl: RealProductLocalStorage): ProductLocalStorage
 
     @Binds
-    fun bindProductLocalStorage(impl: RealProductLocalStorage): ProductLocalStorage
+    fun bindTopUpSourceStorage(impl: RealTopUpSourceStorage): TopUpSourceStorage
+
+    @Binds
+    fun bindTopUpRepository(impl: RealTopUpRepository): TopUpRepository
+
+    @Binds
+    @Singleton
+    fun bindProductWorkerRefCounter(impl: RealProductWorkerRefCounter): ProductWorkerRefCounter
+
+    @Binds
+    fun bindWorkerBootFactory(impl: RealWorkerBootFactory): WorkerBootFactory
+
+    @Binds
+    @Singleton
+    fun bindProductOperationService(impl: RealProductOperationService): ProductOperationService
+
+    @Binds
+    fun bindProductFundingOperationRepository(impl: RealProductFundingOperationRepository): ProductFundingOperationRepository
+
+    @Binds
+    @IntoSet
+    fun bindProductWorkerInitializer(impl: ProductWorkerInitializer): AppInitializer
+
+    @Binds
+    @IntoSet
+    fun bindTopUpResumeInitializer(impl: TopUpResumeInitializer): AppInitializer
 
     @Binds
     fun bindProductAccountOrigins(impl: RealProductAccountOrigins): ProductAccountOrigins
@@ -230,10 +255,6 @@ internal interface ProductsModule {
 
     @Binds
     @Singleton
-    fun bindPermissionRequester(impl: RealProductPermissionRequester): ProductPermissionRequester
-
-    @Binds
-    @Singleton
     fun bindProductScriptResolver(impl: RealProductScriptResolver): ProductScriptResolver
 
     @Binds
@@ -284,8 +305,65 @@ internal interface ProductsModule {
     fun bindProductRequestAccountResolver(impl: RealProductRequestAccountResolver): ProductRequestAccountResolver
 
     @Binds
+    @Singleton
+    fun bindFundingDomainProvider(impl: RemoteConfigFundingDomainProvider): FundingDomainProvider
+
+    @Binds
+    fun bindWhitelistedProductsProvider(impl: RealWhitelistedProductsProvider): WhitelistedProductsProvider
+
+    @Binds
     fun bindDeriveEntropyUseCase(impl: RealDeriveEntropyUseCase): DeriveEntropyUseCase
 
     @Binds
     fun bindExecuteTopUpUseCase(impl: RealExecuteTopUpUseCase): ExecuteTopUpUseCase
+
+    @Binds
+    @Singleton
+    fun bindTopUpService(impl: RealTopUpService): TopUpService
+
+    companion object {
+        @Provides
+        @Singleton
+        @TrUAPIChainHttpClient
+        fun provideTrUAPIChainHttpClient(shared: OkHttpClient): OkHttpClient =
+            shared.newBuilder()
+                // Chain sockets are long-lived subscriptions: the shared client's
+                // read timeout would kill them when idle, so detect dead peers
+                // with pings instead. newBuilder keeps the shared pool/dispatcher.
+                .readTimeout(0, TimeUnit.SECONDS)
+                .pingInterval(CHAIN_SOCKET_PING_SECONDS, TimeUnit.SECONDS)
+                .build()
+
+        private const val CHAIN_SOCKET_PING_SECONDS = 30L
+
+        @Provides
+        @Singleton
+        fun provideProductRuntimeSettings(@ApplicationContext context: Context): ProductRuntimeSettings =
+            PrefsProductRuntimeSettings(
+                prefs = context.getSharedPreferences("product_runtime_settings", Context.MODE_PRIVATE),
+                isDebugBuild = BuildConfig.DEBUG,
+            )
+
+        @Provides
+        @Singleton
+        fun providePermissionRequester(
+            real: RealProductPermissionRequester,
+            whitelistedProductsProvider: WhitelistedProductsProvider,
+        ): ProductPermissionRequester {
+            return AutoAllowProductPermissionRequester(whitelistedProductsProvider, real)
+        }
+
+        @Provides
+        @IntoSet
+        fun provideProductChatSearchResultProvider(
+            productRepository: ProductRepository,
+            productsRouter: ProductsRouter,
+        ): ChatSearchResultProvider {
+            return ProductChatSearchResultProvider(
+                arbitraryProductsEnabled = FeatureOption.ARBITRARY_PRODUCTS.isEnabled,
+                productRepository = productRepository,
+                productsRouter = productsRouter,
+            )
+        }
+    }
 }

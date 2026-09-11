@@ -113,6 +113,19 @@ inline fun <reified I1, reified I2, reified I3, reified T : Any> QueryableModule
     )
 }
 
+inline fun <reified I1, reified I2, reified I3, reified I4, reified T : Any> QueryableModule.storage4(
+    name: String
+): QueryableStorageEntry4<I1, I2, I3, I4, T> {
+    return RealQueryableStorageEntry4(
+        storageEntry = module.storage(name),
+        key1Type = typeOf<I1>(),
+        key2Type = typeOf<I2>(),
+        key3Type = typeOf<I3>(),
+        key4Type = typeOf<I4>(),
+        valueType = typeOf<T>()
+    )
+}
+
 context(withRuntime: WithRuntime)
 inline fun <reified T> QueryableModule.constant(name: String): T {
     val constant = module.constant(name)
@@ -122,9 +135,9 @@ inline fun <reified T> QueryableModule.constant(name: String): T {
 }
 
 context(withRuntime: WithRuntime)
-inline fun <reified T> QueryableModule.constantOrNull(name: String): T? {
+inline fun <reified T : Any> QueryableModule.constantOrNull(name: String): T? {
     val constant = module.constantOrNull(name) ?: return null
     val dynamicStructure = constant.type?.fromByteArrayOrNull(withRuntime.runtime, constant.value)
 
-    return Scale.decode(dynamicStructure)
+    return Scale.decode<T>(dynamicStructure)
 }

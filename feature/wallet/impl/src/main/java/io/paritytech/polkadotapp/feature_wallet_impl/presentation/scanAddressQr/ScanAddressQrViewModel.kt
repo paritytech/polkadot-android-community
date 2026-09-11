@@ -5,6 +5,7 @@ import androidx.camera.core.SurfaceRequest
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.paritytech.polkadotapp.common.domain.model.isValidSubstrateAddress
 import io.paritytech.polkadotapp.common.presentation.camera.CameraQrReader
 import io.paritytech.polkadotapp.common.presentation.camera.QrCodeAnalyzer
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
@@ -41,7 +42,7 @@ class ScanAddressQrViewModel @Inject constructor(
     }
 
     private fun handleQrCodeData(data: String) = viewModelScope.launchUnit {
-        if (isValidAddress(data)) {
+        if (data.isValidSubstrateAddress()) {
             router.backWithResult(
                 SendPaymentFragment.REQUEST_KEY,
                 ScanAddressQrResultPayload(address = data.trim())
@@ -49,9 +50,5 @@ class ScanAddressQrViewModel @Inject constructor(
         } else {
             invalidAddressEvent.emit()
         }
-    }
-
-    private fun isValidAddress(address: String): Boolean {
-        return address.isNotBlank() && (address.startsWith("1") || address.startsWith("42") || address.contains("0x"))
     }
 }

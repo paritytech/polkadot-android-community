@@ -63,7 +63,7 @@ class CoinPresenceSyncServiceTest {
     @Test
     fun `a coin that is still on chain at the same age is not written again`() = runTest {
         givenCoins(coinOf(age = 5, onChain = true))
-        givenChainHolds(mapOf(ACCOUNT to OnChainCoinInfo(value = 3, age = 5)))
+        givenChainHolds(mapOf(ACCOUNT to OnChainCoinInfo(instanceId = 0, value = 3, age = 5)))
 
         startSync()
 
@@ -86,7 +86,7 @@ class CoinPresenceSyncServiceTest {
     @Test
     fun `a coin that has appeared is recorded with the age the chain gave`() = runTest {
         givenCoins(coinOf(age = null, onChain = false))
-        givenChainHolds(mapOf(ACCOUNT to OnChainCoinInfo(value = 3, age = 2)))
+        givenChainHolds(mapOf(ACCOUNT to OnChainCoinInfo(instanceId = 0, value = 3, age = 2)))
 
         startSync()
 
@@ -98,7 +98,7 @@ class CoinPresenceSyncServiceTest {
     @Test
     fun `a coin whose age has moved on is written with the new one`() = runTest {
         givenCoins(coinOf(age = 5, onChain = true))
-        givenChainHolds(mapOf(ACCOUNT to OnChainCoinInfo(value = 3, age = 6)))
+        givenChainHolds(mapOf(ACCOUNT to OnChainCoinInfo(instanceId = 0, value = 3, age = 6)))
 
         startSync()
 

@@ -81,6 +81,9 @@ fun UserConfirmationReview.toConfirmation(callingProductId: ProductId): TrUAPICo
             requestingProductId = ProductId.fromStoredValue(v1.requestingProductId),
             targetProductId = ProductId.fromStoredValue(v1.targetProductId),
         )
+
+    is UserConfirmationReview.ProductSubtree ->
+        TrUAPIConfirmation.ProductSubtree(productId = ProductId.fromStoredValue(v1.productId))
 }
 
 private fun AllocatableResource.toDomain(): ApAllocatableResource = when (this) {

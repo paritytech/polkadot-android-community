@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner
 
-import io.paritytech.polkadotapp.common.utils.transformPair
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAmountBreakdown
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
@@ -12,7 +11,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ageOrDefault
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isAgeValidToSpend
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUseSecured
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerLocationOrThrow
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
 import java.math.BigDecimal
@@ -152,13 +150,7 @@ class TransferPlanner(
         vouchers: List<RecyclerVoucher>,
         targetAmount: BigDecimal
     ): Pair<List<RecyclerVoucher>, BigDecimal>? {
-        val currentTimeMillis = System.currentTimeMillis()
-
-        val (securedVouchers, degradedVouchers) = vouchers
-            .partition { it.isReadyToUseSecured(currentTimeMillis) }
-            .transformPair { it.orderForUnload() }
-
-        val orderedVouchers = securedVouchers + degradedVouchers
+        val orderedVouchers = vouchers.orderForUnload()
 
         val selectedVouchers = mutableListOf<RecyclerVoucher>()
         var totalAmount = BigDecimal.ZERO

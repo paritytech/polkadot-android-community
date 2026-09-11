@@ -5,14 +5,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -25,10 +22,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
+import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
+import io.paritytech.polkadotapp.common.utils.CurrencyConfig
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.Info
 import io.paritytech.polkadotapp.design.components.icon.vectors.Refreshing
+import io.paritytech.polkadotapp.design.components.progress.Shimmer
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
@@ -39,7 +39,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.forma
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.R
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.balanceDetails.compose.BalanceDetailsBottomSheet
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.LocalCardTilt
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.MotionShineParameters
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.maskedMotionShine
@@ -57,13 +56,7 @@ fun DigitalDollarCard(
     onSelected: ((PocketCardUiModel.DigitalDollar) -> Unit)? = null,
     isExpanded: Boolean
 ) {
-    var isBalanceDetailsVisible by remember { mutableStateOf(false) }
     val tiltState = LocalCardTilt.current
-
-    BalanceDetailsBottomSheet(
-        isVisible = isBalanceDetailsVisible,
-        onDismissRequest = { isBalanceDetailsVisible = false }
-    )
 
     val borderBrush = remember {
         Brush.radialGradient(
@@ -128,13 +121,6 @@ fun DigitalDollarCard(
             contentScale = ContentScale.Crop
         )
 
-        val totalBalanceText = LocalTokenAmountFormatter.current
-            .formatTokenAmount(
-                tokenAmount = card.balance,
-                precision = RoundPrecision.FIAT,
-                withSymbol = false
-            )
-
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -156,17 +142,16 @@ fun DigitalDollarCard(
                     HorizontalSpacer { extraSmall }
 
                     NovaText(
-                        text = stringResource(RCommon.string.pocket_digital_dollar_card_title),
+                        text = stringResource(RCommon.string.pocket_digital_dollar_card_title, CurrencyConfig.symbol),
                         style = PolkadotTheme.typography.title.large,
                         color = PocketCardColors.Primary
                     )
                 }
 
-                NovaText(
-                    modifier = if (isExpanded) Modifier.alpha(0f) else Modifier.pocketBalanceSharedElement(card.id),
-                    text = totalBalanceText,
-                    style = PolkadotTheme.typography.headline.medium,
-                    color = PocketCardColors.Primary
+                BalanceAmount(
+                    amounts = card.amounts,
+                    cardId = card.id,
+                    isHidden = isExpanded
                 )
             }
 
@@ -174,9 +159,10 @@ fun DigitalDollarCard(
                 Column(
                     modifier = Modifier.align(Alignment.BottomStart)
                 ) {
+                    val amounts = card.amounts.dataOrNull
                     val balanceStatus = when {
                         card.syncInProgress -> BalanceStatus.Syncing
-                        card.notFullyAvailable -> BalanceStatus.AvailableNow
+                        amounts != null && amounts.notFullyAvailable -> BalanceStatus.Available(amounts.available)
                         else -> BalanceStatus.Hidden
                     }
 
@@ -186,20 +172,16 @@ fun DigitalDollarCard(
                     ) { status ->
                         when (status) {
                             BalanceStatus.Syncing -> SyncProgress()
-                            BalanceStatus.AvailableNow -> AvailableNowBalance(
-                                amount = card.availableNow,
-                                onBalanceDetails = { isBalanceDetailsVisible = true }
-                            )
+                            is BalanceStatus.Available -> AvailableBalance(amount = status.amount)
 
                             BalanceStatus.Hidden -> Unit
                         }
                     }
 
-                    NovaText(
-                        modifier = Modifier.pocketBalanceSharedElement(card.id),
-                        text = totalBalanceText,
-                        style = PolkadotTheme.typography.headline.medium,
-                        color = PocketCardColors.Primary
+                    BalanceAmount(
+                        amounts = card.amounts,
+                        cardId = card.id,
+                        isHidden = false
                     )
                 }
             }
@@ -208,10 +190,34 @@ fun DigitalDollarCard(
 }
 
 @Composable
-fun AvailableNowBalance(
-    amount: TokenAmountModel,
-    onBalanceDetails: () -> Unit
+private fun BalanceAmount(
+    amounts: LoadingState<PocketCardUiModel.DigitalDollar.Amounts>,
+    cardId: String,
+    isHidden: Boolean
 ) {
+    val sharedElement = if (isHidden) Modifier.alpha(0f) else Modifier.pocketBalanceSharedElement(cardId)
+
+    when (amounts) {
+        is LoadingState.Loaded -> NovaText(
+            modifier = sharedElement,
+            text = LocalTokenAmountFormatter.current.formatTokenAmount(
+                tokenAmount = amounts.data.balance,
+                precision = RoundPrecision.FIAT,
+                withSymbol = false
+            ),
+            style = PolkadotTheme.typography.headline.medium,
+            color = PocketCardColors.Primary
+        )
+
+        else -> Shimmer(
+            modifier = sharedElement.size(width = AmountShimmerSizes.WIDTH, height = AmountShimmerSizes.HEIGHT),
+            shape = PolkadotTheme.shapes.small
+        )
+    }
+}
+
+@Composable
+fun AvailableBalance(amount: TokenAmountModel) {
     Row(
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -224,19 +230,9 @@ fun AvailableNowBalance(
         HorizontalSpacer { small }
 
         NovaText(
-            text = stringResource(RCommon.string.balance_details_available_now),
+            text = stringResource(RCommon.string.pocket_digital_dollar_available),
             style = PolkadotTheme.typography.body.medium,
             color = PocketCardColors.Secondary
-        )
-
-        HorizontalSpacer { small }
-
-        NovaIcon(
-            modifier = Modifier
-                .size(16.dp)
-                .clickable(onClick = onBalanceDetails),
-            imageVector = NovaIcons.Info,
-            tint = PocketCardColors.Secondary
         )
     }
 }
@@ -270,22 +266,89 @@ private fun SyncProgress() {
     }
 }
 
-private enum class BalanceStatus {
-    Syncing,
-    AvailableNow,
-    Hidden
+private sealed interface BalanceStatus {
+    data object Syncing : BalanceStatus
+
+    data class Available(val amount: TokenAmountModel) : BalanceStatus
+
+    data object Hidden : BalanceStatus
+}
+
+private object AmountShimmerSizes {
+    val WIDTH = 100.dp
+    val HEIGHT = 28.dp
 }
 
 @Preview
 @Composable
 private fun DigitalDollarCardPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loaded(
+            PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
+        ),
+        syncInProgress = true,
+        isExpanded = true
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardCollapsedPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loaded(
+            PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
+        ),
+        syncInProgress = false,
+        isExpanded = false
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardLoadingPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loading,
+        syncInProgress = false,
+        isExpanded = true
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardCollapsedLoadingPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loading,
+        syncInProgress = false,
+        isExpanded = false
+    )
+}
+
+@Preview
+@Composable
+private fun DigitalDollarCardSyncingWhileLoadingPreview() {
+    DigitalDollarCardPreviewContainer(
+        amounts = LoadingState.Loading,
+        syncInProgress = true,
+        isExpanded = true
+    )
+}
+
+@Composable
+private fun DigitalDollarCardPreviewContainer(
+    amounts: LoadingState<PocketCardUiModel.DigitalDollar.Amounts>,
+    syncInProgress: Boolean,
+    isExpanded: Boolean
+) {
     PolkadotTheme {
         CompositionLocalProvider(
             LocalTokenAmountFormatter provides TokenAmountFormatter.mocked
         ) {
             DigitalDollarCard(
-                card = PocketCardUiModel.DigitalDollar(TokenAmountModel.mock, TokenAmountModel.mock, true),
-                isExpanded = true
+                card = PocketCardUiModel.DigitalDollar(
+                    amounts = amounts,
+                    syncInProgress = syncInProgress
+                ),
+                isExpanded = isExpanded
             )
         }
     }

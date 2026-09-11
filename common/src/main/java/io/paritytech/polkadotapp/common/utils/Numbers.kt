@@ -48,6 +48,12 @@ fun Long.toLittleEndianBytes(): ByteArray =
         .putLong(this)
         .array()
 
+fun UInt.toLittleEndianBytes(): ByteArray =
+    ByteBuffer.allocate(UInt.SIZE_BYTES)
+        .order(ByteOrder.LITTLE_ENDIAN)
+        .putInt(toInt())
+        .array()
+
 fun BigInteger.divideToDecimal(divisor: BigInteger, mathContext: MathContext = MathContext.DECIMAL64): BigDecimal {
     return toBigDecimal().divide(divisor.toBigDecimal(), mathContext)
 }

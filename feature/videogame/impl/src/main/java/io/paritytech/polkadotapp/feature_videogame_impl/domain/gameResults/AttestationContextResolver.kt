@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.domain.gameResults
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
@@ -8,7 +7,7 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.BandersnatchSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.getAliasInContext
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.model.GameIndex
-import io.paritytech.polkadotapp.feature_videogame_impl.data.SCORE
+import io.paritytech.polkadotapp.feature_videogame_impl.data.ScoreContextProvider
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnChainAccountOrPerson
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnChainVideoGameState
 import io.paritytech.polkadotapp.feature_videogame_impl.data.repositories.VideoGameRepositoryInternal
@@ -38,13 +37,14 @@ class AttestationContextResolver @Inject constructor(
     private val gameGroupRosterService: GameGroupRosterService,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
     private val reportSnapshot: GameReportSnapshot,
+    private val scoreContextProvider: ScoreContextProvider,
 ) {
     context(scope: ComputationalScope)
     internal suspend fun resolve(): AttestationContext? {
         val chain = chainRegistry.peopleChain()
         val playingAccount = playingAccountUseCase.getPlayingAccount()
         val ourAccountId = playingAccountUseCase.getOurPlayerAccountId()
-        val ourScoreAlias = bandersnatchSecretsStorage.getAliasInContext(playingAccount.id, BandersnatchContext.SCORE)
+        val ourScoreAlias = bandersnatchSecretsStorage.getAliasInContext(playingAccount.id, scoreContextProvider.context())
 
         val playerData = videoGameRepository.subscribeOurPlayer(chain.id, ourAccountId, ourScoreAlias).first()
         val gameInfo = videoGameRepository.subscribeGameInfo(chain.id).first()

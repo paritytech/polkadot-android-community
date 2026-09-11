@@ -2,14 +2,19 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount
 
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.chains.util.amountFromPlanks
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.domain.validation.onError
 import io.paritytech.polkadotapp.common.domain.validation.onSuccess
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.validation.ValidationMixin
 import io.paritytech.polkadotapp.common.utils.orZero
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.launchWithDiagnostics
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.design.configs.colors.AvatarColorScheme
 import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.ExtractedAddress
@@ -21,6 +26,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferPlan
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.amountinput.AmountInput
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.amountinput.AmountInputMixin
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.amountinput.create
+import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.AmountPreset
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.SendEnterAmountPayload
@@ -29,12 +35,13 @@ import io.paritytech.polkadotapp.feature_wallet_impl.BuildConfig
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.SendPlan
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.TransferMethod
-import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.spendablePlanks
+import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.reachablePlanks
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress.Settling.Stage
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendEnterAmountInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.asSendError
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -57,6 +64,7 @@ class SendEnterAmountViewModel @Inject constructor(
     amountInputMixinFactory: AmountInputMixin.Factory,
     private val walletRouter: PocketRouter,
     private val interactor: SendEnterAmountInteractor,
+    private val tokenAmountMapper: TokenAmountMapper,
 ) : BaseViewModel(), SendEnterAmountContract {
     private val sendProgress = MutableStateFlow<SendProgress>(SendProgress.Idle)
     private val frozenBalance = MutableStateFlow<BigDecimal?>(null)
@@ -69,7 +77,9 @@ class SendEnterAmountViewModel @Inject constructor(
                 flowOf(frozenBalance.value.orZero())
             } else {
                 interactor.tokenBalance()
-                    .map { it.spendablePlanks() }
+                    // Reachable, not spendable: capping the input at the spendable balance would disable
+                    // Send for exactly the amounts the confirmation exists to allow.
+                    .map { it.reachablePlanks() }
                     .onEach { frozenBalance.value = it }
             }
         }
@@ -106,12 +116,24 @@ class SendEnterAmountViewModel @Inject constructor(
 
     override val sendValidationMixin = ValidationMixin.create()
 
+    override val stalenessReport = StalenessReport(this)
+
+    private val balanceSplit = interactor.tokenBalance()
+        .map { balance ->
+            val spendable = tokenAmountMapper.mapFrom(balance.chainAsset.withAmount(balance.spendable))
+            val offerable = balance.offerable?.let { tokenAmountMapper.mapFrom(balance.chainAsset.withAmount(it)) }
+
+            spendable to offerable
+        }
+        .shareInBackground()
+
     override val state = combine(
         amountInputMixin.value,
         amountInputMixin.availableBalance,
         sendProgress,
         debugPlanFlow,
-    ) { inputMixinValue, availableBalance, progress, debugPlan ->
+        balanceSplit,
+    ) { inputMixinValue, availableBalance, progress, debugPlan, (spendable, gainingPrivacy) ->
         val inputNum = inputMixinValue.input.input.toBigDecimalOrNull()
 
         val isPositiveAmount = inputNum?.let { it > BigDecimal.ZERO } ?: false
@@ -123,6 +145,8 @@ class SendEnterAmountViewModel @Inject constructor(
                 input = inputMixinValue.input.input,
                 sendProgress = progress,
                 available = availableBalance,
+                spendable = spendable,
+                gainingPrivacy = gainingPrivacy,
                 recipient = recipientInfo.display,
                 recipientType = recipientInfo.type,
                 recipientAvatarColor = recipientInfo.avatarColor,
@@ -144,20 +168,24 @@ class SendEnterAmountViewModel @Inject constructor(
     }
 
     override fun onConfirmClick() {
-        launch {
+        // The validation can present a confirmation sheet, but it opens no region, so the time the user
+        // spends reading it cannot trip the report's reveal timer.
+        launchWithDiagnostics(stalenessReport) {
             sendProgress.value = SendProgress.Submitting
 
             val amount = amountInputMixin.value.first().amount
 
             val payload = SendValidationPayload(amount.amount, transferMethod)
 
-            sendValidationMixin.runValidation(interactor.sendValidation, payload)
-                .onSuccess { sendValidatedTransfer(it) }
+            val validationResult = sendValidationMixin.runValidation(interactor.sendValidation, payload)
+            validationResult.onSuccess { sendValidatedTransfer(it) }
+            validationResult.onError { showPresentationError(it.asSendError().toPresentationError()) }
 
             sendProgress.value = SendProgress.Idle
         }
     }
 
+    context(diagnostics: StalenessReportCollector)
     private suspend fun sendValidatedTransfer(payload: SendValidationPayload) {
         interactor.send(payload.value, payload.transferMethod)
             .collect { state ->
@@ -176,7 +204,7 @@ class SendEnterAmountViewModel @Inject constructor(
             payload.showTransactionResult && error != null -> walletRouter.openFailure()
 
             !payload.showTransactionResult && error != null -> {
-                showError(error)
+                showPresentationError(error.asSendError().toPresentationError())
                 walletRouter.back()
             }
 

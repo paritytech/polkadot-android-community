@@ -53,6 +53,7 @@ interface StatementStoreFeatureApiModule {
     fun bindStatementStoreSlotAllocator(impl: RealStatementStoreSlotAllocator): StatementStoreSlotAllocator
 
     @Binds
+    @Singleton
     fun bindStatementStoreSlotRepository(impl: RealStatementStoreSlotRepository): StatementStoreSlotRepository
 
     @Binds

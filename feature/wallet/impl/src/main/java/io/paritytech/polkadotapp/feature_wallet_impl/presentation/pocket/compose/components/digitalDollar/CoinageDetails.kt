@@ -37,7 +37,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isReadyToUseSecured
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.recyclerMembersOrZero
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.tokenAmount
 import kotlinx.collections.immutable.ImmutableList
 import java.text.SimpleDateFormat
@@ -178,8 +178,8 @@ internal fun VouchersListSheetContent(
             VoucherSortMode.INDEX_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex }
             VoucherSortMode.VALUE_DESC -> vouchers.sortedByDescending { it.recyclerValue.value }
             VoucherSortMode.VALUE_ASC -> vouchers.sortedBy { it.recyclerValue.value }
-            VoucherSortMode.DATE_DESC -> vouchers.sortedByDescending { it.delayUnloadUntil }
-            VoucherSortMode.DATE_ASC -> vouchers.sortedBy { it.delayUnloadUntil }
+            VoucherSortMode.DATE_DESC -> vouchers.sortedByDescending { it.ringVrfKeyIndex }
+            VoucherSortMode.DATE_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex }
         }
     }
 
@@ -409,7 +409,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val isReady = voucher.isInRecycler()
-    val isReadySecured = voucher.isReadyToUseSecured(System.currentTimeMillis())
+    val ringMembers = voucher.recyclerMembersOrZero()
     val fullKey = voucher.ringVrfPublicKey.toString()
 
     PolkadotSurface(
@@ -431,16 +431,8 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                 )
                 FillerSpacer()
                 Column(horizontalAlignment = Alignment.End) {
-                    val statusText = if (isReady) {
-                        if (isReadySecured) {
-                            "Ready"
-                        } else {
-                            "Ready (Degraded)"
-                        }
-                    } else {
-                        "Not ready"
-                    }
-                    val statusColor = if (isReadySecured) PolkadotTheme.colors.fg.success else PolkadotTheme.colors.fg.tertiary
+                    val statusText = if (isReady) "In recycler ($ringMembers)" else "Not in recycler"
+                    val statusColor = if (isReady) PolkadotTheme.colors.fg.success else PolkadotTheme.colors.fg.tertiary
                     NovaText(
                         text = statusText,
                         color = statusColor
@@ -489,7 +481,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
-                NovaText(text = voucher.delayUnloadUntil.toDateString())
+                NovaText(text = "$ringMembers")
             }
 
             VerticalSpacer { 4.dp }

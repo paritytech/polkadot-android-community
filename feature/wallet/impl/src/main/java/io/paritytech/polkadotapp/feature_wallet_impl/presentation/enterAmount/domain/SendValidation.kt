@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain
 
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAsset
-import io.paritytech.polkadotapp.chains.util.amountFromPlanks
 import io.paritytech.polkadotapp.chains.util.planksFromAmount
 import io.paritytech.polkadotapp.common.domain.validation.Validation
 import io.paritytech.polkadotapp.common.domain.validation.ValidationProcess
@@ -21,39 +20,47 @@ class SendValidation @Inject constructor(
 ) : Validation<SendValidationPayload> {
     context(validationProcess: ValidationProcess)
     override suspend fun validate(payload: SendValidationPayload): ValidationResult<SendValidationPayload> {
-        val balance = totalBalanceUseCase.getBalance().getOrElse { return ValidationResult.Error(Throwable("Can't fetch balance")) }
+        val balance = totalBalanceUseCase.getBalance()
+            .getOrElse { return ValidationResult.Error(SendError.BalanceUnavailable) }
 
         val asset = chainAssetProvider.asset()
         val transferAmountPlanks = payload.value.planksFromAmount(asset.precision)
-        val securedPlanks = balance.spendableBalance.secured
 
-        if (transferAmountPlanks <= securedPlanks) return ValidationResult.Success(payload)
+        if (transferAmountPlanks <= balance.availablePrivate) return ValidationResult.Success(payload)
 
-        val action = ConfirmDegradedVouchersUserAction(
+        val gainingPrivacy = balance.gainingPrivacy
+        val reachable = balance.availablePrivate + gainingPrivacy.amount
+
+        // Either the strategy will not part with what it is holding, or even that would not cover the
+        // amount. Both are the same answer to the user: this cannot be sent.
+        if (!gainingPrivacy.canSpendWithConfirmation || transferAmountPlanks > reachable) {
+            return ValidationResult.Error(SendError.NotEnoughFunds)
+        }
+
+        val action = ConfirmGainingPrivacySpendUserAction(
             totalTransfer = tokenAmountMapper.mapFrom(transferAmountPlanks.withAsset(asset)),
-            secured = tokenAmountMapper.mapFrom(securedPlanks.withAsset(asset)),
-            degraded = tokenAmountMapper.mapFrom((transferAmountPlanks - securedPlanks).withAsset(asset)),
         )
 
         return when (validationProcess.presentUserInput(action)) {
-            ConfirmDegradedVouchersDecision.SendPrivatelyOnly ->
-                ValidationResult.Success(payload.copy(value = securedPlanks.amountFromPlanks(asset.precision)))
-
-            ConfirmDegradedVouchersDecision.SendWithDegraded -> ValidationResult.Success(payload)
-
-            ConfirmDegradedVouchersDecision.Cancel -> ValidationResult.Aborted
+            ConfirmGainingPrivacySpendDecision.SendAnyway -> ValidationResult.Success(payload)
+            ConfirmGainingPrivacySpendDecision.Cancel -> ValidationResult.Aborted
         }
     }
 }
 
-data class ConfirmDegradedVouchersUserAction(
+/**
+ * [totalTransfer] is the amount the user asked for. Part of it can only come from funds the privacy system
+ * has not finished processing, which is what the confirmation is about.
+ */
+data class ConfirmGainingPrivacySpendUserAction(
     val totalTransfer: TokenAmountModel,
-    val secured: TokenAmountModel,
-    val degraded: TokenAmountModel,
-) : ValidationUserInputAction<ConfirmDegradedVouchersDecision>
+) : ValidationUserInputAction<ConfirmGainingPrivacySpendDecision>
 
-sealed interface ConfirmDegradedVouchersDecision {
-    data object SendPrivatelyOnly : ConfirmDegradedVouchersDecision
-    data object SendWithDegraded : ConfirmDegradedVouchersDecision
-    data object Cancel : ConfirmDegradedVouchersDecision
+/**
+ * There is no "send only what is spendable" any more: the user asked for an amount, and silently sending a
+ * smaller one is a worse answer than telling them it cannot be sent.
+ */
+sealed interface ConfirmGainingPrivacySpendDecision {
+    data object SendAnyway : ConfirmGainingPrivacySpendDecision
+    data object Cancel : ConfirmGainingPrivacySpendDecision
 }

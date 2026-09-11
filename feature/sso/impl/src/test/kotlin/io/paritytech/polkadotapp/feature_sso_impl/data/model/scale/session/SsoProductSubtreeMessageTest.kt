@@ -23,7 +23,7 @@ class SsoProductSubtreeMessageTest {
     fun `request round trips through the wire`() {
         val request = productSubtreeRequest()
 
-        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, DotNsTld.FALLBACK).getOrThrow()
+        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, requireNotNull(DotNsTld.parse("dot"))).getOrThrow()
 
         val content = decoded.content as SsoSessionRequest.Content.ProductSubtreeRequest
         assertEquals("browse.dot", content.productId.value)

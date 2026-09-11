@@ -1,6 +1,6 @@
 import { createContainer } from '@novasamatech/host-container';
 import type { Provider, Subscription } from '@novasamatech/host-api';
-import { RequestCredentialsErr, CreateProofErr, GetAliasErr, SignVrfErr, RegisterRingVrfKeyErr, ListRingVrfKeysErr, RingVrfSignErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, toHex, fromHex } from '@novasamatech/host-api';
+import { RequestCredentialsErr, CreateProofErr, GetAliasErr, SignVrfErr, RegisterRingVrfKeyErr, ListRingVrfKeysErr, RingVrfSignErr, ChatMessagePostingErr, NavigateToErr, StorageErr, SigningErr, PreimageSubmitErr, StatementProofErr, GenericError, DeriveEntropyErr, PaymentRequestErr, PaymentTopUpErr, PaymentTopUpStatusErr, ResourceAllocationErr, CreateTransactionErr, CustomRendererNode, PushNotificationError, GetUserIdErr, WorkerErr, toHex, fromHex } from '@novasamatech/host-api';
 import { createWsJsonRpcProvider } from '@novasamatech/host-substrate-chain-connection';
 
 type PausableJsonRpcProvider = ReturnType<typeof createWsJsonRpcProvider>;
@@ -49,16 +49,17 @@ function freezeValue(obj: any, prop: string, value: any) {
 
 // --- Network: intercept with error (future: permission-gated) ---
 
-freezeValue(window, 'XMLHttpRequest', function XMLHttpRequest() {
-  throw new TypeError('Network access is not allowed');
-});
-
-freezeValue(window, 'WebSocket', function WebSocket() {
-  throw new TypeError('Network access is not allowed');
-});
+// TODO commented out for now since we only have trusted products
+// freezeValue(window, 'XMLHttpRequest', function XMLHttpRequest() {
+//   throw new TypeError('Network access is not allowed');
+// });
+//
+// freezeValue(window, 'WebSocket', function WebSocket() {
+//   throw new TypeError('Network access is not allowed');
+// });
 
 // --- Network: delete (no future permission path) ---
-freezeAndDelete(window, 'EventSource');
+// freezeAndDelete(window, 'EventSource');
 
 freezeValue(navigator, 'sendBeacon', () => false);
 
@@ -963,6 +964,7 @@ container.handlePaymentRequest(async (params, { ok, err }) => {
 container.handlePaymentTopUp(async (params, { ok, err }) => {
   try {
     const nativeParams: Record<string, unknown> = {
+      id: toHex(params.id),
       amount: params.amount.toString(),
       sourceTag: params.source.tag,
     };
@@ -976,13 +978,51 @@ container.handlePaymentTopUp(async (params, { ok, err }) => {
     await callNative('paymentTopUp', nativeParams);
     return ok();
   } catch (e) {
-    const msg = String(e instanceof Error ? e.message : e);
-    const partial = msg.match(/PartialPayment:(\d+)/);
-    if (partial) {
-      return err(new PaymentTopUpErr.PartialPayment({ credited: BigInt(partial[1]) }));
+    switch ((e as { code?: string })?.code) {
+      case 'InvalidSource':
+        return err(new PaymentTopUpErr.InvalidSource());
+      case 'AlreadyExists':
+        return err(new PaymentTopUpErr.AlreadyExists());
+      case 'SourceBusy':
+        return err(new PaymentTopUpErr.SourceBusy());
+      default:
+        return err(new PaymentTopUpErr.Unknown({ reason: String((e as Error)?.message ?? e) }));
     }
-    return err(new PaymentTopUpErr.Unknown({ reason: msg }));
   }
+});
+
+container.handlePaymentTopUpStatusSubscribe((id, send, interrupt) => {
+  return subscribeNative(
+    'paymentTopUpStatusSubscribe',
+    { id: toHex(id) },
+    (payload: { tag: string; finalized?: boolean; actualClaimed?: string }) => {
+      switch (payload.tag) {
+        case 'Claimed':
+          return send({ tag: 'Claimed', value: { finalized: payload.finalized ?? false } });
+        case 'ClaimedPartially':
+          return send({
+            tag: 'ClaimedPartially',
+            value: { actualClaimed: BigInt(payload.actualClaimed ?? '0') },
+          });
+        case 'Claiming':
+          return send({ tag: 'Claiming', value: undefined });
+        case 'NotClaimed':
+          return send({ tag: 'NotClaimed', value: undefined });
+        default:
+          return send({ tag: 'Detecting', value: undefined });
+      }
+    },
+    (e) => {
+      // Deferred: an interrupt raised synchronously from this body outruns the product-side
+      // subscription bookkeeping and is dropped, so an unknown id would look like silence.
+      const failure =
+        (e as { code?: string })?.code === 'NotFound'
+          ? new PaymentTopUpStatusErr.NotFound()
+          : new PaymentTopUpStatusErr.Unknown({ reason: String((e as Error)?.message ?? e) });
+
+      queueMicrotask(() => interrupt(failure));
+    },
+  );
 });
 
 container.handlePaymentStatusSubscribe((paymentId, send, interrupt) => {
@@ -1023,6 +1063,40 @@ container.handleLocalStorageClear((key, { ok, err }) => {
   return callNative('localStorageClear', { key }).then(
     () => ok(undefined),
     (e) => err(new StorageErr.Unknown({ reason: String(e) })),
+  );
+});
+
+container.handleLocalStorageSubscribe((key, send, _interrupt) => {
+  return subscribeNative(
+    'localStorageSubscribe',
+    { key },
+    (payload: { value: string | null }) => send(payload.value != null ? fromHex(payload.value) : undefined),
+  );
+});
+
+// --- Worker keep-alive operations (native-bridged) ---
+
+container.handleWorkerBeginOperation((params, { ok, err }) => {
+  return callNative('workerBeginOperation', { label: params.label }).then(
+    (result) => ok({ id: result.operationId }),
+    (e) => err(new WorkerErr.Unknown({ reason: String(e) })),
+  );
+});
+
+container.handleWorkerEndOperation((params, { ok, err }) => {
+  return callNative('workerEndOperation', { id: params.id }).then(
+    () => ok(undefined),
+    (e) => err(new WorkerErr.Unknown({ reason: String(e) })),
+  );
+});
+
+// --- Locale (native-bridged) ---
+
+container.handleLocaleSubscribe((_params, send, _interrupt) => {
+  return subscribeNative(
+    'localeSubscribe',
+    {},
+    (payload: { languageTag: string }) => send({ languageTag: payload.languageTag }),
   );
 });
 

@@ -32,6 +32,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.simpletokenlist
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.simpletokenlist.compose.components.AssetItem
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.simpletokenlist.models.SimpleAssetListUiState
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.simpletokenlist.models.SimpleTokenListUiConfig
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun SimpleAssetListScreen(contract: SimpleAssetListContract, config: SimpleTokenListUiConfig) {
@@ -73,7 +74,7 @@ private fun SimpleAssetListScreenInternal(
                 modifier = Modifier
                     .padding(horizontal = PolkadotTheme.spacings.mediumIncreased)
                     .fillMaxWidth(),
-                text = stringResource(config.titleRes),
+                text = stringResource(config.titleRes, *config.titleArgs.toTypedArray()),
                 style = PolkadotTheme.typography.headline.large,
                 color = PolkadotTheme.colors.fg.primary,
                 textAlign = TextAlign.Center
@@ -122,7 +123,7 @@ private fun WalletScreenPreview() {
                         )
                     )
                 ),
-                config = SimpleTokenListUiConfig(R.string.asset_details_fund_button),
+                config = SimpleTokenListUiConfig(R.string.asset_details_fund_button, persistentListOf("DOT")),
                 onBackClick = {},
                 onAssetClick = {},
             )

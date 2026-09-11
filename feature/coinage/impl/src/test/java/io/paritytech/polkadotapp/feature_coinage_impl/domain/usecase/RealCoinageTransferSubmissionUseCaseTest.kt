@@ -69,7 +69,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
         givenExtrinsicBuilds()
         givenSubmissionSucceeds()
 
-        val result = useCase(listOf(present, missing), mapOf(present.accountId() to OnChainCoinInfo(value = 3, age = 0)), groupId)
+        val result = useCase(listOf(present, missing), mapOf(present.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0)), groupId)
 
         assertTrue(result.isSuccess)
         assertEquals(1, claims.size)
@@ -82,7 +82,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
         givenExtrinsicBuilds()
         givenSubmissionSucceeds()
 
-        useCase(keypairs, keypairs.associate { it.accountId() to OnChainCoinInfo(value = 3, age = 0) }, groupId)
+        useCase(keypairs, keypairs.associate { it.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0) }, groupId)
 
         assertEquals(2, claims.size)
         assertEquals(listOf(groupId), registeredGroups)
@@ -97,7 +97,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
         givenExtrinsicBuilds()
         givenSubmissionSucceeds()
 
-        useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(value = 3, age = 0)), groupId)
+        useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0)), groupId)
 
         assertEquals(listOf(CoinageInput.Coin.Received(keypair.accountId())), claims.single().inputs)
         assertEquals(listOf(OwnAsset.Coin(minted.derivationIndex)), claims.single().outputs)
@@ -110,7 +110,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
         coEvery { extrinsicService.buildExtrinsic(any(), any(), any(), any()) } returns
             Result.failure(IllegalStateException("no runtime"))
 
-        val result = useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(value = 3, age = 0)), groupId)
+        val result = useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0)), groupId)
 
         assertTrue(result.isFailure)
         coVerify(exactly = 0) { transactionService.submitTransactions(any(), any()) }
@@ -124,7 +124,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
         coEvery { transactionService.submitTransactions(any(), any()) } returns
             Result.failure(IllegalStateException("already claimed"))
 
-        val result = useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(value = 3, age = 0)), groupId)
+        val result = useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0)), groupId)
 
         assertTrue(result.isFailure)
     }
@@ -136,7 +136,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
         every { transactionFactory.newTransaction() } returns transaction
         coEvery { transaction.mintCoins(any()) } returns Result.failure(IllegalStateException("no key slot"))
 
-        val result = useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(value = 3, age = 0)), groupId)
+        val result = useCase(listOf(keypair), mapOf(keypair.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0)), groupId)
 
         assertTrue(result.isFailure)
         coVerify(exactly = 0) { transactionService.submitTransactions(any(), any()) }

@@ -8,6 +8,8 @@ value class Fraction private constructor(private val value: BigDecimal) : Compar
     companion object {
         val ZERO = Fraction(BigDecimal.ZERO)
 
+        val FULL = Fraction(BigDecimal.ONE)
+
         fun BigDecimal.toFraction(unit: FractionUnit): Fraction {
             return Fraction(unit.convertToFraction(this))
         }

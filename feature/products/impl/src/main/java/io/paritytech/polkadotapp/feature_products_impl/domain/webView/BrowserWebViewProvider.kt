@@ -45,6 +45,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
     dispatchers: CoroutineDispatchers,
     @Assisted private val initialUrl: String,
     @Assisted private val navigationPolicy: NavigationPolicy,
+    @Assisted private val allowIframes: Boolean,
     @Assisted private val scope: CoroutineScope,
 ) : WebViewProvider(dispatchers), PageLifecycleSource {
     @AssistedFactory
@@ -52,6 +53,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
         fun create(
             initialUrl: String,
             navigationPolicy: NavigationPolicy,
+            allowIframes: Boolean,
             scope: CoroutineScope
         ): BrowserWebViewProvider
     }
@@ -67,7 +69,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
     /** Load progress of the domain the WebView is currently resolving content for. */
     val loadProgress: Flow<DotNsLoadProgress> = contentLoader.loadProgress
 
-    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider)
+    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider, firstPartyOrigin = null)
     private val chromeClient = productWebChromeClientFactory.create(
         logPrefix = "Browser: $initialUrl",
         callingProductIdProvider = callingProductIdProvider,
@@ -89,10 +91,19 @@ class BrowserWebViewProvider @AssistedInject constructor(
                 domStorageEnabled = true
                 allowFileAccess = false
                 allowContentAccess = false
+                // A camera preview is a MediaStream in an autoplaying <video>; the default gesture
+                // requirement would keep it black even once the capture permission is granted.
+                mediaPlaybackRequiresUserGesture = false
             }
 
             val innerClient =
-                BrowserWebViewClient(contentLoader, dotNsTldProvider, servingHostResolver, navigationPolicy)
+                BrowserWebViewClient(
+                    contentLoader,
+                    dotNsTldProvider,
+                    servingHostResolver,
+                    navigationPolicy,
+                    frameEmbeddingResponseHeaders(allowIframes),
+                )
             webViewClient = InternalWebViewClient(innerClient)
             webChromeClient = chromeClient
         }

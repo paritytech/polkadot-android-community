@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingPosition
 import io.paritytech.polkadotapp.feature_members_api.data.model.ringIndex
 import io.paritytech.polkadotapp.feature_members_api.data.repository.MembersRepository
+import io.paritytech.polkadotapp.feature_people_api.data.AliasContextProvider
 import io.paritytech.polkadotapp.feature_people_api.data.SetAliasContext
 import io.paritytech.polkadotapp.feature_people_api.data.model.PersonRecord
 import io.paritytech.polkadotapp.feature_people_api.data.repository.PersonIdRepository
@@ -38,7 +39,7 @@ class RealPersonStatusUseCase @Inject constructor(
     private val knownChains: KnownChains,
     private val accountRepository: AccountRepository,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
-    @SetAliasContext private val assignableContexts: Set<@JvmSuppressWildcards BandersnatchContext>
+    @SetAliasContext private val assignableContexts: Set<@JvmSuppressWildcards AliasContextProvider>
 ) : PersonStatusUseCase {
     override fun personhoodStatusFlow(): Flow<PersonhoodStatus> = flowOfAll {
         val chain = peopleChain()
@@ -111,8 +112,8 @@ class RealPersonStatusUseCase @Inject constructor(
 
     private suspend fun getAliasesExistFlow(chain: Chain, memberRecord: RingPosition): Flow<Boolean> {
         val aliasesFlows = assignableContexts
-            .map { context ->
-                accountRepository.getAliasAccount(context).accountIdIn(chain)
+            .map { provider ->
+                accountRepository.getAliasAccount(provider.context()).accountIdIn(chain)
             }
             .map {
                 peopleRepository.subscribeRegisteredAlias(chain.id, it)

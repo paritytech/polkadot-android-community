@@ -81,4 +81,12 @@ sealed interface TrUAPIConfirmation {
         val requestingProductId: ProductId,
         val targetProductId: ProductId,
     ) : Prompt
+
+    /**
+     * Resolve a product's own account subtree over SSO. Native `accountGet`
+     * treats a product's own account as already granted, so this never prompts.
+     */
+    class ProductSubtree(
+        val productId: ProductId,
+    ) : Prompt
 }

@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.domain.usecase
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainAssetWithAmount
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
@@ -21,7 +20,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.invitation.IssuedInvi
 import io.paritytech.polkadotapp.feature_people_api.domain.models.PersonalAlias
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.PersonStatusUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
-import io.paritytech.polkadotapp.feature_videogame_impl.data.SCORE
+import io.paritytech.polkadotapp.feature_videogame_impl.data.ScoreContextProvider
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.VideoGameRegistrationStage
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnChainParticipant
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.onchain.OnChainVideoGamePlayerInfo
@@ -61,7 +60,8 @@ class RealVideoGameRegistrationStageUseCase @Inject constructor(
     private val personStatusUseCase: PersonStatusUseCase,
     private val gameInvitationUseCase: GameInvitationUseCase,
     @param:CandidateDepositAssetProvider private val assetProvider: ChainAssetProvider,
-    private val bandersnatchSecretsStorage: BandersnatchSecretsStorage
+    private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
+    private val scoreContextProvider: ScoreContextProvider
 ) : VideoGameRegistrationStageUseCase {
     companion object {
         private const val GAME_REGISTRATION_STAGE_CACHE_KEY = "11a97355-42ee-49ce-b859-67f70695dd82"
@@ -74,7 +74,7 @@ class RealVideoGameRegistrationStageUseCase @Inject constructor(
                 val (chain, asset) = assetProvider()
                 val account = accountRepository.getCandidateAccount()
                 val accountId = account.accountIdIn(chain)
-                val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(account.id, BandersnatchContext.SCORE)
+                val scoreAlias = bandersnatchSecretsStorage.getAliasInContext(account.id, scoreContextProvider.context())
 
                 combine(
                     scoreRepository.subscribeOurParticipant(chain.id, accountId, scoreAlias),

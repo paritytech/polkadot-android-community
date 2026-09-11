@@ -335,7 +335,7 @@ class RealStatementStoreSlotRenewerTest {
     private suspend fun withSlots(vararg perCollection: StatementSlotsForCollection) {
         val slots = StatementStoreSlots(perCollection.toList())
         whenever(slotLoader.loadSlots(any())).thenReturn(Result.success(slots))
-        whenever(origins.asResourcesStatementStoreSlot(anyUInt(), anyUInt(), any())).thenReturn(mock())
+        whenever(origins.asResourcesStatementStoreSlot(anyUInt(), anyUInt(), any())).thenReturn(Result.success(mock()))
     }
 
     private suspend fun withBatchResults(results: List<Result<ExtrinsicStatus.InBlock>>) {

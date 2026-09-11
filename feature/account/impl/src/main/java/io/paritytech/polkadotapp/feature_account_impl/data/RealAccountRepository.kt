@@ -170,7 +170,7 @@ class RealAccountRepository @Inject constructor(
     }
 
     private suspend fun BandersnatchContext.aliasAccountDerivationPath(): String {
-        val derivationOverride = aliasDerivationOverrides.find { it.context.stringValue == stringValue }
+        val derivationOverride = aliasDerivationOverrides.find { it.context().stringValue == stringValue }
 
         return derivationOverride?.derivationPath?.invoke() ?: (JunctionDecoder.HARD_SEPARATOR + stringValue)
     }

@@ -88,11 +88,7 @@ class RealTokenAmountFormatter @Inject constructor(
         }
     }
 
-    override fun formatToSymbol(tokenAmount: TokenAmountModel): String =
-        when (val appearance = tokenAmount.appearance) {
-            is TokenSymbolAppearance.DigitalDollar -> TokenSymbolAppearance.DigitalDollar.SYMBOL
-            is TokenSymbolAppearance.Symbol -> appearance.symbol
-        }
+    override fun formatToSymbol(tokenAmount: TokenAmountModel): String = tokenAmount.appearance.symbol
 
     override fun formatAmount(amount: BigDecimal, precision: RoundPrecision): String {
         return precision.formatter().format(amount)

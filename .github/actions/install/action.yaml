@@ -7,10 +7,10 @@ inputs:
       SHA so an unrelated merge there cannot turn this build red; bump it
       deliberately.
       The app's HostCallbacks implementation must match the native API surface
-      at this commit. Currently the 0.7.1 release tag, which is what
+      at this commit. Currently the 0.12.0 release tag, which is what
       polkadot-app-ios-v2 pins.
     required: false
-    default: "3f9ba7368f52fc3c9e8930803cb71ca46a9b1ae7"
+    default: "7e0284cef81c4ca025d613428d02defd0f80b863"
 
 runs:
   using: "composite"

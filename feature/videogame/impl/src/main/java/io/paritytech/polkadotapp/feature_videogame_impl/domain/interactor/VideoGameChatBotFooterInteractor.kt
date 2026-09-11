@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_videogame_impl.domain.interactor
 
-import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainAssetWithAmount
@@ -36,7 +35,7 @@ import io.paritytech.polkadotapp.feature_videogame_api.domain.models.UpcomingGam
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.VideoGamesProgressUseCase
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.model.VideoGamesProgress
 import io.paritytech.polkadotapp.feature_videogame_api.domain.usecase.UpcomingGameStartUseCase
-import io.paritytech.polkadotapp.feature_videogame_impl.data.SCORE
+import io.paritytech.polkadotapp.feature_videogame_impl.data.ScoreContextProvider
 import io.paritytech.polkadotapp.feature_videogame_impl.data.VideoGameInfoSyncService
 import io.paritytech.polkadotapp.feature_videogame_impl.data.getCurrentActiveGameInfo
 import io.paritytech.polkadotapp.feature_videogame_impl.data.models.VideoGameRegistrationStage
@@ -120,6 +119,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
     private val airdropProofFactory: AirdropProofFactory,
     private val airdropRegistrationGate: AirdropRegistrationGate,
     private val scoreRepository: ScoreRepository,
+    private val scoreContextProvider: ScoreContextProvider,
 ) : VideoGameChatBotFooterInteractor {
     companion object {
         private val TESTNET_TOP_UP_AMOUNT = 10.toBigDecimal()
@@ -275,8 +275,8 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
     context(scope: ComputationalScope)
     private suspend fun registerWithAlias(chain: Chain): Result<Unit> {
         val candidateAccount = accountRepository.getCandidateAccount()
-        val alias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, BandersnatchContext.SCORE)
-        val aliasAccount = accountRepository.getAliasAccount(BandersnatchContext.SCORE)
+        val alias = bandersnatchSecretsStorage.getAliasInContext(candidateAccount.id, scoreContextProvider.context())
+        val aliasAccount = accountRepository.getAliasAccount(scoreContextProvider.context())
 
         val message = videoGameRepository.generateStatementAccountSigningMessage(alias)
 

@@ -19,7 +19,7 @@ import org.mockito.Mockito.verify
 class ProductChatSearchResultProviderTest {
     private val productRepository: ProductRepository = mock()
     private val productsRouter: ProductsRouter = mock()
-    private val provider = ProductChatSearchResultProvider(productRepository, productsRouter)
+    private val provider = provider(arbitraryProductsEnabled = true)
 
     @Before
     fun setUp() {
@@ -106,6 +106,20 @@ class ProductChatSearchResultProviderTest {
 
         verify(productsRouter).openSpaBrowser(SpaBrowserPayload.ByProductId("coinflip.dot"))
     }
+
+    @Test
+    fun `returns nothing when arbitrary products are disabled`() = runBlocking {
+        val result = provider(arbitraryProductsEnabled = false).search("")
+
+        assertTrue(result.isSuccess)
+        assertEquals(0, result.getOrThrow().size)
+    }
+
+    private fun provider(arbitraryProductsEnabled: Boolean) = ProductChatSearchResultProvider(
+        arbitraryProductsEnabled = arbitraryProductsEnabled,
+        productRepository = productRepository,
+        productsRouter = productsRouter,
+    )
 
     private fun appResult(id: String) = ChatListSearchResult.App(
         id = id,

@@ -15,6 +15,8 @@ import io.paritytech.polkadotapp.common.utils.mapErrorNotInstance
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_balances_api.data.type.TokenBalanceTypeRegistry
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
+import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
 import io.paritytech.polkadotapp.feature_people_api.domain.BandersnatchKeyResolver
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
@@ -49,6 +51,7 @@ class RealPgasClaimer @Inject constructor(
     private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase,
     private val pgasChainAssetProvider: PgasChainAssetProvider,
     private val tokenBalanceTypeRegistry: TokenBalanceTypeRegistry,
+    private val dotNsTldProvider: DotNsTldProvider,
 ) : PgasClaimer {
     context(diagnostics: StalenessReportCollector)
     override suspend fun claim(destinationAccountId: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit> = diagnostics.markRegion(RCommon.string.pgas_stall_claiming) {
@@ -82,17 +85,17 @@ class RealPgasClaimer @Inject constructor(
     context(diagnostics: StalenessReportCollector)
     private suspend fun submitClaim(ctx: ClaimContext, slotIndex: UInt, destinationAccountId: AccountId): Result<Unit> = diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
         Timber.i("picked free slotIndex=$slotIndex; submitting claim_pgas extrinsic")
-        val origin = pgasOrigins.asPgasClaim(ctx.period, slotIndex, ctx.collection)
-
-        extrinsicService.submitExtrinsicAndAwaitExecution(
-            chain = ctx.chain,
-            origin = origin,
-            submissionFailureRecovery = resubmitWhenValidFactory.create(ctx.chain.id),
-        ) {
-            pgas.claimPgas(slotIndex, destinationAccountId)
+        pgasOrigins.asPgasClaim(ctx.period, slotIndex, ctx.collection).flatMap { origin ->
+            extrinsicService.submitExtrinsicAndAwaitExecution(
+                chain = ctx.chain,
+                origin = origin,
+                submissionFailureRecovery = resubmitWhenValidFactory.create(ctx.chain.id),
+            ) {
+                pgas.claimPgas(slotIndex, destinationAccountId)
+            }
+                .flattenExecutionFailure()
+                .coerceToUnit()
         }
-            .flattenExecutionFailure()
-            .coerceToUnit()
             .onSuccess { Timber.i("claim_pgas executed for slotIndex=$slotIndex") }
     }
 
@@ -109,9 +112,10 @@ class RealPgasClaimer @Inject constructor(
     ): Result<UInt> = diagnostics.markRegion(RCommon.string.pgas_stall_picking_slot) {
         runCatching {
             val maxSlots = pgasRepository.maxClaimsPerPeriod(chainId, collection)
+            val tld = dotNsTldProvider.getTldRetrying()
             Timber.i("scanning $maxSlots slots for period=$period")
             val aliasesByIndex = (0u until maxSlots).associateWith { slot ->
-                val context = BandersnatchContext.pgasClaim(period, slot)
+                val context = BandersnatchContext.pgasClaim(tld, period, slot)
                 bandersnatchKeyResolver.getAliasInContext(collection, context)
             }
             val taken = pgasRepository.claimedAliases(chainId, period, aliasesByIndex.values.toList())

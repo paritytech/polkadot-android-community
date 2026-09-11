@@ -27,6 +27,7 @@ import io.paritytech.polkadotapp.feature_mobrules_impl.domain.voting.RealMobrule
 import io.paritytech.polkadotapp.feature_mobrules_impl.domain.voting.RealVotingStateNotifier
 import io.paritytech.polkadotapp.feature_mobrules_impl.domain.voting.RealVotingStatsUseCase
 import io.paritytech.polkadotapp.feature_mobrules_impl.domain.voting.VotingStateNotifier
+import io.paritytech.polkadotapp.feature_people_api.data.AliasContextProvider
 import io.paritytech.polkadotapp.feature_people_api.data.SetAliasContext
 import javax.inject.Singleton
 
@@ -66,6 +67,6 @@ interface MobrulesModule {
         @Provides
         @ElementsIntoSet
         @SetAliasContext
-        fun provideMobRuleContext(): Set<BandersnatchContext> = setOf(BandersnatchContext.MOB_RULE)
+        fun provideMobRuleContext(): Set<AliasContextProvider> = setOf(AliasContextProvider { BandersnatchContext.MOB_RULE })
     }
 }

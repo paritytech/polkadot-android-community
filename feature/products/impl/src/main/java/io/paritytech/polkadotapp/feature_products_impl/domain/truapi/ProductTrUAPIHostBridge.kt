@@ -8,8 +8,10 @@ import io.parity.truapi.HostBridge
 import io.parity.truapi.HostCoreStorage
 import io.parity.truapi.HostStorage
 import io.parity.truapi.LocalhostBridgeBootstrap
-import io.parity.truapi.RuntimeConfig
-import io.parity.truapi.TrUAPIHostCore
+import io.parity.truapi.ProductExecutionConfig
+import io.parity.truapi.ProductExecutionKind
+import io.parity.truapi.TrUAPIHostRuntime
+import io.parity.truapi.TrUAPIProductExecution
 import io.parity.truapi.WebSocketChainProvider
 import io.paritytech.polkadotapp.common.data.app.AppLifecycleState
 import io.paritytech.polkadotapp.common.data.storage.preferences.encrypted.EncryptedPreferences
@@ -29,9 +31,6 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.RemotePermissionRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,22 +45,21 @@ import uniffi.truapi.RemotePermission
 import uniffi.truapi.ThemeName
 import uniffi.truapi_platform.AuthState
 import uniffi.truapi_platform.HostChainSet
+import uniffi.truapi_platform.PermissionAuthorizationRequest
+import uniffi.truapi_platform.PermissionAuthorizationStatus
 import uniffi.truapi_platform.UserConfirmationReview
 import uniffi.truapi_server.HostNavigateRejection
 import uniffi.truapi_server.HostRejection
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Instant
+import uniffi.truapi.RemotePermissionRequest as NativeRemotePermissionRequest
 import uniffi.truapi.ThemeVariant as NativeThemeVariant
 
-private val EMPTY_CHAINS = TrUAPIChains(
-    advertised = HostChainSet(network = "", chains = emptyList()),
-    endpoints = emptyMap(),
-)
-
 /**
- * Native platform callbacks ([io.parity.truapi.HostBridge]) for a product
- * WebView driven by the Rust TrUAPI core. Widget and custom-message rendering
- * is intentionally unsupported, SPA products only.
+ * Native platform callbacks ([io.parity.truapi.HostBridge]) for one product
+ * WebView, opened as a [TrUAPIProductExecution] on the shared host runtime.
+ * Widget and custom-message rendering is intentionally unsupported, SPA
+ * products only.
  *
  * Threading: the core invokes every callback off the UI thread. The
  * prompt-driven ones (navigateTo, devicePermission, remotePermission,
@@ -90,11 +88,6 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
         HostThemeSubscribeItem(ThemeName.Default, NativeThemeVariant.DARK),
     )
 
-    private val authState = MutableStateFlow<AuthState>(AuthState.Disconnected)
-
-    /** Core-owned session state. Nothing consumes it yet; see [HostBridge.authStateChanged]. */
-    val sessionState: StateFlow<AuthState> = authState.asStateFlow()
-
     // Resolved on attach(): the core asks for chains on its dispatcher thread,
     // where a suspending registry lookup is not allowed.
     private val cachedChains = AtomicReference(EMPTY_CHAINS)
@@ -108,11 +101,12 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
         onLog = { Timber.tag("truapi.chain").d("%s", it) },
     )
 
-    private var core: TrUAPIHostCore? = null
+    private var execution: TrUAPIProductExecution? = null
 
     init {
-        // Tear the core down with the owning scope: otherwise a closed product
-        // leaves a live Rust core, its loopback WS listener, and chain sockets behind.
+        // Tear the execution down with the owning scope: otherwise a closed
+        // product leaves a live connection, its loopback WS listener, and chain
+        // sockets behind.
         scope.coroutineContext.job.invokeOnCompletion { stop() }
     }
 
@@ -180,20 +174,15 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
             hostApiInteractor.lookupPreimage(key).getOrNull()
 
         /**
-         * Observed, not acted on. Rendering [AuthState.Pairing] as a pairing
-         * sheet needs a core-driven session, and `PairingHostRuntime` is not
-         * reachable from a native host yet (truapi#334, "Move SSO to the shared
-         * Rust core"), so the core never reaches a state worth showing. iOS
-         * stubs this the same way. Surfaced as state rather than a log line so
-         * wiring the UI later is a subscription, not a rewrite.
+         * Session state belongs to the shared runtime and is observed there
+         * ([TrUAPIHostRuntimeProvider.sessionState]); an execution only logs it.
          */
         override fun authStateChanged(state: AuthState) {
-            authState.value = state
-            Timber.tag("truapi.auth").d("%s", state.marker())
+            Timber.tag("truapi.auth").d("%s: %s", callingProductId.value, state.marker())
         }
 
         override suspend fun confirmUserAction(review: UserConfirmationReview): Boolean =
-            handleConfirmUserAction(callingProductId, review)
+            confirmationLauncher.decide(review, requesterFallback = callingProductId)
 
         override suspend fun devicePermission(request: HostDevicePermissionRequest): Boolean =
             hostApiInteractor
@@ -229,48 +218,53 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
     }
 
     /**
-     * Boots the core and hands the caller the bootstrap script. It must be
-     * injected before the product page loads or the client never connects.
+     * Opens the product's execution on the shared runtime and hands the caller
+     * the bootstrap script. It must be injected before the product page loads
+     * or the client never connects.
      *
-     * A second call is ignored: booting another core would leak the first,
-     * along with its loopback listener and chain sockets.
+     * A second call is ignored: opening another execution would leak the
+     * first, along with its loopback listener and chain sockets.
      */
     suspend fun attach(
-        config: RuntimeConfig,
+        runtime: TrUAPIHostRuntime,
+        productId: ProductId,
         chains: TrUAPIChains,
         navigationPolicy: NavigationPolicy,
         onReadyToInject: (bootstrap: String) -> Unit,
     ) {
-        if (core != null) {
-            Timber.w("truapi.attach: already attached to %s, ignoring", config.productId)
+        if (execution != null) {
+            Timber.w("truapi.attach: already attached to %s, ignoring", productId.value)
             return
         }
-        val callingProductId = ProductId.fromStoredValue(config.productId)
         cachedChains.set(chains)
-        // A config carrying localSessionSecret derives the session keypairs
-        // inside the constructor, so it cannot run on the main thread. The
-        // callback below still resolves back to the caller's context, which is
-        // where the bootstrap has to be registered on the WebView.
-        val startedCore = withContext(Dispatchers.Default) {
-            TrUAPIHostCore(buildBridge(callingProductId, navigationPolicy), config)
-        }
-        chainProvider.attach(
-            onResponse = startedCore::notifyChainResponse,
-            onClosed = startedCore::notifyChainClosed,
+        val opened = runtime.openProductExecution(
+            bridge = buildBridge(productId, navigationPolicy),
+            configuration = ProductExecutionConfig(productId.value, ProductExecutionKind.APP),
         )
-        val endpoint = startedCore.startWsBridge()
-        core = startedCore
-        observeAppTheme()
-        observeAppLifecycle()
-        val bootstrap = LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token)
-        // The core is live by now, so a failure here would strand the loopback
-        // bridge with its token while `core != null` blocks any re-attach.
-        runCatching { onReadyToInject(bootstrap) }
-            .onFailure {
-                stop()
-                throw it
-            }
+        execution = opened
+        // Anything failing past this point leaves a live execution behind, and
+        // `execution != null` would then block every re-attach; tear it down.
+        runCatching {
+            chainProvider.attach(
+                onResponse = opened::notifyChainResponse,
+                onClosed = opened::notifyChainClosed,
+            )
+            val endpoint = opened.startWsBridge()
+            observeAppTheme()
+            observeAppLifecycle()
+            onReadyToInject(LocalhostBridgeBootstrap.script(endpoint.port, endpoint.token, opened.webRtcAllowed()))
+        }.onFailure {
+            stop()
+            throw it
+        }
     }
+
+    // A peek at the stored decision, never a prompt: the bootstrap bakes it in
+    // as a literal, so it can only change when the page reloads.
+    private suspend fun TrUAPIProductExecution.webRtcAllowed(): Boolean =
+        permissionAuthorizationStatus(
+            PermissionAuthorizationRequest.Remote(NativeRemotePermissionRequest(RemotePermission.WebRtc)),
+        ) == PermissionAuthorizationStatus.AUTHORIZED
 
     private fun observeAppLifecycle() {
         scope.launch {
@@ -279,7 +273,7 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
                 // evicts them and re-dials chainConnect on next use. Sockets do
                 // not idle in background and recover on foreground. Teardown
                 // takes the other path: stop() detaches first, so the core is
-                // not notified about a core that is going away anyway.
+                // not notified about an execution that is going away anyway.
                 if (state == AppLifecycleState.BACKGROUND) chainProvider.closeAll()
             }
         }
@@ -293,44 +287,46 @@ class ProductTrUAPIHostBridge @AssistedInject constructor(
 
     private fun setTheme(theme: HostThemeSubscribeItem) {
         cachedTheme.set(theme)
-        core?.notifyThemeChanged(theme)
+        execution?.notifyThemeChanged(theme)
     }
 
     /**
-     * Tears down the runtime and its chain connections. Idempotent. Detaches
-     * the provider before closing sockets so a closing socket cannot notify a
-     * core that is being disposed.
+     * Tears down the execution and its chain connections; the shared runtime
+     * stays up for other products. Idempotent. Detaches the provider before
+     * closing sockets so a closing socket cannot notify an execution that is
+     * being disposed.
      */
     fun stop() {
-        val startedCore = core ?: return
-        core = null
+        val opened = execution ?: return
+        execution = null
         chainProvider.detach()
         chainProvider.closeAll()
-        startedCore.stopWsBridge()
-        startedCore.disconnect()
-        // Releases the native handle. Without it the Rust core outlives the
-        // product tab even though its bridge and sockets are gone.
-        startedCore.close()
+        opened.stopWsBridge()
+        // Shuts the connection down and releases the native handle. Without it
+        // the execution outlives the product tab even though its bridge and
+        // sockets are gone.
+        opened.close()
     }
+}
 
-    /**
-     * Confirm-only: the core owns the key and signs after approval, so this
-     * answers yes/no and never produces a signature. A review the app cannot
-     * describe still fails closed, but that is now a mapping bug rather than
-     * the normal path for two thirds of the variants.
-     */
-    private suspend fun handleConfirmUserAction(
-        callingProductId: ProductId,
-        review: UserConfirmationReview,
-    ): Boolean {
-        val confirmation = runCatching { review.toConfirmation(callingProductId) }
-            .getOrElse {
-                Timber.w(it, "truapi.confirm: could not describe review, rejecting")
-                return false
-            }
+/**
+ * Confirm-only: the core owns the key and signs after approval, so this
+ * answers yes/no and never produces a signature. A review the app cannot
+ * describe fails closed, but that is a mapping bug rather than the normal
+ * path. [requesterFallback] names the requester for the one review that does
+ * not carry a product id itself.
+ */
+internal suspend fun TrUAPIConfirmationLauncher.decide(
+    review: UserConfirmationReview,
+    requesterFallback: ProductId,
+): Boolean {
+    val confirmation = runCatching { review.toConfirmation(requesterFallback) }
+        .getOrElse {
+            Timber.w(it, "truapi.confirm: could not describe review, rejecting")
+            return false
+        }
 
-        return confirmationLauncher.awaitDecision(confirmation)
-    }
+    return awaitDecision(confirmation)
 }
 
 // Reports the theme name the native host's `themeSubscribe` already sends, so a
@@ -363,7 +359,7 @@ private fun RemotePermission.toDomain(): RemotePermissionRequest = when (this) {
     RemotePermission.StatementSubmit -> RemotePermissionRequest.StatementSubmit
 }
 
-private fun AuthState.marker(): String = when (this) {
+internal fun AuthState.marker(): String = when (this) {
     is AuthState.Disconnected -> "disconnected"
     is AuthState.Pairing -> "pairing"
     is AuthState.Connected -> "connected"

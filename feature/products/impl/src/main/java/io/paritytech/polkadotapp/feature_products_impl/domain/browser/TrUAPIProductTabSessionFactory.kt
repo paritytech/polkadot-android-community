@@ -25,6 +25,7 @@ class TrUAPIProductTabSessionFactory @Inject constructor(
         val provider = browserWebViewProviderFactory.create(
             url,
             NavigationPolicy.InlineNavigation(onDeeplinkNavigation = onDeeplink),
+            allowIframes = true,
             scope,
         )
 

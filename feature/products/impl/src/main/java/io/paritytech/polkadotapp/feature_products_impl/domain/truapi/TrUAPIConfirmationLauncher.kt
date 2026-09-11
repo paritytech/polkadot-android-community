@@ -80,6 +80,11 @@ class TrUAPIConfirmationLauncher @Inject constructor(
             confirmation.requestingProductId,
             ProductPermission.AccountAccess(confirmation.targetProductId.value),
         )
+
+        is TrUAPIConfirmation.ProductSubtree -> permissionGuard.requestPermission(
+            confirmation.productId,
+            ProductPermission.AccountAccess(confirmation.productId.value),
+        )
     }
 
     // The app's own signing sheet, so a core-initiated signature is reviewed the

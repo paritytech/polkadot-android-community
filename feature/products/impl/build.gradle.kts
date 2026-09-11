@@ -1,5 +1,6 @@
 import java.util.Properties
 plugins {
+    id("jacoco")
     id("polkadotapp.android.library")
     id("polkadotapp.android.compose")
     id("polkadotapp.android.hilt")
@@ -74,11 +75,13 @@ dependencies {
 
     implementation(project(":common"))
     implementation(project(":tools:ipfs:api"))
+    implementation(project(":tools:remoteconfig:api"))
     implementation(project(":design"))
     implementation(project(":database"))
     implementation(project(":chains"))
     implementation(project(":feature:chats:api"))
     implementation(project(":feature:account:api"))
+    implementation(project(":feature:settings:api"))
     implementation(project(":feature:transaction-storage:api"))
     implementation(project(":feature:transactions:api"))
     implementation(project(":feature:statement-store:api"))
@@ -120,4 +123,27 @@ val truapiCodegenDir: String = run {
 tasks.withType<Test>().configureEach {
     dependsOn(":bindings:truapi-host:buildHostCdylib")
     systemProperty("jna.library.path", truapiCodegenDir)
+
+    // Instrument only when the coverage report is actually being built, so an ordinary test run is unaffected.
+    extensions.configure<JacocoTaskExtension> {
+        isEnabled = gradle.startParameter.taskNames.any { "topUpCoverage" in it }
+    }
+}
+
+tasks.register<JacocoReport>("topUpCoverage") {
+    dependsOn("testDebugUnitTest")
+
+    executionData.setFrom(fileTree(layout.buildDirectory).matching { include("**/testDebugUnitTest.exec") })
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(
+        fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")).matching {
+            include("**/topUpRequest/**", "**/storage/TopUpSourceStorage*", "**/repository/TopUpRepository*")
+            exclude("**/di/**", "**/*_Factory*", "**/*_HiltModules*", "**/hilt_aggregated_deps/**", "**/*Module*")
+        }
+    )
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
 }

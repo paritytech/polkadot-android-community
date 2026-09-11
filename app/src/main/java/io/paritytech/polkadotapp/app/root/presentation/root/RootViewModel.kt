@@ -8,16 +8,18 @@ import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
 import io.paritytech.polkadotapp.common.presentation.deeplink.flatten
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.OneShotEventChannel
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.feature_chats_api.domain.chatRequest.ChatRequestServiceCoordinator
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBotStateController
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentWorkerStarter
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServiceStarter
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ConnectionStatusMixin
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.SyncPriceCurrencyChange
@@ -62,12 +64,12 @@ class RootViewModel @Inject constructor(
     chatEngine: ChatEngine,
     observeAccountOnboardingStatus: ObserveAccountOnboardingStatusUseCase,
     bottomNavHeightProvider: BottomNavHeightProvider,
-    connectionStatusMixinFactory: ConnectionStatusMixin.Factory,
+    chainHealthMixinFactory: ChainHealthMixin.Factory,
 ) : BaseViewModel(), RootContract {
     override val chatOverlays = chatEngine.observeActiveOverlays()
     override val isOnboarded = observeAccountOnboardingStatus().map { it.isOnboarded }
     override val bottomNavHeight = bottomNavHeightProvider.heightDp
-    override val connectionStatusBanner = connectionStatusMixinFactory.create(this).bannerModel
+    override val chainsHealth = chainHealthMixinFactory.create(this).model
 
     init {
         launch {
@@ -99,7 +101,9 @@ class RootViewModel @Inject constructor(
 
     private suspend fun warmUpWebProducts() {
         web3SummitWarmUpService.warmUpWeb3SummitContent()
-        exploreProductsService.warmUpExploreLoading()
+        if (FeatureOption.BROWSE_TAB.isEnabled) {
+            exploreProductsService.warmUpExploreLoading()
+        }
     }
 
     private fun watchWeb3SummitEnd() {
@@ -141,6 +145,8 @@ class RootViewModel @Inject constructor(
     }
 
     private fun watchSsoEvents() {
-        ssoService.watchSsoEvents().launchIn(this)
+        if (FeatureOption.LINKED_DEVICES.isEnabled) {
+            ssoService.watchSsoEvents().launchIn(this)
+        }
     }
 }

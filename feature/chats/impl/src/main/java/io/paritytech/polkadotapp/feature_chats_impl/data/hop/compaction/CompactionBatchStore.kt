@@ -61,7 +61,7 @@ class CompactionBatchStore @Inject constructor(
 
         val envelope: VersionedHopPoolEntry = VersionedHopPoolEntry.V1(HopPoolEntryPayload.Inline(batch))
 
-        hopSigner.ensureAllocated()
+        hopSigner.ensureCanSubmit()
 
         return hopService.withSession(nodeUrl) {
             submitEntry(BinaryScale.encodeToByteArray(envelope), ticket).toDataByteArray()

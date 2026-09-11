@@ -1,15 +1,19 @@
 package io.paritytech.polkadotapp.feature_pgas_impl.data.extension
 
-import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
-import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
-import io.paritytech.polkadotapp.bandersnatch_crypto.intoBandersnatchContext
-import io.paritytech.polkadotapp.common.utils.padEnd
+import io.paritytech.polkadotapp.common.utils.toLittleEndianBytes
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
+import io.paritytech.polkadotapp.feature_people_api.domain.personhoodProductContext
+import io.paritytech.polkadotapp.feature_people_api.domain.personhoodSystemSuffix
 
-internal fun BandersnatchContext.Companion.pgasClaim(period: UInt, slotIndex: UInt): BandersnatchContext {
-    val contextBytes = "pop:gas:".encodeToByteArray() +
-        BinaryScale.encodeToByteArray(period.toInt()) +
-        BinaryScale.encodeToByteArray(slotIndex.toInt())
+private const val PGAS_CLAIM_FAMILY = 4u
 
-    return contextBytes.padEnd(32).intoBandersnatchContext()
+internal fun BandersnatchContext.Companion.pgasClaim(
+    tld: DotNsTld,
+    day: UInt,
+    slot: UInt
+): BandersnatchContext {
+    val suffix = personhoodSystemSuffix(PGAS_CLAIM_FAMILY, day, slot.toLittleEndianBytes())
+
+    return personhoodProductContext(tld, suffix)
 }

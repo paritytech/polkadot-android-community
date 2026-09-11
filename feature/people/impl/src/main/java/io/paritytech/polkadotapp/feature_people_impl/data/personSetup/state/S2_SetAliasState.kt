@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_members_api.data.model.ringIndex
+import io.paritytech.polkadotapp.feature_people_api.data.AliasContextProvider
 import io.paritytech.polkadotapp.feature_people_api.data.repository.PersonIdRepository
 import io.paritytech.polkadotapp.feature_people_api.data.repository.getPersonIdOrThrow
 import io.paritytech.polkadotapp.feature_people_api.domain.models.PersonId
@@ -22,7 +23,7 @@ class SetAliasState(
     private val accountRepository: AccountRepository,
     private val personIdRepository: PersonIdRepository,
     private val stateFactory: PersonSetupStateFactory,
-    private val assignableContexts: Set<BandersnatchContext>,
+    private val assignableContexts: Set<AliasContextProvider>,
     override val params: Params
 ) : PersonSetupNonTerminalState(), WorkerStateMachineState.WithParams<SetAliasState.Params> {
     companion object {
@@ -47,8 +48,10 @@ class SetAliasState(
         }
     }
 
-    private val sortedContexts: List<BandersnatchContext> by lazy {
-        assignableContexts.sortedWith(DataByteArray.compareByBytes(unsigned = true) { it.value })
+    private suspend fun resolveSortedContexts(): List<BandersnatchContext> {
+        return assignableContexts
+            .map { it.context() }
+            .sortedWith(DataByteArray.compareByBytes(unsigned = true) { it.value })
     }
 
     context(transition: PersonSetupState.Transition)
@@ -56,6 +59,7 @@ class SetAliasState(
         val personId = personIdRepository.getPersonIdOrThrow()
 
         return assignAlias(
+            sortedContexts = resolveSortedContexts(),
             contextIndex = params.lastAssignedIndex + 1,
             personId = personId
         )
@@ -63,6 +67,7 @@ class SetAliasState(
 
     context(transition: PersonSetupState.Transition)
     private suspend fun assignAlias(
+        sortedContexts: List<BandersnatchContext>,
         contextIndex: Int,
         personId: PersonId
     ): Result<PersonSetupState> {
@@ -77,13 +82,13 @@ class SetAliasState(
         if (transition.dataSource.hasUpToDateAlias(aliasAccountId, personId)) {
             Timber.d("Found existing up-to-date alias. Skipping set alias for ${context.stringValue}")
 
-            return Result.success(createNextState(contextIndex))
+            return Result.success(createNextState(sortedContexts, contextIndex))
         }
 
         return transition.dataSource.setAlias(context, aliasAccountId)
             .mapCatching { executionResult ->
                 if (executionResult.canContinue()) {
-                    createNextState(contextIndex)
+                    createNextState(sortedContexts, contextIndex)
                 } else {
                     throw TransitionDidNotSucceedException(executionResult.toString())
                 }
@@ -106,7 +111,10 @@ class SetAliasState(
         return ringMatches && upToDateInRing
     }
 
-    private fun createNextState(justAssignedContextIndex: Int): PersonSetupState {
+    private fun createNextState(
+        sortedContexts: List<BandersnatchContext>,
+        justAssignedContextIndex: Int
+    ): PersonSetupState {
         return if (justAssignedContextIndex == sortedContexts.lastIndex) {
             stateFactory.setPersonalIdAccount()
         } else {

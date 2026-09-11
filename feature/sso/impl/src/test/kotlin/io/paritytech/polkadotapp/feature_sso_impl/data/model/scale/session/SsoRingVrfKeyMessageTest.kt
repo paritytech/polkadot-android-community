@@ -21,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 private val SESSION_ID = SsoSessionId("session")
+private val TLD = requireNotNull(DotNsTld.parse("dot"))
 private const val REQUEST_ID = "request"
 
 private val CALLER = ProductId.fromStoredValue("game.dot")
@@ -49,7 +50,7 @@ class SsoRingVrfKeyMessageTest {
             )
         )
 
-        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, DotNsTld.FALLBACK).getOrThrow()
+        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
 
         val content = decoded.content as SsoSessionRequest.Content.RegisterRingVrfKeyRequest
         assertEquals(CALLER, content.callingProduct)
@@ -67,7 +68,7 @@ class SsoRingVrfKeyMessageTest {
             )
         )
 
-        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, DotNsTld.FALLBACK).getOrThrow()
+        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
 
         val content = decoded.content as SsoSessionRequest.Content.ListRingVrfKeysRequest
         assertEquals("peopl.dot", content.owner.value)
@@ -85,7 +86,7 @@ class SsoRingVrfKeyMessageTest {
             )
         )
 
-        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, DotNsTld.FALLBACK).getOrThrow()
+        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
 
         val content = decoded.content as SsoSessionRequest.Content.RingVrfSignRequest
         assertEquals(KEY_HANDLE, content.keyHandle)
@@ -98,12 +99,12 @@ class SsoRingVrfKeyMessageTest {
 
         val alias = requestWith(
             SsoSessionRequest.Content.AliasRequest(CALLER, KEY_HANDLE, context, RING)
-        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID, DotNsTld.FALLBACK).getOrThrow()
+        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
         assertEquals(KEY_HANDLE, (alias.content as SsoSessionRequest.Content.AliasRequest).keyHandle)
 
         val proof = requestWith(
             SsoSessionRequest.Content.CreateProofRequest(CALLER, KEY_HANDLE, context, RING, ByteArray(4))
-        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID, DotNsTld.FALLBACK).getOrThrow()
+        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
         assertEquals(KEY_HANDLE, (proof.content as SsoSessionRequest.Content.CreateProofRequest).keyHandle)
     }
 

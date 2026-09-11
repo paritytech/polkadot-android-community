@@ -9,7 +9,6 @@ import io.paritytech.polkadotapp.feature_upgrade_username_impl.domain.interactor
 import io.paritytech.polkadotapp.feature_upgrade_username_impl.presentation.UpgradeUsernameRouter
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.MIN_USERNAME_LENGTH
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.filterUsernameInput
-import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +32,7 @@ class UpgradeUsernameViewModel @Inject constructor(
     private val interactor: UsernameUpgradeInteractor
 ) : BaseViewModel(), UpgradeUsernameContract {
     private val username = MutableStateFlow("")
-    private val fieldState = MutableStateFlow(UsernameFieldState.NEUTRAL)
+    private val fieldState = MutableStateFlow(UpgradeUsernameFieldState.Neutral)
     private val isClaimingInProgress = MutableStateFlow(false)
 
     override val uiState: StateFlow<UpgradeUsernameUiState> = combine(
@@ -56,7 +55,7 @@ class UpgradeUsernameViewModel @Inject constructor(
 
         if (previousValue != newValue) {
             username.value = newValue
-            fieldState.value = UsernameFieldState.NEUTRAL
+            fieldState.value = UpgradeUsernameFieldState.Neutral
         }
     }
 
@@ -85,19 +84,19 @@ class UpgradeUsernameViewModel @Inject constructor(
             .debounce(300.milliseconds)
             .filter { it.length >= MIN_USERNAME_LENGTH }
             .mapLatest { username ->
-                fieldState.value = UsernameFieldState.NEUTRAL
+                fieldState.value = UpgradeUsernameFieldState.Neutral
                 interactor.checkUsernameAvailable(username)
                     .onSuccess { availabilityState ->
                         val newFieldState = when (availabilityState) {
-                            is UpgradeUsernameAvailabilityState.NotAvailable -> UsernameFieldState.TAKEN
-                            else -> UsernameFieldState.AVAILABLE
+                            is UpgradeUsernameAvailabilityState.NotAvailable -> UpgradeUsernameFieldState.Taken
+                            else -> UpgradeUsernameFieldState.Available
                         }
 
                         fieldState.value = newFieldState
                     }
                     .onFailure {
                         showError(contextManager.applicationContext.getString(R.string.chat_failed_to_become_peer))
-                        fieldState.value = UsernameFieldState.INVALID
+                        fieldState.value = UpgradeUsernameFieldState.Invalid
                         Timber.d(it)
                     }
             }

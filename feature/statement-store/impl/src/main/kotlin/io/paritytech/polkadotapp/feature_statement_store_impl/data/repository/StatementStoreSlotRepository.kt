@@ -7,10 +7,10 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.data.blockchain.mo
 import kotlin.time.Duration
 
 interface StatementStoreSlotRepository {
-    suspend fun maxSlotsPerPeriod(chainId: ChainId, collection: PeopleCollection): UInt
+    suspend fun maxSlotsPerPeriod(collection: PeopleCollection): Result<UInt>
 
     /** Min delay before an alias's entry can be replaced. */
-    suspend fun replacementCooldown(chainId: ChainId): Duration
+    suspend fun replacementCooldown(): Result<Duration>
 
     suspend fun allowanceEntries(
         chainId: ChainId,

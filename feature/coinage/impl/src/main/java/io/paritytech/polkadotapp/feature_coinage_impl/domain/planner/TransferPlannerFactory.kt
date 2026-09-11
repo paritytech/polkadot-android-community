@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner
 
-import io.paritytech.polkadotapp.common.utils.combine
+import io.paritytech.polkadotapp.common.utils.combineResults
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
@@ -12,12 +12,11 @@ class TransferPlannerFactory @Inject constructor(
     private val coinRepository: CoinRepository
 ) {
     suspend fun create(): Result<TransferPlanner> {
-        val recyclingAge = coinRepository.getCoinRecyclingAge()
-
-        return combine(
+        return combineResults(
+            coinRepository.getCoinRecyclingAge(),
             breakdownAmountUseCase.createCoinAmountBreakdown(),
             coinageBalanceConvertionUseCase.create()
-        ).map { (breakdownAmount, convertionContext) ->
+        ) { recyclingAge, breakdownAmount, convertionContext ->
             TransferPlanner(convertionContext, breakdownAmount, recyclingAge)
         }
     }

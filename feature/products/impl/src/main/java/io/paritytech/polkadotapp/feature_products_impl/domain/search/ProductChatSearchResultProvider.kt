@@ -7,16 +7,18 @@ import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPay
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductRepository
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import kotlinx.coroutines.flow.first
-import javax.inject.Inject
 
-class ProductChatSearchResultProvider @Inject constructor(
+class ProductChatSearchResultProvider(
+    private val arbitraryProductsEnabled: Boolean,
     private val productRepository: ProductRepository,
     private val productsRouter: ProductsRouter,
 ) : ChatSearchResultProvider {
     override val id: ChatExtensionId = PRODUCT_SEARCH_PROVIDER_ID
 
-    override suspend fun search(query: String): Result<List<ChatListSearchResult.App>> =
-        runCatching {
+    override suspend fun search(query: String): Result<List<ChatListSearchResult.App>> {
+        if (!arbitraryProductsEnabled) return Result.success(emptyList())
+
+        return runCatching {
             productRepository.observeProducts()
                 .first()
                 .filter { it.name.contains(query, ignoreCase = true) }
@@ -28,6 +30,7 @@ class ProductChatSearchResultProvider @Inject constructor(
                     )
                 }
         }
+    }
 
     override suspend fun onAppResultSelected(result: ChatListSearchResult.App) {
         productsRouter.openSpaBrowser(SpaBrowserPayload.ByProductId(result.id))

@@ -13,8 +13,6 @@ value class DotNsTld private constructor(val value: String) {
     override fun toString(): String = value
 
     companion object {
-        val FALLBACK = DotNsTld("dot")
-
         private val VALID_TLD = Regex("""[a-z0-9][a-z0-9-]{0,62}""")
 
         fun parse(value: String): DotNsTld? {

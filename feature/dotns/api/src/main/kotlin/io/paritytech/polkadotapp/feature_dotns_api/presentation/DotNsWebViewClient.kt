@@ -22,6 +22,9 @@ open class DotNsWebViewClient(
     private val dotNsResolver: DotNsResolver,
     private val dotNsTldProvider: DotNsTldProvider,
     private val servingHostResolver: DotNsServingHostResolver = DotNsServingHostResolver.Identity,
+    // Stamped onto the main-frame document response so the caller can enforce document-level policy
+    // (e.g. a Content-Security-Policy that forbids iframes) engine-side rather than by heuristics.
+    private val mainDocumentResponseHeaders: Map<String, String> = emptyMap(),
 ) : WebViewClient() {
     override fun shouldInterceptRequest(
         view: WebView,
@@ -55,7 +58,12 @@ open class DotNsWebViewClient(
 
         Timber.d("Successfully resolved file for $url: ${resolvedFile.name}, mimeType=$mimeType")
 
-        return WebResourceResponse(mimeType, "UTF-8", resolvedFile.inputStream())
+        val stream = resolvedFile.inputStream()
+        return if (request.isForMainFrame && mainDocumentResponseHeaders.isNotEmpty()) {
+            WebResourceResponse(mimeType, "UTF-8", 200, "OK", mainDocumentResponseHeaders, stream)
+        } else {
+            WebResourceResponse(mimeType, "UTF-8", stream)
+        }
     }
 
     fun resolveHostFile(uri: Uri?): File? {

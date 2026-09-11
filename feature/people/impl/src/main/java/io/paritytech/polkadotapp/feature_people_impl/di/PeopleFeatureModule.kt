@@ -2,8 +2,11 @@ package io.paritytech.polkadotapp.feature_people_impl.di
 
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.feature_people_api.data.personSetup.PersonSetupStarter
 import io.paritytech.polkadotapp.feature_people_api.data.repository.PersonIdRepository
 import io.paritytech.polkadotapp.feature_people_api.data.signer.origins.PeopleOrigins
@@ -37,6 +40,7 @@ import io.paritytech.polkadotapp.feature_people_impl.domain.RealPeopleMembership
 import io.paritytech.polkadotapp.feature_people_impl.domain.dim.RealCancelOtherDimCommitmentUseCase
 import io.paritytech.polkadotapp.feature_people_impl.domain.dim.RealGetActiveDimCommitmentState
 import io.paritytech.polkadotapp.feature_people_impl.domain.invitation.RealInvitationService
+import io.paritytech.polkadotapp.feature_people_impl.domain.useCase.DisabledPersonStatusUseCase
 import io.paritytech.polkadotapp.feature_people_impl.domain.useCase.RealActivePeopleCollectionUseCase
 import io.paritytech.polkadotapp.feature_people_impl.domain.useCase.RealPersonStatusUseCase
 import io.paritytech.polkadotapp.feature_people_impl.presentation.mixin.RealDimSwitchMixin
@@ -75,9 +79,6 @@ internal interface PeopleFeatureModule {
     fun bindPersonSetupDataSourceFactory(impl: RealPersonSetupDataSourceFactory): PersonSetupDataSource.Factory
 
     @Binds
-    fun bindPersonSetupStatusUseCase(impl: RealPersonStatusUseCase): PersonStatusUseCase
-
-    @Binds
     fun bindGetActiveDimCommitmentState(impl: RealGetActiveDimCommitmentState): GetActiveDimCommitmentState
 
     @Binds
@@ -100,4 +101,15 @@ internal interface PeopleFeatureModule {
 
     @Binds
     fun bindBandersnatchKeyResolver(impl: RealBandersnatchKeyResolver): BandersnatchKeyResolver
+
+    companion object {
+        @Provides
+        @Singleton
+        fun providePersonStatusUseCase(
+            enabled: RealPersonStatusUseCase,
+            disabled: DisabledPersonStatusUseCase
+        ): PersonStatusUseCase {
+            return if (FeatureOption.PERSONHOOD.isEnabled) enabled else disabled
+        }
+    }
 }

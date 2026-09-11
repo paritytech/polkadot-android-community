@@ -107,34 +107,6 @@ class EvmContractCallerTest {
         assertNull(EvmContractCaller.decodeAddress(ByteArray(0)))
     }
 
-    @Test
-    fun `encodeTld produces correct function selector`() {
-        val encoded = EvmContractCaller.encodeTld()
-
-        // tld() selector = keccak256("tld()")[0:4] = 0x2d551432
-        assertEquals("2d551432", encoded.toHexString())
-    }
-
-    @Test
-    fun `decodeTld round-trips with sample data`() {
-        val abiEncoded = abiEncodeString(".paseo")
-
-        val decoded = EvmContractCaller.decodeTld(abiEncoded)
-        assertEquals(".paseo", decoded)
-    }
-
-    @Test
-    fun `decodeTld returns null for empty string`() {
-        val abiEncoded = abiEncodeString("")
-        val result = EvmContractCaller.decodeTld(abiEncoded)
-        assertNull(result)
-    }
-
-    @Test
-    fun `decodeTld returns null for empty output`() {
-        assertNull(EvmContractCaller.decodeTld(byteArrayOf()))
-    }
-
     @Suppress("UNCHECKED_CAST")
     private fun abiEncodeReturnValue(value: Type<*>, typeRef: TypeReference<out Type<*>>): ByteArray {
         // Encode as a function call with the value as input, then strip the 4-byte selector

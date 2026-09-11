@@ -7,5 +7,4 @@ internal class DotNsConfigRemote(
     // Absent in payloads published before manifest support; a null address disables manifest
     // resolution and leaves legacy resolution working.
     val registryContractAddress: HexString?,
-    val protocolRegistryAddress: HexString?,
 )

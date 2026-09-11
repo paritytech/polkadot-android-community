@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_api.domain.model
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
-import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
 
 typealias RingVrfIndex = Int
@@ -12,15 +11,17 @@ data class RecyclerVoucher(
     val ringVrfPublicKey: BandersnatchPublicKey,
     val recyclerValue: ValueExponent,
     val location: Location,
-    val allocatedAt: Timestamp,
-    val delayUnloadUntil: Timestamp,
-    val ringHasEnoughRingMembersToWithdraw: Boolean,
 ) {
     sealed interface Location {
         data object Unknown : Location
         data object Onboarding : Location
         data class InRecycler(
-            val recyclerIndex: RecyclerIndex
+            val recyclerIndex: RecyclerIndex,
+            /**
+             * Keys baked into the ring's root, which is the set a proof actually verifies against — so it is
+             * the anonymity this voucher really has, not how many keys the ring has been offered.
+             */
+            val recyclerMembers: Int,
         ) : Location
     }
 }
@@ -31,15 +32,9 @@ fun RecyclerVoucher.isInRecycler() = location is RecyclerVoucher.Location.InRecy
 
 fun RecyclerVoucher.recyclerLocationOrThrow() = location as RecyclerVoucher.Location.InRecycler
 
-private fun RecyclerVoucher.canBeUnloadedAt(timestamp: Timestamp) = delayUnloadUntil < timestamp
-
-/**
- * Spendable without giving anything away. Neither missing half stops the voucher being used — an unload
- * before its delay, or from a ring too small to hide it, only makes it easier to link back to the coin it
- * came from — so both merely lower it to degraded.
- */
-fun RecyclerVoucher.isReadyToUseSecured(timestamp: Timestamp) =
-    isInRecycler() && canBeUnloadedAt(timestamp) && ringHasEnoughRingMembersToWithdraw
+/** A voucher outside a recycler hides in nothing, which is the same as an empty ring. */
+fun RecyclerVoucher.recyclerMembersOrZero() =
+    (location as? RecyclerVoucher.Location.InRecycler)?.recyclerMembers ?: 0
 
 fun List<RecyclerVoucher>.filterInRecycler(): List<RecyclerVoucher> {
     return filter { it.isInRecycler() }

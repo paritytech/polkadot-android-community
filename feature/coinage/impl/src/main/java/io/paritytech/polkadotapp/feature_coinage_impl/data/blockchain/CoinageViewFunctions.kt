@@ -7,18 +7,22 @@ import io.paritytech.polkadotapp.chains.util.EncodedArguments.Companion.noArgs
 import io.paritytech.polkadotapp.chains.util.Modules
 import kotlinx.serialization.Serializable
 
-/**
- * Each limit is null when it cannot be computed - no price is currently available for the conversion
- * between native and the underlying asset.
- */
 @Serializable
 @AsTuple
-class FreeUnloadTokenInfo(val peopleLimit: Long?, val litePeopleLimit: Long?)
+class FreeUnloadTokenInfo(val peopleLimit: Long, val litePeopleLimit: Long)
 
 suspend fun ViewFunctionsApi.getFreeUnloadTokenInfo(): Result<FreeUnloadTokenInfo> {
     return call(
         pallet = Modules.COINAGE,
         name = "get_free_unload_token_info",
+        arguments = noArgs()
+    )
+}
+
+suspend fun ViewFunctionsApi.getMaximumAge(): Result<UShort> {
+    return call(
+        pallet = Modules.COINAGE,
+        name = "get_maximum_age",
         arguments = noArgs()
     )
 }

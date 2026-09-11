@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,8 +29,8 @@ import io.paritytech.polkadotapp.design.components.text.NovaTextField
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.ClaimUsernameTestTags
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.DigitsFieldState
-import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldState
-import io.paritytech.polkadotapp.common.R as RCommon
+import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldStatus
+import io.paritytech.polkadotapp.feature_usernames_api.presentation.model.UsernameFieldStyle
 
 @Composable
 fun UsernameTextField(
@@ -39,12 +38,10 @@ fun UsernameTextField(
     postfix: String?,
     onUsernameChanged: (String) -> Unit,
     onDigitsChanged: (String) -> Unit,
-    fieldState: UsernameFieldState,
+    status: UsernameFieldStatus,
     digitsFieldState: DigitsFieldState,
     isEnabled: Boolean,
 ) {
-    val hasInvalidDigits = digitsFieldState is DigitsFieldState.Visible && !digitsFieldState.isValid
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -73,16 +70,13 @@ fun UsernameTextField(
                     }
                 }
             },
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (hasInvalidDigits) PolkadotTheme.colors.fg.error else getStateColor(fieldState)
-            ),
+            border = BorderStroke(width = 1.dp, color = statusColor(status.style)),
             enabled = isEnabled
         )
 
         AnimatedVisibility(
             modifier = Modifier.fillMaxWidth(),
-            visible = fieldState != UsernameFieldState.NEUTRAL || hasInvalidDigits
+            visible = status.text != null
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -94,25 +88,6 @@ fun UsernameTextField(
                     shape = PolkadotTheme.shapes.small,
                     color = Color(0x1FFFFFFF)
                 ) {
-                    val statusText: String
-                    val statusColor: Color
-
-                    if (hasInvalidDigits) {
-                        statusText = stringResource(RCommon.string.pick_username_digits_taken)
-                        statusColor = PolkadotTheme.colors.fg.error
-                    } else {
-                        statusText = stringResource(
-                            when (fieldState) {
-                                UsernameFieldState.NEUTRAL -> RCommon.string.common_ok
-                                UsernameFieldState.TAKEN -> RCommon.string.pick_username_state_taken
-                                UsernameFieldState.INVALID -> RCommon.string.pick_username_state_invalid
-                                UsernameFieldState.AVAILABLE -> RCommon.string.pick_username_state_available
-                                UsernameFieldState.ALREADY_CREATED -> RCommon.string.pick_username_account_already_created
-                            }
-                        )
-                        statusColor = getStateColor(fieldState)
-                    }
-
                     NovaText(
                         modifier = Modifier
                             .padding(
@@ -121,8 +96,8 @@ fun UsernameTextField(
                             ),
                         textAlign = TextAlign.Center,
                         style = PolkadotTheme.typography.body.small,
-                        text = statusText,
-                        color = statusColor
+                        text = status.text.orEmpty(),
+                        color = statusColor(status.style)
                     )
                 }
             }
@@ -162,11 +137,10 @@ private fun DigitsSuffix(
 }
 
 @Composable
-private fun getStateColor(fieldState: UsernameFieldState) = when (fieldState) {
-    UsernameFieldState.NEUTRAL -> PolkadotTheme.colors.stroke.primary
-    UsernameFieldState.TAKEN -> PolkadotTheme.colors.fg.error
-    UsernameFieldState.INVALID, UsernameFieldState.ALREADY_CREATED -> PolkadotTheme.colors.fg.error
-    UsernameFieldState.AVAILABLE -> PolkadotTheme.colors.fg.success
+private fun statusColor(style: UsernameFieldStyle) = when (style) {
+    UsernameFieldStyle.Neutral -> PolkadotTheme.colors.stroke.primary
+    UsernameFieldStyle.Error -> PolkadotTheme.colors.fg.error
+    UsernameFieldStyle.Success -> PolkadotTheme.colors.fg.success
 }
 
 @Preview
@@ -177,7 +151,7 @@ fun PickUsernameAvailableScreenPreview() {
             username = "best_username",
             onUsernameChanged = {},
             onDigitsChanged = {},
-            fieldState = UsernameFieldState.AVAILABLE,
+            status = UsernameFieldStatus(UsernameFieldStyle.Success, "It's yours!"),
             digitsFieldState = DigitsFieldState.Visible(digits = "42", isValid = true),
             postfix = null,
             isEnabled = true
@@ -193,7 +167,7 @@ fun PickUsernameInvalidDigitsPreview() {
             username = "best_username",
             onUsernameChanged = {},
             onDigitsChanged = {},
-            fieldState = UsernameFieldState.AVAILABLE,
+            status = UsernameFieldStatus(UsernameFieldStyle.Error, "Digits taken. Try again."),
             digitsFieldState = DigitsFieldState.Visible(digits = "77", isValid = false),
             postfix = null,
             isEnabled = true
@@ -203,13 +177,13 @@ fun PickUsernameInvalidDigitsPreview() {
 
 @Preview
 @Composable
-fun PickUsernameInvalidScreenPreview() {
+fun PickUsernameNeutralScreenPreview() {
     PolkadotTheme {
         UsernameTextField(
             username = "best_username",
             onUsernameChanged = {},
             onDigitsChanged = {},
-            fieldState = UsernameFieldState.INVALID,
+            status = UsernameFieldStatus(UsernameFieldStyle.Neutral, null),
             digitsFieldState = DigitsFieldState.Hidden,
             postfix = null,
             isEnabled = true
@@ -225,7 +199,7 @@ fun PickUsernameTakenScreenPreview() {
             username = "best_username",
             onUsernameChanged = {},
             onDigitsChanged = {},
-            fieldState = UsernameFieldState.TAKEN,
+            status = UsernameFieldStatus(UsernameFieldStyle.Error, "Taken. Try another."),
             digitsFieldState = DigitsFieldState.Hidden,
             postfix = null,
             isEnabled = true

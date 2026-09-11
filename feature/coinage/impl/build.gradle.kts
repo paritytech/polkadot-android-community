@@ -18,6 +18,8 @@ dependencies {
     implementation(project(":feature:transfers:api"))
     implementation(project(":feature:usernames:api"))
 
+    implementation(project(":tools:remoteconfig:api"))
+
     implementation(project(":database"))
 
     implementation(libs.hilt.androidx.work)
@@ -25,6 +27,9 @@ dependencies {
 
     implementation(libs.androidx.work.runtime)
 
+    // Test-only: the harness builds the durability engine directly, and the rules shim calls its ladder.
+    // Production coinage depends on the api alone, so this adds no impl-to-impl edge to the app graph.
+    testImplementation(project(":feature:transactions:impl"))
     testImplementation(project(":test-shared"))
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)

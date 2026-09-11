@@ -16,7 +16,7 @@ android {
             dimension = "distribution"
             buildConfigString(
                 "GOOGLE_OAUTH_ID",
-                localProperties.readSecretOrDefault("GOOGLE_OAUTH_ID", "")
+                localProperties.readSecretOrThrow("GOOGLE_OAUTH_ID")
             )
         }
         create("vanilla") {

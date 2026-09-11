@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.launchUnit
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
@@ -47,8 +46,10 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
             CoinageUiState(
                 tokensState = CoinageUiState.TokensState(
                     totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.totalBalance)),
-                    spendableSecuredBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableSecuredBalance)),
-                    spendableDegradedBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableDegradedBalance)),
+                    spendableBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.spendableBalance)),
+                    gainingPrivacyBalance = tokenAmountMapper.mapFrom(
+                        asset.withAmount(assetInfo.gainingPrivacyBalance)
+                    ),
                     pendingBalance = tokenAmountMapper.mapFrom(asset.withAmount(assetInfo.pendingBalance)),
                     coinList = coins.toImmutableList(),
                     voucherList = vouchers.toImmutableList()
@@ -67,19 +68,19 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     )
 
     val state: StateFlow<DigitalDollarCardDetailsUiState> = interactor.observeBackupProgress()
-        .map {
-            DigitalDollarCardDetailsUiState(
-                it.toBalanceRestoreUiState()
-            )
-        }
+        .map { DigitalDollarCardDetailsUiState(balanceRestore = it.toBalanceRestoreUiState()) }
         .stateIn(
             scope = this,
             started = SharingStarted.Eagerly,
-            initialValue = DigitalDollarCardDetailsUiState(BalanceRestoreUiState.NotDetermined)
+            initialValue = DigitalDollarCardDetailsUiState(
+                balanceRestore = BalanceRestoreUiState.NotDetermined
+            )
         )
 
-    fun onFundClick() {
-        router.openSelectFundAsset()
+    fun onGetCashClick() = launchUnit {
+        interactor.getCashProductId()
+            .onSuccess { router.openProduct(it) }
+            .onFailure { showPresentationError(GetCashUnavailablePresentationError(it)) }
     }
 
     fun onSendClick() {
@@ -90,23 +91,18 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         if (fundInProgress.value) return@launchUnit
         fundInProgress.enable()
         interactor.testnetFund()
-            .logFailure("Failed to perform testnet fund")
-            .onFailure { showMessage("Failed to fund account") }
+            .onFailure { showPresentationError(AutoFundFailedPresentationError(it)) }
         fundInProgress.disable()
-    }
-
-    fun makeAllVouchersReady() = launchUnit {
-        interactor.makeAllVouchersReady()
     }
 
     fun onShareLogsClick() = launchUnit {
         interactor.shareCoinageLogs()
-            .onFailure { showMessage("Failed to share coinage logs") }
+            .onFailure { showPresentationError(ShareCoinageLogsFailedPresentationError(it)) }
     }
 
     fun onForceRecycleClick(coin: Coin) = launchUnit {
         interactor.forceRecycle(coin)
-            .onFailure { showMessage("Failed to recycle coin") }
+            .onFailure { showPresentationError(ForceRecycleFailedPresentationError(it)) }
     }
 
     fun onBackupUpdateClick() {

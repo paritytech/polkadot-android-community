@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.design.components.progress.LoadingScreenState
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
@@ -19,6 +20,7 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_splash_impl.presentation.SplashViewModel
 import io.paritytech.polkadotapp.feature_splash_impl.presentation.compose.components.icons.PolkadotLogo
+import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 fun SplashScreen(viewModel: SplashViewModel) {
@@ -46,7 +48,7 @@ fun SplashScreen(viewModel: SplashViewModel) {
                     VerticalSpacer { mediumIncreased }
 
                     NovaText(
-                        text = "Waiting for network connection...",
+                        text = stringResource(RCommon.string.splash_waiting_for_network_title),
                         style = PolkadotTheme.typography.title.medium,
                         color = PolkadotTheme.colors.fg.secondary
                     )
@@ -54,7 +56,7 @@ fun SplashScreen(viewModel: SplashViewModel) {
                     VerticalSpacer { tiny }
 
                     NovaText(
-                        text = "Turn off Airplane Mode or check your internet",
+                        text = stringResource(RCommon.string.splash_waiting_for_network_message),
                         style = PolkadotTheme.typography.body.medium,
                         color = PolkadotTheme.colors.fg.secondary
                     )

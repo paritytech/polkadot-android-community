@@ -17,7 +17,7 @@ android {
             buildConfigField(
                 "long",
                 "GOOGLE_PROJECT_ID",
-                localProperties.readSecretOrDefault("GOOGLE_PROJECT_ID", "0")
+                localProperties.readSecretOrThrow("GOOGLE_PROJECT_ID")
             )
         }
         create("vanilla") {
@@ -32,7 +32,6 @@ dependencies {
 
     implementation(libs.google.integrity)
 
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.integrity)
-    implementation(libs.firebase.integrity.debug)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

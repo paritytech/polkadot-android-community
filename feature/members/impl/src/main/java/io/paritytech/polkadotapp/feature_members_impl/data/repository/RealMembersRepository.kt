@@ -79,6 +79,16 @@ class RealMembersRepository @Inject constructor(
         }
     }
 
+    override suspend fun getCollections(
+        chainId: ChainId,
+        collectionIds: List<RingCollectionId>,
+        consistency: CacheableDataConsistency,
+    ): Result<Map<RingCollectionId, RingCollection>> {
+        return storageDataSources.pickForDataConsistencyRequirement(consistency).queryCatching(chainId) {
+            metadata.members.collections.entries(collectionIds)
+        }
+    }
+
     override suspend fun getOnboardingSize(
         chainId: ChainId,
         collectionId: RingCollectionId,

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val SHARED_PREFERENCES_FILE = "polkadot_prefs"
+private const val SHARED_PREFERENCES_FILE = "polkadot_prefs_v2"
 
 @Singleton
 class RealPreferences @Inject constructor(

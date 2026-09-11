@@ -27,13 +27,9 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionRequest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FAILURE
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.derivation.VoucherRingDerivation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.FreeUnloadTokenResolver
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenResolverFactory
@@ -46,6 +42,11 @@ import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProve
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -84,6 +85,10 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase = mockk()
     private val peopleMembershipProver: PeopleMembershipProver = mockk()
 
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider = mockk {
+        coEvery { instanceId() } returns Result.success(0u)
+    }
+
     private val useCase = RealUnloadRecyclerIntoExternalAssetUseCase(
         rpcCalls = rpcCalls,
         extrinsicService = extrinsicService,
@@ -100,7 +105,9 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         coinAmountBreakdownUseCase = mockk(relaxed = true),
         coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
         peopleMembershipProver = peopleMembershipProver,
+        quotaTracker = mockk(relaxed = true),
         chainAssetProvider = chainAssetProvider,
+        coinageInstanceIdProvider = coinageInstanceIdProvider,
     )
 
     /** The alias each voucher signs with is a native bandersnatch call; only the seam matters here. */
@@ -344,7 +351,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         every { transactionService.subscribeOperationGroupStatuses(groupId) } returns flowOf(*emissions)
     }
 
-    private fun entry(status: CoinageTransactionStatus) = CoinageTransactionState(
+    private fun entry(status: DurableTxStatus) = CoinageTransactionState(
         id = CoinageTransactionId(status.ordinal.toLong()),
         status = status,
         inputs = listOf(CoinageInput.Voucher(status.ordinal)),
@@ -352,16 +359,13 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
     )
 
     private fun voucherInRecycler(index: Int, recycler: Int = index) =
-        voucherOf(index, Location.InRecycler(RecyclerIndex(BigInteger.valueOf(recycler.toLong()))))
+        voucherOf(index, Location.InRecycler(RecyclerIndex(BigInteger.valueOf(recycler.toLong())), recyclerMembers = 767))
 
     private fun voucherOf(index: Int, location: Location) = RecyclerVoucher(
         ringVrfKeyIndex = index,
         ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
         recyclerValue = ValueExponent(1),
         location = location,
-        allocatedAt = 0L,
-        delayUnloadUntil = 0L,
-        ringHasEnoughRingMembersToWithdraw = true,
     )
 
     private companion object {

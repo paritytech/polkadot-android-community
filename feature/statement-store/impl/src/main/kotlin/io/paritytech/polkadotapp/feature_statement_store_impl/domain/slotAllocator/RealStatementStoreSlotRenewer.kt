@@ -81,7 +81,7 @@ class RealStatementStoreSlotRenewer @Inject constructor(
                     period = context.period,
                     seq = pairing.seq,
                     collection = pairing.collection,
-                )
+                ).getOrThrow()
                 extrinsic(origin = origin) {
                     resourcesCalls.setStatementStoreAccount(context.period, pairing.seq, pairing.row.accountId)
                 }

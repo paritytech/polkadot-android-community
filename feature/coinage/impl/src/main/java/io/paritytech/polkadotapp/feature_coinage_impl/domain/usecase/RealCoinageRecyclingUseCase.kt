@@ -30,7 +30,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetPr
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.MultiExtrinsicBuilder
-import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
@@ -46,21 +45,6 @@ class RealCoinageRecyclingUseCase @Inject constructor(
     private val dispatchers: CoroutineDispatchers,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider
 ) : CoinageRecyclingUseCase {
-    override suspend fun invoke(): Result<Unit> {
-        return withContext(dispatchers.computation) {
-            val recyclingAge = coinRepository.getCoinRecyclingAge()
-            val coinsToRecycle = coinRepository.getOnChainCoinsWithAgeAtLeast(minAge = recyclingAge)
-
-            if (coinsToRecycle.isEmpty()) {
-                coinageLogD("Recycling has no due coins minAge=$recyclingAge")
-                Result.success(Unit)
-            } else {
-                coinageLogD("Recycling due coins=${coinsToRecycle.size} minAge=$recyclingAge")
-                recycle(coinsToRecycle)
-            }
-        }
-    }
-
     /**
      * One group of load-recycler transactions, one per coin.
      *

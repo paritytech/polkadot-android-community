@@ -8,5 +8,5 @@ interface TransactionStorageOrigins {
         period: UInt,
         counter: UByte,
         collection: PeopleCollection,
-    ): TransactionOrigin
+    ): Result<TransactionOrigin>
 }
