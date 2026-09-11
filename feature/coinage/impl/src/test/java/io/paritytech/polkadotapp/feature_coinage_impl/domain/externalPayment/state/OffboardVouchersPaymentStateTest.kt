@@ -33,7 +33,7 @@ class OffboardVouchersPaymentStateTest {
     @Test
     fun `the selected vouchers are unloaded under the payment's group and the payment completes with it`() = runBlocking<Unit> {
         givenSubmitted()
-        givenUnloadReports(ExternalUnloadStatus.Submitted, ExternalUnloadStatus.Success)
+        givenUnloadReports(ExternalUnloadStatus.Submitted, ExternalUnloadStatus.FinalizedSuccess)
 
         assertEquals(CompletedPaymentState(PAYMENT), state.transition().outcome().getOrThrow())
     }

@@ -101,7 +101,7 @@ interface UnloadRecyclerIntoExternalAssetUseCase {
 sealed interface ExternalUnloadStatus {
     data object Submitted : ExternalUnloadStatus
 
-    data object Success : ExternalUnloadStatus
+    data object FinalizedSuccess : ExternalUnloadStatus
 
     /** [claimed] is what reached the destination, net of any surplus folded back into new vouchers. */
     data class PartialSuccess(val executed: Int, val total: Int, val claimed: Balance) : ExternalUnloadStatus
@@ -312,7 +312,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
 
         when (status) {
             is ExternalUnloadStatus.Submitted -> coinageLogD("Unload submitted group=$group")
-            is ExternalUnloadStatus.Success -> coinageLogI("Unload succeeded group=$group")
+            is ExternalUnloadStatus.FinalizedSuccess -> coinageLogI("Unload succeeded group=$group")
             is ExternalUnloadStatus.PartialSuccess ->
                 coinageLogW("Unload partially succeeded group=$group executed=${status.executed} total=${status.total} claimed=${status.claimed}")
 
@@ -327,7 +327,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCase @Inject constructor(
         return when {
             any { it.status.isLive } || isEmpty() -> ExternalUnloadStatus.Submitted
 
-            executed.size == size -> ExternalUnloadStatus.Success
+            executed.size == size -> ExternalUnloadStatus.FinalizedSuccess
 
             executed.isNotEmpty() -> ExternalUnloadStatus.PartialSuccess(
                 executed = executed.size,

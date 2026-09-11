@@ -73,7 +73,7 @@ class OffboardVouchersPaymentState @AssistedInject constructor(
             .first { it !is ExternalUnloadStatus.Submitted }
 
         return when (outcome) {
-            is ExternalUnloadStatus.Success -> CompletedPaymentState(context)
+            is ExternalUnloadStatus.FinalizedSuccess -> CompletedPaymentState(context)
 
             is ExternalUnloadStatus.PartialSuccess -> PartiallyCompletedPaymentState(context, outcome.claimed)
 

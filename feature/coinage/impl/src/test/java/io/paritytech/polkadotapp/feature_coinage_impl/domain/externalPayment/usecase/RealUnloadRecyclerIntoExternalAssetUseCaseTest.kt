@@ -269,7 +269,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
     fun `an unload whose every transaction finalized reports success`() = runBlocking {
         givenGroupReports(listOf(entry(FINALIZED_SUCCESS), entry(FINALIZED_SUCCESS)))
 
-        assertEquals(ExternalUnloadStatus.Success, statuses().last())
+        assertEquals(ExternalUnloadStatus.FinalizedSuccess, statuses().last())
     }
 
     /**
@@ -338,7 +338,7 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         )
 
         assertEquals(
-            listOf(ExternalUnloadStatus.Submitted, ExternalUnloadStatus.Success),
+            listOf(ExternalUnloadStatus.Submitted, ExternalUnloadStatus.FinalizedSuccess),
             useCase.subscribeUnloadStatus(groupId).take(2).toList(),
         )
     }
