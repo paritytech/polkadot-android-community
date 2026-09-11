@@ -4,6 +4,8 @@ import android.database.sqlite.SQLiteConstraintException
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatRecover
+import io.paritytech.polkadotapp.common.utils.mapError
+import io.paritytech.polkadotapp.common.utils.mapErrorInstance
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentError
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentKey
@@ -29,9 +31,7 @@ class RealExternalPaymentService @Inject constructor(
     ): Result<Unit> = runCancellableCatching {
         repository.insert(ExternalPayment.new(key = key, amount = amount, destination = destination))
     }
-        .flatRecover { error ->
-            Result.failure(if (error is SQLiteConstraintException) ExternalPaymentError.AlreadyExists(key) else error)
-        }
+        .mapErrorInstance<_, SQLiteConstraintException> { error -> ExternalPaymentError.AlreadyExists(key) }
         .onSuccess { workerStarter.start() }
 
     override suspend fun exists(key: ExternalPaymentKey): Result<Boolean> = runCancellableCatching {
