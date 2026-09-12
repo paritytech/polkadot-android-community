@@ -6,8 +6,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * All tunable chain-health constants in one place. These are heuristic starting points chosen to
- * keep a healthy chain pinned at 100 (a full white ring) and only degrade once a metric breaches
- * its tolerance — retune here after observing behaviour on live networks.
+ * keep a healthy chain's metrics pinned at 100 and only degrade once a metric breaches its
+ * tolerance — retune here after observing behaviour on live networks.
  */
 object ChainHealthThresholds {
     // --- Block liveness (latency), relative to the chain's expected block time ---
@@ -20,8 +20,13 @@ object ChainHealthThresholds {
     // Samples in the moving-average latency window.
     const val LATENCY_WINDOW_SIZE = 10
 
-    // Cadence at which liveness re-evaluates with no new block, so the ring depletes during a stall.
+    // Cadence at which liveness re-evaluates with no new block, so the score decays during a stall.
     val LIVENESS_TICK: Duration = 1.seconds
+
+    val BLOCK_PRODUCTION_WINDOW: Duration = 30.seconds
+
+    // The health rules call a chain that produced fewer than five sixths of its expected blocks an outage.
+    const val BLOCK_PRODUCTION_REQUIRED_RATIO = 5.0 / 6.0
 
     // --- Finality gap, in blocks (best - finalized). Per-chain overrides live in Chain.additional
     // (finalityGapIdeal / finalityGapOutage); these are the fallback defaults. ---
