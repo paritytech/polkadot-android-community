@@ -735,6 +735,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_enter_amount_privacy_cost_hint">Extra %1$s is spendable, but at the risk of reducing your privacy</string>
     <string name="send_enter_amount_not_enough_funds_error">You don’t have enough funds</string>
     <string name="send_enter_amount_cash_title">%1$s</string>
+    <string name="send_enter_amount_send_button">Send %1$s %2$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>
     <string name="send_enter_amount_settling">Waiting for seller confirmation…</string>
     <string name="send_error_settlement_timeout">The recipient didn\'t confirm the payment in time. Your money is still yours \u2014 try again later.</string>
