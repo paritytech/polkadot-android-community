@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.common.utils.CurrencyConfig
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
@@ -58,13 +59,13 @@ internal fun CoinageStateCard(
             NovaText(
                 modifier = Modifier.padding(16.dp),
                 style = PolkadotTheme.typography.title.medium,
-                text = stringResource(RCommon.string.pocket_coinage_balance_title),
+                text = stringResource(RCommon.string.pocket_balance_details_title, CurrencyConfig.symbol),
                 color = PolkadotTheme.colors.fg.primary
             )
 
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 NovaText(
-                    text = stringResource(RCommon.string.pocket_coinage_total_balance),
+                    text = stringResource(RCommon.string.pocket_balance_details_total),
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
@@ -76,7 +77,7 @@ internal fun CoinageStateCard(
 
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 NovaText(
-                    text = stringResource(RCommon.string.pocket_coinage_spendable_balance),
+                    text = stringResource(RCommon.string.pocket_balance_details_spendable),
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
@@ -88,7 +89,7 @@ internal fun CoinageStateCard(
 
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 NovaText(
-                    text = stringResource(RCommon.string.pocket_coinage_gaining_privacy),
+                    text = stringResource(RCommon.string.pocket_balance_details_gaining_privacy),
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
@@ -100,7 +101,7 @@ internal fun CoinageStateCard(
 
             Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 NovaText(
-                    text = stringResource(RCommon.string.pocket_coinage_pending),
+                    text = stringResource(RCommon.string.pocket_balance_details_pending),
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
@@ -120,7 +121,7 @@ internal fun CoinageStateCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NovaText(
-                    text = stringResource(RCommon.string.pocket_coinage_coins),
+                    text = stringResource(RCommon.string.pocket_balance_details_coins),
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
@@ -144,7 +145,7 @@ internal fun CoinageStateCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NovaText(
-                    text = stringResource(RCommon.string.pocket_coinage_vouchers),
+                    text = stringResource(RCommon.string.pocket_balance_details_vouchers),
                     color = PolkadotTheme.colors.fg.primary
                 )
                 FillerSpacer()
@@ -158,7 +159,7 @@ internal fun CoinageStateCard(
             }
 
             PolkadotTextButton(
-                text = stringResource(RCommon.string.pocket_coinage_share_logs),
+                text = stringResource(RCommon.string.pocket_balance_details_share_logs),
                 onClick = { onShareLogsClick() },
                 modifier = Modifier
                     .fillMaxWidth()

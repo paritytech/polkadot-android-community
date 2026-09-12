@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,7 @@ import kotlinx.collections.immutable.ImmutableList
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import io.paritytech.polkadotapp.common.R as RCommon
 
 enum class CoinageDetails { COINS, VOUCHERS }
 
@@ -69,19 +71,19 @@ internal fun CoinsListSheetContent(
     }
 
     val indexLabel = when (sortMode) {
-        CoinSortMode.INDEX_DESC -> "Idx ↓"
-        CoinSortMode.INDEX_ASC -> "Idx ↑"
-        else -> "Idx"
+        CoinSortMode.INDEX_DESC -> stringResource(RCommon.string.pocket_balance_sort_index_descending)
+        CoinSortMode.INDEX_ASC -> stringResource(RCommon.string.pocket_balance_sort_index_ascending)
+        else -> stringResource(RCommon.string.pocket_balance_sort_index)
     }
     val valueLabel = when (sortMode) {
-        CoinSortMode.VALUE_DESC -> "Val ↓"
-        CoinSortMode.VALUE_ASC -> "Val ↑"
-        else -> "Val"
+        CoinSortMode.VALUE_DESC -> stringResource(RCommon.string.pocket_balance_sort_value_descending)
+        CoinSortMode.VALUE_ASC -> stringResource(RCommon.string.pocket_balance_sort_value_ascending)
+        else -> stringResource(RCommon.string.pocket_balance_sort_value)
     }
     val ageLabel = when (sortMode) {
-        CoinSortMode.AGE_DESC -> "Age ↓"
-        CoinSortMode.AGE_ASC -> "Age ↑"
-        else -> "Age"
+        CoinSortMode.AGE_DESC -> stringResource(RCommon.string.pocket_balance_sort_age_descending)
+        CoinSortMode.AGE_ASC -> stringResource(RCommon.string.pocket_balance_sort_age_ascending)
+        else -> stringResource(RCommon.string.pocket_balance_sort_age)
     }
     val indexActive = sortMode == CoinSortMode.INDEX_DESC || sortMode == CoinSortMode.INDEX_ASC
     val valueActive = sortMode == CoinSortMode.VALUE_DESC || sortMode == CoinSortMode.VALUE_ASC
@@ -89,10 +91,14 @@ internal fun CoinsListSheetContent(
 
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val copiedMessage = stringResource(RCommon.string.pocket_balance_copied)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            NovaText("Coins (${coins.size})", style = PolkadotTheme.typography.title.large)
+            NovaText(
+                text = stringResource(RCommon.string.pocket_balance_coins_title, coins.size),
+                style = PolkadotTheme.typography.title.large
+            )
 
             VerticalSpacer { small }
 
@@ -138,7 +144,7 @@ internal fun CoinsListSheetContent(
                     color = Color(0x0FFFFFFF),
                     onClick = {
                         clipboardManager.setText(AnnotatedString(coins.toString()))
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     NovaIcon(
@@ -152,7 +158,10 @@ internal fun CoinsListSheetContent(
         }
 
         if (sortedCoins.isEmpty()) {
-            NovaText(modifier = Modifier.padding(16.dp), text = "No coins")
+            NovaText(
+                modifier = Modifier.padding(16.dp),
+                text = stringResource(RCommon.string.pocket_balance_coins_empty)
+            )
         } else {
             LazyColumn {
                 items(sortedCoins) { coin ->
@@ -184,19 +193,19 @@ internal fun VouchersListSheetContent(
     }
 
     val indexLabel = when (sortMode) {
-        VoucherSortMode.INDEX_DESC -> "Idx ↓"
-        VoucherSortMode.INDEX_ASC -> "Idx ↑"
-        else -> "Idx"
+        VoucherSortMode.INDEX_DESC -> stringResource(RCommon.string.pocket_balance_sort_index_descending)
+        VoucherSortMode.INDEX_ASC -> stringResource(RCommon.string.pocket_balance_sort_index_ascending)
+        else -> stringResource(RCommon.string.pocket_balance_sort_index)
     }
     val valueLabel = when (sortMode) {
-        VoucherSortMode.VALUE_DESC -> "Val ↓"
-        VoucherSortMode.VALUE_ASC -> "Val ↑"
-        else -> "Val"
+        VoucherSortMode.VALUE_DESC -> stringResource(RCommon.string.pocket_balance_sort_value_descending)
+        VoucherSortMode.VALUE_ASC -> stringResource(RCommon.string.pocket_balance_sort_value_ascending)
+        else -> stringResource(RCommon.string.pocket_balance_sort_value)
     }
     val dateLabel = when (sortMode) {
-        VoucherSortMode.DATE_DESC -> "Date ↓"
-        VoucherSortMode.DATE_ASC -> "Date ↑"
-        else -> "Date"
+        VoucherSortMode.DATE_DESC -> stringResource(RCommon.string.pocket_balance_sort_date_descending)
+        VoucherSortMode.DATE_ASC -> stringResource(RCommon.string.pocket_balance_sort_date_ascending)
+        else -> stringResource(RCommon.string.pocket_balance_sort_date)
     }
     val indexActive = sortMode == VoucherSortMode.INDEX_DESC || sortMode == VoucherSortMode.INDEX_ASC
     val valueActive = sortMode == VoucherSortMode.VALUE_DESC || sortMode == VoucherSortMode.VALUE_ASC
@@ -204,10 +213,14 @@ internal fun VouchersListSheetContent(
 
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val copiedMessage = stringResource(RCommon.string.pocket_balance_copied)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            NovaText("Vouchers (${vouchers.size})", style = PolkadotTheme.typography.title.large)
+            NovaText(
+                text = stringResource(RCommon.string.pocket_balance_vouchers_title, vouchers.size),
+                style = PolkadotTheme.typography.title.large
+            )
 
             VerticalSpacer { small }
 
@@ -253,7 +266,7 @@ internal fun VouchersListSheetContent(
                     color = Color(0x0FFFFFFF),
                     onClick = {
                         clipboardManager.setText(AnnotatedString(vouchers.toString()))
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     NovaIcon(
@@ -267,7 +280,10 @@ internal fun VouchersListSheetContent(
         }
 
         if (sortedVouchers.isEmpty()) {
-            NovaText(modifier = Modifier.padding(16.dp), text = "No vouchers")
+            NovaText(
+                modifier = Modifier.padding(16.dp),
+                text = stringResource(RCommon.string.pocket_balance_vouchers_empty)
+            )
         } else {
             LazyColumn {
                 items(sortedVouchers) { voucher ->
@@ -304,6 +320,7 @@ private fun CoinItemCard(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val copiedMessage = stringResource(RCommon.string.pocket_balance_copied)
     val fullAddress = coin.accountId.toString()
 
     PolkadotSurface(
@@ -316,7 +333,7 @@ private fun CoinItemCard(
         Column(modifier = Modifier.padding(12.dp)) {
             Row {
                 NovaText(
-                    text = "Index: ",
+                    text = stringResource(RCommon.string.pocket_balance_item_index),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 NovaText(
@@ -325,9 +342,9 @@ private fun CoinItemCard(
                 FillerSpacer()
 
                 val (presenceText, presenceColor) = if (coin.isOnChain) {
-                    "On chain" to PolkadotTheme.colors.fg.success
+                    stringResource(RCommon.string.pocket_balance_item_on_chain) to PolkadotTheme.colors.fg.success
                 } else {
-                    "Not on chain" to PolkadotTheme.colors.fg.tertiary
+                    stringResource(RCommon.string.pocket_balance_item_not_on_chain) to PolkadotTheme.colors.fg.tertiary
                 }
                 NovaText(text = presenceText, color = presenceColor)
             }
@@ -336,24 +353,30 @@ private fun CoinItemCard(
 
             Row {
                 NovaText(
-                    text = "Value",
+                    text = stringResource(RCommon.string.pocket_balance_item_value),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
                 val dollars = "$" + String.format(Locale.US, "%.2f", coin.valueExponent.tokenAmount().toDouble() / 100.0)
-                NovaText(text = "2^${coin.valueExponent.value} | $dollars")
+                NovaText(
+                    text = stringResource(
+                        RCommon.string.pocket_balance_item_value_format,
+                        coin.valueExponent.value,
+                        dollars
+                    )
+                )
             }
 
             VerticalSpacer { 4.dp }
 
             Row {
                 NovaText(
-                    text = "Age",
+                    text = stringResource(RCommon.string.pocket_balance_item_age),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
                 val ageText = when (val age = coin.age) {
-                    Coin.Age.Unknown -> "Unknown"
+                    Coin.Age.Unknown -> stringResource(RCommon.string.pocket_balance_item_age_unknown)
                     is Coin.Age.Known -> "${age.value}"
                 }
                 NovaText(text = ageText)
@@ -363,7 +386,7 @@ private fun CoinItemCard(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 NovaText(
-                    text = "Account",
+                    text = stringResource(RCommon.string.pocket_balance_item_account),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
@@ -371,7 +394,7 @@ private fun CoinItemCard(
                     modifier = Modifier.size(24.dp),
                     onClick = {
                         clipboardManager.setText(AnnotatedString(fullAddress))
-                        Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     NovaIcon(
@@ -396,7 +419,7 @@ private fun CoinItemCard(
 
                 PolkadotTextButton(
                     modifier = Modifier.fillMaxWidth(),
-                    text = "Force Recycle",
+                    text = stringResource(RCommon.string.pocket_balance_item_force_recycle),
                     onClick = onForceRecycleClick
                 )
             }
@@ -408,6 +431,7 @@ private fun CoinItemCard(
 private fun VoucherItemCard(voucher: RecyclerVoucher) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val copiedMessage = stringResource(RCommon.string.pocket_balance_copied)
     val isReady = voucher.isInRecycler()
     val ringMembers = voucher.recyclerMembersOrZero()
     val fullKey = voucher.ringVrfPublicKey.toString()
@@ -422,7 +446,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row {
                 NovaText(
-                    text = "Index: ",
+                    text = stringResource(RCommon.string.pocket_balance_item_index),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
 
@@ -431,7 +455,11 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                 )
                 FillerSpacer()
                 Column(horizontalAlignment = Alignment.End) {
-                    val statusText = if (isReady) "In recycler ($ringMembers)" else "Not in recycler"
+                    val statusText = if (isReady) {
+                        stringResource(RCommon.string.pocket_balance_item_in_recycler, ringMembers)
+                    } else {
+                        stringResource(RCommon.string.pocket_balance_item_not_in_recycler)
+                    }
                     val statusColor = if (isReady) PolkadotTheme.colors.fg.success else PolkadotTheme.colors.fg.tertiary
                     NovaText(
                         text = statusText,
@@ -444,28 +472,38 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
 
             Row {
                 NovaText(
-                    text = "Value",
+                    text = stringResource(RCommon.string.pocket_balance_item_value),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
                 val dollars = "$" + String.format(Locale.US, "%.2f", voucher.recyclerValue.tokenAmount().toDouble() / 100.0)
-                NovaText(text = "2^${voucher.recyclerValue.value} | $dollars")
+                NovaText(
+                    text = stringResource(
+                        RCommon.string.pocket_balance_item_value_format,
+                        voucher.recyclerValue.value,
+                        dollars
+                    )
+                )
             }
 
             VerticalSpacer { 4.dp }
 
             Row {
                 NovaText(
-                    text = "Location",
+                    text = stringResource(RCommon.string.pocket_balance_item_location),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
                 when (val loc = voucher.location) {
-                    RecyclerVoucher.Location.Unknown -> NovaText("Unknown")
-                    RecyclerVoucher.Location.Onboarding -> NovaText("Onboarding")
+                    RecyclerVoucher.Location.Unknown ->
+                        NovaText(stringResource(RCommon.string.pocket_balance_item_location_unknown))
+
+                    RecyclerVoucher.Location.Onboarding ->
+                        NovaText(stringResource(RCommon.string.pocket_balance_item_location_onboarding))
+
                     is RecyclerVoucher.Location.InRecycler -> {
                         NovaText(
-                            text = "index: ",
+                            text = stringResource(RCommon.string.pocket_balance_item_location_index),
                             color = PolkadotTheme.colors.fg.tertiary
                         )
                         NovaText(text = "${loc.recyclerIndex}")
@@ -477,7 +515,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
 
             Row {
                 NovaText(
-                    text = "Unload at",
+                    text = stringResource(RCommon.string.pocket_balance_item_unload_at),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
@@ -488,7 +526,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 NovaText(
-                    text = "Key",
+                    text = stringResource(RCommon.string.pocket_balance_item_key),
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 FillerSpacer()
@@ -496,7 +534,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                     modifier = Modifier.size(24.dp),
                     onClick = {
                         clipboardManager.setText(AnnotatedString(fullKey))
-                        Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     NovaIcon(

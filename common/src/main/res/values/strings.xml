@@ -1489,17 +1489,56 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
     <string name="pocket_digital_dollar_advanced">Advanced</string>
-    <string name="pocket_coinage_balance_title">Coinage Balance</string>
-    <string name="pocket_coinage_total_balance">Total Balance</string>
-    <string name="pocket_coinage_spendable_balance">Spendable Balance</string>
-    <string name="pocket_coinage_gaining_privacy">Gaining Privacy</string>
-    <string name="pocket_coinage_pending">Pending</string>
-    <string name="pocket_coinage_coins">Coins</string>
-    <string name="pocket_coinage_vouchers">Vouchers</string>
-    <string name="pocket_coinage_share_logs">Share Coinage Logs</string>
+
+    <string name="pocket_balance_details_title">%1$s Balance</string>
+    <string name="pocket_balance_details_total">Total Balance</string>
+    <string name="pocket_balance_details_spendable">Spendable Balance</string>
+    <string name="pocket_balance_details_gaining_privacy">Gaining Privacy</string>
+    <string name="pocket_balance_details_pending">Pending</string>
+    <string name="pocket_balance_details_coins">Coins</string>
+    <string name="pocket_balance_details_vouchers">Vouchers</string>
+    <string name="pocket_balance_details_share_logs">Share Balance Logs</string>
+
+    <string name="pocket_balance_coins_title">Coins (%1$d)</string>
+    <string name="pocket_balance_coins_empty">No coins</string>
+    <string name="pocket_balance_vouchers_title">Vouchers (%1$d)</string>
+    <string name="pocket_balance_vouchers_empty">No vouchers</string>
+    <string name="pocket_balance_copied">Copied</string>
+
+    <string name="pocket_balance_sort_index">Idx</string>
+    <string name="pocket_balance_sort_index_ascending">Idx ↑</string>
+    <string name="pocket_balance_sort_index_descending">Idx ↓</string>
+    <string name="pocket_balance_sort_value">Val</string>
+    <string name="pocket_balance_sort_value_ascending">Val ↑</string>
+    <string name="pocket_balance_sort_value_descending">Val ↓</string>
+    <string name="pocket_balance_sort_age">Age</string>
+    <string name="pocket_balance_sort_age_ascending">Age ↑</string>
+    <string name="pocket_balance_sort_age_descending">Age ↓</string>
+    <string name="pocket_balance_sort_date">Date</string>
+    <string name="pocket_balance_sort_date_ascending">Date ↑</string>
+    <string name="pocket_balance_sort_date_descending">Date ↓</string>
+
+    <string name="pocket_balance_item_index">"Index: "</string>
+    <string name="pocket_balance_item_on_chain">On chain</string>
+    <string name="pocket_balance_item_not_on_chain">Not on chain</string>
+    <string name="pocket_balance_item_value">Value</string>
+    <string name="pocket_balance_item_value_format">2^%1$d | %2$s</string>
+    <string name="pocket_balance_item_age">Age</string>
+    <string name="pocket_balance_item_age_unknown">Unknown</string>
+    <string name="pocket_balance_item_account">Account</string>
+    <string name="pocket_balance_item_force_recycle">Force Recycle</string>
+    <string name="pocket_balance_item_in_recycler">In recycler (%1$d)</string>
+    <string name="pocket_balance_item_not_in_recycler">Not in recycler</string>
+    <string name="pocket_balance_item_location">Location</string>
+    <string name="pocket_balance_item_location_unknown">Unknown</string>
+    <string name="pocket_balance_item_location_onboarding">Onboarding</string>
+    <string name="pocket_balance_item_location_index">"index: "</string>
+    <string name="pocket_balance_item_unload_at">Unload at</string>
+    <string name="pocket_balance_item_key">Key</string>
+
     <string name="pocket_error_get_cash_unavailable">Get %1$s isn\'t available right now. Try again later.</string>
     <string name="pocket_error_auto_fund_failed">Couldn\'t add test funds to this account. Try again.</string>
-    <string name="pocket_error_share_coinage_logs_failed">Couldn\'t share the coinage logs. Try again.</string>
+    <string name="pocket_error_share_coinage_logs_failed">Couldn\'t share the balance logs. Try again.</string>
     <string name="pocket_error_force_recycle_failed">Couldn\'t recycle this coin. Try again.</string>
 
     <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
