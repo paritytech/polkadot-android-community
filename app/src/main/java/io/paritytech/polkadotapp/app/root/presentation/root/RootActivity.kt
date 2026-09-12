@@ -146,14 +146,13 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
-    // The global navigation bar: a bottom overlay shown on every screen. Self-contained — it resolves its
-    // own view-model and holders; the activity only places it.
     private fun setupRootNavBar() {
         val composeView = ComposeView(this).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
+                val chainsHealth by viewModel.chainsHealth.collectAsStateWithLifecycle()
                 PolkadotTheme {
-                    RootNavBarHost(navController = navController)
+                    RootNavBarHost(navController = navController, chainsHealth = chainsHealth)
                 }
             }
         }
