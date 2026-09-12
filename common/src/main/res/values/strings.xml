@@ -1465,14 +1465,19 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="collectibles_title">Collectibles</string>
     <string name="collectibles_unavailable">Collectibles are temporarily unavailable. Please try again later.</string>
 
-    <string name="chain_health_state_speed_high">Speed is high</string>
-    <string name="chain_health_state_speed_good">Speed is good</string>
-    <string name="chain_health_state_speed_fair">Speed is fair</string>
-    <string name="chain_health_state_speed_low">Speed is low</string>
+    <string name="chain_health_state_speed_high">Speed is High</string>
+    <string name="chain_health_state_speed_good">Speed is Good</string>
+    <string name="chain_health_state_speed_fair">Speed is Fair</string>
+    <string name="chain_health_state_speed_low">Speed is Low</string>
     <string name="chain_health_state_not_producing">Not producing blocks</string>
     <string name="chain_health_state_connecting">Connecting…</string>
     <string name="chain_health_state_broken">Chain broken</string>
-    <string name="chain_health_summary">%1$s · %2$s block time</string>
+    <string name="chain_health_summary">%1$s · %2$ss blocks</string>
+    <string name="chain_health_panel_title">Network Status</string>
+    <string name="chain_health_indicator_description">%1$s, %2$s</string>
+    <string name="chain_health_chain_people">People Chain</string>
+    <string name="chain_health_chain_hub">Hub Chain</string>
+    <string name="chain_health_chain_bulletin">Bulletin Chain</string>
 
     <string name="splash_waiting_for_network_title">Waiting for network connection…</string>
     <string name="splash_waiting_for_network_message">Turn off Airplane Mode or check your internet</string>

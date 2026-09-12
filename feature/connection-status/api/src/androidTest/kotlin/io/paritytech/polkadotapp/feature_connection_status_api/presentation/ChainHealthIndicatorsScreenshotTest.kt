@@ -70,6 +70,18 @@ class ChainHealthIndicatorsScreenshotTest {
     fun disconnectedIsADottedRing() =
         renderAndAssert("disconnected", ChainHealthIndicator.Disconnected, DOTTED_MIN, DOTTED_MAX) { it.stroke.secondary }
 
+    // The panel draws the same states larger; a size not threaded through one drawing shows up here as a
+    // ring band sampled at the wrong radius.
+    @Test
+    fun panelSizeKeepsTheFairArcInItsBand() =
+        renderAndAssert(
+            "speed-fair-panel",
+            ChainHealthIndicator.ConnectionSpeed(Speed.Fair),
+            FAIR_MIN,
+            FAIR_MAX,
+            indicatorSize = ChainIndicatorSize.Panel,
+        ) { it.fg.warning }
+
     @Test
     fun notProducingBlocksDrawsTheCrossInTheRingGap() {
         var expected = Color.Unspecified
@@ -106,6 +118,7 @@ class ChainHealthIndicatorsScreenshotTest {
         indicator: ChainHealthIndicator,
         minimumShare: Float,
         maximumShare: Float?,
+        indicatorSize: ChainIndicatorSize = ChainIndicatorSize.Bar,
         surround: (PolkadotColorsPalette) -> Color,
     ) {
         var expected = Color.Unspecified
@@ -121,6 +134,7 @@ class ChainHealthIndicatorsScreenshotTest {
                         ChainHealthIndicators(
                             modifier = Modifier.testTag(TAG),
                             model = model(indicator),
+                            indicatorSize = indicatorSize,
                         )
                     }
                 }
