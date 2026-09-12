@@ -721,7 +721,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="identity_card_rank_label">Rank</string>
     <string name="identity_card_rank_basic">Basic</string>
     <string name="identity_card_rank_member">Member</string>
-    <string name="pocket_id_share_subtitle">Show this QR to someone who wants to add you as a contact or send you money</string>
+    <string name="pocket_id_share_subtitle">Show this QR to someone who wants to add you as a contact or send you %1$s</string>
     <string name="pocket_id_share_scan_title">Scan with a camera</string>
 
     <string name="send_payment_toolbar_title">Send payment</string>
