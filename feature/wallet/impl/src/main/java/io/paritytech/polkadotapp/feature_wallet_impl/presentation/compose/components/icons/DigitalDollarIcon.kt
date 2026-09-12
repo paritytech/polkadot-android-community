@@ -1,4 +1,4 @@
-package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.icons
+package io.paritytech.polkadotapp.feature_wallet_impl.presentation.compose.components.icons
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
