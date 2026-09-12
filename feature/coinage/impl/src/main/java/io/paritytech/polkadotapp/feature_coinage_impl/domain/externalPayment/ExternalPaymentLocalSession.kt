@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment
 
-import com.google.gson.Gson
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -11,7 +10,7 @@ import io.paritytech.polkadotapp.database.dao.ExternalPaymentDao
 import io.paritytech.polkadotapp.database.model.ExternalPaymentLocal
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.CompletedPaymentState
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.EnsureVouchersPaymentState
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.ExternalPaymentState
@@ -20,11 +19,12 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.sta
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.state.PartiallyCompletedPaymentState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.math.BigInteger
 
 class ExternalPaymentLocalSession @AssistedInject constructor(
     @Assisted private val paymentId: PaymentId,
     private val dao: ExternalPaymentDao,
-    private val gson: Gson,
+    private val selectedVoucherKeysCodec: SelectedVoucherKeysCodec,
     private val ensureVouchersFactory: EnsureVouchersPaymentState.Factory,
     private val offboardVouchersFactory: OffboardVouchersPaymentState.Factory,
 ) : WorkerStateMachineLocalSession<ExternalPaymentState> {
@@ -44,7 +44,7 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
         dao.updateStage(
             id = paymentId,
             stage = stageEnum,
-            selectedVoucherKeys = selected?.let(::serializeKeys),
+            selectedVoucherKeys = selected?.let(selectedVoucherKeysCodec::encode),
             surplusPlanks = surplus,
             failureReason = failureReason,
             updatedAt = System.currentTimeMillis(),
@@ -69,7 +69,7 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
             ExternalPaymentLocal.Stage.ENSURE_VOUCHERS -> ensureVouchersFactory.create(context)
             ExternalPaymentLocal.Stage.OFFBOARD_VOUCHERS -> offboardVouchersFactory.create(
                 context = context,
-                selected = deserializeKeys(
+                selected = selectedVoucherKeysCodec.decode(
                     requireNotNull(selectedVoucherKeys) { "OFFBOARD row missing selectedVoucherKeys" }
                 ),
                 surplusPlanks = requireNotNull(surplusPlanks) { "OFFBOARD row missing surplusPlanks" },
@@ -89,7 +89,7 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
         is FailedPaymentState -> ExternalPaymentLocal.Stage.FAILED
     }
 
-    private fun ExternalPaymentState.persistedPayload(): Pair<List<RingVrfIndex>?, java.math.BigInteger?> = when (this) {
+    private fun ExternalPaymentState.persistedPayload(): Pair<List<CoinageKeyIndex>?, BigInteger?> = when (this) {
         is OffboardVouchersPaymentState -> selected to surplusPlanks
 
         is EnsureVouchersPaymentState,
@@ -97,9 +97,4 @@ class ExternalPaymentLocalSession @AssistedInject constructor(
         is PartiallyCompletedPaymentState,
         is FailedPaymentState -> null to null
     }
-
-    private fun serializeKeys(keys: List<RingVrfIndex>): String = gson.toJson(keys)
-
-    private fun deserializeKeys(json: String): List<RingVrfIndex> =
-        gson.fromJson(json, IntArray::class.java).toList()
 }

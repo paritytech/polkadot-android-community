@@ -842,6 +842,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="product_payment_request_approve">Approve</string>
     <string name="product_payment_request_reject">Reject</string>
     <string name="product_top_up_failed_title">Failed to Accept Funds from %1$s</string>
+    <string name="product_top_up_failed_message">The funds could not be moved into your balance.</string>
     <string name="product_top_up_accepted_title">Accepted funds from %1$s</string>
     <string name="product_top_up_amount_mismatch_warning">The detected amount differs from the amount stated by the product.</string>
     <string name="product_resource_allocation_title">Product %1$s requests resource allocation</string>
@@ -1222,6 +1223,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="asset_details_transfer_button">Transfer</string>
     <string name="asset_details_actions_disabled">Actions will be available after you finish updating your balance</string>
     <string name="asset_details_backup_in_progress">Updating balance</string>
+    <string name="pocket_digital_dollar_account_backup_pending">Account backup is still in progress…</string>
     <string name="asset_details_backup_in_progress_subsequent">Continue updating balance</string>
     <string name="asset_details_balance_restored">Balance restored</string>
     <string name="asset_details_balance_restored_description">If it differs from the previous value, press Update until correct</string>
@@ -1551,13 +1553,6 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="payment_privacy_mode_most_private_accessibility">Most private. Maximum privacy, lowest speed.</string>
     <string name="payment_privacy_mode_state_selected">Selected</string>
     <string name="payment_privacy_mode_state_not_selected">Not selected</string>
-
-    <string name="w3s_wait_title">Your username is being registered</string>
-    <string name="w3s_wait_subtitle">This usually takes around 10 seconds</string>
-    <string name="w3s_debug_skip">(Debug) Skip verification</string>
-    <string name="w3s_start_using_app">Start using the Polkadot App</string>
-    <string name="w3s_start_using_app_preparing">Finishing registration…</string>
-    <string name="w3s_ended">Web3 Summit ended — stay tuned for more updates!</string>
 
     <!-- Keys carried over from the branch, not yet present on master -->
     <string name="video_game_play_host_transition_title">Round %d of %d</string>

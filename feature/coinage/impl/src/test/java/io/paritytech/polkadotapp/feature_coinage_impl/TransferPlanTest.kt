@@ -230,7 +230,7 @@ class TransferPlannerTest {
 
     private fun createCoin(exponent: Int, isSpent: Boolean = false, ageKnown: Int = 0): Coin {
         return Coin(
-            derivationIndex = coinIndexCounter++,
+            derivationIndex = testKey(coinIndexCounter++),
             valueExponent = ValueExponent(exponent),
             age = if (isSpent) Coin.Age.Unknown else Coin.Age.Known(ageKnown),
             isOnChain = true,
@@ -248,10 +248,10 @@ class TransferPlannerTest {
         val delayUnloadUntil = if (isReady) currentTimestamp - 100L else currentTimestamp + 1000L
 
         return RecyclerVoucher(
-            ringVrfKeyIndex = voucherIndexCounter++,
+            ringVrfKeyIndex = testKey(voucherIndexCounter++),
             ringVrfPublicKey = mock(),
             recyclerValue = ValueExponent(exponent),
-            location = Location.InRecycler(index, recyclerMembers = FULL_RING),
+            location = Location.InRecycler(index, recyclerMembers = FULL_RING, enteredAt = null),
         )
     }
 

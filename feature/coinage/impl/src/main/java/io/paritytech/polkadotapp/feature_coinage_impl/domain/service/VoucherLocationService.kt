@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchPublicKey
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.cache.CacheableDataConsistency
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.getOrEmpty
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapToSet
@@ -42,6 +43,7 @@ class VoucherLocationService @Inject constructor(
     private val voucherRepository: VoucherRepository,
     private val membersRepository: MembersRepository,
     private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
+    private val timeProvider: TimeProvider,
 ) {
     context(scope: ComputationalScope)
     fun start() {
@@ -53,7 +55,9 @@ class VoucherLocationService @Inject constructor(
                     .map { statuses -> positions to statuses }
             }
             .onEach { (positions, ringStatuses) ->
-                voucherRepository.updateLocations(resolveLocations(positions, ringStatuses))
+                membersRepository.getRingKeysPageSize(chainId)
+                    .logFailure("Can't fetch ring keys page size for voucher locations")
+                    .onSuccess { keysPerPage -> voucherRepository.updateLocations(resolveLocations(positions, ringStatuses, keysPerPage)) }
             }
             .launchIn(scope)
     }
@@ -63,7 +67,9 @@ class VoucherLocationService @Inject constructor(
         // in it, and the member count is what the strategies read to decide when it may be spent.
         return voucherRepository.subscribeAllVouchers()
             .filter { it.isNotEmpty() }
-            .distinctUntilChangedBy { vouchers -> vouchers.mapToSet { it.ringVrfPublicKey } }
+            .distinctUntilChangedBy { vouchers ->
+                vouchers.mapToSet { it.ringVrfPublicKey to (it.location as? RecyclerVoucher.Location.InRecycler)?.enteredAt }
+            }
             .flatMapLatest { vouchers ->
                 val instanceId = coinageInstanceIdProvider.instanceId()
                     .getOrElse { return@flatMapLatest flowOf(Result.failure(it)) }
@@ -101,16 +107,17 @@ class VoucherLocationService @Inject constructor(
     private fun resolveLocations(
         positions: VoucherPositions,
         ringStatuses: RingStatuses,
+        keysPerPage: Int,
     ): Map<BandersnatchPublicKey, RecyclerVoucher.Location.InRecycler> {
         return positions.mapValuesNotNull { (voucherKey, voucherPosition) ->
             val position = voucherPosition?.includedOrNull() ?: return@mapValuesNotNull null
             val ringStatusKey = voucherKey.first to position.ringIndex
             val ringStatus = ringStatuses[ringStatusKey] ?: return@mapValuesNotNull null
 
-            if (ringStatus.includesKey(position)) {
+            if (ringStatus.includesKey(position, keysPerPage)) {
                 // included, not total: a proof only verifies against the keys baked into the ring root, so
                 // that is the set this voucher actually hides in.
-                RecyclerVoucher.Location.InRecycler(position.ringIndex, ringStatus.included)
+                RecyclerVoucher.Location.InRecycler(position.ringIndex, ringStatus.included, timeProvider.now())
             } else {
                 null
             }

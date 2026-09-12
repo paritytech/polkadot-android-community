@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
@@ -13,7 +14,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
@@ -26,6 +26,8 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.Recycling
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.test_shared.any
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -33,6 +35,7 @@ import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import java.math.BigInteger
+import kotlin.time.Instant
 
 private const val FULL_RING = 767
 private const val FORCED_AGE = 14
@@ -50,6 +53,10 @@ class RealTotalBalanceUseCaseTest {
     private val settings: CoinageRecyclingStrategySettings = mock()
     private val evaluator: CoinRecyclingEvaluator = mock()
     private val quotaTracker: UnloadQuotaTracker = mock()
+
+    private val timeProvider = object : TimeProvider {
+        override fun now(): Instant = Instant.fromEpochMilliseconds(0)
+    }
 
     private val strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker)
 
@@ -73,7 +80,8 @@ class RealTotalBalanceUseCaseTest {
             strategyProvider = strategyProvider,
             settings = settings,
             evaluator = evaluator,
-            usabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider),
+            usabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider, timeProvider),
+            readinessUpdates = mock(),
         )
     }
 
@@ -128,7 +136,7 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.PENDING)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.PENDING)),
             vouchers = emptyList(),
             expected = balanceOf(pending = 1.exponentToBalance()),
         )
@@ -144,7 +152,7 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.FINALIZED_SUCCESS)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.FINALIZED_SUCCESS)),
             vouchers = emptyList(),
             expected = balanceOf(pending = 1.exponentToBalance()),
         )
@@ -156,7 +164,7 @@ class RealTotalBalanceUseCaseTest {
 
         assertBalance(
             coins = listOf(coin),
-            coinStates = listOf(stateWithMinter(CoinageTransactionStatus.FAILURE)),
+            coinStates = listOf(stateWithMinter(DurableTxStatus.FAILURE)),
             vouchers = emptyList(),
             expected = balanceOf(),
         )
@@ -178,7 +186,7 @@ class RealTotalBalanceUseCaseTest {
     fun `under max privacy a voucher in a part-filled ring is gaining privacy`() {
         val voucher = voucherOf(
             exponent = 1,
-            location = inRecycler(members = FULL_RING - 1),
+            location = inRecycler(members = 690),
         )
 
         assertBalance(
@@ -190,9 +198,8 @@ class RealTotalBalanceUseCaseTest {
     }
 
     @Test
-    fun `under balanced a half-full ring releases a voucher`() {
-        // 767 keys, so half rounds up to 384 — a ring of 383 is one short.
-        val voucher = voucherOf(exponent = 1, location = inRecycler(members = FULL_RING / 2 + 1))
+    fun `under balanced twenty percent releases a voucher`() {
+        val voucher = voucherOf(exponent = 1, location = inRecycler(members = 154))
 
         assertBalance(
             coins = emptyList(),
@@ -203,7 +210,7 @@ class RealTotalBalanceUseCaseTest {
     }
 
     @Test
-    fun `under balanced a ring short of half holds the voucher back`() {
+    fun `under balanced an empty ring holds the voucher back`() {
         val voucher = voucherOf(exponent = 1, location = inRecycler(members = 0))
 
         assertBalance(
@@ -236,7 +243,7 @@ class RealTotalBalanceUseCaseTest {
             coinStates = listOf(
                 CoinageAssetState.UNTRACKED,
                 CoinageAssetState.UNTRACKED,
-                stateWithMinter(CoinageTransactionStatus.PENDING),
+                stateWithMinter(DurableTxStatus.PENDING),
             ),
             vouchers = emptyList(),
             verdicts = mapOf(
@@ -332,13 +339,13 @@ class RealTotalBalanceUseCaseTest {
         pending = pending,
     )
 
-    private fun stateWithMinter(status: CoinageTransactionStatus) =
+    private fun stateWithMinter(status: DurableTxStatus) =
         CoinageAssetState(handedOff = false, minterStatus = status, consumerStatus = null)
 
-    private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members)
+    private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members, enteredAt = null)
 
     private fun coinOf(exponent: Int, age: Int?, onChain: Boolean = true, derivationIndex: Int = 0) = Coin(
-        derivationIndex = derivationIndex,
+        derivationIndex = testKey(derivationIndex),
         valueExponent = ValueExponent(exponent),
         age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
         isOnChain = onChain,
@@ -346,7 +353,7 @@ class RealTotalBalanceUseCaseTest {
     )
 
     private fun voucherOf(exponent: Int, location: Location) = RecyclerVoucher(
-        ringVrfKeyIndex = 0,
+        ringVrfKeyIndex = testKey(0),
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(exponent),
         location = location,

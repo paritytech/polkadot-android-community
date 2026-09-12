@@ -266,13 +266,13 @@ private fun TransferPlan.toDebugInfo(): SendPlanDebugInfo.Coinage {
             is StrategyType.UnloadAndSplit -> {
                 add("Vouchers to unload:")
                 st.vouchersToUnload.forEach { v ->
-                    add("  idx=${v.ringVrfKeyIndex}  exp=2^${v.recyclerValue.value}")
+                    add("  idx=${v.ringVrfKeyIndex.item}  exp=2^${v.recyclerValue.value}")
                 }
             }
 
             is StrategyType.Split -> {
                 add("Coins for split:")
-                add("  idx=${st.splitFrom.derivationIndex}  exp=2^${st.splitFrom.valueExponent.value}")
+                add("  idx=${st.splitFrom.derivationIndex.item}  exp=2^${st.splitFrom.valueExponent.value}")
             }
 
             is StrategyType.ExactCoins -> Unit
@@ -295,7 +295,7 @@ private fun ExternalPaymentPlan.toDebugInfo(): SendPlanDebugInfo.External = when
         details = buildList {
             add("coinsToLoad=${coinsToLoad.size}")
             coinsToLoad.forEach { c ->
-                add("  idx=${c.derivationIndex}  exp=2^${c.valueExponent.value}")
+                add("  idx=${c.derivationIndex.item}  exp=2^${c.valueExponent.value}")
             }
         },
     )

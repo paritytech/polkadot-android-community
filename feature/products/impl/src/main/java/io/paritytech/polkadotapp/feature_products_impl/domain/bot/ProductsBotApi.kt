@@ -34,7 +34,9 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.ProductThe
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.NotificationId
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.DeviceCapabilityType
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.RemotePermissionRequest
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpId
 import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.PaymentTopUpSource
+import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUpStatus
 import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
 import io.paritytech.polkadotapp.feature_statement_store_api.data.StatementsPage
 import io.paritytech.polkadotapp.feature_statement_store_api.data.TopicFilter
@@ -175,9 +177,12 @@ interface ProductsBotApi {
 
     suspend fun topUp(
         callingProductId: ProductId,
+        id: PaymentTopUpId,
         amount: Balance,
         source: PaymentTopUpSource,
     ): Result<Unit>
+
+    fun subscribeTopUpStatus(callingProductId: ProductId, id: PaymentTopUpId): Flow<TopUpStatus>
 
     fun subscribePaymentStatus(
         callingProductId: ProductId,

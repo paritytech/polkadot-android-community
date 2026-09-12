@@ -7,11 +7,12 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.FINALIZED_SUCCESS
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionStatus.PENDING
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.flow.first
@@ -42,7 +43,7 @@ class RealCoinageAssetsUseCaseTest {
         val claimed = CoinageAssetState(handedOff = false, minterStatus = FINALIZED_SUCCESS, consumerStatus = PENDING)
 
         givenCoins(coin)
-        givenStates(OwnAsset.Coin(7) to claimed)
+        givenStates(OwnAsset.Coin(testKey(7)) to claimed)
 
         assertEquals(listOf(claimed), useCase.subscribeCoins().first().map { it.state })
     }
@@ -71,7 +72,7 @@ class RealCoinageAssetsUseCaseTest {
 
         givenCoins(coinOf(derivationIndex = 3, age = 1))
         givenVouchers(voucherOf(ringVrfKeyIndex = 3, location = Location.Onboarding))
-        givenStates(OwnAsset.Voucher(3) to voucherState)
+        givenStates(OwnAsset.Voucher(testKey(3)) to voucherState)
 
         assertEquals(listOf(CoinageAssetState.UNTRACKED), useCase.subscribeCoins().first().map { it.state })
         assertEquals(listOf(voucherState), useCase.subscribeVouchers().first().map { it.state })
@@ -88,7 +89,7 @@ class RealCoinageAssetsUseCaseTest {
 
         givenCoins(coinOf(derivationIndex = 7, age = 1))
         whenever(transactionService.subscribeAssetStates())
-            .thenReturn(flowOf(emptyMap(), mapOf(OwnAsset.Coin(7) to claimed)))
+            .thenReturn(flowOf(emptyMap(), mapOf(OwnAsset.Coin(testKey(7)) to claimed)))
 
         val reported = useCase.subscribeCoins().toList().map { tracked -> tracked.map { it.state } }
 
@@ -127,7 +128,7 @@ class RealCoinageAssetsUseCaseTest {
         // The same rows read three times over, as an unrelated write to either table would produce.
         whenever(coinRepository.subscribeCoinsBy(any())).thenReturn(flowOf(listOf(coin), listOf(coin), listOf(coin)))
         whenever(transactionService.subscribeAssetStates())
-            .thenReturn(flowOf(mapOf(OwnAsset.Coin(7) to state)))
+            .thenReturn(flowOf(mapOf(OwnAsset.Coin(testKey(7)) to state)))
 
         val emissions = useCase.subscribeCoinsBy(listOf(coin.accountId)).toList()
 
@@ -148,7 +149,7 @@ class RealCoinageAssetsUseCaseTest {
     }
 
     private fun coinOf(derivationIndex: Int, age: Int?) = Coin(
-        derivationIndex = derivationIndex,
+        derivationIndex = testKey(derivationIndex),
         valueExponent = ValueExponent(1),
         age = age?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
         isOnChain = age != null,
@@ -156,7 +157,7 @@ class RealCoinageAssetsUseCaseTest {
     )
 
     private fun voucherOf(ringVrfKeyIndex: Int, location: Location) = RecyclerVoucher(
-        ringVrfKeyIndex = ringVrfKeyIndex,
+        ringVrfKeyIndex = testKey(ringVrfKeyIndex),
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
         location = location,

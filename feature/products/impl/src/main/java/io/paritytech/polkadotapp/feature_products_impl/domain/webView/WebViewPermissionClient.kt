@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.webView
 
 import android.graphics.Bitmap
+import android.net.Uri
 import android.webkit.WebBackForwardList
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -23,13 +24,20 @@ class WebViewPermissionClientFactory @Inject constructor(
     private val permissionGuard: ProductPermissionGuard,
     private val dotNsTldProvider: DotNsTldProvider
 ) {
-    fun create(callingProductIdProvider: CallingProductIdProvider): WebViewPermissionClient {
-        return WebViewPermissionClient(callingProductIdProvider, permissionGuard, dotNsTldProvider)
+    fun create(
+        callingProductIdProvider: CallingProductIdProvider,
+        firstPartyOrigin: String?,
+    ): WebViewPermissionClient {
+        return WebViewPermissionClient(callingProductIdProvider, firstPartyOrigin, permissionGuard, dotNsTldProvider)
     }
 }
 
 class WebViewPermissionClient(
     private val productIdProvider: CallingProductIdProvider,
+    // Origin serving the calling product's own executable, when that origin is off-dotNS. A manifest
+    // executable lives on `<kind>.<base>`, which the product id check below already covers; a
+    // debug-menu worker is served from an arbitrary host that is nonetheless first-party.
+    private val firstPartyOrigin: String?,
     private val permissionGuard: ProductPermissionGuard,
     private val dotNsTldProvider: DotNsTldProvider
 ) : WebViewClient() {
@@ -73,7 +81,7 @@ class WebViewPermissionClient(
         val requestProductId = dotNsTldProvider.currentTldOrNull()?.let { tld ->
             ProductId.fromUrl(url, tld).getOrNull()
         }
-        if (requestProductId == callingProductId || requestProductId in recentProductIds) {
+        if (requestProductId == callingProductId || requestProductId in recentProductIds || url.isFirstParty()) {
             return super.shouldInterceptRequest(view, request)
         }
 
@@ -89,5 +97,17 @@ class WebViewPermissionClient(
 
         Timber.w("Blocked outbound request from product $callingProductId: $url")
         return WebResourceResponse("text/plain", "UTF-8", 403, "Forbidden", emptyMap(), null)
+    }
+
+    private fun Uri.isFirstParty(): Boolean {
+        val origin = originOrNull() ?: return false
+        return origin.equals(firstPartyOrigin, ignoreCase = true)
+    }
+
+    private fun Uri.originOrNull(): String? {
+        val scheme = scheme ?: return null
+        val host = host ?: return null
+        val port = port.takeIf { it != -1 }?.let { ":$it" }.orEmpty()
+        return "$scheme://$host$port"
     }
 }
