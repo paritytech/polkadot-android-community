@@ -24,30 +24,34 @@ private const val COINAGE_DOMAIN = "coinage"
  */
 private const val ASSET_STATE_QUERY = """
     SELECT k.assetKind AS assetKind,
+           k.installationId AS installationId,
            k.derivationIndex AS derivationIndex,
            (
                SELECT e.status FROM coinage_entry_output o
                JOIN durable_tx e ON e.id = o.entryId
-               WHERE o.assetKind = k.assetKind AND o.derivationIndex = k.derivationIndex
+               WHERE o.assetKind = k.assetKind AND o.installationId = k.installationId
+                 AND o.derivationIndex = k.derivationIndex
                LIMIT 1
            ) AS minterStatus,
            EXISTS(
                SELECT 1 FROM coinage_handoff h
-               WHERE h.assetKind = k.assetKind AND h.derivationIndex = k.derivationIndex
+               WHERE h.assetKind = k.assetKind AND h.installationId = k.installationId
+                 AND h.derivationIndex = k.derivationIndex
            ) AS handedOff,
            (
                SELECT e2.status FROM coinage_entry_input i
                JOIN durable_tx e2 ON e2.id = i.entryId
-               WHERE i.assetKind = k.assetKind AND i.derivationIndex = k.derivationIndex
+               WHERE i.assetKind = k.assetKind AND i.installationId = k.installationId
+                 AND i.derivationIndex = k.derivationIndex
                  AND e2.status != 'FAILURE'
                LIMIT 1
            ) AS consumerStatus
     FROM (
-        SELECT assetKind, derivationIndex FROM coinage_entry_output
+        SELECT assetKind, installationId, derivationIndex FROM coinage_entry_output
         UNION
-        SELECT assetKind, derivationIndex FROM coinage_entry_input WHERE derivationIndex IS NOT NULL
+        SELECT assetKind, installationId, derivationIndex FROM coinage_entry_input WHERE derivationIndex IS NOT NULL
         UNION
-        SELECT assetKind, derivationIndex FROM coinage_handoff
+        SELECT assetKind, installationId, derivationIndex FROM coinage_handoff
     ) k
 """
 
@@ -148,16 +152,24 @@ abstract class CoinageEntryDao {
     @Query(ASSET_STATE_QUERY)
     abstract fun subscribeAssetStates(): Flow<List<CoinageAssetStateProjection>>
 
-    @Query("$ASSET_STATE_QUERY WHERE k.assetKind = :assetKind AND k.derivationIndex = :derivationIndex")
+    @Query(
+        "$ASSET_STATE_QUERY WHERE k.assetKind = :assetKind AND k.installationId = :installationId " +
+            "AND k.derivationIndex = :derivationIndex"
+    )
     abstract suspend fun getAssetState(
         assetKind: CoinageAssetKindLocal,
+        installationId: ByteArray,
         derivationIndex: Int,
     ): CoinageAssetStateProjection?
 
-    /** One kind at a time: SQLite has no tuple IN, and there are only two kinds to ask about. */
-    @Query("$ASSET_STATE_QUERY WHERE k.assetKind = :assetKind AND k.derivationIndex IN (:derivationIndices)")
+    // One kind and installation at a time: SQLite has no tuple IN.
+    @Query(
+        "$ASSET_STATE_QUERY WHERE k.assetKind = :assetKind AND k.installationId = :installationId " +
+            "AND k.derivationIndex IN (:derivationIndices)"
+    )
     abstract suspend fun getAssetStates(
         assetKind: CoinageAssetKindLocal,
+        installationId: ByteArray,
         derivationIndices: List<Int>,
     ): List<CoinageAssetStateProjection>
 }
@@ -173,6 +185,7 @@ class CoinageEntryWithAssets(
 
 class CoinageAssetStateProjection(
     val assetKind: CoinageAssetKindLocal,
+    val installationId: ByteArray,
     val derivationIndex: Int,
     val minterStatus: DurableTxLocal.Status?,
     val handedOff: Boolean,

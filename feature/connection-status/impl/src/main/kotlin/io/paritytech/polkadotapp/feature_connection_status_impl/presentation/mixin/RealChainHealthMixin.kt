@@ -39,7 +39,6 @@ internal class RealChainHealthMixin(
         ChainHealthIndicatorsModel(map(::toItem).toImmutableList())
 
     private fun toItem(health: ChainHealth): ChainHealthItemModel = ChainHealthItemModel(
-        chainId = health.chainId,
         chainName = health.chainName,
         glyph = glyphFor(health.chainId),
         indicator = health.toIndicator(),

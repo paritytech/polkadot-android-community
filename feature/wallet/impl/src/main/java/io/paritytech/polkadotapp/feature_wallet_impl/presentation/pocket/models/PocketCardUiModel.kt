@@ -9,7 +9,8 @@ sealed interface PocketCardUiModel {
 
     data class DigitalDollar(
         val amounts: LoadingState<Amounts>,
-        val syncInProgress: Boolean
+        val syncInProgress: Boolean,
+        val accountBackupPending: Boolean,
     ) : PocketCardUiModel {
         override val id = "digital_dollar_card"
 

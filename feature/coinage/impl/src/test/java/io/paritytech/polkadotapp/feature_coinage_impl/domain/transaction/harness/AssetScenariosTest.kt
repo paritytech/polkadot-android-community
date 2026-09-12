@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.FINALIZED
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.IN_BEST
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import kotlinx.coroutines.flow.first
@@ -20,7 +21,7 @@ class AssetScenariosTest {
         mintCoinsOnChain(COIN_A, finality = FINALIZED)
         val id = givenEntryExecutedOnChain(inputCoin = COIN_A, outputCoin = COIN_B, finality = FINALIZED)
 
-        service.preCommitHandoff(listOf(OwnAsset.Coin(COIN_B))).getOrThrow().commit().getOrThrow()
+        service.preCommitHandoff(listOf(OwnAsset.Coin(testKey(COIN_B)))).getOrThrow().commit().getOrThrow()
         consumeCoinOnChain(COIN_B, finality = IN_BEST)
         // This makes windowClosed to be true and thus challenges noPotentialConsumers against handoff
         chainReachesMortalityOf(id, finality = FINALIZED)
@@ -129,7 +130,7 @@ class AssetScenariosTest {
         val first = service.submitTransaction(
             extrinsic = extrinsicAnchoredAtFinalizedHead(),
             inputs = listOf(CoinageInput.Coin.Received(peerKey)),
-            outputs = listOf(OwnAsset.Coin(COIN_B)),
+            outputs = listOf(OwnAsset.Coin(testKey(COIN_B))),
             groupId = null,
         )
         assertTrue(first.isSuccess)
@@ -137,7 +138,7 @@ class AssetScenariosTest {
         val second = service.submitTransaction(
             extrinsic = extrinsicAnchoredAtFinalizedHead(),
             inputs = listOf(CoinageInput.Coin.Received(peerKey)),
-            outputs = listOf(OwnAsset.Coin(COIN_C)),
+            outputs = listOf(OwnAsset.Coin(testKey(COIN_C))),
             groupId = null,
         )
 

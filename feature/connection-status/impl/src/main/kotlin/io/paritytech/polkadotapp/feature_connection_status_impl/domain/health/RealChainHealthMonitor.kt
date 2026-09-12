@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
 
-import io.novasama.substrate_sdk_android.wsrpc.state.SocketStateMachine.State
 import io.novasama.substrate_sdk_android.wsrpc.state.pendingRequests
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
@@ -95,8 +94,8 @@ class RealChainHealthMonitor @Inject constructor(
         }
     }
 
-    private fun observeSocketState(chainId: ChainId): Flow<RawConnectivity> =
-        chainRegistry.chainsById
+    private fun observeSocketState(chainId: ChainId): Flow<RawConnectivity> {
+        val socketStates = chainRegistry.chainsById
             .map { connectionPool.getConnectionOrNull(chainId) }
             .distinctUntilChanged()
             .flatMapLatest { connection -> connection?.state ?: flowOf(null) }

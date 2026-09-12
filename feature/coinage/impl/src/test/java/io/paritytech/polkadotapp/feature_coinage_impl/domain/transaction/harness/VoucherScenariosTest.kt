@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.FINALIZED
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness.TestActionFinality.IN_BEST
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
@@ -58,7 +59,7 @@ class VoucherScenariosTest {
 
         registerVoucherUnload(voucher = VOUCHER, outputCoin = COIN_B).getOrThrow()
 
-        val state = repository.getAssetState(OwnAsset.Voucher(VOUCHER)).getOrThrow()
+        val state = repository.getAssetState(OwnAsset.Voucher(testKey(VOUCHER))).getOrThrow()
         assertTrue("a live consumer is what makes it unselectable", state.consumerStatus!!.isLive)
     }
 
@@ -80,7 +81,7 @@ class VoucherScenariosTest {
         runPass()
 
         assertEquals(PENDING, statusOf(id))
-        assertTrue(repository.getAssetState(OwnAsset.Voucher(VOUCHER)).getOrThrow().consumerStatus!!.isLive)
+        assertTrue(repository.getAssetState(OwnAsset.Voucher(testKey(VOUCHER))).getOrThrow().consumerStatus!!.isLive)
     }
 
     @Test
@@ -106,12 +107,12 @@ class VoucherScenariosTest {
 
         val id = service.submitTransaction(
             extrinsic = extrinsicAnchoredAtFinalizedHead(),
-            inputs = listOf(CoinageInput.Coin.Own(COIN_A)),
-            outputs = listOf(OwnAsset.Voucher(NEW_VOUCHER)),
+            inputs = listOf(CoinageInput.Coin.Own(testKey(COIN_A))),
+            outputs = listOf(OwnAsset.Voucher(testKey(NEW_VOUCHER))),
             groupId = null,
         ).getOrThrow()
 
-        val state = repository.getAssetState(OwnAsset.Voucher(NEW_VOUCHER)).getOrThrow()
+        val state = repository.getAssetState(OwnAsset.Voucher(testKey(NEW_VOUCHER))).getOrThrow()
         assertEquals(PENDING, state.minterStatus)
         assertFalse(state.handedOff)
         assertEquals(PENDING, statusOf(id))
@@ -135,8 +136,8 @@ class VoucherScenariosTest {
 
         val id = service.submitTransaction(
             extrinsic = extrinsicAnchoredAtFinalizedHead(),
-            inputs = listOf(CoinageInput.Coin.Own(COIN_A)),
-            outputs = listOf(OwnAsset.Voucher(NEW_VOUCHER)),
+            inputs = listOf(CoinageInput.Coin.Own(testKey(COIN_A))),
+            outputs = listOf(OwnAsset.Voucher(testKey(NEW_VOUCHER))),
             groupId = null,
         ).getOrThrow()
         releaseSubmissions()

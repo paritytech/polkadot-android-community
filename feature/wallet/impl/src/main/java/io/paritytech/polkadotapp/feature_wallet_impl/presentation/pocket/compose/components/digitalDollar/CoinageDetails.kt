@@ -59,8 +59,8 @@ internal fun CoinsListSheetContent(
 
     val sortedCoins = remember(coins, sortMode) {
         when (sortMode) {
-            CoinSortMode.INDEX_DESC -> coins.sortedByDescending { it.derivationIndex }
-            CoinSortMode.INDEX_ASC -> coins.sortedBy { it.derivationIndex }
+            CoinSortMode.INDEX_DESC -> coins.sortedByDescending { it.derivationIndex.item }
+            CoinSortMode.INDEX_ASC -> coins.sortedBy { it.derivationIndex.item }
             CoinSortMode.VALUE_DESC -> coins.sortedByDescending { it.valueExponent.value }
             CoinSortMode.VALUE_ASC -> coins.sortedBy { it.valueExponent.value }
             CoinSortMode.AGE_DESC -> coins.sortedByDescending { (it.age as? Coin.Age.Known)?.value ?: -1 }
@@ -174,12 +174,12 @@ internal fun VouchersListSheetContent(
 
     val sortedVouchers = remember(vouchers, sortMode) {
         when (sortMode) {
-            VoucherSortMode.INDEX_DESC -> vouchers.sortedByDescending { it.ringVrfKeyIndex }
-            VoucherSortMode.INDEX_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex }
+            VoucherSortMode.INDEX_DESC -> vouchers.sortedByDescending { it.ringVrfKeyIndex.item }
+            VoucherSortMode.INDEX_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex.item }
             VoucherSortMode.VALUE_DESC -> vouchers.sortedByDescending { it.recyclerValue.value }
             VoucherSortMode.VALUE_ASC -> vouchers.sortedBy { it.recyclerValue.value }
-            VoucherSortMode.DATE_DESC -> vouchers.sortedByDescending { it.ringVrfKeyIndex }
-            VoucherSortMode.DATE_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex }
+            VoucherSortMode.DATE_DESC -> vouchers.sortedByDescending { it.ringVrfKeyIndex.item }
+            VoucherSortMode.DATE_ASC -> vouchers.sortedBy { it.ringVrfKeyIndex.item }
         }
     }
 
@@ -320,7 +320,7 @@ private fun CoinItemCard(
                     color = PolkadotTheme.colors.fg.tertiary
                 )
                 NovaText(
-                    text = "${coin.derivationIndex}"
+                    text = "${coin.derivationIndex.item}"
                 )
                 FillerSpacer()
 
@@ -427,7 +427,7 @@ private fun VoucherItemCard(voucher: RecyclerVoucher) {
                 )
 
                 NovaText(
-                    text = "${voucher.ringVrfKeyIndex}"
+                    text = "${voucher.ringVrfKeyIndex.item}"
                 )
                 FillerSpacer()
                 Column(horizontalAlignment = Alignment.End) {

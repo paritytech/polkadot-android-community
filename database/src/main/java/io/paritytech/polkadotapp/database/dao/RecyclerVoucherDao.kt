@@ -19,6 +19,10 @@ interface RecyclerVoucherDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(vouchers: List<RecyclerVoucherLocal>)
 
+    // A freshly allocated key must never land on an existing row: that row's key may already be handed off.
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertNew(vouchers: List<RecyclerVoucherLocal>)
+
     @Query("SELECT * FROM recycler_vouchers")
     fun subscribeAll(): Flow<List<RecyclerVoucherLocal>>
 
@@ -26,28 +30,31 @@ interface RecyclerVoucherDao {
         """
         UPDATE recycler_vouchers
         SET locationRecyclerIndex = :recyclerIndex,
-            recyclerMembers = :recyclerMembers
+            recyclerMembers = :recyclerMembers,
+            enteredAt = CASE WHEN locationRecyclerIndex = :recyclerIndex
+                THEN COALESCE(enteredAt, :enteredAt) ELSE :enteredAt END
         WHERE ringVrfPublicKey = :ringVrfPublicKey
         """
     )
     suspend fun updateLocation(
         ringVrfPublicKey: ByteArray,
         recyclerIndex: Int,
-        recyclerMembers: Int
+        recyclerMembers: Int,
+        enteredAt: Long?
     )
 
     @Transaction
     suspend fun updateLocations(updates: List<RecyclerVoucherLocationUpdate>) {
         updates.forEach { update ->
-            updateLocation(update.ringVrfPublicKey, update.recyclerIndex, update.recyclerMembers)
+            updateLocation(update.ringVrfPublicKey, update.recyclerIndex, update.recyclerMembers, update.enteredAt)
         }
     }
 
-    @Query("SELECT * FROM recycler_vouchers WHERE ringVrfKeyIndex IN (:indices)")
-    suspend fun getByRingVrfKeyIndices(indices: List<Int>): List<RecyclerVoucherLocal>
+    @Query("SELECT * FROM recycler_vouchers WHERE installationId = :installationId AND ringVrfKeyIndex IN (:indices)")
+    suspend fun getByRingVrfKeyIndices(installationId: ByteArray, indices: List<Int>): List<RecyclerVoucherLocal>
 
-    @Query("SELECT MAX(ringVrfKeyIndex) FROM recycler_vouchers")
-    suspend fun getMaxRingVrfKeyIndex(): Int?
+    @Query("SELECT MAX(ringVrfKeyIndex) FROM recycler_vouchers WHERE installationId = :installationId")
+    suspend fun getMaxRingVrfKeyIndex(installationId: ByteArray): Int?
 
     @Query(VOUCHERS_IN_RECYCLER_QUERY)
     suspend fun getVouchersInRecycler(): List<RecyclerVoucherLocal>
@@ -65,5 +72,6 @@ interface RecyclerVoucherDao {
 class RecyclerVoucherLocationUpdate(
     val ringVrfPublicKey: ByteArray,
     val recyclerIndex: Int,
-    val recyclerMembers: Int
+    val recyclerMembers: Int,
+    val enteredAt: Long?
 )

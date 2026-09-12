@@ -8,7 +8,7 @@ import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.data.worker.stateMachine.WorkerStateMachineState.TransitionResult
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.usecase.ExternalUnloadStatus
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.usecase.UnloadRecyclerIntoExternalAssetUseCase
@@ -26,7 +26,7 @@ import java.math.BigInteger
  */
 class OffboardVouchersPaymentState @AssistedInject constructor(
     @Assisted override val context: PaymentContext,
-    @Assisted val selected: List<RingVrfIndex>,
+    @Assisted val selected: List<CoinageKeyIndex>,
     @Assisted val surplusPlanks: BigInteger,
     private val assetSelector: CoinageAssetSelector,
     private val unloadIntoExternalAsset: UnloadRecyclerIntoExternalAssetUseCase,
@@ -40,7 +40,7 @@ class OffboardVouchersPaymentState @AssistedInject constructor(
     interface Factory {
         fun create(
             context: PaymentContext,
-            selected: List<RingVrfIndex>,
+            selected: List<CoinageKeyIndex>,
             surplusPlanks: BigInteger,
         ): OffboardVouchersPaymentState
     }

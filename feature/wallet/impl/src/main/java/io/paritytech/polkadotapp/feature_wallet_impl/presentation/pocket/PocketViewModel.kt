@@ -60,10 +60,12 @@ class PocketViewModel @Inject constructor(
     private val balanceCard = combine(
         digitalDollarAmounts,
         interactor.observeBackupProgress().onStart { emit(BackupProgress.Unknown) },
-    ) { amounts, backupProgress ->
+        interactor.observeAccountBackupPending().onStart { emit(false) },
+    ) { amounts, backupProgress, accountBackupPending ->
         PocketCardUiModel.DigitalDollar(
             amounts = amounts,
-            syncInProgress = backupProgress.isInProgress()
+            syncInProgress = backupProgress.isInProgress(),
+            accountBackupPending = accountBackupPending,
         )
     }
 
@@ -120,6 +122,7 @@ class PocketViewModel @Inject constructor(
                 },
                 amounts?.let { tokenAmountFormatter.formatFiat(it.available) },
                 card.syncInProgress,
+                card.accountBackupPending,
                 amounts?.notFullyAvailable
             ).joinToString("|")
         }

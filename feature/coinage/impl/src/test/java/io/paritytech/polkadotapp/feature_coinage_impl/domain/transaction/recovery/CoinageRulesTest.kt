@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ow
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerEntry
+import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
@@ -447,9 +448,9 @@ private fun block(number: Long) = CheckpointBlock(number, "0xblock$number")
 
 private fun key(tag: Int) = byteArrayOf(tag.toByte()).toDataByteArray()
 
-private fun coin(tag: Int) = LedgerAsset(CoinageAssetKind.COIN, OwnAsset.Coin(tag), key(tag))
+private fun coin(tag: Int) = LedgerAsset(CoinageAssetKind.COIN, OwnAsset.Coin(testKey(tag)), key(tag))
 
-private fun voucher(tag: Int) = LedgerAsset(CoinageAssetKind.VOUCHER, OwnAsset.Voucher(tag), key(tag))
+private fun voucher(tag: Int) = LedgerAsset(CoinageAssetKind.VOUCHER, OwnAsset.Voucher(testKey(tag)), key(tag))
 
 /** A coin whose key a peer sent us: no local identity, only an on-chain one. */
 private fun received(tag: Int) = LedgerAsset(CoinageAssetKind.COIN, null, key(tag))

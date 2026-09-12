@@ -36,6 +36,8 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlin.time.Duration.Companion.seconds
 
 @RunWith(AndroidJUnit4::class)
 class ChainHealthIndicatorsScreenshotTest {

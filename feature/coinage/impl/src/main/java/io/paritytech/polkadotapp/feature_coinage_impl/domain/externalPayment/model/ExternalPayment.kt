@@ -4,7 +4,7 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentOrigin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RingVrfIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import java.util.UUID
 
 data class ExternalPayment(
@@ -20,7 +20,7 @@ data class ExternalPayment(
         data object EnsureVouchers : Stage
 
         data class OffboardVouchers(
-            val selectedVoucherKeys: List<RingVrfIndex>,
+            val selectedVoucherKeys: List<CoinageKeyIndex>,
             val surplus: Balance,
         ) : Stage
 
