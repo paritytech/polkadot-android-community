@@ -185,7 +185,7 @@ internal val TRACK_INSET = TRACK_HEIGHT / 2
 private val TICK_WIDTH = 2.dp
 private val TICK_HEIGHT = 6.dp
 
-// Also the haptic grain of a drag: the selector ticks once per mark the circle passes.
+// Also the haptic grain of a drag: the selector ticks once per mark the ring passes.
 internal val TICK_STEP = 8.dp
 
 private const val SCALE_BALANCED_STOP = 0.49f

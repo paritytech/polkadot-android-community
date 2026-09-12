@@ -26,12 +26,6 @@ internal data class ModeColors(
     val glow: Color
 )
 
-internal fun ModeColors.blendedTo(other: ModeColors, fraction: Float): ModeColors = ModeColors(
-    selected = selected.blendedTo(other.selected, fraction),
-    unselected = unselected.blendedTo(other.unselected, fraction),
-    glow = lerp(glow, other.glow, fraction)
-)
-
 // The design's per-mode shades; none of them exists as a palette token.
 internal object PrivacyModeColors {
     val Glyph = Color(0xFFF4F4F5)

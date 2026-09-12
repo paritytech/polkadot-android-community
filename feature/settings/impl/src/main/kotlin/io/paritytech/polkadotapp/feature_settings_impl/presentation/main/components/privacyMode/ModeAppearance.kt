@@ -79,12 +79,5 @@ internal fun ModeAppearance.circleBorderBrush(selection: Float): Brush = Brush.v
     )
 )
 
-// A dragged circle takes on the mode it is nearest to, so it changes appearance mid-gesture. Swapping the
-// colours in a single frame is what reads as a jump; blending them lets the colour travel together with the
-// glyph cross-fade in [ModeCircle]. [fraction] is 0 while the circle still shows [previous] and 1 once it
-// has fully become this mode.
-internal fun ModeAppearance.blendedFrom(previous: ModeAppearance, fraction: Float): ModeAppearance =
-    if (fraction >= 1f) this else copy(colors = previous.colors.blendedTo(colors, fraction))
-
 private val WIDE_GLOW = GlowGeometry(size = 56.dp, cornerRadius = 24.dp)
 private val DISC_GLOW = GlowGeometry(size = 40.dp, cornerRadius = 20.dp)

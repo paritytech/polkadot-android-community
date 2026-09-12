@@ -1502,7 +1502,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_error_share_coinage_logs_failed">Couldn\'t share the coinage logs. Try again.</string>
     <string name="pocket_error_force_recycle_failed">Couldn\'t recycle this coin. Try again.</string>
 
-    <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
+    <string name="payment_privacy_mode_title">%1$s Privacy Mode</string>
     <string name="payment_privacy_mode_fastest_label">Fastest</string>
     <string name="payment_privacy_mode_fastest_description">Fastest payments, lower privacy</string>
     <string name="payment_privacy_mode_fastest_accessibility">Fastest. Fastest payments, lower privacy.</string>
