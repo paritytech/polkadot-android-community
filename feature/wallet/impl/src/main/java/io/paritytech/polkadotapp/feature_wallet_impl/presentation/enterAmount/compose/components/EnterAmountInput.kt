@@ -43,7 +43,6 @@ import io.paritytech.polkadotapp.design.utils.conditionalNotNull
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.compose.components.icons.DigitalDollarIcon
 import io.paritytech.polkadotapp.common.R as RCommon
 
-// Figma draws the glyph 39x47 beside the 64sp amount.
 private val SymbolIconSize = DpSize(39.dp, 47.dp)
 private val AmountReferenceHeight = 64.dp
 
