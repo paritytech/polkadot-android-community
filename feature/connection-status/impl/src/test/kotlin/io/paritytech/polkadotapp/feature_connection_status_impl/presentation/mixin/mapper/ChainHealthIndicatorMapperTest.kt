@@ -40,13 +40,13 @@ class ChainHealthIndicatorMapperTest {
     fun `five sixths of the expected blocks is the outage line`() {
         assertEquals(ChainHealthIndicator.Healthy, connected(blocks(5, 5)).toIndicator())
         assertEquals(ChainHealthIndicator.Healthy, connected(blocks(5, 6)).toIndicator())
-        assertEquals(ChainHealthIndicator.Outage(4, 5), connected(blocks(4, 5)).toIndicator())
-        assertEquals(ChainHealthIndicator.Outage(0, 5), connected(blocks(0, 5)).toIndicator())
+        assertEquals(ChainHealthIndicator.Outage, connected(blocks(4, 5)).toIndicator())
+        assertEquals(ChainHealthIndicator.Outage, connected(blocks(0, 5)).toIndicator())
     }
 
     @Test
     fun `an outage wins over a slow connection`() {
-        assertEquals(ChainHealthIndicator.Outage(3, 5), connected(blocks(3, 5), pending(10)).toIndicator())
+        assertEquals(ChainHealthIndicator.Outage, connected(blocks(3, 5), pending(10)).toIndicator())
     }
 
     @Test
@@ -62,7 +62,7 @@ class ChainHealthIndicatorMapperTest {
 
     @Test
     fun `an outage wins over any speed band`() {
-        assertEquals(ChainHealthIndicator.Outage(3, 5), connected(blocks(3, 5), pending(75)).toIndicator())
+        assertEquals(ChainHealthIndicator.Outage, connected(blocks(3, 5), pending(75)).toIndicator())
     }
 
     @Test

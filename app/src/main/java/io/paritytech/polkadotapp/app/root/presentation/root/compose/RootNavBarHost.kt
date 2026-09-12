@@ -6,16 +6,14 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import io.paritytech.polkadotapp.app.root.presentation.root.RootNavBarViewModel
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 
 /**
- * Host for the global navigation bar: resolves its own [RootNavBarViewModel] and renders the overlay. The
- * activity places this in a ComposeView and hands it [chainsHealth] — the chain-health model it already
- * collects for the top bar, shared rather than subscribed to a second time. The [navController]'s current
- * entry is the "screen entered" signal the bar resets its posture on.
+ * Self-contained host for the global navigation bar: resolves its own [RootNavBarViewModel] and renders
+ * the overlay. The activity only needs to place this in a ComposeView — no bar wiring lives there. The
+ * [navController]'s current entry is the "screen entered" signal the bar resets its posture on.
  */
 @Composable
-fun RootNavBarHost(navController: NavController, chainsHealth: ChainHealthIndicatorsModel) {
+fun RootNavBarHost(navController: NavController) {
     val viewModel: RootNavBarViewModel = hiltViewModel()
 
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
@@ -33,7 +31,6 @@ fun RootNavBarHost(navController: NavController, chainsHealth: ChainHealthIndica
         currentTab = currentTab,
         tabWarnings = tabWarnings,
         openApps = openApps,
-        chainsHealth = chainsHealth,
         scannerTooltipVisible = tooltipVisible,
         onTabSelected = viewModel::onTabSelected,
         onScanClicked = viewModel::openScanner,

@@ -16,10 +16,7 @@ sealed interface ChainMetricReading {
         override val score: ChainHealthScore,
     ) : ChainMetricReading
 
-    /**
-     * Best heads seen in the recent window ([recentBlocks]) against the number the block time predicts
-     * ([expectedBlocks]); fewer than [requiredBlocks] means the chain is not producing.
-     */
+    /** Fewer than [requiredBlocks] of the [expectedBlocks] means the chain is not producing. */
     data class BlockProduction(
         val recentBlocks: Int,
         val expectedBlocks: Int,

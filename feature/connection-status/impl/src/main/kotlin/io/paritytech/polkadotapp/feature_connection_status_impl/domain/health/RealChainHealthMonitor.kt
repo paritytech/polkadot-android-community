@@ -16,12 +16,10 @@ import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainHeadDa
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainMetricContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -99,7 +97,9 @@ class RealChainHealthMonitor @Inject constructor(
             .map { connectionPool.getConnectionOrNull(chainId) }
             .distinctUntilChanged()
             .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
-            .let { socketStates -> rawConnectivity(socketStates, networkStateService.isNetworkAvailable) }
+
+        return rawConnectivity(socketStates, networkStateService.isNetworkAvailable)
+    }
 
     private fun observePendingRequests(chainId: ChainId): Flow<Set<Any>> =
         chainRegistry.chainsById
@@ -117,28 +117,3 @@ class RealChainHealthMonitor @Inject constructor(
         val FALLBACK_BLOCK_TIME: Duration = 6.seconds
     }
 }
-
-// A socket stuck reconnecting reads as pending forever, whether the node is slow or the phone is
-// offline. With no network there is nothing to reconnect to, so the chain counts as down instead.
-internal fun State?.toRawConnectivity(deviceOnline: Boolean): RawConnectivity =
-    if (deviceOnline) toSocketConnectivity() else RawConnectivity.Settled
-
-// Both operators are load-bearing. A handover drops the active network for a moment while every socket
-// stays up, and an offline socket retries several times a second, which would otherwise keep restarting
-// the smoother's cooldown before it could report a dead chain.
-@OptIn(FlowPreview::class)
-internal fun rawConnectivity(
-    socketStates: Flow<State?>,
-    deviceOnline: Flow<Boolean>,
-    networkDebounce: Duration = NETWORK_DEBOUNCE,
-): Flow<RawConnectivity> = socketStates
-    .combine(deviceOnline.debounce(networkDebounce)) { state, online -> state.toRawConnectivity(online) }
-    .distinctUntilChanged()
-
-private fun State?.toSocketConnectivity(): RawConnectivity = when (this) {
-    is State.Connected -> RawConnectivity.Connected
-    is State.Connecting, is State.WaitingForReconnect -> RawConnectivity.Pending
-    null, is State.Disconnected, is State.Paused -> RawConnectivity.Settled
-}
-
-private val NETWORK_DEBOUNCE: Duration = 1.seconds

@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,35 +79,12 @@ private const val CROSS_ANGLE_RADIANS = 1.25f * PI.toFloat()
 private const val CROSS_ARM_RATIO = 0.118f
 private val PREVIEW_BLOCK_TIME = 6.seconds
 
-/**
- * The three lengths one indicator is drawn from. [Bar] is the top-bar and tab-bar size; [Panel] is the
- * same drawing at the size the "Network Status" rows use.
- */
-@Immutable
-data class ChainIndicatorSize(
-    val diameter: Dp,
-    val glyph: Dp,
-    val ringStroke: Dp,
-) {
-    companion object {
-        val Bar = ChainIndicatorSize(diameter = 20.dp, glyph = 10.dp, ringStroke = 2.dp)
-        val Panel = ChainIndicatorSize(diameter = 35.dp, glyph = 16.dp, ringStroke = 3.5f.dp)
-    }
-}
-
 object ChainHealthBarDefaults {
-    /**
-     * Height of the bar's content row, excluding the status-bar inset. The root also inflates the
-     * content's top window inset by this amount so screens sit below the bar while their backgrounds
-     * still draw full-bleed behind it.
-     */
-    val ContentHeight = ChainIndicatorSize.Bar.diameter
+    /** The root inflates every screen's top window inset by this, so screens sit below the bar. */
+    val ContentHeight = ICON_SIZE
 }
 
-/**
- * The always-on chain-health bar, overlaid at the very top like the system status indicators.
- * Transparent, so whatever the screen draws behind it stays visible.
- */
+/** Always-on, transparent, overlaid at the very top like the system status indicators. */
 @Composable
 fun ChainHealthBar(model: ChainHealthIndicatorsModel) {
     Row(
@@ -124,15 +100,11 @@ fun ChainHealthBar(model: ChainHealthIndicatorsModel) {
     }
 }
 
-/**
- * One indicator per monitored chain. The inner glyph names the chain; the disc or ring around it draws
- * [ChainHealthIndicator]. Display-only — the row carries no press target of its own.
- */
+/** One tappable indicator per monitored chain; a tap opens that chain's [ChainHealthDetailsPopover]. */
 @Composable
 fun ChainHealthIndicators(
     modifier: Modifier = Modifier,
     model: ChainHealthIndicatorsModel,
-    indicatorSize: ChainIndicatorSize = ChainIndicatorSize.Bar,
 ) {
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         Row(
@@ -140,55 +112,61 @@ fun ChainHealthIndicators(
             horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.tiny),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            model.chains.forEach { item -> ChainIndicator(item = item, indicatorSize = indicatorSize) }
-        }
-    }
-}
-
-/** One chain's indicator on its own: the glyph inside the disc or ring for its [ChainHealthIndicator]. */
-@Composable
-fun ChainIndicator(
-    modifier: Modifier = Modifier,
-    item: ChainHealthItemModel,
-    indicatorSize: ChainIndicatorSize,
-) {
-    Box(modifier = modifier) {
-        Box(
-            modifier = Modifier.size(indicatorSize.diameter),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (val indicator = item.indicator) {
-                ChainHealthIndicator.Healthy -> HealthyDisc(item, indicatorSize)
-                is ChainHealthIndicator.Outage -> NotProducingRing(item, indicatorSize)
-                is ChainHealthIndicator.ConnectionSpeed -> SpeedArc(item, indicator, indicatorSize)
-                ChainHealthIndicator.Connecting -> ConnectingRing(item, indicatorSize)
-                ChainHealthIndicator.Disconnected -> DottedRing(item, indicatorSize)
-            }
+            model.chains.forEach { item -> Indicator(item = item) }
         }
     }
 }
 
 @Composable
-private fun HealthyDisc(item: ChainHealthItemModel, indicatorSize: ChainIndicatorSize) {
+private fun Indicator(item: ChainHealthItemModel) {
+    var showDetails by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .size(ICON_SIZE)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { showDetails = true },
+        contentAlignment = Alignment.Center,
+    ) {
+        when (val indicator = item.indicator) {
+            ChainHealthIndicator.Healthy -> HealthyDisc(item)
+            ChainHealthIndicator.Outage -> NotProducingRing(item)
+            is ChainHealthIndicator.ConnectionSpeed -> SpeedArc(item, indicator)
+            ChainHealthIndicator.Connecting -> ConnectingRing(item)
+            ChainHealthIndicator.Disconnected -> DottedRing(item)
+        }
+
+        ChainHealthDetailsPopover(
+            expanded = showDetails,
+            item = item,
+            onDismiss = { showDetails = false },
+        )
+    }
+}
+
+@Composable
+private fun HealthyDisc(item: ChainHealthItemModel) {
     PolkadotSurface(
         modifier = Modifier.fillMaxSize(),
         shape = CircleShape,
         color = PolkadotTheme.colors.fg.primary,
         contentAlignment = Alignment.Center,
     ) {
-        Glyph(item = item, tint = PolkadotTheme.colors.fg.primaryInverted, indicatorSize = indicatorSize)
+        Glyph(item = item, tint = PolkadotTheme.colors.fg.primaryInverted)
     }
 }
 
 @Composable
-private fun NotProducingRing(item: ChainHealthItemModel, indicatorSize: ChainIndicatorSize) {
+private fun NotProducingRing(item: ChainHealthItemModel) {
     val ringColor = PolkadotTheme.colors.stroke.secondary
     val crossColor = PolkadotTheme.colors.fg.disabled
     Box(
         modifier = Modifier
             .fillMaxSize()
             .drawWithCache {
-                val stroke = indicatorSize.ringStroke.toPx()
+                val stroke = RING_STROKE.toPx()
                 val style = Stroke(width = stroke, cap = StrokeCap.Round)
                 val inset = Offset(stroke / 2, stroke / 2)
                 val arcSize = Size(size.width - stroke, size.height - stroke)
@@ -205,13 +183,12 @@ private fun NotProducingRing(item: ChainHealthItemModel, indicatorSize: ChainInd
                 }
             },
     )
-    Glyph(item = item, tint = PolkadotTheme.colors.fg.disabled, indicatorSize = indicatorSize)
-    // The design puts the cross in the ring's gap and above the glyph, so it paints last.
+    Glyph(item = item, tint = PolkadotTheme.colors.fg.disabled)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .drawWithCache {
-                val stroke = indicatorSize.ringStroke.toPx()
+                val stroke = RING_STROKE.toPx()
                 val radius = (size.minDimension - stroke) / 2
                 val centre = Offset(size.width / 2, size.height / 2)
                 val crossCentre = centre + Offset(
@@ -228,7 +205,7 @@ private fun NotProducingRing(item: ChainHealthItemModel, indicatorSize: ChainInd
 }
 
 @Composable
-private fun SpeedArc(item: ChainHealthItemModel, indicator: ChainHealthIndicator.ConnectionSpeed, indicatorSize: ChainIndicatorSize) {
+private fun SpeedArc(item: ChainHealthItemModel, indicator: ChainHealthIndicator.ConnectionSpeed) {
     val trackColor = PolkadotTheme.colors.stroke.secondary
     val color = when (indicator.speed) {
         Speed.Good -> PolkadotTheme.colors.fg.primary
@@ -244,7 +221,7 @@ private fun SpeedArc(item: ChainHealthItemModel, indicator: ChainHealthIndicator
         modifier = Modifier
             .fillMaxSize()
             .drawWithCache {
-                val stroke = indicatorSize.ringStroke.toPx()
+                val stroke = RING_STROKE.toPx()
                 val trackStyle = Stroke(stroke)
                 val arcStyle = Stroke(width = stroke, cap = StrokeCap.Round)
                 val radius = (size.minDimension - stroke) / 2
@@ -265,12 +242,12 @@ private fun SpeedArc(item: ChainHealthItemModel, indicator: ChainHealthIndicator
                 }
             },
     )
-    Glyph(item = item, tint = PolkadotTheme.colors.fg.primary, indicatorSize = indicatorSize)
+    Glyph(item = item, tint = PolkadotTheme.colors.fg.primary)
 }
 
 @Composable
-private fun ConnectingRing(item: ChainHealthItemModel, indicatorSize: ChainIndicatorSize) {
-    ScallopRing(color = PolkadotTheme.colors.stroke.secondary, indicatorSize = indicatorSize)
+private fun ConnectingRing(item: ChainHealthItemModel) {
+    ScallopRing()
     val pulse = rememberInfiniteTransition(label = "ChainConnectingPulse")
     val alpha by pulse.animateFloat(
         initialValue = 1f,
@@ -279,18 +256,18 @@ private fun ConnectingRing(item: ChainHealthItemModel, indicatorSize: ChainIndic
         label = "ChainConnectingGlyphAlpha",
     )
     Box(modifier = Modifier.graphicsLayer { this.alpha = alpha }) {
-        Glyph(item = item, tint = PolkadotTheme.colors.fg.primary, indicatorSize = indicatorSize)
+        Glyph(item = item, tint = PolkadotTheme.colors.fg.primary)
     }
 }
 
 @Composable
-private fun DottedRing(item: ChainHealthItemModel, indicatorSize: ChainIndicatorSize) {
+private fun DottedRing(item: ChainHealthItemModel) {
     val ringColor = PolkadotTheme.colors.stroke.secondary
     Box(
         modifier = Modifier
             .fillMaxSize()
             .drawWithCache {
-                val stroke = indicatorSize.ringStroke.toPx()
+                val stroke = RING_STROKE.toPx()
                 val radius = (size.minDimension - stroke) / 2
                 // Deriving the period from the circumference keeps the dots from bunching at the seam, and
                 // the on-length is zero because a round cap already draws a dot one stroke wide at each end.
@@ -303,16 +280,17 @@ private fun DottedRing(item: ChainHealthItemModel, indicatorSize: ChainIndicator
                 onDrawBehind { drawCircle(color = ringColor, radius = radius, style = style) }
             },
     )
-    Glyph(item = item, tint = PolkadotTheme.colors.fg.disabled, indicatorSize = indicatorSize)
+    Glyph(item = item, tint = PolkadotTheme.colors.fg.disabled)
 }
 
 @Composable
-private fun ScallopRing(color: Color, indicatorSize: ChainIndicatorSize) {
+private fun ScallopRing() {
+    val color = PolkadotTheme.colors.stroke.secondary
     Box(
         modifier = Modifier
             .fillMaxSize()
             .drawWithCache {
-                val stroke = indicatorSize.ringStroke.toPx()
+                val stroke = RING_STROKE.toPx()
                 val crest = (size.minDimension - stroke) / 2
                 val centre = Offset(size.width / 2, size.height / 2)
                 val path = scallopPath(centre, crest, crest * SCALLOP_TROUGH_RATIO)
@@ -322,8 +300,7 @@ private fun ScallopRing(color: Color, indicatorSize: ChainIndicatorSize) {
     )
 }
 
-// Polar cosine modulation: the radius rides between crest and trough once per lobe, so the ring ripples
-// SCALLOP_LOBES times around. Sampled as a polyline because a cosine radius has no path-verb equivalent.
+// Sampled as a polyline because a cosine-modulated radius has no path-verb equivalent.
 private fun scallopPath(centre: Offset, crest: Float, trough: Float): Path {
     val path = Path()
     val steps = SCALLOP_LOBES * STEPS_PER_LOBE
@@ -339,9 +316,9 @@ private fun scallopPath(centre: Offset, crest: Float, trough: Float): Path {
 }
 
 @Composable
-private fun Glyph(item: ChainHealthItemModel, tint: Color, indicatorSize: ChainIndicatorSize) {
+private fun Glyph(item: ChainHealthItemModel, tint: Color) {
     NovaIcon(
-        modifier = Modifier.requiredSize(indicatorSize.glyph),
+        modifier = Modifier.requiredSize(GLYPH_SIZE),
         imageVector = item.glyph.imageVector(),
         tint = tint,
         contentDescription = item.chainName,
@@ -362,22 +339,21 @@ private fun ChainHealthIndicatorsPreview() {
             modifier = Modifier.padding(PolkadotTheme.spacings.medium),
             model = ChainHealthIndicatorsModel(
                 persistentListOf(
-                    previewItem("people", ChainGlyph.People, ChainHealthIndicator.Healthy),
-                    previewItem("hub", ChainGlyph.AssetHub, ChainHealthIndicator.Outage(3, 5)),
-                    previewItem("good", ChainGlyph.Bulletin, ChainHealthIndicator.ConnectionSpeed(Speed.Good)),
-                    previewItem("fair", ChainGlyph.People, ChainHealthIndicator.ConnectionSpeed(Speed.Fair)),
-                    previewItem("low", ChainGlyph.AssetHub, ChainHealthIndicator.ConnectionSpeed(Speed.Low)),
-                    previewItem("connecting", ChainGlyph.AssetHub, ChainHealthIndicator.Connecting),
-                    previewItem("dead", ChainGlyph.Bulletin, ChainHealthIndicator.Disconnected),
+                    previewItem("People", ChainGlyph.People, ChainHealthIndicator.Healthy),
+                    previewItem("Asset Hub", ChainGlyph.AssetHub, ChainHealthIndicator.Outage),
+                    previewItem("Bulletin", ChainGlyph.Bulletin, ChainHealthIndicator.ConnectionSpeed(Speed.Good)),
+                    previewItem("Fair", ChainGlyph.People, ChainHealthIndicator.ConnectionSpeed(Speed.Fair)),
+                    previewItem("Low", ChainGlyph.AssetHub, ChainHealthIndicator.ConnectionSpeed(Speed.Low)),
+                    previewItem("Connecting", ChainGlyph.AssetHub, ChainHealthIndicator.Connecting),
+                    previewItem("Broken", ChainGlyph.Bulletin, ChainHealthIndicator.Disconnected),
                 ),
             ),
         )
     }
 }
 
-private fun previewItem(id: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
-    chainId = id,
-    chainName = id,
+private fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+    chainName = name,
     glyph = glyph,
     indicator = indicator,
     expectedBlockTime = PREVIEW_BLOCK_TIME,

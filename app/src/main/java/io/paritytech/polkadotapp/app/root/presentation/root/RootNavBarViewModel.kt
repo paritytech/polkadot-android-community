@@ -25,7 +25,8 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 /**
- * State + actions for the global navigation bar (shown on every screen).
+ * State + actions for the global navigation bar (shown on every screen). Owns everything the bar needs so
+ * the host component only wires the view-model — the activity is not involved.
  */
 @HiltViewModel
 class RootNavBarViewModel @Inject constructor(

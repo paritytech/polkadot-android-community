@@ -146,36 +146,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
-    private fun setupRootNavBar() {
-        val composeView = ComposeView(this).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                val chainsHealth by viewModel.chainsHealth.collectAsStateWithLifecycle()
-                PolkadotTheme {
-                    RootNavBarHost(navController = navController, chainsHealth = chainsHealth)
-                }
-            }
-        }
-        addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-    }
-
-    private fun setupChatExtensionOverlay() {
-        val composeView = ComposeView(this).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                CompositionLocalProvider(LocalTimeFormatter provides timeFormatter) {
-                    ChatExtensionOverlayHost(
-                        navController = navController,
-                        overlays = viewModel.chatOverlays,
-                        isOnboarded = viewModel.isOnboarded,
-                        bottomNavHeight = viewModel.bottomNavHeight,
-                    )
-                }
-            }
-        }
-        addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-    }
-
     private fun setupChainHealthBar() {
         findViewById<ComposeView>(R.id.connectionStatusBanner).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -217,6 +187,37 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
                 Insets.of(statusBars.left, statusBars.top + extraTopPx, statusBars.right, statusBars.bottom),
             )
             .build()
+    }
+
+    // The global navigation bar: a bottom overlay shown on every screen. Self-contained — it resolves its
+    // own view-model and holders; the activity only places it.
+    private fun setupRootNavBar() {
+        val composeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                PolkadotTheme {
+                    RootNavBarHost(navController = navController)
+                }
+            }
+        }
+        addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+
+    private fun setupChatExtensionOverlay() {
+        val composeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                CompositionLocalProvider(LocalTimeFormatter provides timeFormatter) {
+                    ChatExtensionOverlayHost(
+                        navController = navController,
+                        overlays = viewModel.chatOverlays,
+                        isOnboarded = viewModel.isOnboarded,
+                        bottomNavHeight = viewModel.bottomNavHeight,
+                    )
+                }
+            }
+        }
+        addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
     private fun processIntent(intent: Intent) {

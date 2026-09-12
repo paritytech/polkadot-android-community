@@ -28,11 +28,6 @@ object ChainHealthThresholds {
     // The health rules call a chain that produced fewer than five sixths of its expected blocks an outage.
     const val BLOCK_PRODUCTION_REQUIRED_RATIO = 5.0 / 6.0
 
-    // Bands for the worst of the pending-request and response scores; at or above the first there is no surround.
-    const val CONNECTION_HIGH_FROM = 90
-    const val CONNECTION_GOOD_FROM = 70
-    const val CONNECTION_FAIR_FROM = 40
-
     // --- Finality gap, in blocks (best - finalized). Per-chain overrides live in Chain.additional
     // (finalityGapIdeal / finalityGapOutage); these are the fallback defaults. ---
     // Full score up to this gap; GRANDPA is structurally >= 2 behind and async backing adds a few more.

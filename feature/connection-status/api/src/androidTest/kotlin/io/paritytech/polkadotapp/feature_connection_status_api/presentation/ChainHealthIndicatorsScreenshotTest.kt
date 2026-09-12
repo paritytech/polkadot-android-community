@@ -32,7 +32,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.math.abs
-import kotlin.time.Duration.Companion.seconds
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -49,7 +48,7 @@ class ChainHealthIndicatorsScreenshotTest {
 
     @Test
     fun notProducingBlocksIsAThreeQuarterRing() =
-        renderAndAssert("not-producing", notProducing, THREE_QUARTER_MIN, THREE_QUARTER_MAX) { it.stroke.secondary }
+        renderAndAssert("not-producing", ChainHealthIndicator.Outage, THREE_QUARTER_MIN, THREE_QUARTER_MAX) { it.stroke.secondary }
 
     @Test
     fun goodSpeedIsThreeQuartersColourless() =
@@ -71,18 +70,6 @@ class ChainHealthIndicatorsScreenshotTest {
     fun disconnectedIsADottedRing() =
         renderAndAssert("disconnected", ChainHealthIndicator.Disconnected, DOTTED_MIN, DOTTED_MAX) { it.stroke.secondary }
 
-    // The panel draws the same states larger; a size not threaded through one drawing shows up here as a
-    // ring band sampled at the wrong radius.
-    @Test
-    fun panelSizeKeepsTheFairArcInItsBand() =
-        renderAndAssert(
-            "speed-fair-panel",
-            ChainHealthIndicator.ConnectionSpeed(Speed.Fair),
-            FAIR_MIN,
-            FAIR_MAX,
-            indicatorSize = ChainIndicatorSize.Panel,
-        ) { it.fg.warning }
-
     @Test
     fun notProducingBlocksDrawsTheCrossInTheRingGap() {
         var expected = Color.Unspecified
@@ -97,7 +84,7 @@ class ChainHealthIndicatorsScreenshotTest {
                             .background(PolkadotTheme.colors.bg.surface.main)
                             .padding(16.dp),
                     ) {
-                        ChainHealthIndicators(modifier = Modifier.testTag(TAG), model = model(notProducing))
+                        ChainHealthIndicators(modifier = Modifier.testTag(TAG), model = model(ChainHealthIndicator.Outage))
                     }
                 }
             }
@@ -119,7 +106,6 @@ class ChainHealthIndicatorsScreenshotTest {
         indicator: ChainHealthIndicator,
         minimumShare: Float,
         maximumShare: Float?,
-        indicatorSize: ChainIndicatorSize = ChainIndicatorSize.Bar,
         surround: (PolkadotColorsPalette) -> Color,
     ) {
         var expected = Color.Unspecified
@@ -135,7 +121,6 @@ class ChainHealthIndicatorsScreenshotTest {
                         ChainHealthIndicators(
                             modifier = Modifier.testTag(TAG),
                             model = model(indicator),
-                            indicatorSize = indicatorSize,
                         )
                     }
                 }
@@ -151,8 +136,6 @@ class ChainHealthIndicatorsScreenshotTest {
         }
     }
 
-    private val notProducing = ChainHealthIndicator.Outage(recentBlocks = 3, expectedBlocks = 5)
-
     private fun model(indicator: ChainHealthIndicator) = ChainHealthIndicatorsModel(
         persistentListOf(
             item("people", ChainGlyph.People, indicator),
@@ -161,9 +144,8 @@ class ChainHealthIndicatorsScreenshotTest {
         ),
     )
 
-    private fun item(id: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
-        chainId = id,
-        chainName = id,
+    private fun item(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+        chainName = name,
         glyph = glyph,
         indicator = indicator,
         expectedBlockTime = 6.seconds,
@@ -198,7 +180,7 @@ class ChainHealthIndicatorsScreenshotTest {
         const val TAG = "indicators"
         const val OUTPUT_DIR_ARGUMENT = "additionalTestOutputDir"
         const val SAMPLES = 72
-        const val SQRT_TWO = 1.4142f
+        val SQRT_TWO = sqrt(2f)
         const val RING_BAND_RADIUS = 0.45f
         // Must stay under the 0.098 that separates stroke.secondary from fg.disabled, or the two read as one.
         const val CHANNEL_TOLERANCE = 0.06f

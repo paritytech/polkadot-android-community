@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mockito.Mockito.mock
-import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RawConnectivityTest {
@@ -70,7 +69,7 @@ class RawConnectivityTest {
         sockets.tryEmit(null)
         val results = mutableListOf<RawConnectivity>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            rawConnectivity(sockets, online, networkDebounce = 1.seconds).collect { results += it }
+            rawConnectivity(sockets, online).collect { results += it }
         }
         return results
     }
