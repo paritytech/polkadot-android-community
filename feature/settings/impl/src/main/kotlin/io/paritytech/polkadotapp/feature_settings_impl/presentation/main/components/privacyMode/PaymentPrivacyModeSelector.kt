@@ -163,7 +163,7 @@ private fun ModeSelector(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(CIRCLE_BOX_SIZE)
+                .height(MODE_BOX_SIZE)
                 .onSizeChanged { trackWidth = it.width }
         ) {
             // The visuals carry no semantics of their own; the touch targets below describe each mode in one
@@ -182,8 +182,11 @@ private fun ModeSelector(
                             .align(Alignment.CenterStart)
                             .offset(centreOffset({ index.toFloat() }, { trackWidth }, modes.lastIndex)),
                         appearance = appearances[index],
-                        isSelected = index == highlightedIndex,
-                        isSettled = !isDragging && !position.isRunning && index == selectedIndex,
+                        state = when {
+                            !isDragging && !position.isRunning && index == selectedIndex -> CircleState.Settled
+                            index == highlightedIndex -> CircleState.Grown
+                            else -> CircleState.Resting
+                        },
                         interactionSource = interactionSources[index]
                     )
                 }
@@ -279,7 +282,6 @@ private fun ModeSelector(
     }
 }
 
-// Modes are pinned centre-to-centre: [TRACK_INSET] at each end, then an equal step between neighbours.
 // [position] is a fractional mode index, so the selection tracks a finger continuously.
 private fun centreOffset(
     position: () -> Float,
@@ -289,7 +291,7 @@ private fun centreOffset(
     val inset = TRACK_INSET.toPx()
     val centre = inset + position() * trackStep(trackWidth(), inset, lastIndex)
 
-    IntOffset(x = (centre - CIRCLE_BOX_SIZE.toPx() / 2f).roundToInt(), y = 0)
+    IntOffset(x = (centre - MODE_BOX_SIZE.toPx() / 2f).roundToInt(), y = 0)
 }
 
 private fun trackStep(trackWidth: Int, inset: Float, lastIndex: Int): Float {

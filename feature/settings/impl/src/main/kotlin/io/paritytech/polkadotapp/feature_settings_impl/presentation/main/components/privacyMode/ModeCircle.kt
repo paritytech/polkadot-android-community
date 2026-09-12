@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode
 
-import android.graphics.BlurMaskFilter
 import android.graphics.Paint
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,7 +22,6 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
@@ -33,24 +31,23 @@ import androidx.compose.ui.util.lerp as lerpFloat
 
 // Selecting a mode grows its circle; the mode losing the selection shrinks back in the same motion, so the
 // selection reads as passing between two circles while the ring travels.
-// The glow is what says a mode has been settled on rather than merely passed over, so it is [isSettled]'s to
-// decide and not the selected size's: a circle under a moving ring is grown but unlit.
+// The glow is what says a mode has been settled on rather than merely passed over, so it is [CircleState]'s to
+// decide and not the size alone: a circle under a moving ring is grown but unlit.
 // The box reserves row height for the ring and its shadow and sizes the touch row; the glow may spill past it.
 @Composable
 internal fun ModeCircle(
     modifier: Modifier,
     appearance: ModeAppearance,
-    isSelected: Boolean,
-    isSettled: Boolean,
+    state: CircleState,
     interactionSource: MutableInteractionSource
 ) {
     val selection by animateFloatAsState(
-        targetValue = if (isSelected) 1f else 0f,
+        targetValue = if (state == CircleState.Resting) 0f else 1f,
         animationSpec = SELECTION_ANIMATION,
         label = "circleSelection"
     )
     val glow by animateFloatAsState(
-        targetValue = if (isSettled) 1f else 0f,
+        targetValue = if (state == CircleState.Settled) 1f else 0f,
         animationSpec = SELECTION_ANIMATION,
         label = "circleGlow"
     )
@@ -62,13 +59,8 @@ internal fun ModeCircle(
 
     // Held across frames and reconfigured in place: the circle's size animates, which rebuilds the draw
     // cache on every frame of a selection change, so anything created there is created per frame.
-    val density = LocalDensity.current
-    val shadowBlur = remember(density) {
-        with(density) { BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL) }
-    }
-    val glowBlur = remember(density) {
-        with(density) { BlurMaskFilter(GLOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL) }
-    }
+    val shadowBlur = rememberBlurMaskFilter(SHADOW_BLUR)
+    val glowBlur = rememberBlurMaskFilter(GLOW_BLUR)
     val shadowPaint = remember(shadowBlur) {
         Paint().apply {
             isAntiAlias = true
@@ -84,7 +76,7 @@ internal fun ModeCircle(
 
     Box(
         modifier = Modifier
-            .size(CIRCLE_BOX_SIZE)
+            .size(MODE_BOX_SIZE)
             .then(modifier),
         contentAlignment = Alignment.Center
     ) {
@@ -147,6 +139,8 @@ internal fun ModeCircle(
         }
     }
 }
+
+internal enum class CircleState { Resting, Grown, Settled }
 
 private val CIRCLE_SIZE = 28.dp
 private val SELECTED_CIRCLE_SIZE = 50.dp

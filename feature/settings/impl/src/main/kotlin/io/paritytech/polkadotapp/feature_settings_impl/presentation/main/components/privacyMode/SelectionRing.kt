@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode
 
-import android.graphics.BlurMaskFilter
 import android.graphics.Paint
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -55,15 +54,14 @@ internal fun SelectionRing(
 
     val shadowColor = PolkadotTheme.colors.shadow.medium
     val density = LocalDensity.current
-    val shadowPaint = remember(shadowColor, density) {
-        with(density) {
-            Paint().apply {
-                isAntiAlias = true
-                style = Paint.Style.STROKE
-                strokeWidth = RING_STROKE.toPx()
-                color = shadowColor.copy(alpha = SELECTED_SHADOW_ALPHA).toArgb()
-                maskFilter = BlurMaskFilter(SHADOW_BLUR.toPx(), BlurMaskFilter.Blur.NORMAL)
-            }
+    val shadowBlur = rememberBlurMaskFilter(SHADOW_BLUR)
+    val shadowPaint = remember(shadowColor, shadowBlur, density) {
+        Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeWidth = with(density) { RING_STROKE.toPx() }
+            color = shadowColor.copy(alpha = SELECTED_SHADOW_ALPHA).toArgb()
+            maskFilter = shadowBlur
         }
     }
     val stroke = remember(density) { with(density) { Stroke(width = RING_STROKE.toPx()) } }
@@ -81,7 +79,7 @@ internal fun SelectionRing(
         // The caller's modifier carries the offset that puts the ring on its mode, so it has to sit before the
         // drawing: a draw modifier paints at the node's own position, ignoring a later shift.
         modifier = Modifier
-            .size(CIRCLE_BOX_SIZE)
+            .size(MODE_BOX_SIZE)
             .then(modifier)
             .drawWithCache {
                 val centreX = size.width / 2f
@@ -121,7 +119,7 @@ private val RING_OUTER_SIZE = 62.dp
 private val RING_CORNER_RADIUS = 24.dp
 private val RING_STROKE = 2.dp
 
-internal val CIRCLE_BOX_SIZE = RING_OUTER_SIZE + (SHADOW_OFFSET + SHADOW_BLUR) * 2
+internal val MODE_BOX_SIZE = RING_OUTER_SIZE + (SHADOW_OFFSET + SHADOW_BLUR) * 2
 
 // The ring's gradient spans the ring, not the box it sits in.
-private val RING_TOP_INSET = (CIRCLE_BOX_SIZE - RING_OUTER_SIZE + RING_STROKE) / 2
+private val RING_TOP_INSET = (MODE_BOX_SIZE - RING_OUTER_SIZE + RING_STROKE) / 2
