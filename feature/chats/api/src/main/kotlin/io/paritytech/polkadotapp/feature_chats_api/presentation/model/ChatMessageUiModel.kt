@@ -62,6 +62,10 @@ sealed interface ChatMessageUiModel {
             get() = (paymentStatus as? Status.Transferred)?.transferred
                 ?.takeIf { it.amount.compareTo(amount.amount) != 0 }
 
+        /** Failed transfers count as not arrived: the header must not read delivered over a failed status line. */
+        val hasArrived: Boolean
+            get() = paymentStatus is Status.Transferred
+
         @Immutable
         sealed interface Status {
             data object Detecting : Status

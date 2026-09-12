@@ -74,13 +74,8 @@ fun PaymentMessage(
     ) {
         val isIncoming = message.direction == ChatMessageUiModel.Direction.INCOMING
         val headerText = if (isIncoming) {
-            // Only a finished claim means the money is here. Every other status is a send still on its
-            // way — failures included, since those never landed either — so the header may not call it
-            // done while the status line below is still reporting otherwise.
-            val arrived = message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.Transferred
-
             stringResource(
-                if (arrived) {
+                if (message.hasArrived) {
                     RCommon.string.chat_message_payment_incoming
                 } else {
                     RCommon.string.chat_message_payment_incoming_pending
