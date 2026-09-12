@@ -122,12 +122,11 @@ internal fun EnterAmountInput(
                 val baseStyle = PolkadotTheme.typography.display.extraLarge
                     .copy(fontSize = currentFontSize)
 
-                Row(
-                    modifier = Modifier.offset(x = offsetX),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.offset(x = offsetX)) {
                     NovaIcon(
-                        modifier = Modifier.size(symbolIconSize),
+                        modifier = Modifier
+                            .size(symbolIconSize)
+                            .alignBy { it.measuredHeight },
                         imageVector = DigitalDollarIcon,
                         tint = PolkadotTheme.colors.fg.primary
                     )
@@ -140,6 +139,7 @@ internal fun EnterAmountInput(
                         singleLine = true,
                         enabled = enabled,
                         modifier = Modifier
+                            .alignByBaseline()
                             .conditionalNotNull(focusRequester) { focusRequester(it) },
                         cursorBrush = SolidColor(PolkadotTheme.colors.fg.primary),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
