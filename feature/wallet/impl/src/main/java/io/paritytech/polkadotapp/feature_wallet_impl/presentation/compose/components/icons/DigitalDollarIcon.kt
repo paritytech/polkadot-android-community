@@ -8,36 +8,38 @@ import androidx.compose.ui.unit.dp
 val DigitalDollarIcon: ImageVector by lazy(LazyThreadSafetyMode.NONE) {
     ImageVector.Builder(
         name = "DigitalDollarIcon",
-        defaultWidth = 20.dp,
+        defaultWidth = 21.5.dp,
         defaultHeight = 24.dp,
-        viewportWidth = 20f,
-        viewportHeight = 24f
+        viewportWidth = 76f,
+        viewportHeight = 85f
     ).apply {
         path(fill = SolidColor(Color.White)) {
-            moveTo(13.792f, 23.304f)
-            curveTo(9.607f, 23.306f, 6.596f, 23.079f, 3.408f, 19.903f)
-            curveTo(1.207f, 17.717f, -0.022f, 14.737f, 0f, 11.634f)
-            curveTo(-0.009f, 8.533f, 1.233f, 5.558f, 3.444f, 3.384f)
-            curveTo(6.67f, 0.177f, 9.849f, -0.003f, 14.077f, 0f)
-            lineTo(19.376f, 0.011f)
-            lineTo(19.377f, 0.029f)
-            lineTo(19.374f, 0.027f)
-            lineTo(19.371f, 7.779f)
-            lineTo(19.377f, 7.78f)
-            lineTo(19.377f, 7.794f)
-            lineTo(19.373f, 7.794f)
-            lineTo(19.373f, 7.791f)
-            curveTo(17.367f, 7.796f, 15.353f, 7.767f, 13.347f, 7.765f)
-            curveTo(11.493f, 7.764f, 10.329f, 7.661f, 8.851f, 8.952f)
-            curveTo(7.432f, 10.479f, 7.335f, 12.882f, 8.844f, 14.374f)
-            curveTo(9.385f, 14.9f, 10.064f, 15.264f, 10.801f, 15.424f)
-            curveTo(11.622f, 15.611f, 15.524f, 15.584f, 17.904f, 15.565f)
-            lineTo(17.904f, 15.568f)
-            lineTo(19.377f, 15.568f)
-            lineTo(19.377f, 23.285f)
-            lineTo(19.374f, 23.285f)
-            curveTo(19.224f, 23.29f, 19.072f, 23.292f, 18.921f, 23.293f)
-            lineTo(13.792f, 23.304f)
+            moveTo(42.5f, 0f)
+            curveTo(45.4601f, 0f, 48.3494f, 0.3024f, 51.1387f, 0.8784f)
+            curveTo(35.7299f, 4.869f, 24.1455f, 21.9875f, 24.1455f, 42.5f)
+            lineTo(24.1563f, 43.5968f)
+            curveTo(24.5608f, 63.6213f, 36.0071f, 80.2017f, 51.1417f, 84.1196f)
+            curveTo(48.3514f, 84.6961f, 45.4612f, 85f, 42.5f, 85f)
+            curveTo(19.0279f, 84.9999f, 0f, 65.9721f, 0f, 42.5f)
+            curveTo(0f, 19.0278f, 19.0279f, 0.0001f, 42.5f, 0f)
+            close()
+
+            moveTo(32.1526f, 61.7113f)
+            curveTo(37.7675f, 68.6748f, 46.3674f, 73.1309f, 56.0089f, 73.1309f)
+            curveTo(62.5461f, 73.1308f, 68.6047f, 71.0823f, 73.5785f, 67.5928f)
+            curveTo(74.5836f, 66.8876f, 76.3457f, 68.2311f, 75.5744f, 69.1863f)
+            curveTo(71.649f, 74.0462f, 66.6744f, 78.0229f, 60.9952f, 80.7731f)
+            curveTo(60.0127f, 80.9027f, 59.0205f, 80.9699f, 58.0225f, 80.9699f)
+            curveTo(47.3857f, 80.9696f, 37.4468f, 73.4569f, 32.1526f, 61.7113f)
+            close()
+
+            moveTo(58.0225f, 4.0292f)
+            curveTo(59.0195f, 4.0292f, 60.0107f, 4.0956f, 60.9922f, 4.2249f)
+            curveTo(66.6726f, 6.9751f, 71.6482f, 10.9521f, 75.5744f, 15.8127f)
+            curveTo(76.3459f, 16.7679f, 74.5836f, 18.1114f, 73.5785f, 17.4063f)
+            curveTo(68.6046f, 13.917f, 62.5459f, 11.8692f, 56.0089f, 11.8691f)
+            curveTo(46.3677f, 11.8691f, 37.7675f, 16.3246f, 32.1526f, 23.2877f)
+            curveTo(37.4469f, 11.5421f, 47.3858f, 4.0294f, 58.0225f, 4.0292f)
             close()
         }
     }.build()
