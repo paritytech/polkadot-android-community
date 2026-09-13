@@ -65,17 +65,6 @@ class ChainHealthIndicatorMapperTest {
         assertEquals(ChainHealthIndicator.Outage, connected(blocks(3, 5), pending(75)).toIndicator())
     }
 
-    @Test
-    fun `block latency and finality gap do not colour the indicator`() {
-        val health = connected(
-            blocks(5, 5),
-            ChainMetricReading.BlockLatency(latency = 60.seconds, target = 6.seconds, score = ChainHealthScore.Zero),
-            ChainMetricReading.FinalityGap(gapBlocks = 100, targetBlocks = 6, score = ChainHealthScore.Zero),
-        )
-
-        assertEquals(ChainHealthIndicator.Healthy, health.toIndicator())
-    }
-
     private fun speed(speed: Speed) = ChainHealthIndicator.ConnectionSpeed(speed)
 
     private fun connected(vararg readings: ChainMetricReading): ChainHealth =

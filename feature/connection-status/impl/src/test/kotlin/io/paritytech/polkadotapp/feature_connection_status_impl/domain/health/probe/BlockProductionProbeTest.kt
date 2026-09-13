@@ -1,13 +1,16 @@
 package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe
 
-import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
 import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -16,7 +19,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import org.mockito.Mockito.mock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -106,17 +108,23 @@ class BlockProductionProbeTest {
     private lateinit var heads: MutableSharedFlow<Int>
     private lateinit var connection: MutableStateFlow<ChainConnectionPresentation>
 
+    private fun sampleTicks(): Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            delay(ChainHealthThresholds.SAMPLE_TICK)
+        }
+    }
+
     private fun TestScope.collectReadings(blockTime: Duration): List<ChainMetricReading.BlockProduction> {
         heads = MutableSharedFlow(extraBufferCapacity = 64)
         connection = MutableStateFlow(ChainConnectionPresentation.Connected)
         val probe = BlockProductionProbe(FakeTimeProvider { testScheduler.currentTime })
         val context = ChainMetricContext(
-            chain = mock(Chain::class.java),
             bestBlockNumber = heads,
-            finalizedBlockNumber = emptyFlow(),
             expectedBlockTime = blockTime,
             pendingRequests = emptyFlow(),
             connection = connection,
+            ticks = sampleTicks(),
         )
         val results = mutableListOf<ChainMetricReading.BlockProduction>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {

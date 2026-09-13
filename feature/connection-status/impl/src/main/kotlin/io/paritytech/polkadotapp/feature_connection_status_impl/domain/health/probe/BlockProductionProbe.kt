@@ -6,7 +6,6 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.BlockArrivalWindow
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
@@ -39,7 +38,7 @@ class BlockProductionProbe @Inject constructor(
             .distinctUntilChanged()
             .filter { connected -> connected }
             .map { Event.Reconnected }
-        val ticks = ticker(ChainHealthThresholds.LIVENESS_TICK)
+        val ticks = context.ticks.map { Event.Tick }
 
         emitAll(
             merge(blocks, reconnects, ticks).map { event ->
@@ -64,13 +63,6 @@ class BlockProductionProbe @Inject constructor(
                 )
             }.distinctUntilChanged(),
         )
-    }
-
-    private fun ticker(period: Duration): Flow<Event> = flow {
-        while (true) {
-            emit(Event.Tick)
-            delay(period)
-        }
     }
 
     private sealed interface Event {

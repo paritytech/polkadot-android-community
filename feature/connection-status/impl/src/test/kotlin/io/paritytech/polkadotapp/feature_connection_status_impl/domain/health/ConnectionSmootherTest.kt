@@ -26,14 +26,42 @@ class ConnectionSmootherTest {
     )
 
     @Test
-    fun `rising edge reports connected only after the stability window`() = runTest {
+    fun `a first connect settles immediately`() = runTest {
         val results = collectSmoothed()
+
+        source.emit(RawConnectivity.Connected); runCurrent()
+
+        assertEquals(listOf(ChainConnectionPresentation.Connected), results)
+    }
+
+    @Test
+    fun `a reconnect reports connected only after the stability window`() = runTest {
+        val results = collectSmoothed()
+
+        source.emit(RawConnectivity.Connected); runCurrent()
+        source.emit(RawConnectivity.Pending); runCurrent()
 
         source.emit(RawConnectivity.Connected)
         advanceTimeBy(1_000); runCurrent()
         assertEquals(ChainConnectionPresentation.Connecting, results.last())
 
         advanceTimeBy(2_500); runCurrent() // total 3.5s > 3s
+        assertEquals(ChainConnectionPresentation.Connected, results.last())
+    }
+
+    @Test
+    fun `a reconnect long after its drop aged out still waits out the stability window`() = runTest {
+        val results = collectSmoothed()
+
+        source.emit(RawConnectivity.Connected); runCurrent()
+        source.emit(RawConnectivity.Pending); runCurrent()
+        advanceTimeBy(31_000); runCurrent() // past the 30s flap window, so the drop is purged
+
+        source.emit(RawConnectivity.Connected)
+        advanceTimeBy(1_000); runCurrent()
+        assertEquals(ChainConnectionPresentation.Connecting, results.last())
+
+        advanceTimeBy(2_500); runCurrent()
         assertEquals(ChainConnectionPresentation.Connected, results.last())
     }
 

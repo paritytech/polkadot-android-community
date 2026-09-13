@@ -8,10 +8,8 @@ import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.RealChainHealthMonitor
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.BlockLivenessProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.BlockProductionProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.FinalityGapProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.PendingRequestLatencyProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ResponseLatencyProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.presentation.mixin.RealChainHealthMixinFactory
@@ -29,15 +27,7 @@ interface ConnectionStatusFeatureModule {
 
     @Binds
     @IntoSet
-    fun bindBlockLivenessProbe(impl: BlockLivenessProbe): ChainHealthProbe
-
-    @Binds
-    @IntoSet
     fun bindBlockProductionProbe(impl: BlockProductionProbe): ChainHealthProbe
-
-    @Binds
-    @IntoSet
-    fun bindFinalityGapProbe(impl: FinalityGapProbe): ChainHealthProbe
 
     @Binds
     @IntoSet

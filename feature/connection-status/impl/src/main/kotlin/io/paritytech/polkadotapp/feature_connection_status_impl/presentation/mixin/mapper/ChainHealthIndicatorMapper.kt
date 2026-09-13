@@ -43,5 +43,5 @@ private fun ChainHealth.connectionSpeed(): ChainHealthIndicator.ConnectionSpeed?
 
 private fun ChainMetricReading.isConnectionSpeed(): Boolean = when (this) {
     is ChainMetricReading.PendingRequestLatency, is ChainMetricReading.ResponseLatency -> true
-    is ChainMetricReading.BlockLatency, is ChainMetricReading.BlockProduction, is ChainMetricReading.FinalityGap -> false
+    is ChainMetricReading.BlockProduction -> false
 }

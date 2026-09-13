@@ -47,19 +47,39 @@ class RawConnectivityTest {
     }
 
     @Test
-    fun `a connectivity blip shorter than the debounce never reaches the output`() = runTest {
+    fun `a known connectivity state reaches the output without waiting out the settle delay`() = runTest {
+        val online = MutableStateFlow(true)
+        val results = collectResolved(online)
+        sockets.emit(connectedSocket)
+        advanceTimeBy(100); runCurrent()
+
+        assertEquals(listOf(RawConnectivity.Settled, RawConnectivity.Connected), results)
+    }
+
+    @Test
+    fun `an offline start reaches the output without waiting out the settle delay`() = runTest {
+        val online = MutableStateFlow(false)
+        val results = collectResolved(online)
+        advanceTimeBy(100); runCurrent()
+
+        assertEquals(listOf(RawConnectivity.Settled), results)
+    }
+
+    @Test
+    fun `a connectivity blip shorter than the settle delay never reaches the output`() = runTest {
         val online = MutableStateFlow(true)
         val results = collectResolved(online)
         sockets.emit(connectedSocket)
         advanceTimeBy(2_000); runCurrent()
-        assertEquals(listOf(RawConnectivity.Connected), results)
+        assertEquals(listOf(RawConnectivity.Settled, RawConnectivity.Connected), results)
+        val settled = results.toList()
 
         online.value = false
         advanceTimeBy(200); runCurrent()
         online.value = true
         advanceTimeBy(2_000); runCurrent()
 
-        assertEquals(listOf(RawConnectivity.Connected), results)
+        assertEquals(settled, results)
     }
 
     private lateinit var sockets: MutableSharedFlow<State?>

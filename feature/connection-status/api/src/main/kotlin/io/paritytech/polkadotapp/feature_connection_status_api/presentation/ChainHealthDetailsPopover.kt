@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
+import java.util.Locale
 import kotlin.time.Duration
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -92,7 +93,8 @@ private fun ChainHealthIndicator.labelRes(): Int = when (this) {
     ChainHealthIndicator.Disconnected -> RCommon.string.chain_health_state_broken
 }
 
-private fun Duration.formatSeconds(): String = "%.1fs".format(inWholeMilliseconds / MILLIS_PER_SECOND)
+private fun Duration.formatSeconds(): String =
+    String.format(Locale.ROOT, "%.1fs", inWholeMilliseconds / MILLIS_PER_SECOND)
 
 /**
  * Positions the popup just below the tapped anchor. The anchor already sits below the system status

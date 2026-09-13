@@ -15,6 +15,7 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainHeadDataSource
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainMetricContext
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,8 +33,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Builds a per-chain [ChainHealth] from the smoothed socket state and the readings of the pluggable
- * probe set. The whole per-chain pipeline runs only while collected (foreground) and keeps the socket
- * up via the ref counter for as long as it is subscribed.
+ * probe set. The pipeline is foreground-gated by the mixin and holds the chain socket up via the ref
+ * counter for as long as it runs.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
@@ -64,19 +65,19 @@ class RealChainHealthMonitor @Inject constructor(
 
             val bestBlock = chainHeadDataSource.bestBlockNumber(chainId)
                 .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
-            val finalizedBlock = chainHeadDataSource.finalizedBlockNumber(chainId)
+            val pendingRequests = observePendingRequests(chainId)
                 .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
+            val ticks = sharedSampleTicks(this@channelFlow, ChainHealthThresholds.SAMPLE_TICK)
 
             val connection = connectionSmoother.smooth(observeSocketState(chainId))
                 .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
 
             val context = ChainMetricContext(
-                chain = chain,
                 bestBlockNumber = bestBlock,
-                finalizedBlockNumber = finalizedBlock,
                 expectedBlockTime = blockTime,
-                pendingRequests = observePendingRequests(chainId),
+                pendingRequests = pendingRequests,
                 connection = connection,
+                ticks = ticks,
             )
             val readings = probes.map { it.observe(context) }.combine()
 
