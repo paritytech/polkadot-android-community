@@ -43,7 +43,7 @@ import io.paritytech.polkadotapp.design.utils.conditionalNotNull
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.compose.components.icons.DigitalDollarIcon
 import io.paritytech.polkadotapp.common.R as RCommon
 
-private val SymbolIconSize = DpSize(39.dp, 47.dp)
+private val SymbolIconSize = DpSize(42.dp, 47.dp)
 private val AmountReferenceHeight = 64.dp
 
 private fun Density.symbolIconSizeFor(amountFontSize: TextUnit): DpSize =
