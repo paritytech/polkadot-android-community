@@ -144,7 +144,7 @@ class CoinageInstallationRegistrar @Inject constructor(
         const val CONNECTION_LABEL = "CoinageInstallationRegistrar"
         const val MAX_BACKOFF_DOUBLINGS = 10
 
-        val EXPECTED_REGISTRATION_TIME = 30.seconds
+        val EXPECTED_REGISTRATION_TIME = 1.minutes
         val INITIAL_BACKOFF = 5.seconds
         val MAX_BACKOFF = 5.minutes
     }
