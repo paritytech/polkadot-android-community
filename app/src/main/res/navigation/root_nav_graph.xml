@@ -46,11 +46,6 @@
 
 
     <fragment
-        android:id="@+id/LanguageFragment"
-        android:name="io.paritytech.polkadotapp.feature_settings_impl.presentation.language.LanguageFragment"
-        android:label="LanguageFragment" />
-
-    <fragment
         android:id="@+id/ThemeFragment"
         android:name="io.paritytech.polkadotapp.feature_settings_impl.presentation.theme.ThemeFragment"
         android:label="ThemeFragment" />
@@ -287,11 +282,6 @@
     <action
         android:id="@+id/action_global_to_commit_to_tattoo_graph"
         app:destination="@id/commit_to_tattoo_graph" />
-
-    <action
-        android:id="@+id/action_global_to_change_language"
-        app:destination="@id/LanguageFragment"
-        app:launchSingleTop="true" />
 
     <action
         android:id="@+id/action_global_to_change_theme"
