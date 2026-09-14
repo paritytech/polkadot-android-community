@@ -350,7 +350,7 @@ class CoinageInstallationRegistrarTest {
     private companion object {
         const val INITIAL_BACKOFF_MS = 5_000L
         const val MAX_BACKOFF_MS = 5 * 60_000L
-        const val EXPECTED_REGISTRATION_MS = 30_000L
+        const val EXPECTED_REGISTRATION_MS = 60_000L
 
         val CONTRACT = ByteArray(20) { 0x0c }.toDataByteArray()
         val OTHER_CONTRACT = ByteArray(20) { 0x0d }.toDataByteArray()
