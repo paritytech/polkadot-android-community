@@ -21,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BlockProductionProbeTest {
@@ -103,6 +104,34 @@ class BlockProductionProbeTest {
         assertEquals(5, readings.last().recentBlocks)
         advanceTimeBy(29_000); runCurrent()
         assertEquals(5, readings.last().recentBlocks)
+    }
+
+    @Test
+    fun `the observed gap leaves the outage line where the configured block time put it`() = runTest {
+        val readings = collectReadings(blockTime = 6.seconds)
+
+        advanceTimeBy(31_000); runCurrent()
+        repeat(4) { index ->
+            heads.emit(index)
+            advanceTimeBy(2_000); runCurrent()
+        }
+
+        // 30s / 6s configured, not 30s / the 2s actually seen.
+        assertEquals(5, readings.last().expectedBlocks)
+    }
+
+    @Test
+    fun `reports when the last block landed`() = runTest {
+        val readings = collectReadings(blockTime = 6.seconds)
+
+        advanceTimeBy(10_000); runCurrent()
+        heads.emit(1)
+        runCurrent()
+        val landed = testScheduler.currentTime
+
+        advanceTimeBy(5_000); runCurrent()
+
+        assertEquals(Instant.fromEpochMilliseconds(landed), readings.last().lastBlockAt)
     }
 
     private lateinit var heads: MutableSharedFlow<Int>

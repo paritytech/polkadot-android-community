@@ -59,6 +59,7 @@ class BlockProductionProbe @Inject constructor(
                     recentBlocks = recentBlocks,
                     expectedBlocks = expectedBlocks,
                     requiredBlocks = requiredBlocks,
+                    lastBlockAt = arrivals.lastArrival(),
                     score = ChainHealthScore.coerced(recentBlocks * ChainHealthScore.MAX_VALUE / expectedBlocks),
                 )
             }.distinctUntilChanged(),
