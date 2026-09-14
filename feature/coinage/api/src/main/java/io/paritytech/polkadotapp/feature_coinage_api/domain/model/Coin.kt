@@ -7,7 +7,8 @@ data class Coin(
     val valueExponent: ValueExponent,
     val age: Age,
     val isOnChain: Boolean,
-    val accountId: AccountId
+    val accountId: AccountId,
+    val provenance: CoinProvenance
 ) {
     /**
      * The last age the chain was seen to hold for this coin, and never cleared once known.
@@ -33,6 +34,10 @@ val Coin.hasEverBeenOnChain: Boolean get() = age is Coin.Age.Known
 fun Coin.knownAgeOrThrow() = age as Coin.Age.Known
 
 fun Coin.tokenAmount() = valueExponent.tokenAmount()
+
+val Coin.hops: List<Hop> get() = provenance.hops
+
+val Coin.recyclerFungibility: RecyclerFungibility? get() = provenance.recyclerFungibility
 
 fun Coin.isAgeValidToSpend(recyclableAge: Int) = when (age) {
     is Coin.Age.Known -> age.value < recyclableAge

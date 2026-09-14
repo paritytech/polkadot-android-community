@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 64,
-    "identityHash": "cd152023abe8b9db85107f28bbad2da1",
+    "identityHash": "71de1a4ac19c374efea3e04f0a974a96",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -1662,7 +1662,7 @@
       },
       {
         "tableName": "coins",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `derivationIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `valueExponent` INTEGER NOT NULL, `ageValue` INTEGER, `onChain` INTEGER NOT NULL, PRIMARY KEY(`installationId`, `derivationIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `derivationIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `valueExponent` INTEGER NOT NULL, `ageValue` INTEGER, `onChain` INTEGER NOT NULL, `recyclerFungibility` INTEGER, `hops` BLOB, `incomingBundleSize` INTEGER, PRIMARY KEY(`installationId`, `derivationIndex`))",
         "fields": [
           {
             "fieldPath": "installationId",
@@ -1698,6 +1698,21 @@
             "columnName": "onChain",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "recyclerFungibility",
+            "columnName": "recyclerFungibility",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "hops",
+            "columnName": "hops",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "incomingBundleSize",
+            "columnName": "incomingBundleSize",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -1710,7 +1725,7 @@
       },
       {
         "tableName": "recycler_vouchers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `enteredAt` INTEGER, PRIMARY KEY(`installationId`, `ringVrfKeyIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `enteredAt` INTEGER, `recyclerFungibility` INTEGER NOT NULL DEFAULT 0, `maxRecyclerFungibility` INTEGER, PRIMARY KEY(`installationId`, `ringVrfKeyIndex`))",
         "fields": [
           {
             "fieldPath": "installationId",
@@ -1749,6 +1764,18 @@
           {
             "fieldPath": "enteredAt",
             "columnName": "enteredAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "recyclerFungibility",
+            "columnName": "recyclerFungibility",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "maxRecyclerFungibility",
+            "columnName": "maxRecyclerFungibility",
             "affinity": "INTEGER"
           }
         ],
@@ -2222,7 +2249,7 @@
       },
       {
         "tableName": "external_payments",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `origin` TEXT NOT NULL, `amountPlanks` TEXT NOT NULL, `destination` BLOB NOT NULL, `stage` TEXT NOT NULL, `failureReason` TEXT, `selectedVoucherKeys` TEXT, `surplusPlanks` TEXT, `claimedPlanks` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`origin`, `id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `origin` TEXT NOT NULL, `amountPlanks` TEXT NOT NULL, `destination` BLOB NOT NULL, `stage` TEXT NOT NULL, `failureReason` TEXT, `selectedVoucherKeys` TEXT, `surplusPlanks` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -2270,11 +2297,6 @@
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "claimedPlanks",
-            "columnName": "claimedPlanks",
-            "affinity": "TEXT"
-          },
-          {
             "fieldPath": "createdAt",
             "columnName": "createdAt",
             "affinity": "INTEGER",
@@ -2290,7 +2312,6 @@
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "origin",
             "id"
           ]
         }
@@ -3095,7 +3116,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cd152023abe8b9db85107f28bbad2da1')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '71de1a4ac19c374efea3e04f0a974a96')"
     ]
   }
 }

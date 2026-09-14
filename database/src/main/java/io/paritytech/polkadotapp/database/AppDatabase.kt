@@ -89,6 +89,7 @@ import io.paritytech.polkadotapp.database.migrations.Migration55To56
 import io.paritytech.polkadotapp.database.migrations.Migration57To58
 import io.paritytech.polkadotapp.database.migrations.Migration60To61
 import io.paritytech.polkadotapp.database.migrations.Migration62To63
+import io.paritytech.polkadotapp.database.migrations.Migration63To64
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
 import io.paritytech.polkadotapp.database.model.ChatDraftLocal
@@ -147,7 +148,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 64,
+    version = 65,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -282,7 +283,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         // Add recycler_vouchers.enteredAt to preserve readiness timers across restarts
         AutoMigration(from = 61, to = 62),
         // Key external_payments by (origin, id); add claimedPlanks for partially claimed payments
-        AutoMigration(from = 63, to = 64),
+        AutoMigration(from = 64, to = 65),
     ]
 )
 @TypeConverters(
@@ -334,6 +335,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Migration57To58(),
                 Migration60To61(),
                 Migration62To63(),
+                Migration63To64(),
                 *chatMessageContentMigrations.toTypedArray() // 25 -> 26, 31 -> 32, 37 -> 38, 44 -> 45
             )
         }

@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.PaymentContext
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -23,6 +24,8 @@ fun voucherInRecycler(index: Int, exponent: Int) = RecyclerVoucher(
     ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
     recyclerValue = ValueExponent(exponent),
     location = RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = 32, enteredAt = null),
+    recyclerFungibility = RecyclerFungibility.NONE,
+    maxRecyclerFungibility = RecyclerFungibility.NONE,
 )
 
 suspend fun ExternalPaymentState.transition(): TransitionResult<ExternalPaymentState> = with(Unit) { performTransition() }

@@ -7,6 +7,8 @@ import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -146,6 +148,8 @@ class RealExternalPaymentPlannerTest {
         ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
         recyclerValue = ValueExponent(exponent),
         location = RecyclerVoucher.Location.Unknown,
+        recyclerFungibility = RecyclerFungibility.NONE,
+        maxRecyclerFungibility = RecyclerFungibility.NONE,
     )
 
     private fun coin(index: Int, exponent: Int) = Coin(
@@ -154,5 +158,6 @@ class RealExternalPaymentPlannerTest {
         age = Coin.Age.Known(0),
         isOnChain = true,
         accountId = byteArrayOf(index.toByte()).intoAccountId(),
+        provenance = CoinProvenance.UNKNOWN,
     )
 }

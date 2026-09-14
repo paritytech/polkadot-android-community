@@ -3,8 +3,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment
 import android.database.sqlite.SQLiteConstraintException
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.utils.flatRecover
-import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.mapErrorInstance
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentError

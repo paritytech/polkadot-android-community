@@ -11,8 +11,10 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.measureExecution
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin.Age
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher.Location
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -93,7 +95,10 @@ class RealInstallationAssetScanner @Inject constructor(
             accountId = accountId,
             // Recovered from a read that found it, so it is on chain by construction.
             age = Age.Known(onChainInfo.age),
-            isOnChain = true
+            isOnChain = true,
+            // Recovery reads value and age, never where the coin has been. Left unobserved so the presence
+            // sync fills the history in from the age, the same way it does for a claimed coin.
+            provenance = CoinProvenance.UNKNOWN
         )
     }
 
@@ -106,6 +111,11 @@ class RealInstallationAssetScanner @Inject constructor(
             ringVrfPublicKey = publicKey,
             recyclerValue = values[publicKey] ?: return@mapNotNull null,
             location = onChainInfo.getVoucherLocation(),
+            // Recovery knows where the voucher sits, not how drained its ring is. Zero until the location
+            // service reads it; the max is left unfrozen so that service writes a real one rather than
+            // inheriting this placeholder.
+            recyclerFungibility = RecyclerFungibility.NONE,
+            maxRecyclerFungibility = null,
         )
     }
 
