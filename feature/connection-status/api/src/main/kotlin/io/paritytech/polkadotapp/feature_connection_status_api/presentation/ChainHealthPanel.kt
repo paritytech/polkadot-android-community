@@ -84,11 +84,7 @@ private fun ChainRow(item: ChainHealthItemModel, now: Instant) {
                 color = PolkadotTheme.colors.fg.primary,
             )
             NovaText(
-                text = stringResource(
-                    RCommon.string.chain_health_summary,
-                    stringResource(item.indicator.labelRes()),
-                    blockAge(item.lastBlockAt, now),
-                ),
+                text = summary(item, now),
                 style = PolkadotTheme.typography.body.small,
                 color = PolkadotTheme.colors.fg.secondary,
                 // A long stall pushes the age into minutes; wrapping it would grow the row on a tick.
@@ -96,6 +92,23 @@ private fun ChainRow(item: ChainHealthItemModel, now: Instant) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/**
+ * While nothing is reaching the app, the age of the last block it saw measures how long the app has
+ * been out of touch, not how the chain is doing, so the state stands alone.
+ */
+@Composable
+private fun summary(item: ChainHealthItemModel, now: Instant): String {
+    val state = stringResource(item.indicator.labelRes())
+
+    return when (item.indicator) {
+        ChainHealthIndicator.Connecting,
+        ChainHealthIndicator.Offline,
+        -> state
+
+        else -> stringResource(RCommon.string.chain_health_summary, state, blockAge(item.lastBlockAt, now))
     }
 }
 
