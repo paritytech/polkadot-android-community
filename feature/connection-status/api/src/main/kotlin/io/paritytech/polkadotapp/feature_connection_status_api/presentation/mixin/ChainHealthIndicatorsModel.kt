@@ -27,8 +27,11 @@ sealed interface ChainHealthIndicator {
 
     data object Connecting : ChainHealthIndicator
 
-    /** No node responding, a connected node that no longer answers, or a device with no internet. */
+    /** No node responding, or a connected node that no longer answers. */
     data object Disconnected : ChainHealthIndicator
+
+    /** The device has no network. Drawn as [Disconnected] but named for the cause, not the chain. */
+    data object Offline : ChainHealthIndicator
 
     /** How far the chain has fallen from a speed that needs no comment; the band above these is [Healthy]. */
     enum class Speed {

@@ -21,6 +21,9 @@ enum class RawConnectivity {
     Connected,
     Pending,
     Settled,
+
+    /** The device has no network at all, so there is nothing for any socket to reach. */
+    Offline,
 }
 
 data class ConnectionSmoothingConfig(
@@ -79,6 +82,10 @@ class ConnectionSmoother internal constructor(
                         everConnected = true
                         emit(ChainConnectionPresentation.Connected)
                     }
+
+                    // A device with no network needs no cooldown: the cause is known, and the
+                    // resolver has already waited out the brief drop a handover causes.
+                    current == RawConnectivity.Offline -> emit(ChainConnectionPresentation.Offline)
 
                     current == RawConnectivity.Settled -> {
                         emit(ChainConnectionPresentation.Connecting)

@@ -20,7 +20,7 @@ internal fun rawConnectivity(socketStates: Flow<State?>, deviceOnline: Flow<Bool
 
 // A reconnecting socket reads as pending forever; with no network there is nothing to reconnect to.
 internal fun State?.toRawConnectivity(deviceOnline: Boolean): RawConnectivity =
-    if (deviceOnline) toSocketConnectivity() else RawConnectivity.Settled
+    if (deviceOnline) toSocketConnectivity() else RawConnectivity.Offline
 
 // Only losing the network waits it out: a handover drops connectivity for a moment while every
 // socket stays up. The first value is not a loss, so an offline start still draws immediately.

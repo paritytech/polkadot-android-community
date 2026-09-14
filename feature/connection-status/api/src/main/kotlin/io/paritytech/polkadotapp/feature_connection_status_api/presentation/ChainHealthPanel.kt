@@ -131,6 +131,7 @@ internal fun ChainHealthIndicator.labelRes(): Int = when (this) {
     }
     ChainHealthIndicator.Connecting -> RCommon.string.chain_health_state_connecting
     ChainHealthIndicator.Disconnected -> RCommon.string.chain_health_state_broken
+    ChainHealthIndicator.Offline -> RCommon.string.chain_health_state_offline
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)

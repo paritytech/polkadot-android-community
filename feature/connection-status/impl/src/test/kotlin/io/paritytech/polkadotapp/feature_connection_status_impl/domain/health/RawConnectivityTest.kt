@@ -25,11 +25,11 @@ class RawConnectivityTest {
     }
 
     @Test
-    fun `a device with no internet settles whatever the socket believes`() {
-        assertEquals(RawConnectivity.Settled, connectedSocket.toRawConnectivity(deviceOnline = false))
-        assertEquals(RawConnectivity.Settled, reconnectingSocket.toRawConnectivity(deviceOnline = false))
-        assertEquals(RawConnectivity.Settled, State.Disconnected.toRawConnectivity(deviceOnline = false))
-        assertEquals(RawConnectivity.Settled, null.toRawConnectivity(deviceOnline = false))
+    fun `a device with no internet reads as offline whatever the socket believes`() {
+        assertEquals(RawConnectivity.Offline, connectedSocket.toRawConnectivity(deviceOnline = false))
+        assertEquals(RawConnectivity.Offline, reconnectingSocket.toRawConnectivity(deviceOnline = false))
+        assertEquals(RawConnectivity.Offline, State.Disconnected.toRawConnectivity(deviceOnline = false))
+        assertEquals(RawConnectivity.Offline, null.toRawConnectivity(deviceOnline = false))
     }
 
     @Test
@@ -43,7 +43,7 @@ class RawConnectivityTest {
             advanceTimeBy(300); runCurrent()
         }
 
-        assertEquals(listOf(RawConnectivity.Settled), results)
+        assertEquals(listOf(RawConnectivity.Offline), results)
     }
 
     @Test
@@ -62,7 +62,7 @@ class RawConnectivityTest {
         val results = collectResolved(online)
         advanceTimeBy(100); runCurrent()
 
-        assertEquals(listOf(RawConnectivity.Settled), results)
+        assertEquals(listOf(RawConnectivity.Offline), results)
     }
 
     @Test

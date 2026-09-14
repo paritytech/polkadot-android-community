@@ -22,6 +22,15 @@ class ChainHealthIndicatorMapperTest {
     }
 
     @Test
+    fun `a device with no internet is told apart from a broken chain`() {
+        val offline = health(ChainConnectionPresentation.Offline, blocks(5, 5))
+        val broken = health(ChainConnectionPresentation.Disconnected, blocks(5, 5))
+
+        assertEquals(ChainHealthIndicator.Offline, offline.toIndicator())
+        assertEquals(ChainHealthIndicator.Disconnected, broken.toIndicator())
+    }
+
+    @Test
     fun `connecting wins over an outage`() {
         val health = health(ChainConnectionPresentation.Connecting, blocks(0, 5))
 
