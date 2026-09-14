@@ -462,3 +462,53 @@ jobs:
 ```
 
 Add a publishing job (§7) only on the events/branches you want to ship from.
+
+---
+
+## 9. Localization
+
+All UI strings live in a single module: `common/src/main/res/values/strings.xml`
+holds the default (English) resources, and no other module declares strings.
+
+The app has no language list of its own. Users pick a language in the Android 13+
+system per-app language screen, which the app's *Settings → Language* row opens.
+Android 12 and older show no such screen and follow the device language. Web products
+receive the same locale through the `localeSubscribe` host call, so they need no
+extra wiring.
+
+Adding a language takes one resource file and one registration.
+
+### 9.1 Add the translated strings
+
+Create `common/src/main/res/values-<qualifier>/strings.xml`, where `<qualifier>` is the
+Android resource qualifier for the language: `values-fr`, `values-pt-rBR`,
+`values-b+zh+Hant`. Translate the `<string>` and `<plurals>` entries of the default
+file, keeping the same names. Skip the ones marked `translatable="false"`. Any key
+missing from the translation falls back to English at runtime.
+
+The build sets no `localeFilters` / `resConfigs`, so every `values-*` folder ships in
+the APK without Gradle changes.
+
+### 9.2 Register the locale in `locale-config`
+
+`app/src/main/res/xml/locales_config.xml` is referenced from the manifest
+(`android:localeConfig`). The system language screen lists exactly the locales in this
+file. It is maintained by hand (the build does not enable `generateLocaleConfig`), so
+add a `<locale>` element with the BCP-47 tag matching the qualifier from §9.1 (`fr`,
+`pt-BR`, `zh-Hant`):
+
+```xml
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="fr" />
+</locale-config>
+```
+
+A translation without this entry still applies on devices whose system language
+matches it. It just can't be picked per app.
+
+### 9.3 Verify
+
+Build any variant (§6) and install it on an Android 13+ device. Open *Settings →
+Language* in the app, check that the new language is listed, select it, and check that
+the UI switches to the translation.
