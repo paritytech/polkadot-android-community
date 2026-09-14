@@ -13,7 +13,14 @@ object ChainHealthThresholds {
     // Re-evaluation cadence, so a score decays during a stall instead of holding its last value.
     val SAMPLE_TICK: Duration = 1.seconds
 
-    val BLOCK_PRODUCTION_WINDOW: Duration = 30.seconds
+    // The window is at least 30 seconds, and at least ten block periods. A flat 30 seconds gives a
+    // 6-second chain only five slots, where the five-sixths threshold demands a flawless run and one
+    // late block reads as an outage; ten slots keep the ratio and raise the resolution.
+    val BLOCK_PRODUCTION_MIN_WINDOW: Duration = 30.seconds
+    const val BLOCK_PRODUCTION_MIN_SLOTS = 10
+
+    // How long the anchor read may take before the window is left to fill from observation instead.
+    val BLOCK_PRODUCTION_ANCHOR_TIMEOUT: Duration = 15.seconds
 
     // The health rules call a chain that produced fewer than five sixths of its expected blocks an outage.
     const val BLOCK_PRODUCTION_REQUIRED_RATIO = 5.0 / 6.0

@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.common.utils.combine
 import io.paritytech.polkadotapp.common.utils.network.NetworkStateService
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealth
+import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainAnchorDataSource
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainHeadDataSource
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainMetricContext
@@ -44,6 +45,7 @@ class RealChainHealthMonitor @Inject constructor(
     private val connectionPool: ConnectionPool,
     private val chainStateRepository: ChainStateRepository,
     private val chainHeadDataSource: ChainHeadDataSource,
+    private val chainAnchorDataSource: ChainAnchorDataSource,
     private val connectionRefCounter: ChainConnectionRefCounter,
     private val connectionSmoother: ConnectionSmoother,
     private val networkStateService: NetworkStateService,
@@ -78,6 +80,7 @@ class RealChainHealthMonitor @Inject constructor(
                 pendingRequests = pendingRequests,
                 connection = connection,
                 ticks = ticks,
+                productionAnchor = { blocks -> chainAnchorDataSource.fetch(chainId, blocks) },
             )
             val readings = probes.map { it.observe(context) }.combine()
 
