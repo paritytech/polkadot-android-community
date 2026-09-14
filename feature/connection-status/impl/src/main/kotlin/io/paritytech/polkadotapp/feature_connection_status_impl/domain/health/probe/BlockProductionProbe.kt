@@ -37,6 +37,8 @@ class BlockProductionProbe @Inject constructor(
         val expectedBlocks = (window / blockTime).toInt().coerceAtLeast(MIN_EXPECTED_BLOCKS)
         val requiredBlocks = ceil(expectedBlocks * ChainHealthThresholds.BLOCK_PRODUCTION_REQUIRED_RATIO).toInt()
         val blocks = BlockProductionWindow(window)
+        var atRateRun = 0
+        var inOutage = false
 
         val connects = context.connection
             .map { it == ChainConnectionPresentation.Connected }
@@ -56,8 +58,27 @@ class BlockProductionProbe @Inject constructor(
             merge(heads, reconnects, anchors, ticks).map { event ->
                 val now = timeProvider.now()
                 when (event) {
-                    is Event.Head -> blocks.record(height = event.height, at = now)
-                    Event.Reconnected -> blocks.clear()
+                    is Event.Head -> {
+                        val previous = blocks.lastArrival()
+                        blocks.record(height = event.height, at = now)
+
+                        val atRate = previous != null && now - previous <= blockTime * RECOVERY_GAP_FACTOR
+                        atRateRun = if (atRate) atRateRun + 1 else 0
+
+                        // Leaving the outage does not wait for the window to refill. It still
+                        // remembers the stall, which would hold the mark on screen for most of a
+                        // window after the chain visibly came back; measuring afresh from the
+                        // recovery says the same thing sooner and invents nothing.
+                        if (inOutage && atRateRun >= RECOVERY_BLOCKS) {
+                            blocks.clear()
+                            atRateRun = 0
+                        }
+                    }
+
+                    Event.Reconnected -> {
+                        blocks.clear()
+                        atRateRun = 0
+                    }
                     is Event.Anchored -> event.anchor?.let { blocks.seed(it, window, now) }
                     Event.Tick -> Unit
                 }
@@ -65,6 +86,7 @@ class BlockProductionProbe @Inject constructor(
                 // Null means the window does not reach back far enough to measure anything yet, which
                 // is not the same as a chain that produced nothing; report it as producing.
                 val recentBlocks = blocks.blocksProduced(now)?.coerceAtMost(expectedBlocks) ?: expectedBlocks
+                inOutage = recentBlocks < requiredBlocks
 
                 ChainMetricReading.BlockProduction(
                     recentBlocks = recentBlocks,
@@ -106,5 +128,9 @@ class BlockProductionProbe @Inject constructor(
     private companion object {
         val MIN_BLOCK_TIME: Duration = 1.milliseconds
         const val MIN_EXPECTED_BLOCKS = 1
+
+        // Blocks arriving at rate that end an outage, and how late one may be and still count.
+        const val RECOVERY_BLOCKS = 2
+        const val RECOVERY_GAP_FACTOR = 2
     }
 }

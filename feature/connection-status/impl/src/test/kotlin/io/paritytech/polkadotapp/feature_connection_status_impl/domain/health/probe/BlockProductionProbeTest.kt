@@ -174,6 +174,48 @@ class BlockProductionProbeTest {
         assertEquals(Instant.fromEpochMilliseconds(landed), readings.last().lastBlockAt)
     }
 
+    @Test
+    fun `two blocks at rate end an outage without waiting for the window to refill`() = runTest {
+        val readings = collectReadings(blockTime = 6.seconds)
+        heads.emit(100)
+        advanceTimeBy(120_000)
+        heads.emit(101)
+        runCurrent()
+        assertEquals(1, readings.last().recentBlocks)
+
+        advanceTimeBy(6_000); heads.emit(102); runCurrent()
+        advanceTimeBy(6_000); heads.emit(103); runCurrent()
+
+        assertEquals(10, readings.last().recentBlocks)
+    }
+
+    @Test
+    fun `blocks still arriving late do not end an outage`() = runTest {
+        val readings = collectReadings(blockTime = 6.seconds)
+        heads.emit(100)
+        advanceTimeBy(120_000)
+        heads.emit(101)
+        runCurrent()
+        assertEquals(1, readings.last().recentBlocks)
+
+        repeat(3) { advanceTimeBy(30_000); heads.emit(102 + it); runCurrent() }
+
+        assertEquals(true, readings.last().recentBlocks < readings.last().requiredBlocks)
+    }
+
+    @Test
+    fun `a healthy chain is still measured rather than reset on every pair of blocks`() = runTest {
+        val readings = collectReadings(blockTime = 6.seconds)
+        heads.emit(100)
+        repeat(10) { advanceTimeBy(6_000); heads.emit(101 + it); runCurrent() }
+
+        assertEquals(10, readings.last().recentBlocks)
+
+        // The window was never reset, so a stall after it is still caught.
+        advanceTimeBy(70_000); runCurrent()
+        assertEquals(0, readings.last().recentBlocks)
+    }
+
     private lateinit var heads: MutableSharedFlow<Int>
     private lateinit var connection: MutableStateFlow<ChainConnectionPresentation>
 
