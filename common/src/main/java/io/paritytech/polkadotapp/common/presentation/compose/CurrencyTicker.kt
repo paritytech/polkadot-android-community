@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -17,7 +18,7 @@ fun String.withCurrencyTickerStyle(style: TextStyle): AnnotatedString {
     return remember(this, spanStyle) {
         buildAnnotatedString {
             append(this@withCurrencyTickerStyle)
-            applyTo(this@withCurrencyTickerStyle, spanStyle)
+            styleTickerOccurrences(this@withCurrencyTickerStyle, spanStyle)
         }
     }
 }
@@ -29,9 +30,24 @@ fun AnnotatedString.withCurrencyTickerStyle(style: TextStyle): AnnotatedString {
     return remember(this, spanStyle) {
         buildAnnotatedString {
             append(this@withCurrencyTickerStyle)
-            applyTo(this@withCurrencyTickerStyle.text, spanStyle)
+            styleTickerOccurrences(this@withCurrencyTickerStyle.text, spanStyle)
         }
     }
+}
+
+internal fun tickerRanges(source: String, ticker: String): List<TextRange> {
+    if (ticker.isEmpty()) return emptyList()
+
+    val ranges = mutableListOf<TextRange>()
+    var start = source.indexOf(ticker)
+
+    while (start >= 0) {
+        val end = start + ticker.length
+        if (source.standsAlone(start, end)) ranges += TextRange(start, end)
+        start = source.indexOf(ticker, end)
+    }
+
+    return ranges
 }
 
 @Composable
@@ -44,25 +60,10 @@ private fun rememberTickerSpanStyle(style: TextStyle): SpanStyle {
     }
 }
 
-private fun AnnotatedString.Builder.applyTo(source: String, spanStyle: SpanStyle) {
+private fun AnnotatedString.Builder.styleTickerOccurrences(source: String, spanStyle: SpanStyle) {
     tickerRanges(source, CurrencyConfig.symbol).forEach { range ->
-        addStyle(style = spanStyle, start = range.first, end = range.last + 1)
+        addStyle(style = spanStyle, start = range.start, end = range.end)
     }
-}
-
-internal fun tickerRanges(source: String, ticker: String): List<IntRange> {
-    if (ticker.isEmpty()) return emptyList()
-
-    val ranges = mutableListOf<IntRange>()
-    var start = source.indexOf(ticker)
-
-    while (start >= 0) {
-        val end = start + ticker.length
-        if (source.standsAlone(start, end)) ranges += start until end
-        start = source.indexOf(ticker, end)
-    }
-
-    return ranges
 }
 
 private fun String.standsAlone(start: Int, end: Int): Boolean =

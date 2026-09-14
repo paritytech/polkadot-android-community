@@ -14,7 +14,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import io.paritytech.polkadotapp.common.R
-import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
@@ -33,7 +32,7 @@ internal fun EnterAmountInputRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         NovaText(
-            text = symbol.withCurrencyTickerStyle(PolkadotTheme.typography.display.extraLarge),
+            text = symbol,
             style = PolkadotTheme.typography.display.extraLarge,
             color = PolkadotTheme.colors.fg.tertiary
         )
