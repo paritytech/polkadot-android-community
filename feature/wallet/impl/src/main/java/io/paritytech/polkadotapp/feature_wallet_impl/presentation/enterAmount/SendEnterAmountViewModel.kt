@@ -151,6 +151,7 @@ class SendEnterAmountViewModel @Inject constructor(
                 recipientType = recipientInfo.type,
                 recipientAvatarColor = recipientInfo.avatarColor,
                 showBalanceError = showBalanceError,
+                isAmountPositive = isPositiveAmount,
                 isSendEnabled = isSendEnabled,
                 isAmountLocked = isAmountLocked,
                 debugPlanInfo = debugPlan,

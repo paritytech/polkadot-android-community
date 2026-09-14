@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.util.scaleEncodeSerializable
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import org.junit.Assert.assertEquals
@@ -52,7 +53,8 @@ class SplitDestinationTest {
         valueExponent = ValueExponent(exponent),
         age = Coin.Age.Known(0),
         isOnChain = true,
-        accountId = accountId(index)
+        accountId = accountId(index),
+        provenance = CoinProvenance.UNKNOWN,
     )
 
     private fun accountId(index: Int): AccountId = ByteArray(32) { index.toByte() }.toDataByteArray()

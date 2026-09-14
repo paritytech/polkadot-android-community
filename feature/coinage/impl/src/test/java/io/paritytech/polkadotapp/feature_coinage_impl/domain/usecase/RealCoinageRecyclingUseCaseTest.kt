@@ -12,6 +12,8 @@ import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.VoucherAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
@@ -307,7 +309,8 @@ class RealCoinageRecyclingUseCaseTest {
             valueExponent = ValueExponent(exponent),
             age = Coin.Age.Known(recyclingAge),
             isOnChain = true,
-            accountId = byteArrayOf(exponent.toByte()).intoAccountId()
+            accountId = byteArrayOf(exponent.toByte()).intoAccountId(),
+            provenance = CoinProvenance.UNKNOWN,
         )
     }
 
@@ -317,6 +320,8 @@ class RealCoinageRecyclingUseCaseTest {
             ringVrfPublicKey = byteArrayOf(ringVrfKeyIndex.toByte()).toDataByteArray(),
             recyclerValue = ValueExponent(exponent),
             location = RecyclerVoucher.Location.Unknown,
+            recyclerFungibility = RecyclerFungibility.NONE,
+            maxRecyclerFungibility = RecyclerFungibility.NONE,
         )
     }
 
