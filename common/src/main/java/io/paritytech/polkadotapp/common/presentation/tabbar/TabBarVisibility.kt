@@ -3,9 +3,8 @@ package io.paritytech.polkadotapp.common.presentation.tabbar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.withStateAtLeast
+import androidx.lifecycle.withResumed
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,7 +62,7 @@ fun ForceShowTabBar() {
         LaunchedEffect(holder, lifecycle) {
             // A predictive-back gesture composes the screen it previews without ever resuming it. Waiting is
             // one-shot because the composition outlives ON_STOP — releasing on pause republishes a zero bar height.
-            lifecycle.withStateAtLeast(Lifecycle.State.RESUMED) {}
+            lifecycle.withResumed {}
             val key = Any()
             holder.forceShow(key)
             try {
