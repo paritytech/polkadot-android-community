@@ -12,12 +12,16 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 
@@ -47,7 +51,6 @@ internal object HoldingGeometry {
     val solidBarCorner = 5.5.dp
 
     /** A near-zero score still leaves a mark, and a square one at that. */
-    val minBarWidth = 21.dp
 
     val frameWidth = 1.dp
 
@@ -349,3 +352,21 @@ private const val STRIPE_LEAN = 0.7f
 private const val TRIANGLE_TOP = 1.2f
 private const val TRIANGLE_SIDE = 1.0666f
 private const val TRIANGLE_BASE = 0.8f
+
+/**
+ * Runs [block] clipped to a rounded rectangle at the origin.
+ *
+ * `DrawTransform` offers only rectangular and path clips, so the shape is built as a path. Callers that draw
+ * every frame should hold the result of [roundedBarPath] rather than rebuilding it here.
+ */
+internal inline fun DrawScope.clipToBar(path: Path, block: DrawScope.() -> Unit) = clipPath(path, block = block)
+
+/** The outline of one bar, for clipping segments that must meet inside it. */
+internal fun roundedBarPath(width: Float, height: Float, cornerRadius: Float): Path = Path().apply {
+    addRoundRect(
+        RoundRect(
+            rect = Rect(Offset.Zero, Size(width, height)),
+            cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+        )
+    )
+}

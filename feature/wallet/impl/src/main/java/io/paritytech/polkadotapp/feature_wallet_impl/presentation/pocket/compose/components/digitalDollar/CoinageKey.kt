@@ -17,6 +17,8 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
@@ -30,10 +32,12 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.HoldingColors
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.HoldingGeometry
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.clipToBar
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.drawBarberPole
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.drawFramedBar
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.drawHopDisc
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.drawUnknownPair
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.roundedBarPath
 import io.paritytech.polkadotapp.common.R as RCommon
 
 /**
@@ -172,39 +176,33 @@ private fun BlockIllustration(colors: HoldingColors) {
 
 @Composable
 private fun VoucherIllustration(colors: HoldingColors, stripePhase: State<Float>) {
-    Illustration { diameter, gap ->
-        val solid = diameter
+    Illustration { diameter, _ ->
+        val corner = HoldingGeometry.solidBarCorner.toPx()
+
+        clipToBar(roundedBarPath(size.width, size.height, corner)) {
+            drawRect(color = colors.spendable, topLeft = Offset.Zero, size = Size(diameter, size.height))
+
+            drawBarberPole(
+                left = diameter,
+                top = 0f,
+                width = size.width - diameter,
+                height = size.height,
+                cornerRadius = 0f,
+                stripePeriod = HoldingGeometry.stripeWidth.toPx() * STRIPE_PERIODS_PER_WIDTH,
+                phase = stripePhase.value,
+                colors = colors
+            )
+        }
+
         drawFramedBar(
             left = 0f,
             top = 0f,
-            width = solid,
-            height = size.height,
-            fill = colors.spendable,
-            frame = colors.frame,
-            frameWidth = HoldingGeometry.frameWidth.toPx(),
-            cornerRadius = HoldingGeometry.solidBarCorner.toPx()
-        )
-
-        val poleLeft = solid + gap
-        drawBarberPole(
-            left = poleLeft,
-            top = 0f,
-            width = size.width - poleLeft,
-            height = size.height,
-            cornerRadius = size.height / 2,
-            stripePeriod = HoldingGeometry.stripeWidth.toPx() * STRIPE_PERIODS_PER_WIDTH,
-            phase = stripePhase.value,
-            colors = colors
-        )
-        drawFramedBar(
-            left = poleLeft,
-            top = 0f,
-            width = size.width - poleLeft,
+            width = size.width,
             height = size.height,
             fill = Color.Transparent,
             frame = colors.frame,
             frameWidth = HoldingGeometry.frameWidth.toPx(),
-            cornerRadius = size.height / 2
+            cornerRadius = corner
         )
     }
 }

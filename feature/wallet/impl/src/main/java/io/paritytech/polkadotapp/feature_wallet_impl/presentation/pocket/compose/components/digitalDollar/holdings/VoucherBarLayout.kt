@@ -1,44 +1,42 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings
 
-/** Where a voucher row's solid bar and barber pole end up, in pixels. */
+/** The two segments of a voucher row's bar, in pixels. They abut, so the bar is their sum. */
 internal class VoucherBarLayout(
     val solidWidth: Float,
-    val poleLeft: Float,
     val poleWidth: Float,
-)
+) {
+    val totalWidth: Float
+        get() = solidWidth + poleWidth
+}
 
 /**
- * Fits a voucher's two marks into one column.
+ * Splits a voucher's bar into the traceability that will remain and the privacy still to be earned.
  *
- * The solid bar runs from the left edge to `solidEnd` and the pole ends at `poleEnd`, both fractions of
- * [columnWidth]. Each is floored at [minWidth] so a score that rounds to nothing still leaves a mark, and
- * **neither ever disappears**: a voucher always has both a ceiling and a gap still to close, even when both
- * round away.
+ * The solid segment runs to `solidEnd` and the striped one on to `poleEnd`, both fractions of [columnWidth].
+ * They meet without a gap: this is one bar whose length is how traceable the voucher is, divided at the
+ * point its ring can no longer improve on.
  *
- * When the pole would push past the column it is pinned to the right edge and the solid bar gives up the
- * room, because the pole is the reading that keeps changing and so the one that must stay legible. What the
- * pole may never do is take the solid bar's minimum with it.
- * That branch is not an edge case — a voucher whose maximum has not been frozen yet scores zero, which makes
- * the solid bar span the whole column and leaves the pole nowhere to sit.
+ * Neither segment has a floor of its own, so either may round away to nothing and leave the other holding
+ * the whole bar. Only the bar as a whole is floored, at [minWidth], and both segments are then scaled into
+ * that length. Scaling rather than padding is the point: a minimum applied to one segment would buy
+ * legibility by reporting a ratio the voucher does not have.
  *
- * Both marks stay visible for any column wider than `2 * minWidth + gap`, which the details column always is.
+ * Both ends at zero is not an empty reading but the best one there is, since full fungibility draws nothing.
+ * It has no gap left to earn, so the floor goes entirely to the solid segment.
  */
 internal fun voucherBarLayout(
     columnWidth: Float,
     minWidth: Float,
-    gap: Float,
     solidEnd: Float,
     poleEnd: Float,
 ): VoucherBarLayout {
-    // The pole's *minimum* is what takes precedence, not its nominal length: it grows only as far as still
-    // leaves the solid bar its own minimum. The outer bound keeps that minimum inviolable even in a column
-    // too narrow for both, which the details column never is.
-    val poleCeiling = maxOf(minWidth, columnWidth - minWidth - gap)
-    val poleWidth = ((poleEnd - solidEnd) * columnWidth).coerceIn(minWidth, poleCeiling)
-    val solidNominal = (solidEnd * columnWidth).coerceAtLeast(minWidth)
+    val totalWidth = (poleEnd * columnWidth)
+        .coerceAtLeast(minWidth)
+        .coerceAtMost(columnWidth)
 
-    val poleLeft = (solidNominal + gap).coerceAtMost(columnWidth - poleWidth)
-    val solidWidth = minOf(solidNominal, poleLeft - gap).coerceAtLeast(0f)
+    if (poleEnd <= 0f) return VoucherBarLayout(solidWidth = totalWidth, poleWidth = 0f)
 
-    return VoucherBarLayout(solidWidth = solidWidth, poleLeft = poleLeft, poleWidth = poleWidth)
+    val solidWidth = totalWidth * (solidEnd / poleEnd).coerceIn(0f, 1f)
+
+    return VoucherBarLayout(solidWidth = solidWidth, poleWidth = totalWidth - solidWidth)
 }

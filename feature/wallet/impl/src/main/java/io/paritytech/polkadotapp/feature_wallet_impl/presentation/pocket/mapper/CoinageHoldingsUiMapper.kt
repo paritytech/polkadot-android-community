@@ -13,7 +13,6 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageHoldingUiModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
-import kotlin.math.sqrt
 
 fun List<CoinageHolding>.toUiModels(
     asset: Chain.Asset,
@@ -70,11 +69,10 @@ private fun CoinageHolding.VoucherHolding.frozenMax(): RecyclerFungibility =
 /**
  * A bar's end as a fraction of the column, from a fungibility percentage.
  *
- * The square root is what makes the picture readable: fungibility falls off with the square of what is left
- * in the ring, so an un-rooted length would leave almost every healthy recycler pinned near zero.
- * Full fungibility draws nothing, none of it draws the whole column.
+ * Length is traceability, so the scale runs the opposite way to the percentage: full fungibility draws
+ * nothing, none of it draws the whole column.
  */
-private fun RecyclerFungibility.toBarEnd(): Float = 1f - sqrt(percent / PERCENT).toFloat()
+private fun RecyclerFungibility.toBarEnd(): Float = (1f - percent / PERCENT).toFloat()
 
 private fun Hop.toUiModel(): CoinHopUiModel {
     // A crowd of one hid in nothing, so it gets no dots; beyond the cap the exact number stops being

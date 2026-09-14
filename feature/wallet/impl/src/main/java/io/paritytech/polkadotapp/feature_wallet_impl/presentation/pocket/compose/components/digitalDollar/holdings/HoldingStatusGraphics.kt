@@ -14,6 +14,9 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Dp
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
@@ -24,8 +27,10 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.
 import kotlinx.collections.immutable.ImmutableList
 
 /**
- * A voucher's two marks: the traceability that will remain even once the ring is full, then the privacy
- * still to be earned.
+ * A voucher's bar: how traceable it will remain even once its ring fills, then the privacy still to earn.
+ *
+ * One bar rather than two marks, because the two readings are parts of a single quantity and a gap between
+ * them invited reading the striped part as a separate thing the voucher also has.
  *
  * [stripePhase] is read inside the draw block rather than in composition, so the animation costs a redraw
  * per frame instead of recomposing the list.
@@ -46,47 +51,43 @@ internal fun VoucherStatusGraphics(
                 val height = size.height
                 val layout = voucherBarLayout(
                     columnWidth = size.width,
-                    minWidth = HoldingGeometry.minBarWidth.toPx(),
-                    gap = HoldingGeometry.gap.toPx(),
+                    // Square at its shortest, the floor the coin's block bar already takes.
+                    minWidth = height,
                     solidEnd = row.solidBarEnd,
                     poleEnd = row.barberPoleEnd
                 )
-                val frame = HoldingGeometry.frameWidth.toPx()
+                val corner = HoldingGeometry.solidBarCorner.toPx()
                 val period = HoldingGeometry.stripeWidth.toPx() * STRIPE_PERIODS_PER_WIDTH
+                // Built once per measure rather than per frame: the pole animates, the outline does not.
+                val outline = roundedBarPath(layout.totalWidth, height, corner)
 
                 onDrawBehind {
+                    // Clipped to the bar's own outline so the segments meet edge to edge inside one shape,
+                    // rather than reading as two marks that happen to touch.
+                    clipToBar(outline) {
+                        drawRect(color = fill, topLeft = Offset.Zero, size = Size(layout.solidWidth, height))
+
+                        drawBarberPole(
+                            left = layout.solidWidth,
+                            top = 0f,
+                            width = layout.poleWidth,
+                            height = height,
+                            cornerRadius = 0f,
+                            stripePeriod = period,
+                            phase = stripePhase.value,
+                            colors = colors
+                        )
+                    }
+
                     drawFramedBar(
                         left = 0f,
                         top = 0f,
-                        width = layout.solidWidth,
+                        width = layout.totalWidth,
                         height = height,
-                        fill = fill,
+                        fill = Color.Transparent,
                         frame = colors.frame,
-                        frameWidth = frame,
-                        cornerRadius = HoldingGeometry.solidBarCorner.toPx()
-                    )
-
-                    // Capsule-clipped, unlike the solid bar: the pole is a quantity still being earned, not
-                    // a fixed ceiling, and the rounder shape is what tells the two apart at a glance.
-                    drawBarberPole(
-                        left = layout.poleLeft,
-                        top = 0f,
-                        width = layout.poleWidth,
-                        height = height,
-                        cornerRadius = height / 2,
-                        stripePeriod = period,
-                        phase = stripePhase.value,
-                        colors = colors
-                    )
-                    drawFramedBar(
-                        left = layout.poleLeft,
-                        top = 0f,
-                        width = layout.poleWidth,
-                        height = height,
-                        fill = androidx.compose.ui.graphics.Color.Transparent,
-                        frame = colors.frame,
-                        frameWidth = frame,
-                        cornerRadius = height / 2
+                        frameWidth = HoldingGeometry.frameWidth.toPx(),
+                        cornerRadius = corner
                     )
                 }
             }
@@ -184,7 +185,7 @@ private fun OverflowChip(hiddenHops: Int, colors: HoldingColors, offsetX: Dp) {
             .height(HoldingGeometry.markHeight)
             .widthIn(min = HoldingGeometry.overflowChipMinWidth),
         shape = RoundedCornerShape(percent = CAPSULE_PERCENT),
-        color = androidx.compose.ui.graphics.Color.Transparent,
+        color = Color.Transparent,
         border = BorderStroke(HoldingGeometry.frameWidth, colors.chipOutline),
         contentAlignment = Alignment.Center
     ) {
