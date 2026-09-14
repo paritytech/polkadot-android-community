@@ -1,8 +1,12 @@
 package io.paritytech.polkadotapp.common.presentation.tabbar
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.withStateAtLeast
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -46,15 +50,27 @@ class TabBarVisibilityHolder @Inject constructor() {
 val LocalTabBarVisibility = staticCompositionLocalOf<TabBarVisibilityHolder?> { null }
 
 /**
- * Call inside a screen's composable to show the bar while it is present — outside taps pass through to
- * content (used on Main). Screens that do not call this have no bar at all.
+ * Call inside a screen's composable to show the bar from the moment the host lifecycle resumes until the
+ * composition leaves; a screen a predictive-back gesture is only previewing never resumes, so it gets no
+ * bar. Outside taps pass through to content (used on Main). Screens that never call this have no bar.
  */
 @Composable
 fun ForceShowTabBar() {
-    val holder = LocalTabBarVisibility.current ?: return
-    DisposableEffect(holder) {
-        val key = Any()
-        holder.forceShow(key)
-        onDispose { holder.releaseForce(key) }
+    val holder = LocalTabBarVisibility.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+
+    if (holder != null) {
+        LaunchedEffect(holder, lifecycle) {
+            // A predictive-back gesture composes the screen it previews without ever resuming it. Waiting is
+            // one-shot because the composition outlives ON_STOP — releasing on pause republishes a zero bar height.
+            lifecycle.withStateAtLeast(Lifecycle.State.RESUMED) {}
+            val key = Any()
+            holder.forceShow(key)
+            try {
+                awaitCancellation()
+            } finally {
+                holder.releaseForce(key)
+            }
+        }
     }
 }
