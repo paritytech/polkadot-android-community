@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.common.presentation.loading.onLoaded
 import io.paritytech.polkadotapp.design.components.bottomsheet.NovaBottomSheetSurface
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
@@ -130,7 +131,7 @@ private fun PartialPaymentContent(state: TopUpRequestUiState.PartialPayment) {
                 textAlign = TextAlign.Center,
             )
             NovaText(
-                text = formatter.formatToSymbol(state.creditedAmount),
+                text = formatter.formatToSymbol(state.creditedAmount).withCurrencyTickerStyle(PolkadotTheme.typography.body.medium),
                 style = PolkadotTheme.typography.body.medium,
                 color = PolkadotTheme.colors.fg.secondary,
                 textAlign = TextAlign.Center,
