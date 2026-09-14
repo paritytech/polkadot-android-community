@@ -1,11 +1,12 @@
 package io.paritytech.polkadotapp.common.presentation.tabbar
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.withResumed
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -49,27 +50,21 @@ class TabBarVisibilityHolder @Inject constructor() {
 val LocalTabBarVisibility = staticCompositionLocalOf<TabBarVisibilityHolder?> { null }
 
 /**
- * Call inside a screen's composable to show the bar from the moment the host lifecycle resumes until the
- * composition leaves; a screen a predictive-back gesture is only previewing never resumes, so it gets no
- * bar. Outside taps pass through to content (used on Main). Screens that never call this have no bar.
+ * Pins the bar from the host lifecycle's first resume until the composition leaves; outside taps pass through
+ * to content (used on Main). Screens that never call this have no bar.
  */
 @Composable
 fun ForceShowTabBar() {
     val holder = LocalTabBarVisibility.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    // A back-gesture preview composes the screen unresumed; releasing on pause would republish a zero bar height.
+    val resumed by produceState(false, lifecycle) { lifecycle.withResumed { value = true } }
 
-    if (holder != null) {
-        LaunchedEffect(holder, lifecycle) {
-            // A predictive-back gesture composes the screen it previews without ever resuming it. Waiting is
-            // one-shot because the composition outlives ON_STOP — releasing on pause republishes a zero bar height.
-            lifecycle.withResumed {}
+    if (holder != null && resumed) {
+        DisposableEffect(holder) {
             val key = Any()
             holder.forceShow(key)
-            try {
-                awaitCancellation()
-            } finally {
-                holder.releaseForce(key)
-            }
+            onDispose { holder.releaseForce(key) }
         }
     }
 }
