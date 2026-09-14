@@ -13,14 +13,19 @@ import io.paritytech.polkadotapp.common.data.memory.SingleValueCache
 import io.paritytech.polkadotapp.common.data.memory.getCatching
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.database.dao.CoinDao
+import io.paritytech.polkadotapp.database.dao.CoinHopsUpdateLocal
 import io.paritytech.polkadotapp.database.dao.CoinUpdateLocal
 import io.paritytech.polkadotapp.database.model.CoinLocal
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinUpdate
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Hop
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.coinsByOwner
@@ -28,6 +33,8 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.getMaximum
 import io.paritytech.polkadotapp.feature_coinage_impl.data.blockchain.maxConsolidation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.queryPerInstallation
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.toCoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.decodeCoinHops
+import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.encodeCoinHops
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.getNextIndex
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
@@ -68,6 +75,9 @@ interface CoinRepository {
     suspend fun fetchCoinsInfoFor(chainId: ChainId, accounts: List<AccountId>): Result<Map<AccountId, OnChainCoinInfo?>>
 
     suspend fun updateCoins(updates: List<CoinUpdate>)
+
+    /** Fills in the hops of coins that arrived without any, once the chain has reported their age. */
+    suspend fun updateCoinHops(updates: Map<CoinageKeyIndex, List<Hop>>)
 
     /** Coins the chain currently holds. Says nothing about whether they may be spent — see the ledger. */
     suspend fun getOnChainCoins(): List<Coin>
@@ -149,6 +159,20 @@ class RealCoinRepository @Inject constructor(
         coinDao.updateCoins(updateLocals)
     }
 
+    override suspend fun updateCoinHops(updates: Map<CoinageKeyIndex, List<Hop>>) {
+        if (updates.isEmpty()) return
+
+        coinDao.updateCoinHops(
+            updates.map { (keyIndex, hops) ->
+                CoinHopsUpdateLocal(
+                    installationId = keyIndex.installation.value.value,
+                    derivationIndex = keyIndex.item,
+                    hops = hops.encodeCoinHops()
+                )
+            }
+        )
+    }
+
     override suspend fun getOnChainCoins(): List<Coin> {
         return coinDao.getOnChainCoins().map { it.toDomain() }
     }
@@ -183,7 +207,16 @@ class RealCoinRepository @Inject constructor(
             valueExponent = ValueExponent(valueExponent),
             age = ageValue?.let(Coin.Age::Known) ?: Coin.Age.Unknown,
             isOnChain = onChain,
-            accountId = accountId.intoAccountId()
+            accountId = accountId.intoAccountId(),
+            provenance = CoinProvenance(
+                recyclerFungibility = recyclerFungibility?.let(RecyclerFungibility::ofPercent),
+                // A corrupt blob costs one details row its circles; failing here would take down the balance
+                // stream this mapper sits inside, so the row is drawn as though the coin had no history.
+                hops = hops.decodeCoinHops()
+                    .logFailure("Can't decode hops of coin $derivationIndex")
+                    .getOrDefault(emptyList()),
+                incomingBundleSize = incomingBundleSize,
+            )
         )
     }
 
@@ -195,6 +228,10 @@ class RealCoinRepository @Inject constructor(
             valueExponent = valueExponent.value,
             ageValue = (age as? Coin.Age.Known)?.value,
             onChain = isOnChain,
+            recyclerFungibility = provenance.recyclerFungibility?.percent,
+            // Null rather than an encoded empty list, so a coin with no hops costs no blob.
+            hops = provenance.hops.takeIf { it.isNotEmpty() }?.encodeCoinHops(),
+            incomingBundleSize = provenance.incomingBundleSize,
         )
     }
 

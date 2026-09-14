@@ -5,6 +5,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
@@ -42,7 +43,7 @@ class RealCoinAllocatorTest {
 
     @Test
     fun `an allocated coin takes the next index of the current installation`() = runTest {
-        val coin = allocator.allocate(ValueExponent(3)).getOrThrow()
+        val coin = allocator.allocate(ValueExponent(3), CoinProvenance.UNKNOWN).getOrThrow()
 
         assertEquals(CoinageKeyIndex(TEST_INSTALLATION, NEXT_INDEX), coin.derivationIndex)
         coVerify { coinRepository.saveNew(coin) }
@@ -52,7 +53,7 @@ class RealCoinAllocatorTest {
     fun `an allocation whose index is already taken fails instead of overwriting the row`() = runTest {
         coEvery { coinRepository.saveNew(any<Coin>()) } throws IllegalStateException("UNIQUE constraint failed: coins")
 
-        val result = allocator.allocate(ValueExponent(3))
+        val result = allocator.allocate(ValueExponent(3), CoinProvenance.UNKNOWN)
 
         assertTrue(result.isFailure)
         coVerify(exactly = 0) { coinRepository.save(any()) }
@@ -62,7 +63,7 @@ class RealCoinAllocatorTest {
     fun `a batch whose indices are already taken fails instead of overwriting the rows`() = runTest {
         coEvery { coinRepository.saveNew(any<List<Coin>>()) } throws IllegalStateException("UNIQUE constraint failed: coins")
 
-        val result = allocator.allocateAll(listOf(ValueExponent(1), ValueExponent(2)))
+        val result = allocator.allocateAll(listOf(ValueExponent(1), ValueExponent(2)), CoinProvenance.UNKNOWN)
 
         assertTrue(result.isFailure)
         coVerify(exactly = 0) { coinRepository.saveAll(any()) }

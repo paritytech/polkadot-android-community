@@ -721,7 +721,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="identity_card_rank_label">Rank</string>
     <string name="identity_card_rank_basic">Basic</string>
     <string name="identity_card_rank_member">Member</string>
-    <string name="pocket_id_share_subtitle">Show this QR to someone who wants to add you as a contact or send you money</string>
+    <string name="pocket_id_share_subtitle">Show this QR to someone who wants to add you as a contact or send you %1$s</string>
     <string name="pocket_id_share_scan_title">Scan with a camera</string>
 
     <string name="send_payment_toolbar_title">Send payment</string>
@@ -735,6 +735,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_enter_amount_privacy_cost_hint">Extra %1$s is spendable, but at the risk of reducing your privacy</string>
     <string name="send_enter_amount_not_enough_funds_error">You don’t have enough funds</string>
     <string name="send_enter_amount_cash_title">%1$s</string>
+    <string name="send_enter_amount_send_button">Send %1$s %2$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>
     <string name="send_enter_amount_settling">Waiting for seller confirmation…</string>
     <string name="send_error_settlement_timeout">The recipient didn\'t confirm the payment in time. Your money is still yours \u2014 try again later.</string>
@@ -1066,6 +1067,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_message_contact_added_outgoing">You added %1$s</string>
     <string name="chat_message_last_outgoing">You: %1$s</string>
     <string name="chat_message_payment_incoming">%1$s sent you</string>
+    <string name="chat_message_payment_incoming_sending">%1$s is sending you</string>
     <string name="chat_message_payment_outgoing">You sent</string>
     <string name="chat_payment_status_detecting_sender">Sending…</string>
     <string name="chat_payment_status_detecting_recipient">Detecting…</string>
@@ -1077,6 +1079,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_payment_status_failed">Invalid transaction</string>
     <string name="chat_payment_amount_differs">Amount received differs from amount sent</string>
     <string name="chat_last_message_payment_incoming">%1$s sent you %2$s</string>
+    <string name="chat_last_message_payment_incoming_sending">%1$s is sending you %2$s</string>
     <string name="chat_last_message_payment_outgoing">You sent %1$s</string>
     <string name="chat_reply_transfer_incoming">Sent you %1$s</string>
     <string name="chat_reply_transfer_outgoing">You sent %1$s</string>
@@ -1489,21 +1492,23 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_digital_dollar_available">Available</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
-    <string name="pocket_digital_dollar_advanced">Advanced</string>
-    <string name="pocket_coinage_balance_title">Coinage Balance</string>
-    <string name="pocket_coinage_total_balance">Total Balance</string>
-    <string name="pocket_coinage_spendable_balance">Spendable Balance</string>
-    <string name="pocket_coinage_gaining_privacy">Gaining Privacy</string>
-    <string name="pocket_coinage_pending">Pending</string>
-    <string name="pocket_coinage_coins">Coins</string>
-    <string name="pocket_coinage_vouchers">Vouchers</string>
-    <string name="pocket_coinage_share_logs">Share Coinage Logs</string>
     <string name="pocket_error_get_cash_unavailable">Get %1$s isn\'t available right now. Try again later.</string>
     <string name="pocket_error_auto_fund_failed">Couldn\'t add test funds to this account. Try again.</string>
     <string name="pocket_error_share_coinage_logs_failed">Couldn\'t share the coinage logs. Try again.</string>
-    <string name="pocket_error_force_recycle_failed">Couldn\'t recycle this coin. Try again.</string>
+    <string name="pocket_coinage_balance_title">Coinage Balance</string>
+    <string name="pocket_coinage_total_balance">Total balance</string>
+    <string name="pocket_coinage_spendable">Spendable</string>
+    <string name="pocket_coinage_gaining_privacy">Loading</string>
+    <string name="pocket_coinage_unavailable">Unavailable</string>
+    <string name="pocket_coinage_share_logs">Share Coinage Logs</string>
+    <string name="pocket_coinage_show_details">Show Details</string>
+    <string name="pocket_coinage_key_title">How to read this</string>
+    <string name="pocket_coinage_key_hops">Coins show one circle per past payment, oldest first. Dots are the other coins that moved with it: more dots, easier to trace.</string>
+    <string name="pocket_coinage_key_unknown">A thin red and orange line means we have no record for that part of the coin\'s past.</string>
+    <string name="pocket_coinage_key_block">A single block means no past payments at all. The longer it is, the easier the coin is to trace.</string>
+    <string name="pocket_coinage_key_voucher">Vouchers are coins gaining privacy. The block is how traceable they will still be at best; the striped part is the privacy still to be earned.</string>
 
-    <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
+    <string name="payment_privacy_mode_title">%1$s Privacy Mode</string>
     <string name="payment_privacy_mode_fastest_label">Fastest</string>
     <string name="payment_privacy_mode_fastest_description">Fastest payments, lower privacy</string>
     <string name="payment_privacy_mode_fastest_accessibility">Fastest. Fastest payments, lower privacy.</string>
