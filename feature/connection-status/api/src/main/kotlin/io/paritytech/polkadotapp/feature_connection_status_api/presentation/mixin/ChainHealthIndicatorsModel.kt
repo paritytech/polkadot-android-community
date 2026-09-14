@@ -2,7 +2,7 @@ package io.paritytech.polkadotapp.feature_connection_status_api.presentation.mix
 
 import androidx.compose.runtime.Immutable
 import kotlinx.collections.immutable.ImmutableList
-import kotlin.time.Duration
+import kotlin.time.Instant
 
 enum class ChainGlyph {
     People,
@@ -19,8 +19,10 @@ sealed interface ChainHealthIndicator {
 
     data object Outage : ChainHealthIndicator
 
+    /** [arc] is the share of the ring the indicator fills; it travels inside the [speed] band's quarter. */
     data class ConnectionSpeed(
         val speed: Speed,
+        val arc: Float,
     ) : ChainHealthIndicator
 
     data object Connecting : ChainHealthIndicator
@@ -46,5 +48,6 @@ data class ChainHealthItemModel(
     val chainName: String,
     val glyph: ChainGlyph,
     val indicator: ChainHealthIndicator,
-    val expectedBlockTime: Duration,
+    /** When the last block landed. The view ages it on its own tick, so a stalled chain keeps counting. */
+    val lastBlockAt: Instant?,
 )

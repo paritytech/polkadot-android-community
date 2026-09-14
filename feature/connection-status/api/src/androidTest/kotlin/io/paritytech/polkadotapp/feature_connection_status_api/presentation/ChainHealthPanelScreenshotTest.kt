@@ -45,13 +45,13 @@ class ChainHealthPanelScreenshotTest {
     fun speedHigh() = render("speed-high", ChainHealthIndicator.Healthy)
 
     @Test
-    fun speedGood() = render("speed-good", ChainHealthIndicator.ConnectionSpeed(Speed.Good))
+    fun speedGood() = render("speed-good", ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.68f))
 
     @Test
-    fun speedFair() = render("speed-fair", ChainHealthIndicator.ConnectionSpeed(Speed.Fair))
+    fun speedFair() = render("speed-fair", ChainHealthIndicator.ConnectionSpeed(Speed.Fair, arc = 0.38f))
 
     @Test
-    fun speedLow() = render("speed-low", ChainHealthIndicator.ConnectionSpeed(Speed.Low))
+    fun speedLow() = render("speed-low", ChainHealthIndicator.ConnectionSpeed(Speed.Low, arc = 0.18f))
 
     @Test
     fun notProducingBlocks() = render("not-producing", ChainHealthIndicator.Outage)
@@ -65,8 +65,8 @@ class ChainHealthPanelScreenshotTest {
     @Test
     fun mixed() = render(
         "mixed",
-        people = ChainHealthIndicator.ConnectionSpeed(Speed.Good),
-        hub = ChainHealthIndicator.ConnectionSpeed(Speed.Low),
+        people = ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.68f),
+        hub = ChainHealthIndicator.ConnectionSpeed(Speed.Low, arc = 0.18f),
         bulletin = ChainHealthIndicator.Disconnected,
     )
 
@@ -118,7 +118,7 @@ class ChainHealthPanelScreenshotTest {
             chainName = name,
             glyph = glyph,
             indicator = indicator,
-            expectedBlockTime = blockSeconds.seconds,
+            lastBlockAt = null,
         )
 
     // AGP hands the output dir over as a runner argument when it collects test outputs; without it the
