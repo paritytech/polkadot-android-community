@@ -134,7 +134,6 @@ internal fun CoinageStateCard(
     }
 }
 
-/** The amount carries no symbol of its own; the symbol appears once here, small and beside it. */
 @Composable
 private fun Headline(total: TokenAmountModel) {
     val formatter = LocalTokenAmountFormatter.current
@@ -156,8 +155,8 @@ private fun Headline(total: TokenAmountModel) {
             )
             NovaText(
                 modifier = Modifier.alignByBaseline(),
-                text = CurrencyConfig.symbol.withCurrencyTickerStyle(PolkadotTheme.typography.body.small),
-                style = PolkadotTheme.typography.body.small,
+                text = CurrencyConfig.symbol.withCurrencyTickerStyle(PolkadotTheme.typography.title.large),
+                style = PolkadotTheme.typography.title.large,
                 color = PolkadotTheme.colors.fg.secondary
             )
         }

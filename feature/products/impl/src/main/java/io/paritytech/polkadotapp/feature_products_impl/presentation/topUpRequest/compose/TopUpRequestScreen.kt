@@ -131,8 +131,8 @@ private fun PartialPaymentContent(state: TopUpRequestUiState.PartialPayment) {
                 textAlign = TextAlign.Center,
             )
             NovaText(
-                text = formatter.formatToSymbol(state.creditedAmount).withCurrencyTickerStyle(PolkadotTheme.typography.body.medium),
-                style = PolkadotTheme.typography.body.medium,
+                text = formatter.formatToSymbol(state.creditedAmount).withCurrencyTickerStyle(PolkadotTheme.typography.title.large),
+                style = PolkadotTheme.typography.title.large,
                 color = PolkadotTheme.colors.fg.secondary,
                 textAlign = TextAlign.Center,
             )

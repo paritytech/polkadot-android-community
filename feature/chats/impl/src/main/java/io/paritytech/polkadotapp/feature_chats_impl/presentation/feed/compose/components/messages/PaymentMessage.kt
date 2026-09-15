@@ -174,8 +174,8 @@ private fun PaymentMessageContent(
                 }
 
                 NovaText(
-                    text = formatter.formatToSymbol(message.amount).withCurrencyTickerStyle(PolkadotTheme.typography.body.medium),
-                    style = PolkadotTheme.typography.body.medium,
+                    text = formatter.formatToSymbol(message.amount).withCurrencyTickerStyle(PolkadotTheme.typography.title.large),
+                    style = PolkadotTheme.typography.title.large,
                     color = secondaryTextColor,
                     textAlign = TextAlign.Center
                 )
