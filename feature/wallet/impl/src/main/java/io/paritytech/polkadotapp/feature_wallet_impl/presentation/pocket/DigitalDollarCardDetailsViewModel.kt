@@ -15,9 +15,11 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmo
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDollarCardDetailsInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.CoinageHoldingsInfo
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.clearing
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.toCompositionUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.toUiModels
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageBalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.DigitalDollarCardDetailsUiState
 import kotlinx.coroutines.flow.Flow
@@ -131,11 +133,16 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
 
     private fun CoinageHoldingsInfo.toTokensState(asset: Chain.Asset) = CoinageUiState.TokensState(
         totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.total)),
-        spendableBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.availablePrivate)),
-        gainingPrivacyBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.gainingPrivacy.amount)),
-        unavailableBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.pending)),
+        readyBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.availablePrivate)),
+        clearingBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.clearing)),
         composition = balance.toCompositionUiModel(),
-        holdings = holdings.toUiModels(asset, tokenAmountMapper)
+        holdings = holdings.toUiModels(asset, tokenAmountMapper),
+        breakdown = CoinageBalanceBreakdownUiModel(
+            availablePrivate = tokenAmountMapper.mapFrom(asset.withAmount(balance.availablePrivate)),
+            gainingPrivacy = tokenAmountMapper.mapFrom(asset.withAmount(balance.gainingPrivacy.amount)),
+            pending = tokenAmountMapper.mapFrom(asset.withAmount(balance.pending)),
+            canSpendGainingPrivacy = balance.gainingPrivacy.canSpendWithConfirmation
+        )
     )
 
     private fun BackupProgress.toBalanceRestoreUiState(): BalanceRestoreUiState {
