@@ -9,6 +9,7 @@ import coil.Coil
 import coil.ImageLoader
 import dagger.hilt.android.HiltAndroidApp
 import io.paritytech.polkadotapp.app.logging.AppFileDebugTree
+import io.paritytech.polkadotapp.app.logging.CoinageFileDebugTree
 import io.paritytech.polkadotapp.app.root.presentation.debug.DebugShakeObserver
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.AppInitializerPipeline
@@ -30,6 +31,9 @@ class App : Application(), Configuration.Provider {
 
     @Inject
     lateinit var appFileDebugTree: AppFileDebugTree
+
+    @Inject
+    lateinit var coinageFileDebugTree: CoinageFileDebugTree
 
     @Inject
     lateinit var debugShakeObserver: DebugShakeObserver
@@ -56,7 +60,7 @@ class App : Application(), Configuration.Provider {
         }
 
         if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree(), appFileDebugTree)
+            Timber.plant(Timber.DebugTree(), appFileDebugTree, coinageFileDebugTree)
 
             ProcessLifecycleOwner.get().lifecycle
                 .addObserver(debugShakeObserver)
