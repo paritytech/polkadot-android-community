@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.p
 
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.BlockProductionAnchor
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
 
@@ -17,6 +18,8 @@ data class ChainMetricContext(
     val pendingRequests: Flow<Set<Any>>,
     val connection: Flow<ChainConnectionPresentation>,
     val ticks: Flow<Unit>,
+    // Reads how long the chain took over its last N blocks, by the chain's own timestamps.
+    val productionAnchor: suspend (blocks: Int) -> BlockProductionAnchor?,
 )
 
 /**
