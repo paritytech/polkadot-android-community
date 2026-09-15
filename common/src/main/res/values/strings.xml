@@ -1214,7 +1214,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_notification_reaction_added">reacted with %1$s</string>
 
     <string name="chat_notification_contact_added">added you</string>
-    <string name="chat_notification_payment">sent you %1$s. Open to claim</string>
+    <string name="chat_notification_payment">is sending you %1$s</string>
     <string name="chat_notification_request_approved">approved the chat request</string>
 
     <string name="pocket_toolbar_title">Pocket</string>
