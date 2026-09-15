@@ -67,7 +67,7 @@ class RealStatementStoreSlotAllocatorTest {
         mock(StatementStoreSlotAllocationRepository::class.java)
     private val renewer: StatementStoreSlotRenewer = mock(StatementStoreSlotRenewer::class.java)
     private val lock = StatementStoreSlotRenewalLock()
-    private val knownChains = KnownChains(people = chainId, assetHub = "assetHub", bulletIn = "bulletIn", hydration = null)
+    private val knownChains = KnownChains(people = chainId, assetHub = "assetHub", bulletIn = "bulletIn", hydration = null, networkSuffix = "paseo")
 
     private val allocator = RealStatementStoreSlotAllocator(
         appContext = appContext,

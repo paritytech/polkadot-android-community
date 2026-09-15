@@ -23,7 +23,7 @@ class RealDefaultExtrinsicVersionProviderTest {
     private val chainRegistry = mockk<ChainRegistry>()
 
     private val provider = RealDefaultExtrinsicVersionProvider(
-        knownChains = KnownChains(people = PEOPLE, assetHub = ASSET_HUB, bulletIn = "bullet-in", hydration = null),
+        knownChains = KnownChains(people = PEOPLE, assetHub = ASSET_HUB, bulletIn = "bullet-in", hydration = null, networkSuffix = "paseo"),
         remoteConfigService = remoteConfig,
         chainRegistry = chainRegistry,
     )

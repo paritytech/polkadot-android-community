@@ -141,12 +141,22 @@ private fun RawPayload.toContent(): RawPayloadContent = when (this) {
     is RawPayload.Payload -> RawPayloadContent.Payload(payload)
 }
 
+// `watermarked` is not consumed here: the domain model carries no flag for
+// it, and adding one reaches the SSO SCALE mappers, which encode a wire message to
+// the paired wallet. The core's contract is that a host displays the payload
+// according to it and warns that an unwatermarked signature can authorize a
+// transaction, so the confirmation screen still owes that warning.
 private fun SignRawReview.toSigningRequestBody(): SigningRequestBody = when (this) {
     is SignRawReview.Product ->
-        SigningRequestBody.Raw(SigningRawPayload(v1.account.toDomain(), v1.payload.toContent()))
+        SigningRequestBody.Raw(
+            SigningRawPayload(request.account.toDomain(), request.payload.toContent()),
+        )
     is SignRawReview.LegacyAccount ->
         SigningRequestBody.RawLegacy(
-            SigningRawLegacyPayload(v1.signer.parseLegacySigner().toDataByteArray(), v1.payload.toContent()),
+            SigningRawLegacyPayload(
+                request.signer.parseLegacySigner().toDataByteArray(),
+                request.payload.toContent(),
+            ),
         )
 }
 

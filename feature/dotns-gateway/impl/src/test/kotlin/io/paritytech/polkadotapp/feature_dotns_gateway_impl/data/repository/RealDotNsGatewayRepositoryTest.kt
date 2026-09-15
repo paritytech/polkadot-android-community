@@ -35,7 +35,7 @@ import org.web3j.abi.datatypes.Function
 import org.web3j.abi.datatypes.Type
 
 class RealDotNsGatewayRepositoryTest {
-    private val knownChains = KnownChains(people = "", assetHub = CHAIN_ID, bulletIn = "", hydration = null)
+    private val knownChains = KnownChains(people = "", assetHub = CHAIN_ID, bulletIn = "", hydration = null, networkSuffix = "paseo")
     private val localStorageSource: StorageDataSource = mock()
     private val reviveContractApi: ReviveContractApi = mock()
     private val configProvider: DotNsGatewayConfigProvider = mock()

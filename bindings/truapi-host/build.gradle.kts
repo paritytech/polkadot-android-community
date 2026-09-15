@@ -117,11 +117,46 @@ val hostCdylib: String = run {
     "$truapiDir/target/codegen/libtruapi_server.$ext"
 }
 
+// codegen.sh formats what it emits with the core's own prettier, resolved with
+// `npm exec --no`, so the core's workspace dependencies have to be installed
+// before it runs. host-rust-core's own CI does the same thing ahead of the
+// script; without it the task dies on a missing prettier rather than anything
+// to do with the generated code.
+val installCoreNodeDeps by tasks.registering(Exec::class) {
+    workingDir = file(truapiDir)
+    commandLine("npm", "ci", "--ignore-scripts")
+    inputs.files("$truapiDir/package.json", "$truapiDir/package-lock.json")
+        .withPropertyName("coreNodeManifests")
+    outputs.dir("$truapiDir/node_modules").withPropertyName("coreNodeModules")
+}
+
+// Generate the core's wire dispatcher. host-rust-core stopped tracking
+// `truapi-server/src/generated` and generates it on demand, so a checkout of any
+// commit after that does not compile until this runs. Release tags do not carry
+// it either: the iOS tag script commits only the paths `Package.swift` declares.
+// Calling the core's own script rather than repeating its codegen invocation
+// keeps this from drifting when that pipeline changes.
+val generateCoreDispatcher by tasks.registering(Exec::class) {
+    dependsOn(installCoreNodeDeps)
+    workingDir = file(truapiDir)
+    commandLine("./scripts/codegen.sh")
+    inputs.files(
+        fileTree("$truapiDir/rust/crates/truapi") { include("**/*.rs", "**/Cargo.toml") },
+        fileTree("$truapiDir/rust/crates/truapi-platform") { include("**/*.rs", "**/Cargo.toml") },
+        fileTree("$truapiDir/rust/crates/truapi-codegen") { include("**/*.rs", "**/Cargo.toml") },
+    ).withPropertyName("codegenSources")
+    outputs.dirs(
+        "$truapiDir/rust/crates/truapi-server/src/generated",
+        "$truapiDir/rust/crates/truapi-server/src/wasm",
+    ).withPropertyName("generatedDispatcher")
+}
+
 // Build the host-native cdylib for uniffi-bindgen — a runner-targeted build,
 // separate from the per-ABI Android cross-compile (cargoBuild). Cargo is
 // incremental on its own; the input/output declarations additionally let
 // Gradle skip the cargo invocation entirely when the rust tree is untouched.
 val buildHostCdylib by tasks.registering(Exec::class) {
+    dependsOn(generateCoreDispatcher)
     workingDir = file(truapiDir)
     commandLine("cargo", "build", "-p", "truapi-server", "--profile", "codegen", "--features", "ws-bridge")
     inputs.files(
@@ -154,6 +189,11 @@ val generateUniffiKotlin by tasks.registering(Exec::class) {
 
 tasks.matching { it.name == "compileDebugKotlin" || it.name == "compileReleaseKotlin" }
     .configureEach { dependsOn(generateUniffiKotlin) }
+
+// The per-ABI cross-compiles build truapi-server too, so they need the
+// dispatcher just as much as the host-native build does.
+tasks.matching { it.name.startsWith("cargoBuild") }
+    .configureEach { dependsOn(generateCoreDispatcher) }
 
 dependencies {
     // UniFFI Kotlin bindings use JNA for FFI.

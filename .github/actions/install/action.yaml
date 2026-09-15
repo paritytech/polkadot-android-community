@@ -7,10 +7,10 @@ inputs:
       SHA so an unrelated merge there cannot turn this build red; bump it
       deliberately.
       The app's HostCallbacks implementation must match the native API surface
-      at this commit. Currently the 0.12.0 release tag, which is what
+      at this commit. Currently the 0.16.0 release tag, which is what
       polkadot-app-ios-v2 pins.
     required: false
-    default: "7e0284cef81c4ca025d613428d02defd0f80b863"
+    default: "1b01dd0dc61d58b5ffafb060eb3dcd4ecb4f34b4"
 
 runs:
   using: "composite"
@@ -124,7 +124,10 @@ runs:
     - name: 🦀 Install Rust
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
-        toolchain: stable
+        # nightly alongside stable: the core's codegen script drives
+        # `cargo +nightly rustdoc --output-format json`, and the generated wire
+        # dispatcher it writes is not tracked in host-rust-core.
+        toolchain: stable,nightly
         override: true
         components: rustfmt, clippy
         # truapi is a separate cargo workspace outside this repo's tree, so

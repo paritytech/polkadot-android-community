@@ -19,7 +19,7 @@ import org.junit.Test
 import org.mockito.Mockito.mock
 
 class RealCheckUsernameAvailabilityUseCaseTest {
-    private val knownChains = KnownChains(people = "", assetHub = CHAIN_ID, bulletIn = "", hydration = null)
+    private val knownChains = KnownChains(people = "", assetHub = CHAIN_ID, bulletIn = "", hydration = null, networkSuffix = "paseo")
     private val chainRegistry: ChainRegistry = mock()
     private val accountRepository: AccountRepository = mock()
     private val dotNsGatewayRepository: DotNsGatewayRepository = mock()

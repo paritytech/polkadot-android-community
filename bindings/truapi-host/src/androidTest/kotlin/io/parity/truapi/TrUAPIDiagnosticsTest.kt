@@ -93,6 +93,7 @@ class TrUAPIDiagnosticsTest {
             hostIcon = "https://dot.li/dotli.png",
             peopleChainGenesisHash = ByteArray(32),
             bulletinChainGenesisHash = ByteArray(32),
+            networkSuffix = "paseo",
             // 32 bytes of BIP-39 entropy → a deterministic local signing session
             // (no SSO pairing, fully offline).
             localSessionSecret = ByteArray(32) { (it + 1).toByte() },

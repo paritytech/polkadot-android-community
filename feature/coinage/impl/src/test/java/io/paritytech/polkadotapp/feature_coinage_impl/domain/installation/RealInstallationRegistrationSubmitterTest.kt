@@ -44,7 +44,7 @@ class RealInstallationRegistrationSubmitterTest {
 
     private val submitter = RealInstallationRegistrationSubmitter(
         chainRegistry = chainRegistry,
-        knownChains = KnownChains(people = "people", assetHub = ASSET_HUB, bulletIn = "bullet-in", hydration = null),
+        knownChains = KnownChains(people = "people", assetHub = ASSET_HUB, bulletIn = "bullet-in", hydration = null, networkSuffix = "paseo"),
         dataStoreRepository = dataStoreRepository,
         reviveContractApi = reviveContractApi,
         pgasProvisioner = pgasProvisioner,

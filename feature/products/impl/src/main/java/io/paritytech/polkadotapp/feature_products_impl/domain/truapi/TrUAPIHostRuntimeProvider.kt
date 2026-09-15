@@ -125,6 +125,7 @@ class TrUAPIHostRuntimeProvider @Inject constructor(
             hostName = HOST_NAME,
             peopleChainGenesisHash = peopleGenesis,
             bulletinChainGenesisHash = bulletinGenesis,
+            networkSuffix = knownChains.networkSuffix,
             localSessionSecret = localSession?.secret,
             localSessionLiteUsername = localSession?.liteUsername,
         )

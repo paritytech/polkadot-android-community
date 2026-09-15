@@ -97,10 +97,11 @@ class ConfirmationReviewMappingTest {
     fun `sign raw product bytes maps to raw`() {
         val review = UserConfirmationReview.SignRaw(
             SignRawReview.Product(
-                HostSignRawRequest(
+                request = HostSignRawRequest(
                     account = nativeAccount(),
                     payload = RawPayload.Bytes(byteArrayOf(0xca.toByte(), 0xfe.toByte())),
                 ),
+                watermarked = true,
             ),
         )
 
@@ -115,10 +116,11 @@ class ConfirmationReviewMappingTest {
     fun `sign raw legacy hex signer maps to raw legacy`() {
         val review = UserConfirmationReview.SignRaw(
             SignRawReview.LegacyAccount(
-                HostSignRawWithLegacyAccountRequest(
+                request = HostSignRawWithLegacyAccountRequest(
                     signer = "0x0102",
                     payload = RawPayload.Payload("hello"),
                 ),
+                watermarked = false,
             ),
         )
 

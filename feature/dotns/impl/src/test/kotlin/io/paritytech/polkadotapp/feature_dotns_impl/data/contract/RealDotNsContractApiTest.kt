@@ -109,7 +109,7 @@ class RealDotNsContractApiTest {
 
     private fun stubConfig() = runBlocking {
         whenever(chainRegistry.knownChains).thenReturn(
-            KnownChains(people = "", assetHub = CHAIN_ID, bulletIn = "", hydration = null)
+            KnownChains(people = "", assetHub = CHAIN_ID, bulletIn = "", hydration = null, networkSuffix = "paseo")
         )
         whenever(configProvider.getDotNsConfig()).thenReturn(
             Result.success(DotNsConfig(resolverContractAddress = FIXED_RESOLVER, registryContractAddress = REGISTRY))

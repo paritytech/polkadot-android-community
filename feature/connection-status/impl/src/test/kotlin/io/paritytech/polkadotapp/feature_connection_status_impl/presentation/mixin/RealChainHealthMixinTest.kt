@@ -91,7 +91,7 @@ class RealChainHealthMixinTest {
     private fun createMixin() = RealChainHealthMixin(
         scope = ComputationalScope(scope),
         monitor = monitor,
-        knownChains = KnownChains(people = PEOPLE, assetHub = HUB, bulletIn = BULLETIN, hydration = null),
+        knownChains = KnownChains(people = PEOPLE, assetHub = HUB, bulletIn = BULLETIN, hydration = null, networkSuffix = "paseo"),
         appLifecycleObserver = lifecycle,
     )
 
