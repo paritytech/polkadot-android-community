@@ -164,7 +164,7 @@ fun DigitalDollarCard(
                     val balanceStatus = when {
                         card.syncInProgress -> BalanceStatus.Syncing
                         card.accountBackupPending -> BalanceStatus.AccountBackupPending
-                        amounts != null && amounts.notFullyAvailable -> BalanceStatus.Available(amounts.available)
+                        amounts != null && amounts.notFullyReady -> BalanceStatus.Ready(amounts.ready)
                         else -> BalanceStatus.Hidden
                     }
 
@@ -175,7 +175,7 @@ fun DigitalDollarCard(
                         when (status) {
                             BalanceStatus.Syncing -> SyncProgress()
                             BalanceStatus.AccountBackupPending -> AccountBackupPending()
-                            is BalanceStatus.Available -> AvailableBalance(amount = status.amount)
+                            is BalanceStatus.Ready -> ReadyBalance(amount = status.amount)
 
                             BalanceStatus.Hidden -> Unit
                         }
@@ -220,7 +220,7 @@ private fun BalanceAmount(
 }
 
 @Composable
-fun AvailableBalance(amount: TokenAmountModel) {
+fun ReadyBalance(amount: TokenAmountModel) {
     Row(
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -233,7 +233,7 @@ fun AvailableBalance(amount: TokenAmountModel) {
         HorizontalSpacer { small }
 
         NovaText(
-            text = stringResource(RCommon.string.pocket_digital_dollar_available),
+            text = stringResource(RCommon.string.pocket_coinage_ready),
             style = PolkadotTheme.typography.body.medium,
             color = PocketCardColors.Secondary
         )
@@ -293,7 +293,7 @@ private sealed interface BalanceStatus {
 
     data object AccountBackupPending : BalanceStatus
 
-    data class Available(val amount: TokenAmountModel) : BalanceStatus
+    data class Ready(val amount: TokenAmountModel) : BalanceStatus
 
     data object Hidden : BalanceStatus
 }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -20,10 +19,10 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageCompositionUiModel
 
 /**
- * The balance partition drawn to scale: Spendable, Gaining privacy, Unavailable, left to right.
+ * The balance partition drawn to scale: Ready, then Clearing.
  *
- * The three segments are the same three buckets as the figures above, in the same order and with the same
- * three fills as the legend swatches — which is why the bar carries no labels of its own. Widths are
+ * The two segments are the same two buckets as the figures below, in the same order and with the same
+ * fills as the legend swatches — which is why the bar carries no labels of its own. Widths are
  * value-weighted shares of the total, and the last segment absorbs the rounding remainder so the fills
  * always meet the frame exactly. With nothing held, only the capsule frame is drawn.
  *
@@ -33,7 +32,6 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.
 internal fun CoinageCompositionBar(
     modifier: Modifier = Modifier,
     composition: CoinageCompositionUiModel,
-    stripePhase: State<Float>,
     colors: HoldingColors,
 ) {
     Box(modifier = modifier) {
@@ -51,8 +49,7 @@ internal fun CoinageCompositionBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .drawWithCache {
-                        val spendableRight = composition.spendableFraction * size.width
-                        val gainingPrivacyRight = spendableRight + composition.gainingPrivacyFraction * size.width
+                        val readyRight = composition.readyFraction * size.width
                         val period = HoldingGeometry.stripeWidth.toPx() * STRIPE_PERIODS_PER_WIDTH
 
                         onDrawBehind {
@@ -61,27 +58,21 @@ internal fun CoinageCompositionBar(
                             drawRect(
                                 color = colors.spendable,
                                 topLeft = Offset.Zero,
-                                size = Size(spendableRight, size.height)
+                                size = Size(readyRight, size.height)
                             )
 
+                            // Runs to the far edge rather than to its own fraction: two floats need not sum
+                            // to exactly one, and a hairline of ground showing through at the end would read
+                            // as a third segment.
                             drawBarberPole(
-                                left = spendableRight,
+                                left = readyRight,
                                 top = 0f,
-                                width = gainingPrivacyRight - spendableRight,
+                                width = size.width - readyRight,
                                 height = size.height,
                                 cornerRadius = 0f,
                                 stripePeriod = period,
-                                phase = stripePhase.value,
+                                phase = 0f,
                                 colors = colors
-                            )
-
-                            // Runs to the far edge rather than to its own fraction: three floats need not
-                            // sum to exactly one, and a hairline of ground showing through at the end would
-                            // read as a fourth segment.
-                            drawRect(
-                                color = colors.notSpendable,
-                                topLeft = Offset(gainingPrivacyRight, 0f),
-                                size = Size(size.width - gainingPrivacyRight, size.height)
                             )
                         }
                     }
@@ -90,16 +81,11 @@ internal fun CoinageCompositionBar(
     }
 }
 
-/**
- * One legend swatch, drawn with the same three fills as the bar's segments so the two cannot drift.
- *
- * [gainingPrivacy] gets the live barber pole rather than a still of it, for the same reason.
- */
+/** One legend swatch, drawn with the same fills as the bar's segments so the two cannot drift. */
 @Composable
 internal fun CoinageLegendSwatch(
     fill: Color?,
-    gainingPrivacy: Boolean,
-    stripePhase: State<Float>,
+    clearing: Boolean,
     colors: HoldingColors,
 ) {
     Box(
@@ -111,7 +97,7 @@ internal fun CoinageLegendSwatch(
                 val period = HoldingGeometry.stripeWidth.toPx() * STRIPE_PERIODS_PER_WIDTH
 
                 onDrawBehind {
-                    if (gainingPrivacy) {
+                    if (clearing) {
                         drawBarberPole(
                             left = 0f,
                             top = 0f,
@@ -119,7 +105,7 @@ internal fun CoinageLegendSwatch(
                             height = size.height,
                             cornerRadius = corner,
                             stripePeriod = period,
-                            phase = stripePhase.value,
+                            phase = 0f,
                             colors = colors
                         )
                     }
@@ -129,7 +115,7 @@ internal fun CoinageLegendSwatch(
                         top = 0f,
                         width = size.width,
                         height = size.height,
-                        fill = if (gainingPrivacy) Color.Transparent else fill ?: Color.Transparent,
+                        fill = if (clearing) Color.Transparent else fill ?: Color.Transparent,
                         frame = colors.frame,
                         frameWidth = frame,
                         cornerRadius = corner
@@ -146,11 +132,9 @@ private fun CoinageCompositionBarPreview() {
         CoinageCompositionBar(
             modifier = Modifier.height(HoldingGeometry.summaryBarHeight),
             composition = CoinageCompositionUiModel(
-                spendableFraction = 0.5f,
-                gainingPrivacyFraction = 0.3f,
-                unavailableFraction = 0.2f
+                readyFraction = 0.6f,
+                clearingFraction = 0.4f
             ),
-            stripePhase = rememberBarberPolePhase(),
             colors = rememberHoldingColors()
         )
     }

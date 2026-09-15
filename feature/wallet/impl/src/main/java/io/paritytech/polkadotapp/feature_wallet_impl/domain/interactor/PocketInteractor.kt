@@ -62,7 +62,7 @@ class PocketInteractor @Inject constructor(
                 .map { balance ->
                     DigitalDollarBalance(
                         total = asset.withAmount(balance.total),
-                        available = asset.withAmount(balance.available)
+                        ready = asset.withAmount(balance.availablePrivate)
                     )
                 }
         )

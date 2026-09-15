@@ -22,22 +22,18 @@ data class CoinageUiState(
     val keyVisible: Boolean
 ) {
     /**
-     * The last three figures partition [totalBalance] exactly, and [composition] is a picture of the same
-     * three — so the numbers and the bar are read off one classification and cannot contradict each other.
+     * The last two figures partition [totalBalance] exactly, and [composition] is a picture of the same
+     * two — so the numbers and the bar are read off one classification and cannot contradict each other.
      */
     @Immutable
     data class TokensState(
         val totalBalance: TokenAmountModel,
-        /** Free to spend without giving up any privacy. */
-        val spendableBalance: TokenAmountModel,
-        /** Gaining privacy. Spending it costs that privacy back. */
-        val gainingPrivacyBalance: TokenAmountModel,
-        /**
-         * In flight, or past the age the chain accepts. Nothing the user does or waits for releases it,
-         * which is why it is not named for a remedy.
-         */
-        val unavailableBalance: TokenAmountModel,
+        /** Free to use without giving up any privacy. */
+        val readyBalance: TokenAmountModel,
+        /** Everything else: gaining privacy, in flight, or due to be recycled before it can be used. */
+        val clearingBalance: TokenAmountModel,
         val composition: CoinageCompositionUiModel,
-        val holdings: ImmutableList<CoinageHoldingUiModel>
+        val holdings: ImmutableList<CoinageHoldingUiModel>,
+        val breakdown: CoinageBalanceBreakdownUiModel
     )
 }
