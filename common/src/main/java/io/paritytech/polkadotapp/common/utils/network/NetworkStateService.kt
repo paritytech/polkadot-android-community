@@ -7,10 +7,17 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.paritytech.polkadotapp.common.presentation.AppLifecycleObserver
+import io.paritytech.polkadotapp.common.presentation.subscribeIsForeground
 import io.paritytech.polkadotapp.common.utils.awaitTrue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -35,13 +42,26 @@ suspend fun <T> NetworkStateService.withNetworkRetries(compute: suspend () -> T)
         }
 
 @SuppressLint("MissingPermission")
-class RealNetworkStateService @Inject constructor(@ApplicationContext context: Context) : NetworkStateService {
+class RealNetworkStateService @Inject constructor(
+    @ApplicationContext context: Context,
+    appLifecycleObserver: AppLifecycleObserver,
+) : NetworkStateService {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val _isNetworkAvailable = MutableStateFlow(isNetworkAvailable())
     override val isNetworkAvailable: StateFlow<Boolean> = _isNetworkAvailable.asStateFlow()
 
+    private val scope = CoroutineScope(Dispatchers.Default)
+
     init {
+        // The callbacks below are the only thing that moves this flag, and the system can withhold
+        // them while the device dozes — so a sleep can leave it pointing at a network that is long
+        // back. Coming to the foreground is when a stale value starts being read, so re-read then.
+        appLifecycleObserver.subscribeIsForeground()
+            .filter { inForeground -> inForeground }
+            .onEach { recompute() }
+            .launchIn(scope)
+
         val networkRequest = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()

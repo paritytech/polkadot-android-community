@@ -173,7 +173,9 @@ internal fun ChainIndicator(
                 ChainHealthIndicator.Outage -> NotProducingRing(item, indicatorSize)
                 is ChainHealthIndicator.ConnectionSpeed -> SpeedArc(item, indicator, indicatorSize)
                 ChainHealthIndicator.Connecting -> ConnectingRing(item, indicatorSize)
-                ChainHealthIndicator.Disconnected -> DottedRing(item, indicatorSize)
+                // The stakeholder asked for the same mark whether the chain or the device is at
+                // fault; only the panel's wording tells them apart.
+                ChainHealthIndicator.Disconnected, ChainHealthIndicator.Offline -> DottedRing(item, indicatorSize)
             }
         }
     }

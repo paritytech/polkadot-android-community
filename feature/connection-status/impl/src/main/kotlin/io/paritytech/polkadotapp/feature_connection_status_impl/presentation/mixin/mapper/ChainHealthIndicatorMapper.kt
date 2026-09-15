@@ -23,6 +23,7 @@ private const val LOW_ARC_FROM = 0f
 private const val MIN_ARC = 0.01f
 
 internal fun ChainHealth.toIndicator(): ChainHealthIndicator = when (connection) {
+    ChainConnectionPresentation.Offline -> ChainHealthIndicator.Offline
     ChainConnectionPresentation.Disconnected -> ChainHealthIndicator.Disconnected
     ChainConnectionPresentation.Connecting -> ChainHealthIndicator.Connecting
     ChainConnectionPresentation.Connected -> when {
