@@ -8,17 +8,19 @@ import io.paritytech.polkadotapp.common.utils.flatten
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxRegistrationError
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPreparation
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -49,13 +51,19 @@ class DurableSubmissionExecutor @Inject constructor(
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     dispatchers: CoroutineDispatchers,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + dispatchers.computation)
+    private val scope = CoroutineScope(
+        SupervisorJob() + dispatchers.computation + CoroutineExceptionHandler { _, error ->
+            durabilityLogE("submission-executor-crashed", error)
+        }
+    )
 
     private val mutex = Mutex()
     private var collector: Job? = null
     private val buckets = mutableMapOf<Bucket, Job>()
 
-    /** Idempotent. */
+    // In memory on purpose: a relaunch starting every transaction's cooldown over costs one early rebuild each.
+    private val attemptsStarted = mutableMapOf<DurableTxId, Int>()
+
     fun ensureStarted() {
         scope.launch {
             mutex.withLock {
@@ -66,23 +74,37 @@ class DurableSubmissionExecutor @Inject constructor(
         }
     }
 
-    /** Cancels everything this instance runs. */
     fun close() {
         scope.cancel()
     }
 
+    /**
+     * Every emission is acted on. A Room query flow can skip the intermediate states between two emissions, so
+     * one that reads the same as the last may still hide a transaction that left and came back meanwhile.
+     */
     private suspend fun collectPendingSubmissions() {
+        var lastPending = emptySet<DurableTxId>()
+
         repository.subscribePendingSubmissions()
-            .map { pending -> pending.mapTo(mutableSetOf()) { it.id to it.bucket() } }
-            .distinctUntilChanged()
+            .retryWhen { error, attempt ->
+                durabilityLogW("pending-submissions-subscription-failed attempt=$attempt error=$error")
+                delay(backoffAfter(attempt.toInt() + 1))
+                true
+            }
             .collect { pending ->
-                if (pending.isEmpty()) return@collect
+                val ids = pending.mapTo(mutableSetOf()) { it.id }
+                if (ids.isEmpty()) {
+                    lastPending = ids
+                    return@collect
+                }
 
-                durabilityLogD("pending-submissions count=${pending.size}")
+                if (ids != lastPending) {
+                    durabilityLogD("pending-submissions count=${ids.size}")
+                    recoveryScheduler.ensureRunning()
+                }
+                lastPending = ids
 
-                recoveryScheduler.ensureRunning()
-
-                pending.mapTo(mutableSetOf()) { it.second }.forEach { launchIfIdle(it) }
+                pending.mapTo(mutableSetOf()) { it.bucket() }.forEach { launchIfIdle(it) }
             }
     }
 
@@ -93,7 +115,7 @@ class DurableSubmissionExecutor @Inject constructor(
     }
 
     private suspend fun runBucket(bucket: Bucket) {
-        val policy = policies.get()[bucket.policyId]
+        val policy = policies.get()[bucket.policyId.value]
 
         if (policy == null) {
             durabilityLogE("${bucket.logId()} submission-skipped reason=no-registered-policy")
@@ -103,20 +125,25 @@ class DurableSubmissionExecutor @Inject constructor(
             return
         }
 
-        chainConnectionRefCounter.withConnectionEnabled(policy.chainId, CONNECTION_LABEL) {
-            var failures = 0
+        runCancellableCatching {
+            chainConnectionRefCounter.withConnectionEnabled(policy.chainId, CONNECTION_LABEL) {
+                var failures = 0
 
-            do {
-                val decided = workOnce(bucket, policy)
+                do {
+                    val decided = workOnce(bucket, policy)
 
-                if (decided) {
-                    failures = 0
-                } else {
-                    val backoff = backoffAfter(++failures)
-                    durabilityLogW("${bucket.logId()} submission-backoff failures=$failures delay=$backoff")
-                    delay(backoff)
-                }
-            } while (!finishBucket(bucket))
+                    if (decided) {
+                        failures = 0
+                    } else {
+                        val backoff = backoffAfter(++failures)
+                        durabilityLogD("${bucket.logId()} submission-backoff failures=$failures delay=$backoff")
+                        delay(backoff)
+                    }
+                } while (!finishBucket(bucket))
+            }
+        }.onFailure {
+            // The bucket stays registered but inactive, so the next ledger emission starts it again.
+            durabilityLogE("${bucket.logId()} bucket-failed", it)
         }
     }
 
@@ -130,6 +157,8 @@ class DurableSubmissionExecutor @Inject constructor(
 
         if (transactions.isEmpty()) return true
 
+        awaitRebuildCooldown(bucket, transactions)
+
         durabilityLogD("${bucket.logId()} preparing transactions=${transactions.map { it.id.value }}")
 
         val outcomes = runCancellableCatching { policy.prepareSubmission(transactions) }.flatten().getOrElse {
@@ -139,26 +168,50 @@ class DurableSubmissionExecutor @Inject constructor(
         }
 
         val ids = transactions.mapTo(mutableSetOf()) { it.id }
+        val relevant = outcomes.filterKeys { it in ids }
 
-        outcomes.filterKeys { it in ids }
-            .forEach { (id, outcome) -> apply(bucket, id, outcome) }
-
-        return outcomes.isNotEmpty()
+        return relevant.map { (id, outcome) -> apply(bucket, id, outcome) }.any { it }
     }
 
-    private suspend fun apply(bucket: Bucket, id: DurableTxId, outcome: SubmissionPreparation) {
-        when (outcome) {
-            is SubmissionPreparation.Ready -> launcher.startAttempt(id, outcome.extrinsic)
-                .onFailure {
-                    // An extrinsic the engine cannot track would be rejected the same way on every rebuild.
-                    durabilityLogE("${bucket.logId()} entry=${id.value} attempt-rejected error=$it")
-                    repository.abandonSubmission(id)
-                }
+    /**
+     * A transaction built again right after its last attempt failed would fail the same way just as fast if
+     * the failure repeats, so every rebuild after the first waits longer than the one before.
+     */
+    private suspend fun awaitRebuildCooldown(bucket: Bucket, transactions: List<ScheduledDurableTx>) {
+        val rebuilds = mutex.withLock { transactions.maxOf { attemptsStarted[it.id] ?: 0 } }
+        if (rebuilds == 0) return
 
-            SubmissionPreparation.GiveUp -> {
-                durabilityLogI("${bucket.logId()} entry=${id.value} policy-gave-up")
-                repository.abandonSubmission(id)
-            }
+        val cooldown = (REBUILD_COOLDOWN * (1 shl (rebuilds - 1).coerceAtMost(MAX_BACKOFF_DOUBLINGS)))
+            .coerceAtMost(MAX_REBUILD_COOLDOWN)
+
+        durabilityLogD("${bucket.logId()} rebuild-cooldown attempts=$rebuilds delay=$cooldown")
+        delay(cooldown)
+    }
+
+    /** Returns whether [id] was decided: started, or failed for good. */
+    private suspend fun apply(bucket: Bucket, id: DurableTxId, outcome: SubmissionPreparation): Boolean = when (outcome) {
+        is SubmissionPreparation.Ready -> launcher.startAttempt(id, outcome.extrinsic).fold(
+            onSuccess = {
+                mutex.withLock { attemptsStarted[id] = (attemptsStarted[id] ?: 0) + 1 }
+                true
+            },
+            onFailure = { error ->
+                if (error is DurableTxRegistrationError) {
+                    // An extrinsic the engine cannot track would be rejected the same way on every rebuild.
+                    durabilityLogE("${bucket.logId()} entry=${id.value} attempt-rejected error=$error")
+                    repository.abandonSubmission(id)
+                    true
+                } else {
+                    durabilityLogW("${bucket.logId()} entry=${id.value} attempt-not-started error=$error")
+                    false
+                }
+            },
+        )
+
+        SubmissionPreparation.GiveUp -> {
+            durabilityLogI("${bucket.logId()} entry=${id.value} policy-gave-up")
+            repository.abandonSubmission(id)
+            true
         }
     }
 
@@ -190,8 +243,8 @@ class DurableSubmissionExecutor @Inject constructor(
     private fun backoffAfter(failures: Int): Duration =
         (INITIAL_BACKOFF * (1 shl (failures - 1).coerceAtMost(MAX_BACKOFF_DOUBLINGS))).coerceAtMost(MAX_BACKOFF)
 
-    private data class Bucket(val policyId: String, val groupId: OperationGroupId?) {
-        fun logId() = "policy=$policyId group=${groupId?.value}"
+    private data class Bucket(val policyId: SubmissionPolicyId, val groupId: OperationGroupId?) {
+        fun logId() = "policy=${policyId.value} group=${groupId?.value}"
     }
 
     private fun ScheduledDurableTx.bucket() = Bucket(policy.id, groupId)
@@ -202,5 +255,8 @@ class DurableSubmissionExecutor @Inject constructor(
         val INITIAL_BACKOFF = 2.seconds
         val MAX_BACKOFF = 2.minutes
         const val MAX_BACKOFF_DOUBLINGS = 10
+
+        val REBUILD_COOLDOWN = 5.seconds
+        val MAX_REBUILD_COOLDOWN = 10.minutes
     }
 }

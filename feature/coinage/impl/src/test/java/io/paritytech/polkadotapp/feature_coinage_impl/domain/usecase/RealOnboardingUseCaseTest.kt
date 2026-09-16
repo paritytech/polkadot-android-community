@@ -699,6 +699,7 @@ class RealOnboardingUseCaseTest {
             status = status,
             inputs = emptyList(),
             outputs = listOf(OwnAsset.Voucher(testKey(index))),
+            hasSubmissionPolicy = false,
         )
     }
 

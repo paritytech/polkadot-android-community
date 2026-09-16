@@ -19,17 +19,17 @@ import kotlin.time.Instant
 class CoinageSubmissionParamsTest {
     @Test
     fun `a transfer with a retry window survives a round trip`() {
-        val params = TransferSubmissionParams(retryUntil = RETRY_UNTIL)
+        val params = TransferSubmissionParams(buildUntil = RETRY_UNTIL, retryFailures = true)
 
         val policy = CoinageSubmissionParams.splitPolicy(params)
 
         assertEquals(params, CoinageSubmissionParams.decodeTransfer(policy.params).getOrThrow())
     }
 
-    /** No window is how a transfer asks never to be retried, so it must not come back as some window. */
+    /** A transfer built once must not come back as one that is retried. */
     @Test
     fun `a transfer without a retry window survives a round trip`() {
-        val params = TransferSubmissionParams(retryUntil = null)
+        val params = TransferSubmissionParams(buildUntil = RETRY_UNTIL, retryFailures = false)
 
         val policy = CoinageSubmissionParams.unloadPolicy(params)
 
@@ -38,7 +38,7 @@ class CoinageSubmissionParamsTest {
 
     @Test
     fun `a claim survives a round trip`() {
-        val params = ClaimRetryParams(retryUntil = RETRY_UNTIL, receivedKey = RECEIVED_KEY)
+        val params = ClaimSubmissionParams(retryUntil = RETRY_UNTIL, receivedKey = RECEIVED_KEY)
 
         val policy = CoinageSubmissionParams.claimPolicy(params)
 
@@ -47,32 +47,32 @@ class CoinageSubmissionParamsTest {
 
     @Test
     fun `each policy is keyed by its own id`() {
-        val transfer = TransferSubmissionParams(RETRY_UNTIL)
+        val transfer = TransferSubmissionParams(RETRY_UNTIL, retryFailures = true)
 
-        assertEquals(COINAGE_SPLIT_POLICY_ID, CoinageSubmissionParams.splitPolicy(transfer).id)
-        assertEquals(COINAGE_UNLOAD_POLICY_ID, CoinageSubmissionParams.unloadPolicy(transfer).id)
-        assertEquals(COINAGE_CLAIM_POLICY_ID, CoinageSubmissionParams.claimPolicy(ClaimRetryParams(RETRY_UNTIL, RECEIVED_KEY)).id)
+        assertEquals(COINAGE_SPLIT_POLICY_ID, CoinageSubmissionParams.splitPolicy(transfer).id.value)
+        assertEquals(COINAGE_UNLOAD_POLICY_ID, CoinageSubmissionParams.unloadPolicy(transfer).id.value)
+        assertEquals(COINAGE_CLAIM_POLICY_ID, CoinageSubmissionParams.claimPolicy(ClaimSubmissionParams(RETRY_UNTIL, RECEIVED_KEY)).id.value)
     }
 
     // ---- conformance ----
 
     @Test
-    fun `a transfer with a retry window encodes as a present optional millisecond`() {
-        val encoded = CoinageSubmissionParams.splitPolicy(TransferSubmissionParams(RETRY_UNTIL)).params.value
+    fun `a transfer with a retry window encodes its deadline followed by a set flag`() {
+        val encoded = CoinageSubmissionParams.splitPolicy(TransferSubmissionParams(RETRY_UNTIL, retryFailures = true)).params.value
 
         assertEquals(TRANSFER_WITH_WINDOW, encoded.toHex())
     }
 
     @Test
-    fun `a transfer without a retry window encodes as an absent optional`() {
-        val encoded = CoinageSubmissionParams.splitPolicy(TransferSubmissionParams(null)).params.value
+    fun `a transfer without a retry window encodes its deadline followed by a cleared flag`() {
+        val encoded = CoinageSubmissionParams.splitPolicy(TransferSubmissionParams(RETRY_UNTIL, retryFailures = false)).params.value
 
         assertEquals(TRANSFER_WITHOUT_WINDOW, encoded.toHex())
     }
 
     @Test
     fun `a claim encodes its window followed by the received key`() {
-        val encoded = CoinageSubmissionParams.claimPolicy(ClaimRetryParams(RETRY_UNTIL, RECEIVED_KEY)).params.value
+        val encoded = CoinageSubmissionParams.claimPolicy(ClaimSubmissionParams(RETRY_UNTIL, RECEIVED_KEY)).params.value
 
         assertEquals(CLAIM, encoded.toHex())
     }
@@ -80,15 +80,15 @@ class CoinageSubmissionParamsTest {
     @Test
     fun `stored params decode back to what was written`() {
         assertEquals(
-            TransferSubmissionParams(RETRY_UNTIL),
+            TransferSubmissionParams(RETRY_UNTIL, retryFailures = true),
             CoinageSubmissionParams.decodeTransfer(TRANSFER_WITH_WINDOW.fromHex().toDataByteArray()).getOrThrow(),
         )
         assertEquals(
-            TransferSubmissionParams(null),
+            TransferSubmissionParams(RETRY_UNTIL, retryFailures = false),
             CoinageSubmissionParams.decodeTransfer(TRANSFER_WITHOUT_WINDOW.fromHex().toDataByteArray()).getOrThrow(),
         )
         assertEquals(
-            ClaimRetryParams(RETRY_UNTIL, RECEIVED_KEY),
+            ClaimSubmissionParams(RETRY_UNTIL, RECEIVED_KEY),
             CoinageSubmissionParams.decodeClaim(CLAIM.fromHex().toDataByteArray()).getOrThrow(),
         )
     }
@@ -107,8 +107,8 @@ class CoinageSubmissionParamsTest {
         val RETRY_UNTIL: Instant = Instant.fromEpochMilliseconds(1_700_000_000_123)
         val RECEIVED_KEY: CoinPrivateKey = byteArrayOf(0x0a, 0x0b, 0x0c).toDataByteArray()
 
-        const val TRANSFER_WITH_WINDOW = "017b68e5cf8b010000"
-        const val TRANSFER_WITHOUT_WINDOW = "00"
+        const val TRANSFER_WITH_WINDOW = "7b68e5cf8b01000001"
+        const val TRANSFER_WITHOUT_WINDOW = "7b68e5cf8b01000000"
         const val CLAIM = "7b68e5cf8b0100000c0a0b0c"
     }
 }

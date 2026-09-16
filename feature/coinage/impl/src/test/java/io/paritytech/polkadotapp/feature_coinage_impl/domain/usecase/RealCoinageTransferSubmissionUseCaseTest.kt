@@ -25,7 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransa
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransactionAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_CLAIM_POLICY_ID
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ClaimRetryParams
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ClaimSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -134,8 +134,8 @@ class RealCoinageTransferSubmissionUseCaseTest {
         useCase(listOf(key), mapOf(key.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0)), groupId, RETRY_UNTIL)
 
         val policy = requireNotNull(claims.single().policy)
-        assertEquals(COINAGE_CLAIM_POLICY_ID, policy.id)
-        assertEquals(ClaimRetryParams(RETRY_UNTIL, key), CoinageSubmissionParams.decodeClaim(policy.params).getOrThrow())
+        assertEquals(COINAGE_CLAIM_POLICY_ID, policy.id.value)
+        assertEquals(ClaimSubmissionParams(RETRY_UNTIL, key), CoinageSubmissionParams.decodeClaim(policy.params).getOrThrow())
     }
 
     @Test

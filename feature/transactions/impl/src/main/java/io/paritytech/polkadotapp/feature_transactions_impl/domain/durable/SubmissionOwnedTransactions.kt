@@ -30,12 +30,15 @@ class SubmissionOwnedTransactions @Inject constructor() {
     private val owned = mutableMapOf<Long, TransactionHash>()
     private val everReleased = mutableSetOf<Pair<Long, TransactionHash>>()
 
-    suspend fun acquire(id: DurableTxId, txHash: TransactionHash) = mutex.withLock {
+    /** Returns whether ownership was taken; an attempt already released is never owned again. */
+    suspend fun acquire(id: DurableTxId, txHash: TransactionHash): Boolean = mutex.withLock {
         if (id.value to txHash !in everReleased) {
             owned[id.value] = txHash
             durabilityLogD("entry=${id.value} submission-ownership acquired hash=$txHash")
+            true
         } else {
             durabilityLogW("entry=${id.value} submission-ownership acquire-ignored reason=already-released hash=$txHash")
+            false
         }
     }
 

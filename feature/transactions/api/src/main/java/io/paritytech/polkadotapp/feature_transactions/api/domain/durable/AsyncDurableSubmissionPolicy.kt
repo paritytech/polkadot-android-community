@@ -16,12 +16,14 @@ interface AsyncDurableSubmissionPolicy {
     val chainId: ChainId
 
     /**
-     * Whether [entry], whose attempt is proven unable to land, should be built again instead of failing.
+     * Whether [entry], whose attempt was proven unable to land because of [failure], should be built again
+     * instead of failing.
      *
      * Asked while a verdict is being written, so it must not read the chain. Whether a rebuild is still
-     * possible belongs to [prepareSubmission], which may take as long as it needs to find out.
+     * possible belongs to [prepareSubmission], which may take as long as it needs to find out. A failure that
+     * would repeat on the same effects must not be retried indefinitely: nothing else bounds the loop.
      */
-    suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray): Boolean
+    suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray, failure: DurableFailureKind): Boolean
 
     /**
      * Builds whichever of [transactions] it can. Every one of them shares a policy and a group, so work

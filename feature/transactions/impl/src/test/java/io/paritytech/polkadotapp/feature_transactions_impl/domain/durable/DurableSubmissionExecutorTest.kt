@@ -10,9 +10,11 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxRegistrationError
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPreparation
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
@@ -192,7 +194,7 @@ class DurableSubmissionExecutorTest {
 
     @Test
     fun `an attempt the engine refuses to track fails the transaction`() = runTest {
-        withLedger(attemptOutcome = Result.failure(IllegalStateException("not mortal")))
+        withLedger(attemptOutcome = Result.failure(DurableTxRegistrationError.NotMortal))
         val tx = scheduled(1, POLICY_A, GROUP_1)
         withPolicyReady(policyA)
         pending.value = listOf(tx)
@@ -201,6 +203,73 @@ class DurableSubmissionExecutorTest {
         advanceUntilIdle()
 
         assertEquals(listOf(tx.id), abandoned)
+    }
+
+    /** A database hiccup while starting the attempt says nothing about the transaction, so it must stay waiting. */
+    @Test
+    fun `an attempt that could not be started stays waiting`() = runTest {
+        withLedger()
+        val tx = scheduled(1, POLICY_A, GROUP_1)
+        withPolicyReady(policyA)
+        coEvery { launcher.startAttempt(any(), any()) } returns Result.failure(IllegalStateException("database locked"))
+        pending.value = listOf(tx)
+
+        start()
+        runCurrent()
+        advanceTimeBy(1.minutes)
+
+        assertEquals(emptyList<DurableTxId>(), abandoned)
+        assertEquals(listOf(tx), pending.value)
+
+        executor!!.close()
+    }
+
+    /**
+     * A Room flow can skip the states between two emissions, so the set of waiting transactions can read the
+     * same twice while one of them was started and handed back in between.
+     */
+    @Test
+    fun `a transaction handed back between two identical emissions is still built`() = runTest {
+        withLedger()
+        val tx = scheduled(1, POLICY_A, GROUP_1)
+        withPolicyReady(policyA)
+        pending.value = listOf(tx)
+
+        start()
+        advanceUntilIdle()
+        assertEquals(listOf(tx.id), started)
+
+        pending.value = listOf(tx)
+        advanceUntilIdle()
+
+        assertEquals(listOf(tx.id, tx.id), started)
+    }
+
+    /** A failure that repeats on every rebuild must not turn into a build loop as fast as the chain answers. */
+    @Test
+    fun `a transaction built again waits longer each time`() = runTest {
+        withLedger()
+        val tx = scheduled(1, POLICY_A, GROUP_1)
+        withPolicyReady(policyA)
+        pending.value = listOf(tx)
+
+        start()
+        advanceUntilIdle()
+        assertEquals(1, started.size)
+
+        pending.value = listOf(tx)
+        runCurrent()
+        advanceTimeBy(4.seconds)
+        assertEquals(1, started.size)
+        advanceTimeBy(2.seconds)
+        assertEquals(2, started.size)
+
+        pending.value = listOf(tx)
+        runCurrent()
+        advanceTimeBy(9.seconds)
+        assertEquals(2, started.size)
+        advanceTimeBy(2.seconds)
+        assertEquals(3, started.size)
     }
 
     @Test
@@ -301,7 +370,7 @@ class DurableSubmissionExecutorTest {
             val policyId = firstArg<String>()
             val groupId = secondArg<String?>()?.let(::OperationGroupId)
 
-            Result.success(pending.value.filter { it.policy.id == policyId && it.groupId == groupId })
+            Result.success(pending.value.filter { it.policy.id.value == policyId && it.groupId == groupId })
         }
         coEvery { repository.abandonSubmission(any()) } answers {
             val id = DurableTxId(firstArg())
@@ -339,7 +408,7 @@ class DurableSubmissionExecutorTest {
         id = DurableTxId(id),
         domainId = TxDomainId("test"),
         groupId = groupId,
-        policy = SubmissionPolicy(policyId, byteArrayOf(id.toByte()).toDataByteArray()),
+        policy = SubmissionPolicy(SubmissionPolicyId(policyId), byteArrayOf(id.toByte()).toDataByteArray()),
     )
 
     private companion object {

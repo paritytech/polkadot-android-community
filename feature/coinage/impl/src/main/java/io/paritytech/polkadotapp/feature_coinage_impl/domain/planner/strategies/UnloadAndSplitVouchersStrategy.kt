@@ -19,8 +19,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.mintAndHandOf
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import javax.inject.Inject
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 import io.paritytech.polkadotapp.common.R as RCommon
 
 class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
@@ -61,13 +59,12 @@ class UnloadAndSplitVouchersStrategy(
      * One transaction per voucher batch, all built together by the unload policy once they are scheduled, so
      * they share one pinned block and person proof.
      */
-    @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
-    override suspend fun schedule(retryUntil: Instant?): Result<ScheduledTransfer> =
+    override suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer> =
         diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
             runCatching { mintBatches() }.flatMap { minted ->
                 transactionService.preCommitHandoff(minted.handedOff()).map { handoffCommit ->
-                    val policy = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(retryUntil))
+                    val policy = CoinageSubmissionParams.unloadPolicy(params)
 
                     ScheduledTransfer(
                         entries = minted.memoEntries(),

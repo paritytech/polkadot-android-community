@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -291,6 +293,40 @@ class CoinageClaimSubmissionPolicyTest {
         assertTrue("expected a failure but was $outcome", outcome.isFailure)
     }
 
+    // ---- whether a failure is retried ----
+
+    /** A claim that simply never got included may land if built again, however late that is. */
+    @Test
+    fun `an attempt that expired is retried even after the window`() = runTest {
+        val claim = claimOf(1)
+        givenWindowClosed()
+
+        assertTrue(policy.canRetry(mockk(), claim.scheduled.policy.params, DurableFailureKind.EXPIRED))
+    }
+
+    /** A dispatch failure would most likely repeat, so only the window bounds how often it is rebuilt. */
+    @Test
+    fun `a dispatch failure is retried only while the window is open`() = runTest {
+        val claim = claimOf(1)
+
+        assertTrue(policy.canRetry(mockk(), claim.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
+
+        givenWindowClosed()
+
+        assertFalse(policy.canRetry(mockk(), claim.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
+    }
+
+    @Test
+    fun `a rejected attempt is retried only while the window is open`() = runTest {
+        val claim = claimOf(1)
+
+        assertTrue(policy.canRetry(mockk(), claim.scheduled.policy.params, DurableFailureKind.REJECTED))
+
+        givenWindowClosed()
+
+        assertFalse(policy.canRetry(mockk(), claim.scheduled.policy.params, DurableFailureKind.REJECTED))
+    }
+
     // ---- harness ----
 
     private suspend fun prepare(vararg claims: PeerClaim): Map<DurableTxId, SubmissionPreparation> =
@@ -340,7 +376,7 @@ class CoinageClaimSubmissionPolicyTest {
             id = DurableTxId(seed.toLong()),
             domainId = COINAGE_DOMAIN,
             groupId = GROUP,
-            policy = CoinageSubmissionParams.claimPolicy(ClaimRetryParams(RETRY_UNTIL, privateKey)),
+            policy = CoinageSubmissionParams.claimPolicy(ClaimSubmissionParams(RETRY_UNTIL, privateKey)),
         )
 
         return PeerClaim(

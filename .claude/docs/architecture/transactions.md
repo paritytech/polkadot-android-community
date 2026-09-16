@@ -31,11 +31,13 @@ Classic signed extrinsics + a growing family of custom origins (People-Lite, AsP
 5. **`major`** — Manual binary encoding of arguments is forbidden when `BinaryScale` / `autoEncodedArgs` covers the case.
 6. **`major`** — Origin's `paysFees` flag is the source of truth at the caller. Don't second-guess. Fee estimation uses it; submission uses it.
 7. **`major`** — Multi-extrinsic submission from the same `(chainId, accountId)` uses `ExtrinsicBuilderSequence` for nonce management. Don't hand-roll.
-8. **`blocking`** — A durable transaction's status is written only through `DurableVerdictWriter` (recovery pass and submission watch alike). It is where a `FAILURE` is handed back to the row's policy; a second writer silently makes failures final again.
+8. **`blocking`** — A verdict about a submitted attempt is written only through `DurableVerdictWriter` (recovery pass and submission watch alike). It is where a `FAILURE` is handed back to the row's policy; a second writer silently makes failures final again. (Starting an attempt and a policy's give-up are the executor's writes on rows waiting to be built.)
 9. **`blocking`** — An `AsyncDurableSubmissionPolicy` rebuild consumes and mints exactly the assets registered for the row. A retry re-arms the same `DurableTxId`; the domain's rows, locks and completion rules keep applying to it.
 10. **`major`** — `AsyncDurableSubmissionPolicy.canRetry` never reads the chain — it runs while a verdict is written. Whether a rebuild can still land is decided in `prepareSubmission`, which returns `GiveUp` to end it; a failed `Result` is retried after a backoff, never treated as a verdict.
-11. **`major`** — Work common to one policy's transactions of one group (pinned blocks, proofs, per-extrinsic tokens) is done once per `prepareSubmission` call, not per transaction.
-12. **`major`** — When a new identity-proof origin is added, extend `AsPersonTransactionExtension` and expose via the matching `*Origins` factory (e.g. `PeopleOrigins`, `CoinageTransactionOrigins`). Composition, not inheritance from scratch.
+11. **`blocking`** — `canRetry` distinguishes `DurableFailureKind`: an `EXPIRED` attempt may be rebuilt indefinitely, but a `DISPATCH_FAILED` or `REJECTED` one would repeat on the same effects and must be bounded (coinage: only while the window is open). Nothing else ends that loop.
+12. **`major`** — A `TxCompletionOracle`'s `LedgerView` never contains `PENDING_SUBMISSION` rows: they have no attempt in flight and cannot have produced an effect.
+13. **`major`** — Work common to one policy's transactions of one group (pinned blocks, proofs, per-extrinsic tokens) is done once per `prepareSubmission` call, not per transaction.
+14. **`major`** — When a new identity-proof origin is added, extend `AsPersonTransactionExtension` and expose via the matching `*Origins` factory (e.g. `PeopleOrigins`, `CoinageTransactionOrigins`). Composition, not inheritance from scratch.
 
 ## Seams
 

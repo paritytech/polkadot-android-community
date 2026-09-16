@@ -18,6 +18,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
@@ -40,14 +41,24 @@ class CoinageClaimSubmissionPolicy @Inject constructor(
 ) : AsyncDurableSubmissionPolicy {
     override val chainId: ChainId get() = chainAssetProvider.chainId()
 
-    /** Whether the peer's coin is still there depends on the chain, which only [prepareSubmission] may read. */
-    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray): Boolean = true
+    /**
+     * The failure decides: see [retryableFailure]. Whether the peer's coin is still there depends on the chain,
+     * which only [prepareSubmission] may read.
+     */
+    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray, failure: DurableFailureKind): Boolean {
+        val claim = CoinageSubmissionParams.decodeClaim(params).getOrNull() ?: return false
+
+        return retryableFailure(failure, timeProvider.now(), claim.retryUntil)
+    }
 
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
     ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
         val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrElse { return@runCancellableCatching Result.failure(it) }
         val (claims, unbuildable) = resolveClaims(transactions, assets)
+        val gaveUp = unbuildable.associateWith { SubmissionPreparation.GiveUp }
+
+        if (claims.isEmpty()) return@runCancellableCatching Result.success(gaveUp)
 
         val look = awaitInputs(
             presence = coinRepository.subscribeCoinPresence(chainId, claims.map { it.source }),
@@ -75,7 +86,7 @@ class CoinageClaimSubmissionPolicy @Inject constructor(
             }
         }
 
-        Result.success((decided + unbuildable.map { it to SubmissionPreparation.GiveUp }).toMap())
+        Result.success(decided.toMap() + gaveUp)
     }.flatten()
 
     private fun resolveClaims(

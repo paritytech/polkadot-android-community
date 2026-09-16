@@ -166,6 +166,23 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     /**
+     * The engine already rebuilt this claim for as long as its policy allowed, into the coin it first recorded.
+     * A new claim here would mint into a different coin, which a payment made out of the recorded one would
+     * never see — so the claim ends instead, however much of the coin is still on chain.
+     */
+    @Test
+    fun `a claim its policy gave up on is not claimed again into a new coin`() = runTest {
+        val coin = key(1)
+        givenChainSees(listOf(coin.accountId))
+        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId, hasSubmissionPolicy = true)))
+
+        val reported = reportsOfCompleted(coin)
+
+        coVerify(exactly = 0) { submissionUseCase(any(), any(), any(), any()) }
+        assertEquals(CoinageTransferDetection.NotClaimed, reported.last())
+    }
+
+    /**
      * A claim of ours already finalized against this coin, so the coin is ours and the chain read that still
      * shows it is stale. Claiming it again would spend a key that is already spent.
      */
@@ -778,11 +795,13 @@ class RealClaimReceivedCoinsUseCaseTest {
         status: DurableTxStatus,
         claiming: AccountId,
         outputs: Int = 1,
+        hasSubmissionPolicy: Boolean = false,
     ) = CoinageTransactionState(
         id = CoinageTransactionId(claiming.value.first().toLong() * 10 + status.ordinal),
         status = status,
         inputs = listOf(CoinageInput.Coin.Received(claiming)),
         outputs = List(outputs) { OwnAsset.Coin(testKey(it)) },
+        hasSubmissionPolicy = hasSubmissionPolicy,
     )
 
     private companion object {

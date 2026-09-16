@@ -48,6 +48,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleC
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
@@ -390,16 +391,48 @@ class CoinageUnloadSubmissionPolicyTest {
 
     @Test
     fun `a transfer scheduled without a retry window is never retried`() = runTest {
-        val unload = unloadOf(1, retryUntil = null)
+        val unload = unloadOf(1, retryFailures = false)
 
-        assertFalse(policy.canRetry(mockk(), unload.scheduled.policy.params))
+        assertFalse(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.EXPIRED))
     }
 
     @Test
     fun `a transfer scheduled with a retry window is retried`() = runTest {
         val unload = unloadOf(1)
 
-        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params))
+        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.EXPIRED))
+    }
+
+    /** An attempt that simply never got included may land if built again, however late that is. */
+    @Test
+    fun `an attempt that expired is retried even after the window`() = runTest {
+        val unload = unloadOf(1)
+        givenWindowClosed()
+
+        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.EXPIRED))
+    }
+
+    /** A dispatch failure would most likely repeat, so only the window bounds how often it is rebuilt. */
+    @Test
+    fun `a dispatch failure is retried only while the window is open`() = runTest {
+        val unload = unloadOf(1)
+
+        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
+
+        givenWindowClosed()
+
+        assertFalse(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
+    }
+
+    @Test
+    fun `a rejected attempt is retried only while the window is open`() = runTest {
+        val unload = unloadOf(1)
+
+        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.REJECTED))
+
+        givenWindowClosed()
+
+        assertFalse(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.REJECTED))
     }
 
     // ---- harness ----
@@ -487,7 +520,7 @@ class CoinageUnloadSubmissionPolicyTest {
     }
 
     /** Two vouchers unloaded into two coins; a seed keeps different unloads' assets apart. */
-    private fun unloadOf(seed: Int, retryUntil: Instant? = RETRY_UNTIL): ScheduledUnload {
+    private fun unloadOf(seed: Int, retryUntil: Instant = RETRY_UNTIL, retryFailures: Boolean = true): ScheduledUnload {
         val vouchers = listOf(voucherOf(seed * 10), voucherOf(seed * 10 + 1))
         val outputs = listOf(coinOf(seed * 10 + 2), coinOf(seed * 10 + 3))
         knownVouchers += vouchers
@@ -497,7 +530,7 @@ class CoinageUnloadSubmissionPolicyTest {
             id = DurableTxId(seed.toLong()),
             domainId = COINAGE_DOMAIN,
             groupId = GROUP,
-            policy = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(retryUntil)),
+            policy = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(retryUntil, retryFailures)),
         )
 
         return ScheduledUnload(scheduled, vouchers, outputs)

@@ -4,8 +4,7 @@ import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessRepor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.PlannedMemoEntry
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageScheduledTransactionRequest
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 
 sealed interface TransferStrategy {
     /**
@@ -13,12 +12,11 @@ sealed interface TransferStrategy {
      * [io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction]. Returns the memo entries
      * describing the coins handed to the recipient, built from the coins actually allocated here.
      *
-     * Builds and registers nothing: the transactions come back to be scheduled, built by their policies — and
-     * built again until [retryUntil] has passed with their inputs gone from the chain, or never when it is null.
+     * Builds and registers nothing: the transactions come back to be scheduled and built by their policies, as
+     * [params] describe.
      */
-    @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
-    suspend fun schedule(retryUntil: Instant?): Result<ScheduledTransfer>
+    suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer>
 }
 
 /**

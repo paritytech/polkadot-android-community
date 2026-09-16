@@ -40,7 +40,10 @@ class DurableSubmissionLauncher @Inject constructor(
         val attempt = runCatching { extrinsic.toAttempt() }.getOrElse { return Result.failure(it) }
 
         // Owned before the row turns pending, so a pass can never evaluate the new attempt underneath its watch.
-        submissionOwned.acquire(id, attempt.txHash)
+        // Bytes identical to an attempt already released cannot be owned again, and so must not be started.
+        if (!submissionOwned.acquire(id, attempt.txHash)) {
+            return Result.failure(IllegalStateException("Attempt ${attempt.txHash} of entry ${id.value} was already watched"))
+        }
 
         return repository.startAttempt(id, attempt)
             .onSuccess { started ->

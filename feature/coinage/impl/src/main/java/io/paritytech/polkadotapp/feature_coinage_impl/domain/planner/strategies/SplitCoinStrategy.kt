@@ -14,8 +14,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.mintAndHandOf
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import javax.inject.Inject
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 import io.paritytech.polkadotapp.common.R as RCommon
 
 class SplitCoinStrategyFactory @Inject constructor(
@@ -49,9 +47,8 @@ class SplitCoinStrategy(
         splitHop(recipientDenominations.size + changeDenominations.size)
     )
 
-    @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
-    override suspend fun schedule(retryUntil: Instant?): Result<ScheduledTransfer> =
+    override suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer> =
         diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
             val transaction = coinageTransactionFactory.newTransaction()
 
@@ -64,7 +61,7 @@ class SplitCoinStrategy(
                     handoffCommit = handoffCommit,
                     transactions = listOf(
                         CoinageScheduledTransactionRequest(
-                            policy = CoinageSubmissionParams.splitPolicy(TransferSubmissionParams(retryUntil)),
+                            policy = CoinageSubmissionParams.splitPolicy(params),
                             inputs = assets.inputs,
                             outputs = assets.outputs,
                         )

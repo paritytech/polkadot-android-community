@@ -32,8 +32,12 @@ import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetPr
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import java.math.BigDecimal
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -47,7 +51,19 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val memoBuilder: TransferMemoBuilder,
     private val transactionService: CoinageTransactionService,
+    private val timeProvider: TimeProvider,
 ) : PrepareCoinageTransferUseCase {
+    private companion object {
+        /**
+         * How long a transfer sent right away may wait for its inputs to be seen. Its coins were selected as
+         * spendable a moment ago, so this only covers a presence read lagging behind that selection.
+         */
+        val IMMEDIATE_BUILD_WINDOW = 1.minutes
+
+        /** How long the sender waits for the transactions to reach the wire before calling the send failed. */
+        val SUBMISSION_TIMEOUT = 2.minutes
+    }
+
     /**
      * Plans against spendable funds first and only widens if they cannot cover the amount.
      */
@@ -77,12 +93,15 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     }
 
     /**
-     * The same scheduled path as [prepareScheduledMemo], registered at once and without a retry window, then
-     * held until every transaction is on the wire — so the memo only leaves once its coins are on their way.
+     * The same scheduled path as [prepareScheduledMemo], registered at once and never retried, then held until
+     * every transaction is on the wire — so the memo only leaves once its coins are on their way.
      */
+    @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
     override suspend fun prepareMemo(plan: TransferPlan): Result<PreparedTransferMemo> {
-        return createStrategy(plan).schedule(retryUntil = null)
+        val params = TransferSubmissionParams(buildUntil = timeProvider.now() + IMMEDIATE_BUILD_WINDOW, retryFailures = false)
+
+        return createStrategy(plan).schedule(params)
             .flatMap { scheduled -> submitNow(scheduled).map { scheduled } }
             .flatMap { scheduled ->
                 memoBuilder.buildMemo(scheduled.entries)
@@ -94,7 +113,7 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
     override suspend fun prepareScheduledMemo(plan: TransferPlan, retryUntil: Instant): Result<PreparedTransferMemo> {
-        return createStrategy(plan).schedule(retryUntil)
+        return createStrategy(plan).schedule(TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true))
             .flatMap { scheduled ->
                 memoBuilder.buildMemo(scheduled.entries).map { memo ->
                     PreparedTransferMemo(memo, SchedulingHandoffCommit(scheduled, transactionService))
@@ -107,7 +126,8 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
 
     /**
      * Schedules [scheduled]'s transactions and waits until each one has either been submitted or failed for
-     * good. Building runs in the background, so this waits for its outcome rather than doing the work.
+     * good. Building runs in the background, so this waits for its outcome rather than doing the work. A wait
+     * that runs out fails the send; the transactions stay scheduled and their assets stay recoverable.
      */
     context(diagnostics: StalenessReportCollector)
     private suspend fun submitNow(scheduled: ScheduledTransfer): Result<Unit> =
@@ -122,10 +142,12 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
         }
 
     private suspend fun awaitSubmitted(groupId: CoinageOperationGroupId): Result<Unit> {
-        val settled = transactionService.subscribeOperationGroupStatuses(groupId)
-            .first { states -> states.none { it.status == DurableTxStatus.PENDING_SUBMISSION } }
+        val settled = withTimeoutOrNull(SUBMISSION_TIMEOUT) {
+            transactionService.subscribeOperationGroupStatuses(groupId)
+                .first { states -> states.none { it.status == DurableTxStatus.PENDING_SUBMISSION } }
+        }
 
-        return if (settled.any { it.status == DurableTxStatus.FAILURE }) {
+        return if (settled == null || settled.any { it.status == DurableTxStatus.FAILURE }) {
             coinageLogW("Transfer could not be submitted group=${groupId.value}")
             Result.failure(TransferSubmissionFailedException())
         } else {

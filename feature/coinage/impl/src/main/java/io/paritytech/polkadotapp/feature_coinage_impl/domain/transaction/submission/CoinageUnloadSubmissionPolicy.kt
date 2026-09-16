@@ -20,6 +20,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleC
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
@@ -49,15 +50,24 @@ class CoinageUnloadSubmissionPolicy @Inject constructor(
 ) : AsyncDurableSubmissionPolicy {
     override val chainId: ChainId get() = chainAssetProvider.chainId()
 
-    /** Whether a rebuild can still land depends on the chain, which only [prepareSubmission] may read. */
-    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray): Boolean =
-        CoinageSubmissionParams.hasRetryWindow(params)
+    /**
+     * A transfer scheduled to be built once is never built again. Otherwise the failure decides: see
+     * [retryableFailure]. Whether a rebuild can still land depends on the chain, which only [prepareSubmission]
+     * may read.
+     */
+    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray, failure: DurableFailureKind): Boolean {
+        val transfer = CoinageSubmissionParams.decodeTransfer(params).getOrNull() ?: return false
+
+        return transfer.retryFailures && retryableFailure(failure, timeProvider.now(), transfer.buildUntil)
+    }
 
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
     ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
         val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrElse { return@runCancellableCatching Result.failure(it) }
         val (unloads, unbuildable) = resolveUnloads(transactions, assets)
+
+        if (unloads.isEmpty()) return@runCancellableCatching Result.success(unbuildable.associateWith { SubmissionPreparation.GiveUp })
 
         val look = awaitInputs(
             presence = voucherRepository.subscribeVouchersInRecycler().map { vouchers ->
@@ -136,7 +146,7 @@ class CoinageUnloadSubmissionPolicy @Inject constructor(
                 coinageLogE("unload-rebuild-impossible entry=${tx.id.value} reason=ledger-or-params-unreadable")
                 unbuildable += tx.id
             } else {
-                unloads += ScheduledUnload(tx.id, resolved, resolvedOutputs, params.retryUntil ?: timeProvider.now())
+                unloads += ScheduledUnload(tx.id, resolved, resolvedOutputs, params.buildUntil)
             }
         }
 

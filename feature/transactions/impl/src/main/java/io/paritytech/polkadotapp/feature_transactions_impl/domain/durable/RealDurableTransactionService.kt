@@ -86,7 +86,7 @@ class RealDurableTransactionService @Inject constructor(
             .onSuccess { ids ->
                 durabilityLogI(
                     "entries-scheduled domain=${domain.value} group=${groupId.value} " +
-                        "entries=${ids.map { it.value }} policies=${policies.map { it.id }.distinct()}"
+                        "entries=${ids.map { it.value }} policies=${policies.map { it.id.value }.distinct()}"
                 )
 
                 // Nothing is built until the executor reads these rows, so this is safe while an enclosing
@@ -131,7 +131,7 @@ class RealDurableTransactionService @Inject constructor(
             "entry-registered ${durabilityLogId(domain, id, attempt.txHash, registration.groupId)} " +
                 "checkpoint=${attempt.checkpoint.blockNumber} mortality=${attempt.mortalityBlocks} " +
                 "window=${attempt.checkpoint.blockNumber}..${attempt.checkpoint.blockNumber + attempt.mortalityBlocks} " +
-                "policy=${registration.policy?.id}"
+                "policy=${registration.policy?.id?.value}"
         )
     }
 

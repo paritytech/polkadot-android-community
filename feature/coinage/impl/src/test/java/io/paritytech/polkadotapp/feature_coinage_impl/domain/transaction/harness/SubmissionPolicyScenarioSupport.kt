@@ -10,10 +10,12 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPreparation
 import kotlinx.coroutines.awaitCancellation
 
@@ -43,7 +45,7 @@ class ScriptedSubmissionPolicy(
     /** Every call's transactions, in call order. */
     val prepared = mutableListOf<List<DurableTxId>>()
 
-    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray): Boolean = true
+    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray, failure: DurableFailureKind): Boolean = true
 
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
@@ -71,7 +73,7 @@ fun DurabilityHarness.givenSubmissionPolicy(behaviour: PolicyBehaviour): Scripte
     return policy
 }
 
-fun scriptedPolicy() = SubmissionPolicy(SCRIPTED_POLICY_ID, byteArrayOf().toDataByteArray())
+fun scriptedPolicy() = SubmissionPolicy(SubmissionPolicyId(SCRIPTED_POLICY_ID), byteArrayOf().toDataByteArray())
 
 /** One coin in, [outputCoins] out, registered with the scripted policy so a proven failure is built again. */
 suspend fun DurabilityHarness.registerRetriable(

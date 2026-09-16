@@ -23,7 +23,7 @@ private val HOLD_OUT = 30.seconds
 
 /**
  * How long one call waits while nothing it asks about is visible. Returning then costs the executor another
- * call, and keeps a deadline that passes meanwhile from going unnoticed until the next look.
+ * call, and bounds how long a look that never arrives can hold a call open.
  */
 private val IDLE_LIMIT = 5.minutes
 
@@ -33,6 +33,10 @@ class InputsLook<K>(
     val present: Set<K>,
     /** Whether any look was taken at all: only a look can say an input is absent. */
     val looked: Boolean,
+    /**
+     * When this look was returned. [presence] is a live subscription that emits on every change, so a later
+     * time than the last emission still describes what the chain holds.
+     */
     val takenAt: Instant,
 ) {
     /** Proven absent past its [deadline], which is the only thing that ends a transaction's retries. */
@@ -41,11 +45,12 @@ class InputsLook<K>(
 
 /**
  * The inputs of [wanted] that [presence] shows, once every one of them is visible, once [HOLD_OUT] has passed
- * since some of them were, or once a look was taken after [earliestDeadline].
+ * since some of them were, or once [earliestDeadline] passes after a look was taken — waking at the deadline
+ * rather than waiting for the chain to change.
  *
  * [presence] reports the whole set it can see on each look; a look it cannot take must not be emitted, so a
- * failed read never erases what the chain last showed. Each look is consumed once, so a caller that acts on a
- * partial look and asks again waits for the chain to change rather than spinning on the same answer.
+ * failed read never erases what the chain last showed. Every call opens its own subscription, which starts from
+ * what the chain holds now.
  */
 @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 suspend fun <K> awaitInputs(
@@ -60,8 +65,9 @@ suspend fun <K> awaitInputs(
         var latest: Set<K>? = null
 
         withTimeoutOrNull(IDLE_LIMIT) {
+            var look = looks.receive().intersect(wanted)
+
             while (true) {
-                val look = looks.receive().intersect(wanted)
                 latest = look
 
                 when {
@@ -72,6 +78,9 @@ suspend fun <K> awaitInputs(
                     }
                     timeProvider.now() >= earliestDeadline -> break
                 }
+
+                look = withTimeoutOrNull(earliestDeadline - timeProvider.now()) { looks.receive() }?.intersect(wanted)
+                    ?: look
             }
         }
 

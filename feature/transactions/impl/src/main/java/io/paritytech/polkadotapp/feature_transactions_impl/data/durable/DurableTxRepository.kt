@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Operati
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionHash
@@ -86,7 +87,10 @@ interface DurableTxRepository {
     /** Emits the transactions waiting to be built whenever the ledger changes. */
     fun subscribePendingSubmissions(): Flow<List<ScheduledDurableTx>>
 
-    suspend fun getPendingSubmissions(policyId: String, groupId: OperationGroupId?): Result<List<ScheduledDurableTx>>
+    suspend fun getPendingSubmissions(
+        policyId: SubmissionPolicyId,
+        groupId: OperationGroupId?,
+    ): Result<List<ScheduledDurableTx>>
 
     /** Replaces the attempt of a transaction waiting to be built and makes it pending. Returns whether it wrote. */
     suspend fun startAttempt(id: DurableTxId, attempt: DurableTxAttempt): Result<Boolean>
@@ -177,10 +181,10 @@ class RealDurableTxRepository @Inject constructor(
         dao.subscribePendingSubmissions().map { rows -> rows.mapNotNull { it.toScheduledOrNull() } }
 
     override suspend fun getPendingSubmissions(
-        policyId: String,
+        policyId: SubmissionPolicyId,
         groupId: OperationGroupId?,
     ): Result<List<ScheduledDurableTx>> = runCatching {
-        dao.getPendingSubmissions(policyId, groupId?.value).mapNotNull { it.toScheduledOrNull() }
+        dao.getPendingSubmissions(policyId.value, groupId?.value).mapNotNull { it.toScheduledOrNull() }
     }
 
     override suspend fun startAttempt(id: DurableTxId, attempt: DurableTxAttempt): Result<Boolean> = runCatching {
@@ -272,7 +276,7 @@ class RealDurableTxRepository @Inject constructor(
         mortalityBlocks = attempt.mortalityBlocks,
         successDetectedAt = null,
         status = DurableTxLocal.Status.PENDING,
-        submissionPolicyId = policy?.id,
+        submissionPolicyId = policy?.id?.value,
         submissionPolicyParams = policy?.params?.value,
     )
 
@@ -285,7 +289,7 @@ class RealDurableTxRepository @Inject constructor(
         mortalityBlocks = null,
         successDetectedAt = null,
         status = DurableTxLocal.Status.PENDING_SUBMISSION,
-        submissionPolicyId = policy.id,
+        submissionPolicyId = policy.id.value,
         submissionPolicyParams = policy.params.value,
     )
 
@@ -310,7 +314,7 @@ class RealDurableTxRepository @Inject constructor(
         val policyId = submissionPolicyId ?: return null
         val params = submissionPolicyParams ?: return null
 
-        return SubmissionPolicy(policyId, params.toDataByteArray())
+        return SubmissionPolicy(SubmissionPolicyId(policyId), params.toDataByteArray())
     }
 
     private fun DurableTxLocal.toScheduledOrNull(): ScheduledDurableTx? {

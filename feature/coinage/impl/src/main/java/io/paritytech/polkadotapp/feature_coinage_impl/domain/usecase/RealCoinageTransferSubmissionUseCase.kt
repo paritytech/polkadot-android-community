@@ -19,7 +19,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.mintCoin
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ClaimRetryParams
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ClaimSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSubmissionParams
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -123,7 +123,7 @@ class RealCoinageTransferSubmissionUseCase @Inject constructor(
                 extrinsic = extrinsic,
                 inputs = assets.inputs,
                 outputs = assets.outputs,
-                policy = CoinageSubmissionParams.claimPolicy(ClaimRetryParams(retryUntil, coin.key)),
+                policy = CoinageSubmissionParams.claimPolicy(ClaimSubmissionParams(retryUntil, coin.key)),
             )
         }
     }

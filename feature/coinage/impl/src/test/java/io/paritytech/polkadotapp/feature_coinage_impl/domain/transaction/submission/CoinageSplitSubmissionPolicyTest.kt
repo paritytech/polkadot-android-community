@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
@@ -38,6 +39,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -243,7 +245,7 @@ class CoinageSplitSubmissionPolicyTest {
     /** A transfer with no window — the merchant path — is abandoned the moment a look shows its input missing. */
     @Test
     fun `a transfer scheduled without a retry window gives up as soon as its input is seen missing`() = runTest {
-        val split = splitOf(1, retryUntil = null)
+        val split = splitOf(1, retryUntil = WINDOW_OPEN, retryFailures = false)
         givenLedgerRecords(split)
         givenChain(look())
 
@@ -286,16 +288,82 @@ class CoinageSplitSubmissionPolicyTest {
 
     @Test
     fun `a transfer scheduled without a retry window is never retried`() = runTest {
-        val split = splitOf(1, retryUntil = null)
+        val split = splitOf(1, retryFailures = false)
 
-        assertFalse(policy.canRetry(mockk(), split.scheduled.policy.params))
+        assertFalse(policy.canRetry(mockk(), split.scheduled.policy.params, DurableFailureKind.EXPIRED))
     }
 
     @Test
     fun `a transfer scheduled with a retry window is retried`() = runTest {
         val split = splitOf(1)
 
-        assertTrue(policy.canRetry(mockk(), split.scheduled.policy.params))
+        assertTrue(policy.canRetry(mockk(), split.scheduled.policy.params, DurableFailureKind.EXPIRED))
+    }
+
+    /** An attempt that simply never got included may land if built again, however late that is. */
+    @Test
+    fun `an attempt that expired is retried even after the window`() = runTest {
+        val split = splitOf(1)
+        givenWindowClosed()
+
+        assertTrue(policy.canRetry(mockk(), split.scheduled.policy.params, DurableFailureKind.EXPIRED))
+    }
+
+    /** A dispatch failure would most likely repeat, so only the window bounds how often it is rebuilt. */
+    @Test
+    fun `a dispatch failure is retried only while the window is open`() = runTest {
+        val split = splitOf(1)
+
+        assertTrue(policy.canRetry(mockk(), split.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
+
+        givenWindowClosed()
+
+        assertFalse(policy.canRetry(mockk(), split.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
+    }
+
+    @Test
+    fun `a rejected attempt is retried only while the window is open`() = runTest {
+        val split = splitOf(1)
+
+        assertTrue(policy.canRetry(mockk(), split.scheduled.policy.params, DurableFailureKind.REJECTED))
+
+        givenWindowClosed()
+
+        assertFalse(policy.canRetry(mockk(), split.scheduled.policy.params, DurableFailureKind.REJECTED))
+    }
+
+    /** The merchant path builds its transfer once: no failure, however it happened, is built again. */
+    @Test
+    fun `a transfer scheduled to be built once is never retried`() = runTest {
+        val split = splitOf(1, retryFailures = false)
+
+        DurableFailureKind.entries.forEach { failure ->
+            assertFalse("$failure was retried", policy.canRetry(mockk(), split.scheduled.policy.params, failure))
+        }
+    }
+
+    // ---- deadlines ----
+
+    /**
+     * Nothing changes on a quiet chain, so waiting for the next look would notice a deadline only whenever the
+     * call happens to return. The policy wakes at the deadline instead.
+     */
+    @Test
+    fun `a deadline that passes on a quiet chain is noticed without a new look`() = runTest {
+        val split = splitOf(1, retryUntil = WINDOW_OPEN + QUIET_DEADLINE)
+        givenLedgerRecords(split)
+        every { timeProvider.now() } answers {
+            if (testScheduler.currentTime >= QUIET_DEADLINE.inWholeMilliseconds) WINDOW_CLOSED else WINDOW_OPEN
+        }
+        givenChain(look())
+
+        val outcome = prepare(split)
+
+        assertGaveUp(outcome, split)
+        assertTrue(
+            "the deadline was noticed only at ${testScheduler.currentTime}ms",
+            testScheduler.currentTime < IDLE_LIMIT.inWholeMilliseconds,
+        )
     }
 
     // ---- harness ----
@@ -335,7 +403,7 @@ class CoinageSplitSubmissionPolicyTest {
     }
 
     /** One coin split into two, every coin with its own key; a seed keeps different splits' coins apart. */
-    private fun splitOf(seed: Int, retryUntil: Instant? = RETRY_UNTIL): ScheduledSplit {
+    private fun splitOf(seed: Int, retryUntil: Instant = RETRY_UNTIL, retryFailures: Boolean = true): ScheduledSplit {
         val input = coinOf(seed * 10)
         val outputs = listOf(coinOf(seed * 10 + 1), coinOf(seed * 10 + 2))
         knownCoins += input
@@ -345,7 +413,7 @@ class CoinageSplitSubmissionPolicyTest {
             id = DurableTxId(seed.toLong()),
             domainId = COINAGE_DOMAIN,
             groupId = GROUP,
-            policy = CoinageSubmissionParams.splitPolicy(TransferSubmissionParams(retryUntil)),
+            policy = CoinageSubmissionParams.splitPolicy(TransferSubmissionParams(retryUntil, retryFailures)),
         )
 
         return ScheduledSplit(scheduled, input, outputs)
@@ -414,5 +482,8 @@ class CoinageSplitSubmissionPolicyTest {
         val RETRY_UNTIL = Instant.fromEpochSeconds(1_000)
         val WINDOW_OPEN = Instant.fromEpochSeconds(500)
         val WINDOW_CLOSED = Instant.fromEpochSeconds(1_500)
+
+        val QUIET_DEADLINE = 60.seconds
+        val IDLE_LIMIT = 5.minutes
     }
 }

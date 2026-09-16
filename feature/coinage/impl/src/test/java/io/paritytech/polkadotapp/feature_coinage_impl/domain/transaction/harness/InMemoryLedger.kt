@@ -23,6 +23,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Operati
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionHash
@@ -194,7 +195,7 @@ private class InMemoryDurableTxRepository(private val store: InMemoryLedger) : D
         store.revisions.map { store.pendingSubmissions { true } }
 
     override suspend fun getPendingSubmissions(
-        policyId: String,
+        policyId: SubmissionPolicyId,
         groupId: OperationGroupId?,
     ): Result<List<ScheduledDurableTx>> = store.read {
         store.pendingSubmissions { it.policy.id == policyId && it.groupId == groupId }
@@ -452,6 +453,7 @@ private fun InMemoryLedger.groupStates(groupId: CoinageOperationGroupId) =
             status = entry.status,
             inputs = entryAssets.inputs.map { it.toCoinageInput() },
             outputs = entryAssets.outputs.mapNotNull { it.asset },
+            hasSubmissionPolicy = entry.id in policies,
         )
     }
 

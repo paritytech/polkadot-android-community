@@ -23,8 +23,14 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUBMISSION
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
-import org.mockito.ArgumentMatchers.isNull
+import kotlinx.coroutines.test.runTest
+import kotlin.time.Duration.Companion.minutes
 import org.mockito.Mockito
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import kotlin.time.ExperimentalTime
@@ -69,6 +75,7 @@ class RealPrepareCoinageTransferUseCaseTest {
     private val splitStrategy: SplitCoinStrategy = mock()
     private val exactStrategy: ExactMatchStrategy = mock()
     private val handoffCommit: CoinageHandoffCommit = mock()
+    private val timeProvider: TimeProvider = mock<TimeProvider>().also { whenever(it.now()).thenReturn(NOW) }
 
     private val useCase = RealPrepareCoinageTransferUseCase(
         assetSelector = assetSelector,
@@ -79,6 +86,7 @@ class RealPrepareCoinageTransferUseCaseTest {
         chainAssetProvider = mock(),
         memoBuilder = memoBuilder,
         transactionService = transactionService,
+        timeProvider = timeProvider,
     )
 
     private val amount: BigDecimal = BigDecimal.TEN
@@ -201,6 +209,24 @@ class RealPrepareCoinageTransferUseCaseTest {
         verify(handoffCommit, never()).commit()
     }
 
+    /** The coins stay reserved and their transactions stay scheduled; only the screen stops waiting. */
+    @Test
+    fun `a merchant send that is not submitted in time fails`() = runTest {
+        withSplitScheduling()
+        withSchedulingAccepted()
+        whenever(transactionService.subscribeOperationGroupStatuses(anyGroupId())).thenReturn(
+            flow {
+                emit(listOf(stateOf(PENDING_SUBMISSION)))
+                awaitCancellation()
+            }
+        )
+
+        val prepared = prepareMerchantSend()
+
+        assertTrue(prepared.exceptionOrNull() is TransferSubmissionFailedException)
+        verify(handoffCommit, never()).commit()
+    }
+
     @Test
     fun `a merchant send fails when a transaction could not be submitted`() = runBlocking<Unit> {
         withSplitScheduling()
@@ -212,7 +238,10 @@ class RealPrepareCoinageTransferUseCaseTest {
         assertTrue(prepared.exceptionOrNull() is TransferSubmissionFailedException)
     }
 
-    /** Low latency is the merchant flow's whole point, so nothing about it may wait hours on a rebuild. */
+    /**
+     * Low latency is the merchant flow's whole point, so nothing about it may wait hours on a rebuild: it is
+     * built once, and only waits a moment for its inputs to be seen.
+     */
     @Test
     fun `a merchant send is never retried`() = runBlocking<Unit> {
         withSplitScheduling()
@@ -222,7 +251,21 @@ class RealPrepareCoinageTransferUseCaseTest {
         prepareMerchantSend()
 
         val verified = verify(splitStrategy)
-        with(eq(StalenessReportCollector.NoOp)) { verified.schedule(isNull()) }
+        with(eq(StalenessReportCollector.NoOp)) {
+            verified.schedule(eq(TransferSubmissionParams(buildUntil = NOW + 1.minutes, retryFailures = false)))
+        }
+    }
+
+    @Test
+    fun `a chat send is retried until its window`() = runBlocking<Unit> {
+        withSplitScheduling()
+
+        prepareChatSend()
+
+        val verified = verify(splitStrategy)
+        with(eq(StalenessReportCollector.NoOp)) {
+            verified.schedule(eq(TransferSubmissionParams(buildUntil = RETRY_UNTIL, retryFailures = true)))
+        }
     }
 
     private suspend fun prepareChatSend(chatPlan: TransferPlan = splitPlan) =
@@ -268,6 +311,7 @@ class RealPrepareCoinageTransferUseCaseTest {
         status = status,
         inputs = splitTransaction.inputs,
         outputs = splitTransaction.outputs,
+        hasSubmissionPolicy = true,
     )
 
     /** A value class over String: the matcher is what counts, the wrapped value only has to be non-null. */
@@ -298,13 +342,14 @@ class RealPrepareCoinageTransferUseCaseTest {
     )
 
     private val splitTransaction = CoinageScheduledTransactionRequest(
-        policy = SubmissionPolicy("split", byteArrayOf().toDataByteArray()),
+        policy = SubmissionPolicy(SubmissionPolicyId("split"), byteArrayOf().toDataByteArray()),
         inputs = listOf(CoinageInput.Coin.Own(testKey(1))),
         outputs = listOf(OwnAsset.Coin(testKey(2))),
     )
 
     private companion object {
         val RETRY_UNTIL: Instant = Instant.fromEpochSeconds(1_000)
+        val NOW: Instant = Instant.fromEpochSeconds(500)
     }
 
     private fun coinOf(derivationIndex: Int) = Coin(

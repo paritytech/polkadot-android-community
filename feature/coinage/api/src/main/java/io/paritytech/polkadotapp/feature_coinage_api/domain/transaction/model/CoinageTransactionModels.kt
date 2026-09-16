@@ -63,6 +63,8 @@ data class CoinageTransactionState(
     val status: DurableTxStatus,
     val inputs: List<CoinageInput>,
     val outputs: List<OwnAsset>,
+    /** Registered with a submission policy, so a failure here already had every rebuild it was allowed. */
+    val hasSubmissionPolicy: Boolean,
 )
 
 /**

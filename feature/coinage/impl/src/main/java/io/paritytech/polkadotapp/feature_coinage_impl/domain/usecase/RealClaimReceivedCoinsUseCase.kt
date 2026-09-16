@@ -80,9 +80,10 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
         while (true) {
             settled = awaitKnownOperationsSettled(groupId, keys.keys, report = ::send)
 
-            // A claim that failed is built again by the engine, into the same coin, for as long as its window
-            // allows — so a settled group only ever holds finalized claims and ones that can never land.
-            val unclaimed = keys.keys - settled.finalizedCoins()
+            // A claim that failed is built again by the engine, into the same coin, for as long as its policy
+            // allows. One its policy gave up on is not claimed again here: a new claim would mint into a coin
+            // nothing that spends the recorded one would ever see.
+            val unclaimed = keys.keys - settled.finalizedCoins() - settled.coinsGivenUpByPolicy()
 
             // Every coin has a claim that finalized. Claim finished.
             if (unclaimed.isEmpty()) break
@@ -196,6 +197,10 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
      */
     private fun List<CoinageTransactionState>.finalizedCoins(): Set<AccountId> =
         filter { it.status == DurableTxStatus.FINALIZED_SUCCESS }.receivedInputs()
+
+    /** Coins whose claim failed after every rebuild its submission policy allowed. */
+    private fun List<CoinageTransactionState>.coinsGivenUpByPolicy(): Set<AccountId> =
+        filter { it.status == DurableTxStatus.FAILURE && it.hasSubmissionPolicy }.receivedInputs() - finalizedCoins()
 
     /**
      * Coins an attempt of ours failed on, so they are waiting on a retry rather than on a block — whether the

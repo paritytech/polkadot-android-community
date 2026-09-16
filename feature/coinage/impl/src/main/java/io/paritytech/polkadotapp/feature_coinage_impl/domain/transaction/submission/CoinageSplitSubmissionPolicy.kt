@@ -16,6 +16,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
@@ -38,15 +39,25 @@ class CoinageSplitSubmissionPolicy @Inject constructor(
 ) : AsyncDurableSubmissionPolicy {
     override val chainId: ChainId get() = chainAssetProvider.chainId()
 
-    /** Whether a rebuild can still land depends on the chain, which only [prepareSubmission] may read. */
-    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray): Boolean =
-        CoinageSubmissionParams.hasRetryWindow(params)
+    /**
+     * A transfer scheduled to be built once is never built again. Otherwise the failure decides: see
+     * [retryableFailure]. Whether a rebuild can still land depends on the chain, which only [prepareSubmission]
+     * may read.
+     */
+    override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray, failure: DurableFailureKind): Boolean {
+        val transfer = CoinageSubmissionParams.decodeTransfer(params).getOrNull() ?: return false
+
+        return transfer.retryFailures && retryableFailure(failure, timeProvider.now(), transfer.buildUntil)
+    }
 
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
     ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
         val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrElse { return@runCancellableCatching Result.failure(it) }
         val (splits, unbuildable) = resolveSplits(transactions, assets)
+        val gaveUp = unbuildable.associateWith { SubmissionPreparation.GiveUp }
+
+        if (splits.isEmpty()) return@runCancellableCatching Result.success(gaveUp)
 
         val look = awaitInputs(
             presence = coinRepository.subscribeCoinPresence(chainId, splits.map { it.coinToSplit.accountId }),
@@ -76,7 +87,7 @@ class CoinageSplitSubmissionPolicy @Inject constructor(
             }
         }
 
-        Result.success((decided + unbuildable.map { it to SubmissionPreparation.GiveUp }).toMap())
+        Result.success(decided.toMap() + gaveUp)
     }.flatten()
 
     private suspend fun resolveSplits(
@@ -100,7 +111,7 @@ class CoinageSplitSubmissionPolicy @Inject constructor(
                 coinageLogE("split-rebuild-impossible entry=${tx.id.value} reason=ledger-or-params-unreadable")
                 unbuildable += tx.id
             } else {
-                splits += Split(tx.id, input, outputs.filterNotNull(), params.retryUntil ?: timeProvider.now())
+                splits += Split(tx.id, input, outputs.filterNotNull(), params.buildUntil)
             }
         }
 

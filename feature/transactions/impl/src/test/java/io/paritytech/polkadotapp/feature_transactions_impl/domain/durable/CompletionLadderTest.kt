@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.network.binding.BlockHash
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.HeadKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
@@ -220,6 +221,32 @@ class CompletionLadderTest {
         )
 
         assertDecided(DurableTxStatus.FAILURE, outcome)
+    }
+
+    /** A policy decides whether to build again from this: a dispatch that failed would most likely fail again. */
+    @Test
+    fun `a failed dispatch is reported as a dispatch failure`() = runBlocking<Unit> {
+        val outcome = evaluate(
+            tx = tx(),
+            oracle = says(),
+            search = TransactionSearchResult.Found(block(110), ExtrinsicOutcome.FAILURE),
+        )
+
+        assertEquals(DurableFailureKind.DISPATCH_FAILED, assertDecided(DurableTxStatus.FAILURE, outcome).verdict.failure)
+    }
+
+    @Test
+    fun `a transaction that never ran within its window is reported as expired`() = runBlocking<Unit> {
+        val provenAbsent = evaluate(tx = tx(), oracle = says(notCompletedAtFinalized = true), finalized = MORTALITY_END + 1)
+        val searchedAbsent = evaluate(
+            tx = tx(),
+            oracle = says(),
+            finalized = MORTALITY_END + 1,
+            search = TransactionSearchResult.NotFound(wholeRangeRead = true),
+        )
+
+        assertEquals(DurableFailureKind.EXPIRED, assertDecided(DurableTxStatus.FAILURE, provenAbsent).verdict.failure)
+        assertEquals(DurableFailureKind.EXPIRED, assertDecided(DurableTxStatus.FAILURE, searchedAbsent).verdict.failure)
     }
 
     @Test

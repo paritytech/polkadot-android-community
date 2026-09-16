@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.PreSubmissionValidationFailed
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ResubmitWhenValidFactory
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
@@ -158,7 +159,7 @@ class DurableSubmissionTracker @Inject constructor(
             durabilityLogD("${logId(id)} in-block block=${at?.blockNumber} outcome=$outcome")
 
             if (outcome == ExtrinsicOutcome.SUCCESS) {
-                propose(id, txHash, Verdict(DurableTxStatus.PENDING_SUCCESS, successDetectedAt = at))
+                propose(id, txHash, Verdict(DurableTxStatus.PENDING_SUCCESS, successDetectedAt = at, failure = null))
             }
             false
         }
@@ -175,10 +176,10 @@ class DurableSubmissionTracker @Inject constructor(
 
             when (outcome) {
                 ExtrinsicOutcome.SUCCESS ->
-                    propose(id, txHash, Verdict(DurableTxStatus.FINALIZED_SUCCESS, blockOf(id, status.blockHash)))
+                    propose(id, txHash, Verdict(DurableTxStatus.FINALIZED_SUCCESS, blockOf(id, status.blockHash), failure = null))
 
                 ExtrinsicOutcome.FAILURE ->
-                    propose(id, txHash, Verdict(DurableTxStatus.FAILURE, successDetectedAt = null))
+                    propose(id, txHash, Verdict(DurableTxStatus.FAILURE, successDetectedAt = null, DurableFailureKind.DISPATCH_FAILED))
 
                 null -> Unit
             }
@@ -195,7 +196,7 @@ class DurableSubmissionTracker @Inject constructor(
             // propagated when recovery declined to resubmit, so nothing can ever include these bytes:
             // finalized-grade evidence without waiting for finality.
             if (status.exception is PreSubmissionValidationFailed) {
-                propose(id, txHash, Verdict(DurableTxStatus.FAILURE, successDetectedAt = null))
+                propose(id, txHash, Verdict(DurableTxStatus.FAILURE, successDetectedAt = null, DurableFailureKind.REJECTED))
             }
             true
         }
@@ -212,7 +213,7 @@ class DurableSubmissionTracker @Inject constructor(
         val entry = repository.getEntry(id).getOrNull() ?: return
         if (entry.successDetectedAt?.blockHash != blockHash) return
 
-        propose(id, txHash, Verdict(DurableTxStatus.PENDING, successDetectedAt = null))
+        propose(id, txHash, Verdict(DurableTxStatus.PENDING, successDetectedAt = null, failure = null))
     }
 
     /**

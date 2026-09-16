@@ -7,10 +7,12 @@ import io.mockk.mockk
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Verdict
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
@@ -38,7 +40,19 @@ class DurableVerdictWriterTest {
 
         writer.write(ENTRY, FAILURE)
 
-        verifyWritten(Verdict(DurableTxStatus.PENDING_SUBMISSION, successDetectedAt = null))
+        verifyWritten(Verdict(DurableTxStatus.PENDING_SUBMISSION, successDetectedAt = null, failure = null))
+    }
+
+    /** The policy decides with the reason in hand, since a failure that would repeat must not loop. */
+    @Test
+    fun `the policy is told why the attempt failed`() = runBlocking<Unit> {
+        withPolicy(REFERENCE)
+        withWritesSucceeding()
+        coEvery { policy.canRetry(any(), any(), any()) } returns false
+
+        writer.write(ENTRY, Verdict(DurableTxStatus.FAILURE, successDetectedAt = null, DurableFailureKind.DISPATCH_FAILED))
+
+        coVerify { policy.canRetry(ENTRY, REFERENCE.params, DurableFailureKind.DISPATCH_FAILED) }
     }
 
     @Test
@@ -88,7 +102,7 @@ class DurableVerdictWriterTest {
     @Test
     fun `a failure is not written when its policy throws deciding`() = runBlocking<Unit> {
         withPolicy(REFERENCE)
-        coEvery { policy.canRetry(any(), any()) } throws IllegalStateException("broken params")
+        coEvery { policy.canRetry(any(), any(), any()) } throws IllegalStateException("broken params")
 
         val result = writer.write(ENTRY, FAILURE)
 
@@ -99,12 +113,12 @@ class DurableVerdictWriterTest {
     @Test
     fun `a verdict other than failure is written as it is, without asking the policy`() = runBlocking<Unit> {
         withWritesSucceeding()
-        val success = Verdict(DurableTxStatus.PENDING_SUCCESS, CheckpointBlock(12, "0x12"))
+        val success = Verdict(DurableTxStatus.PENDING_SUCCESS, CheckpointBlock(12, "0x12"), failure = null)
 
         writer.write(ENTRY, success)
 
         verifyWritten(success)
-        coVerify(exactly = 0) { policy.canRetry(any(), any()) }
+        coVerify(exactly = 0) { policy.canRetry(any(), any(), any()) }
     }
 
     /** The compare-and-set carries the attempt, so a verdict about old bytes cannot land on a rebuilt row. */
@@ -123,7 +137,7 @@ class DurableVerdictWriterTest {
     }
 
     private fun withPolicyRetrying(retry: Boolean) {
-        coEvery { policy.canRetry(ENTRY, REFERENCE.params) } returns retry
+        coEvery { policy.canRetry(ENTRY, REFERENCE.params, DurableFailureKind.EXPIRED) } returns retry
     }
 
     private fun withWritesSucceeding() {
@@ -137,9 +151,9 @@ class DurableVerdictWriterTest {
     private companion object {
         const val POLICY_ID = "test-policy"
 
-        val REFERENCE = SubmissionPolicy(POLICY_ID, byteArrayOf(1, 2).toDataByteArray())
+        val REFERENCE = SubmissionPolicy(SubmissionPolicyId(POLICY_ID), byteArrayOf(1, 2).toDataByteArray())
 
-        val FAILURE = Verdict(DurableTxStatus.FAILURE, successDetectedAt = null)
+        val FAILURE = Verdict(DurableTxStatus.FAILURE, successDetectedAt = null, DurableFailureKind.EXPIRED)
 
         val ENTRY = DurableTxEntry(
             id = DurableTxId(7),

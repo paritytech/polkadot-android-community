@@ -79,7 +79,11 @@ class UnloadExtrinsicBuilder @Inject constructor(
         buildAll(unloads, context, freeUnloadTokens, personProver, peopleCollection, chain)
     }
 
-    /** After submission, not after resolving: a token picked for a transaction that never left is still there to be picked again. */
+    /**
+     * After a successful build, not after resolving: a token picked for an extrinsic that was never built is still
+     * there to be picked again. An attempt the engine then declines to start is over-counted until the tracker's
+     * next refresh, which is the safe direction.
+     */
     suspend fun noteUnloadsHappened(count: Int) {
         quotaTracker.noteUnloadsHappened(count)
     }

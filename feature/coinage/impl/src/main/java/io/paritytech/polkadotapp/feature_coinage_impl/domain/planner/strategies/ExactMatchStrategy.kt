@@ -4,9 +4,8 @@ import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessRepor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import javax.inject.Inject
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 
 class ExactMatchStrategyFactory @Inject constructor(
     private val transactionService: CoinageTransactionService,
@@ -28,9 +27,8 @@ class ExactMatchStrategy(
      *
      * Marks no region: a local handoff mark cannot stall.
      */
-    @OptIn(ExperimentalTime::class)
     context(_: StalenessReportCollector)
-    override suspend fun schedule(retryUntil: Instant?): Result<ScheduledTransfer> {
+    override suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer> {
         val handedOff = coins.map { OwnAsset.Coin(it.derivationIndex) }
 
         return transactionService.preCommitHandoff(handedOff)
