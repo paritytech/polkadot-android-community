@@ -84,8 +84,8 @@ private const val CROSS_EXTENT_RATIO = 0.308f
 private const val CROSS_RADIUS_RATIO = 0.483f
 
 /**
- * The two lengths one indicator is drawn from. [Bar] is the Chats-header and tab-bar size; [Panel] is the
- * same drawing at the size the "Network Status" rows use.
+ * The two lengths one indicator is drawn from. [Bar] is the Chats-header size and the default; [Panel] is
+ * the same drawing at the size the "Network Status" rows use.
  */
 @Immutable
 data class ChainIndicatorSize(
