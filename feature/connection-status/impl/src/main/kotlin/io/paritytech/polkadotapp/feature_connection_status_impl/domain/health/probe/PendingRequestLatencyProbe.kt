@@ -3,8 +3,8 @@ package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.p
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealthScore
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.ChainHealthThresholds
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.PendingRequestTracker
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -24,8 +24,7 @@ class PendingRequestLatencyProbe @Inject constructor(
         return combine(context.pendingRequests, context.ticks) { pending, _ ->
             val latency = tracker.update(pending, timeProvider.now().toEpochMilliseconds()).milliseconds
 
-            ChainMetricReading.PendingRequestLatency(
-                latency = latency,
+            ChainMetricReading.NodeResponsiveness(
                 score = if (latency > threshold) ChainHealthScore.Zero else ChainHealthScore.Perfect,
             )
         }.distinctUntilChangedBy { it.score }

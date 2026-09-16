@@ -7,7 +7,7 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.BlockProductionAnchor
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.BlockProductionAnchorDataSource
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.BlockProductionWindow
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.ChainHealthThresholds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -31,9 +31,7 @@ class BlockProductionProbe @Inject constructor(
         val expectedBlocks = (ChainHealthThresholds.MIN_BLOCK_PRODUCTION_WINDOW / blockTime)
             .roundToInt()
             .coerceAtLeast(ChainHealthThresholds.MIN_EXPECTED_BLOCKS)
-        // Derived from the count, not the other way round, so the window holds exactly what it expects.
-        val production = BlockProductionWindow(window = blockTime * expectedBlocks, expectedBlocks = expectedBlocks)
-        production.restart(timeProvider.now())
+        val production = BlockProductionWindow(blockTime = blockTime, expectedBlocks = expectedBlocks)
 
         val connects = context.connection
             .map { it == ChainConnectionPresentation.Connected }
@@ -63,8 +61,6 @@ class BlockProductionProbe @Inject constructor(
                     Event.Tick -> Unit
                 }
 
-                // Only the first few block times have nothing to judge by; past that the window scales
-                // its verdict to however much of itself has run rather than assuming the rest went well.
                 val measured = production.produced(now) ?: fullWindow(expectedBlocks)
 
                 ChainMetricReading.BlockProduction(recentBlocks = measured.blocks, expectedBlocks = measured.expected)

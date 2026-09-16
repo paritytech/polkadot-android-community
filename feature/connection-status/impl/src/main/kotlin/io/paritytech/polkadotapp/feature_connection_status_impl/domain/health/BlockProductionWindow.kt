@@ -8,10 +8,10 @@ import kotlin.time.Instant
 // Heights rather than arrival counts: a lost head notification must not read as a stall.
 @OptIn(ExperimentalTime::class)
 class BlockProductionWindow(
-    private val window: Duration,
+    private val blockTime: Duration,
     private val expectedBlocks: Int,
 ) {
-    private val blockTime = window / expectedBlocks
+    private val window = blockTime * expectedBlocks
     private val minObservation = blockTime * MIN_OBSERVED_BLOCKS
 
     private val samples = ArrayDeque<Sample>()
@@ -34,7 +34,6 @@ class BlockProductionWindow(
         dropExpired(orderedAt)
     }
 
-    // chainTimeSpan is measured from the blocks' own timestamps, not the device clock.
     fun seed(headHeight: Int, chainTimeSpan: Duration, at: Instant) {
         // Repeats the data source's check: mapping an inconsistent span to a full window would report
         // a healthy chain on input already known to be wrong.
@@ -62,8 +61,7 @@ class BlockProductionWindow(
         val newest = samples.lastOrNull() ?: return Measured(blocks = 0, expected = expectedOver(at - since))
         val anchor = samples.lastOrNull { it.at <= at - window } ?: samples.first()
         val expected = expectedOver(at - anchor.at)
-        // Heights only ever grow, except across a reorg deeper than the window, and a chain cannot do
-        // better than everything it owed over the interval being measured.
+        // Heights only grow except across a deep reorg, and nothing beats everything it owed.
         val blocks = (newest.height - anchor.height).coerceIn(0, expected)
 
         return Measured(blocks = blocks, expected = expected)

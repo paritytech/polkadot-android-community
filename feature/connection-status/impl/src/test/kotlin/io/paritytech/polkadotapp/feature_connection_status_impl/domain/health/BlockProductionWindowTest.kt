@@ -18,7 +18,7 @@ class BlockProductionWindowTest {
         window.restart(T0)
 
         assertNull(window.produced(T0 + 5.seconds))
-        assertEquals(expected(3), window.produced(T0 + 6.seconds))
+        assertEquals(measured(0, 3), window.produced(T0 + 6.seconds))
     }
 
     @Test
@@ -42,8 +42,6 @@ class BlockProductionWindowTest {
         assertEquals(measured(5, 15), window.produced(T0 + 50.seconds))
     }
 
-    // The verdict is scaled to the interval actually measured, so a chain keeping up reads as keeping up
-    // from the first few blocks rather than after a whole window.
     @Test
     fun `a chain keeping up is judged against what it owed so far, not a whole window`() {
         val window = peopleWindow()
@@ -68,8 +66,6 @@ class BlockProductionWindowTest {
         assertEquals(measured(blocks = 2, expected = 2), window.produced(T0 + 7500.milliseconds))
     }
 
-    // The whole point of the change: a connected chain producing nothing must not wait out a window
-    // before it is reported, whether or not the anchor answered.
     @Test
     fun `a chain producing nothing is reported after a few block times, not a whole window`() {
         val window = peopleWindow()
@@ -172,7 +168,7 @@ class BlockProductionWindowTest {
 
     @Test
     fun `a slow bulletin chain shows its share at once instead of after a full window`() {
-        val window = BlockProductionWindow(window = 60.seconds, expectedBlocks = 10)
+        val window = BlockProductionWindow(blockTime = 6.seconds, expectedBlocks = 10)
         window.seed(headHeight = 1000, chainTimeSpan = 10.minutes, at = T0)
 
         assertEquals(measured(1, 10), window.produced(T0))
@@ -215,11 +211,9 @@ class BlockProductionWindowTest {
         assertEquals(measured(0, 3), window.produced(T0 + 36.seconds))
     }
 
-    private fun peopleWindow() = BlockProductionWindow(window = 30.seconds, expectedBlocks = 15)
+    private fun peopleWindow() = BlockProductionWindow(blockTime = 2.seconds, expectedBlocks = 15)
 
     private fun measured(blocks: Int, expected: Int) = BlockProductionWindow.Measured(blocks, expected)
-
-    private fun expected(expected: Int) = BlockProductionWindow.Measured(blocks = 0, expected = expected)
 
     private companion object {
         val T0: Instant = Instant.fromEpochMilliseconds(1_000_000)

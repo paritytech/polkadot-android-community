@@ -1,4 +1,4 @@
-package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring
+package io.paritytech.polkadotapp.feature_connection_status_impl.domain.health
 
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds

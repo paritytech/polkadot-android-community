@@ -4,7 +4,7 @@ import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.Chai
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainMetricReading
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.BlockProductionAnchor
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.BlockProductionAnchorDataSource
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.ChainHealthThresholds
 import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.anyInt
@@ -33,20 +33,26 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class BlockProductionProbeTest {
     @Test
-    fun `the window widens until at least ten blocks fit`() = runTest {
+    fun `a two second chain expects a block for every two seconds of the window`() = runTest {
         withNoAnchor()
 
-        val people = collectReadings(blockTime = 2.seconds)
+        val readings = collectReadings(blockTime = 2.seconds)
         runCurrent()
-        assertEquals(15, people.last().expectedBlocks)
 
-        val bulletin = collectReadings(blockTime = 6.seconds)
-        runCurrent()
-        assertEquals(10, bulletin.last().expectedBlocks)
+        assertEquals(15, readings.last().expectedBlocks)
     }
 
-    // Three block times is the whole grace an unanswered anchor buys: past that the chain is judged on
-    // what it owed over the interval measured, not assumed to have produced a full window.
+    // A flat window would leave the six-second chain expecting five blocks, one per band.
+    @Test
+    fun `a six second chain widens its window until ten blocks fit`() = runTest {
+        withNoAnchor()
+
+        val readings = collectReadings(blockTime = 6.seconds)
+        runCurrent()
+
+        assertEquals(10, readings.last().expectedBlocks)
+    }
+
     @Test
     fun `an unanswered anchor is optimistic only for the first few block times`() = runTest {
         withNoAnchor()
@@ -155,8 +161,8 @@ class BlockProductionProbeTest {
         assertEquals(1, readings.last().recentBlocks)
     }
 
-    // The clear that a reconnect performs and the seed its anchor produces must stay in that order:
-    // the other way round the anchor is wiped and the chain reads healthy for a whole window.
+    // The restart a reconnect performs and the seed its anchor produces must stay in that order: the
+    // other way round the anchor is wiped and the chain reads healthy for a whole window.
     @Test
     fun `a reconnect re-anchors instead of being cleared back to optimistic`() = runTest {
         whenever(anchorDataSource.fetch(any(), anyInt()))

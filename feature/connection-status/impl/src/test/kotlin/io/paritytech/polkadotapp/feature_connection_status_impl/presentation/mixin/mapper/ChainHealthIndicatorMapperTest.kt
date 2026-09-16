@@ -72,7 +72,7 @@ class ChainHealthIndicatorMapperTest {
     }
 
     @Test
-    fun `exactly half the expected blocks is white, the floor of its band`() {
+    fun `exactly half the expected blocks is neutral, the floor of its band`() {
         assertEquals(Band.Neutral, bandOf(connected(blocks(5, 10))))
         assertEquals(Band.Warning, bandOf(connected(blocks(4, 10))))
     }
@@ -125,13 +125,10 @@ class ChainHealthIndicatorMapperTest {
     private fun blocks(recent: Int, expected: Int): ChainMetricReading =
         ChainMetricReading.BlockProduction(recentBlocks = recent, expectedBlocks = expected)
 
-    private fun silentNode(): ChainMetricReading = ChainMetricReading.PendingRequestLatency(
-        latency = 1.seconds,
-        score = ChainHealthScore.Zero,
-    )
+    private fun silentNode(): ChainMetricReading = ChainMetricReading.NodeResponsiveness(ChainHealthScore.Zero)
 
     private companion object {
-        const val SHARE_TOLERANCE = 0.011f
+        const val SHARE_TOLERANCE = 1e-5f
         val BLOCK_TIME: Duration = 6.seconds
     }
 }

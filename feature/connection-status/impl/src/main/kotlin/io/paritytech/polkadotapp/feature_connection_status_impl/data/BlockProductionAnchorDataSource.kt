@@ -12,7 +12,7 @@ import io.paritytech.polkadotapp.chains.storage.typed.now
 import io.paritytech.polkadotapp.chains.storage.typed.timestamp
 import io.paritytech.polkadotapp.common.utils.flatten
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
-import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
+import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.ChainHealthThresholds
 import kotlinx.coroutines.withTimeoutOrNull
 import java.math.BigInteger
 import javax.inject.Inject

@@ -1,7 +1,5 @@
 package io.paritytech.polkadotapp.feature_connection_status_api.domain.model
 
-import kotlin.time.Duration
-
 /**
  * One metric's contribution for a chain. The metric type and its value are one sealed field — adding a
  * metric adds a variant here, a probe that emits it, and a UI branch that formats it. Formatting stays
@@ -20,12 +18,8 @@ sealed interface ChainMetricReading {
         val expectedBlocks: Int,
     ) : ChainMetricReading
 
-    /**
-     * How long the oldest still-pending socket request has been waiting. [score] is binary: the node
-     * either answered in time or counts as silent, since nothing else in the app times one out.
-     */
-    data class PendingRequestLatency(
-        val latency: Duration,
+    /** Whether the node is still answering: the oldest pending request either came back in time or did not. */
+    data class NodeResponsiveness(
         val score: ChainHealthScore,
     ) : ChainMetricReading
 }

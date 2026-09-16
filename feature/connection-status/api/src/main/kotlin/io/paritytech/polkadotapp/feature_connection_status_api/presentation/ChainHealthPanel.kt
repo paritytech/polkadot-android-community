@@ -21,19 +21,14 @@ import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixi
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.roundToInt
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private const val PERCENT = 100
-private val PREVIEW_BLOCK_TIME: Duration = 2.seconds
 
 /**
  * The "Network Status" breakdown behind the tab bar's connectivity item: one row per monitored chain
- * with its indicator at panel size, its name, and what the indicator is saying. The figures appear only
- * while the chain is connected and producing — in every other state the name says everything, and they
- * would either be undefined or measure something other than the chain.
+ * with its indicator at panel size, its name, and what the indicator is saying.
  */
 @Composable
 fun ChainHealthPanel(
@@ -116,13 +111,13 @@ internal fun ChainHealthIndicator.labelRes(): Int = when (this) {
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ChainHealthPanelHealthyPreview() {
-    PanelPreview(producing(1f), producing(0.93f), producing(0.9f))
+    PanelPreview(previewProducing(1f), previewProducing(0.93f), previewProducing(0.9f))
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ChainHealthPanelMixedPreview() {
-    PanelPreview(producing(0.56f), producing(0.38f), ChainHealthIndicator.Outage)
+    PanelPreview(previewProducing(0.56f), previewProducing(0.38f), ChainHealthIndicator.Outage)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
@@ -146,11 +141,3 @@ private fun PanelPreview(people: ChainHealthIndicator, hub: ChainHealthIndicator
         )
     }
 }
-
-private fun producing(share: Float) = ChainHealthIndicator.producing(share, PREVIEW_BLOCK_TIME)
-
-private fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
-    chainName = name,
-    glyph = glyph,
-    indicator = indicator,
-)

@@ -200,7 +200,8 @@ class ChainHealthIndicatorsScreenshotTest {
         File(dir, "indicator-$name.png").outputStream().use { image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    // Round caps run the drawn arc past the path's own ends, so a sweep of the ring band reads a little long.
+    // Round caps run the drawn arc past the path's own ends, so a sweep of the ring band reads long
+    // rather than short — hence the asymmetry between the two bounds.
     private fun minimumFor(share: Float): Float = share - MIN_SLACK
 
     private fun maximumFor(share: Float): Float = share + MAX_SLACK

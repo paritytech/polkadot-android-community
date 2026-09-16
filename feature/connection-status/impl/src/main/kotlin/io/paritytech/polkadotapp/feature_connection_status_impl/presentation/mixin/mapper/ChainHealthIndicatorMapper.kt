@@ -24,5 +24,5 @@ private fun ChainHealth.blockProduction(): ChainMetricReading.BlockProduction? =
     readings.filterIsInstance<ChainMetricReading.BlockProduction>().firstOrNull()
 
 private fun ChainHealth.nodeSilent(): Boolean = readings
-    .filterIsInstance<ChainMetricReading.PendingRequestLatency>()
+    .filterIsInstance<ChainMetricReading.NodeResponsiveness>()
     .any { it.score == ChainHealthScore.Zero }

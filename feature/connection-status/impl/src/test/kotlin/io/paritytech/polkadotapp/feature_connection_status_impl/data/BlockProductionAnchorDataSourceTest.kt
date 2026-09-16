@@ -19,6 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import java.math.BigInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -32,8 +33,6 @@ class BlockProductionAnchorDataSourceTest {
 
         assertEquals(1_000, anchor.headHeight)
         assertEquals(30.seconds, anchor.chainTimeSpan)
-        // Resolved once and both hashes derived from it: reading the best hash and the best height
-        // separately would leave them a block apart and flatter the span.
         assertEquals(1, chainState.headReads)
         verify(rpcCalls).getBlockHash(CHAIN_ID, 1_000.toBlockNumber())
         verify(rpcCalls).getBlockHash(CHAIN_ID, (1_000 - BLOCKS_BACK).toBlockNumber())
@@ -44,6 +43,7 @@ class BlockProductionAnchorDataSourceTest {
         withChainAt(head = BLOCKS_BACK - 1, headTimeMillis = 130_000, previousTimeMillis = 100_000)
 
         assertTrue(dataSource.fetch(CHAIN_ID, BLOCKS_BACK).isFailure)
+        verifyNoInteractions(rpcCalls)
     }
 
     @Test

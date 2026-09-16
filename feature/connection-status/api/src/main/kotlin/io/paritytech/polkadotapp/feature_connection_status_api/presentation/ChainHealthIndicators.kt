@@ -176,7 +176,7 @@ internal fun ChainIndicator(
             when (val indicator = item.indicator) {
                 is ChainHealthIndicator.Producing -> when (indicator.band) {
                     Band.Full -> FullDisc(item, indicatorSize)
-                    else -> ShareArc(item, indicator, indicatorSize)
+                    Band.Neutral, Band.Warning, Band.Error -> ShareArc(item, indicator, indicatorSize)
                 }
                 ChainHealthIndicator.Outage -> NotProducingRing(item, indicatorSize)
                 ChainHealthIndicator.Connecting -> ConnectingRing(item, indicatorSize)
@@ -242,7 +242,7 @@ private fun ShareArc(
         color = when (indicator.band) {
             Band.Warning -> PolkadotTheme.colors.fg.warning
             Band.Error -> PolkadotTheme.colors.fg.error
-            else -> PolkadotTheme.colors.fg.primary
+            Band.Full, Band.Neutral -> PolkadotTheme.colors.fg.primary
         },
         indicatorSize = indicatorSize,
         trackColor = PolkadotTheme.colors.stroke.secondary,
@@ -424,9 +424,9 @@ private fun ChainShareScalePreview() {
     }
 }
 
-private fun previewProducing(share: Float) = ChainHealthIndicator.producing(share, PREVIEW_BLOCK_TIME)
+internal fun previewProducing(share: Float) = ChainHealthIndicator.producing(share, PREVIEW_BLOCK_TIME)
 
-private fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+internal fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
     chainName = name,
     glyph = glyph,
     indicator = indicator,

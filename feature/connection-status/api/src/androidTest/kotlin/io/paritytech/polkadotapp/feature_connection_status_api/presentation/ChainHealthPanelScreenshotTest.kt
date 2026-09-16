@@ -42,16 +42,16 @@ class ChainHealthPanelScreenshotTest {
     val compose = createComposeRule()
 
     @Test
-    fun fullShare() = render("share-full", producing(1f))
+    fun fullBandCaption() = render("share-full", producing(1f))
 
     @Test
-    fun whiteShare() = render("share-white", producing(0.68f))
+    fun neutralBandCaption() = render("share-neutral", producing(0.68f))
 
     @Test
-    fun warningShare() = render("share-warning", producing(0.38f))
+    fun warningBandCaption() = render("share-warning", producing(0.38f))
 
     @Test
-    fun errorShare() = render("share-error", producing(0.18f))
+    fun errorBandCaption() = render("share-error", producing(0.18f))
 
     @Test
     fun notProducingBlocks() = render("not-producing", ChainHealthIndicator.Outage)
