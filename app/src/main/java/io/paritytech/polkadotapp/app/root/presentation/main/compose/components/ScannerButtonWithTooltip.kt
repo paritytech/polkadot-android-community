@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.app.root.presentation.main.compose.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,15 +37,16 @@ import io.paritytech.polkadotapp.common.R as RCommon
  */
 @Composable
 fun ScannerIconWithTooltip(
+    modifier: Modifier = Modifier,
     tooltipVisible: Boolean,
+    active: Boolean,
     onTooltipDismiss: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        AnimatedScannerIcon(tooltipVisible)
+        AnimatedScannerIcon(animating = tooltipVisible, active = active)
 
         PolkadotTooltip(
             expanded = tooltipVisible,
@@ -69,8 +72,11 @@ fun ScannerIconWithTooltip(
 }
 
 @Composable
-private fun AnimatedScannerIcon(animating: Boolean) {
-    val restingColor = PolkadotTheme.colors.fg.secondary
+private fun AnimatedScannerIcon(animating: Boolean, active: Boolean) {
+    val restingColor by animateColorAsState(
+        targetValue = if (active) PolkadotTheme.colors.fg.primary else PolkadotTheme.colors.fg.secondary,
+        label = "ScannerIconColor",
+    )
     val accentColor = PolkadotTheme.colors.fg.tertiary
 
     val phase = remember { Animatable(0f) }

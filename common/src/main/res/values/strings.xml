@@ -901,6 +901,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="scan_invalid_code_error_message">The scanned QR code is not recognized</string>
     <string name="scan_invalid_code_error_action">Got it</string>
     <string name="scan_point_camera_at_qr_code">Scan the QR code to continue</string>
+    <string name="scan_panel_camera_permission_hint">Allow camera access to scan QR codes</string>
 
     <string name="chat_message_unsupported">Unsupported message content. Please update the app.</string>
     <string name="chat_message_compaction_unavailable">Some messages could not be retrieved and are permanently unavailable.</string>

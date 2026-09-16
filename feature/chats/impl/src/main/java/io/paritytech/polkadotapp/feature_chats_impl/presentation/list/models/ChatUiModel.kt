@@ -3,9 +3,17 @@ package io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models
 import androidx.compose.runtime.Immutable
 import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
+import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatPreviewUiModel
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatDisplayUiModel
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import kotlinx.collections.immutable.ImmutableList
+
+@Immutable
+data class ChatListScreenUiState(
+    val chainsHealth: ChainHealthIndicatorsModel,
+    val chats: LoadingState<ChatListUiState>,
+)
 
 @Immutable
 data class ChatListUiState(

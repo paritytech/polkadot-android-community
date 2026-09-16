@@ -59,6 +59,7 @@ fun PolkadotTopBar(
     titleSize: TopBarTitleSize = TopBarTitleSize.Standard,
     actions: ImmutableList<TopBarAction> = persistentListOf(),
     leadingContent: (@Composable () -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null,
 ) {
     require(actions.size <= MAX_TOP_BAR_ACTIONS) { "Top bar supports at most $MAX_TOP_BAR_ACTIONS actions" }
@@ -68,6 +69,9 @@ fun PolkadotTopBar(
         TopBarTitleSize.Large -> PolkadotTheme.typography.headline.small
     }
     val hasLeading = navigationAction != null || leadingContent != null
+    // Action buttons carry their own 12dp inset, so the bar keeps a 4dp edge next to them; a bare slot
+    // (title without a leading group, trailing content without actions) gets the full margin instead.
+    val hasBareTrailing = actions.isEmpty() && trailingContent != null
     val edgePadding = if (content != null) PolkadotTheme.spacings.mediumIncreased else PolkadotTheme.spacings.tiny
     val innerModifier = Modifier
         .statusBarsPadding()
@@ -75,7 +79,7 @@ fun PolkadotTopBar(
         .heightIn(min = TopBarHeight)
         .padding(
             start = if (content == null && !hasLeading) PolkadotTheme.spacings.mediumIncreased else edgePadding,
-            end = edgePadding,
+            end = if (content == null && hasBareTrailing) PolkadotTheme.spacings.mediumIncreased else edgePadding,
             top = PolkadotTheme.spacings.small,
             bottom = PolkadotTheme.spacings.small,
         )
@@ -90,6 +94,7 @@ fun PolkadotTopBar(
                 subtitle = subtitle,
                 titleStyle = titleStyle,
                 actions = actions,
+                trailingContent = trailingContent,
             )
         } else {
             StartTopBar(
@@ -100,6 +105,7 @@ fun PolkadotTopBar(
                 subtitle = subtitle,
                 titleStyle = titleStyle,
                 actions = actions,
+                trailingContent = trailingContent,
                 content = content,
             )
         }
@@ -114,6 +120,7 @@ private fun CenteredTopBar(
     subtitle: String?,
     titleStyle: TextStyle,
     actions: ImmutableList<TopBarAction>,
+    trailingContent: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     // Reserve equal side gutters (= the wider side) so the title is centered to the bar itself,
@@ -131,7 +138,7 @@ private fun CenteredTopBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 )
             },
-            { if (actions.isNotEmpty()) TopBarActions(actions) },
+            { TrailingGroup(actions, trailingContent) },
         ),
     ) { (startMeasurables, centerMeasurables, endMeasurables), constraints ->
         val looseConstraints = constraints.copy(minWidth = 0)
@@ -172,6 +179,7 @@ private fun StartTopBar(
     subtitle: String?,
     titleStyle: TextStyle,
     actions: ImmutableList<TopBarAction>,
+    trailingContent: (@Composable () -> Unit)?,
     content: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -201,8 +209,27 @@ private fun StartTopBar(
             )
         }
 
+        if (actions.isNotEmpty() || trailingContent != null) {
+            TrailingGroup(actions, trailingContent)
+        }
+    }
+}
+
+@Composable
+private fun TrailingGroup(
+    actions: ImmutableList<TopBarAction>,
+    trailingContent: (@Composable () -> Unit)?,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
+    ) {
         if (actions.isNotEmpty()) {
             TopBarActions(actions)
+        }
+
+        if (trailingContent != null) {
+            trailingContent()
         }
     }
 }
@@ -310,6 +337,18 @@ private fun PolkadotTopBarPreview() {
                 title = "Label",
                 titleSize = TopBarTitleSize.Large,
                 actions = persistentListOf(rememberTopBarAction(action = {}, icon = NovaIcons.More)),
+            )
+
+            // Big title with a trailing status slot instead of actions
+            PolkadotTopBar(
+                title = "Label",
+                titleSize = TopBarTitleSize.Large,
+                trailingContent = {
+                    PolkadotAvatar(
+                        model = AvatarUiModel.Mock.fromName("Status"),
+                        modifier = Modifier.size(LeadingContentSize),
+                    )
+                },
             )
 
             // Back, centered title + subtitle + action

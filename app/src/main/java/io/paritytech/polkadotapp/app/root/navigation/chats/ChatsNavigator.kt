@@ -23,10 +23,6 @@ class ChatsNavigator @Inject constructor(
         performNavigation(R.id.action_global_to_chatSearchFragment)
     }
 
-    override fun openAddContact() {
-        performNavigation(R.id.action_global_to_addContactFragment)
-    }
-
     override fun openScan() {
         if (isCurrentDestination(R.id.scanQrFragment)) return
         performNavigation(R.id.action_global_to_scan_graph)

@@ -12,31 +12,27 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.common.R
-import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.NewMessage
 import io.paritytech.polkadotapp.design.components.progress.NovaCircularProgressIndicator
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleSize
-import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.ChatTestTags
-import kotlinx.collections.immutable.persistentListOf
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthIndicators
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainIndicatorSize
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 
 @Composable
 fun ChatListHeader(
-    onAddContactClick: () -> Unit,
+    chainsHealth: ChainHealthIndicatorsModel,
     isLoading: Boolean
 ) {
     Box {
         PolkadotTopBar(
             modifier = Modifier.testTag(ChatTestTags.CHATS_TITLE),
             title = stringResource(R.string.chats_toolbar_title),
-            actions = persistentListOf(
-                rememberTopBarAction(
-                    action = onAddContactClick,
-                    icon = NovaIcons.NewMessage,
-                ),
-            ),
             titleSize = TopBarTitleSize.Large,
+            trailingContent = {
+                ChainHealthIndicators(model = chainsHealth, indicatorSize = ChainIndicatorSize.Bar)
+            },
         )
 
         AnimatedVisibility(

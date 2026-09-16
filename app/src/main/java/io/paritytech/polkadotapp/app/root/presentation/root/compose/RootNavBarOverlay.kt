@@ -78,7 +78,7 @@ fun RootNavBarOverlay(
     chainsHealth: ChainHealthIndicatorsModel,
     scannerTooltipVisible: Boolean,
     onTabSelected: (BottomTab) -> Unit,
-    onScanClicked: () -> Unit,
+    onUsernameSearchClick: () -> Unit,
     onScannerTooltipDismiss: () -> Unit,
     onAppClick: (Long) -> Unit,
     onAppClose: (Long) -> Unit,
@@ -209,6 +209,7 @@ fun RootNavBarOverlay(
                         chainsHealth = chainsHealth,
                         networkStatusExpanded = pull.networkStatusExpanded,
                         scannerTooltipVisible = tooltipVisible,
+                        scanExpanded = pull.scanExpanded,
                         // Selecting the tab you are already on adds no back-stack entry, so the
                         // panel would otherwise stay up with its tab deselected.
                         onTabSelected = { tab -> pull.collapsePanels(); onTabSelected(tab) },
@@ -216,7 +217,9 @@ fun RootNavBarOverlay(
                         onNetworkStatusClicked = { pull.toggleNetworkStatus() },
                         onAppClick = onAppClick,
                         onAppClose = onAppClose,
-                        onScanClicked = onScanClicked,
+                        onScanClicked = { onScannerTooltipDismiss(); pull.toggleScan() },
+                        onScanHandled = { navigate -> pull.collapsePanels(); navigate?.invoke() },
+                        onUsernameSearchClick = { pull.collapsePanels(); onUsernameSearchClick() },
                         onScannerTooltipDismiss = onScannerTooltipDismiss,
                     )
                 }

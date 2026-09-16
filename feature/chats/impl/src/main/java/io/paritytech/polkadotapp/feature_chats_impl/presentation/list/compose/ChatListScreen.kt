@@ -18,7 +18,9 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.co
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.IdleSearchEntry
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.SearchRevealContainer
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.compose.components.rememberSearchRevealState
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.ChatListScreenUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.ChatListUiState
+import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import kotlinx.collections.immutable.persistentListOf
 
 @Composable
@@ -27,8 +29,7 @@ fun ChatListScreen() {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     ChatListScreenInternal(
-        loadingState = state,
-        onAddContactClick = viewModel::onAddContactClick,
+        state = state,
         onChatClick = viewModel::onChatClick,
         onNewRequestsClick = viewModel::onNewRequestsClick,
         onSearchBarClick = viewModel::onSearchBarClick,
@@ -37,8 +38,7 @@ fun ChatListScreen() {
 
 @Composable
 private fun ChatListScreenInternal(
-    loadingState: LoadingState<ChatListUiState>,
-    onAddContactClick: () -> Unit,
+    state: ChatListScreenUiState,
     onChatClick: (ChatListUiState.ChatItem) -> Unit,
     onNewRequestsClick: () -> Unit,
     onSearchBarClick: () -> Unit,
@@ -50,17 +50,17 @@ private fun ChatListScreenInternal(
             modifier = Modifier.fillMaxSize()
         ) {
             ChatListHeader(
-                onAddContactClick = onAddContactClick,
-                isLoading = loadingState is LoadingState.Loading
+                chainsHealth = state.chainsHealth,
+                isLoading = state.chats is LoadingState.Loading
             )
 
-            when (loadingState) {
+            when (val chats = state.chats) {
                 is LoadingState.Loaded -> SearchRevealContainer(
                     state = revealState,
                     header = { IdleSearchEntry(onClick = onSearchBarClick) },
                     content = {
                         ChatListContent(
-                            state = loadingState.data,
+                            state = chats.data,
                             onChatClick = onChatClick,
                             onNewRequestsClick = onNewRequestsClick
                         )
@@ -78,13 +78,15 @@ private fun ChatListScreenInternal(
 private fun ChatListScreenPreview() {
     PolkadotTheme {
         ChatListScreenInternal(
-            loadingState = LoadingState.Loaded(
-                ChatListUiState(
-                    chats = persistentListOf(),
-                    pendingRequestsCount = 1
-                )
+            state = ChatListScreenUiState(
+                chainsHealth = ChainHealthIndicatorsModel(persistentListOf()),
+                chats = LoadingState.Loaded(
+                    ChatListUiState(
+                        chats = persistentListOf(),
+                        pendingRequestsCount = 1
+                    )
+                ),
             ),
-            onAddContactClick = {},
             onChatClick = {},
             onNewRequestsClick = {},
             onSearchBarClick = {},
