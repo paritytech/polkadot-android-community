@@ -103,7 +103,7 @@ private fun AddContactScreenInternal(
 
 @Composable
 private fun InitialState() {
-    CenteredMessage(text = stringResource(RCommon.string.chats_empty_state_message))
+    CenteredMessage(text = stringResource(RCommon.string.add_contact_search_prompt))
 }
 
 @Composable
