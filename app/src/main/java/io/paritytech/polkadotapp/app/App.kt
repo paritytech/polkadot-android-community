@@ -7,9 +7,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.work.Configuration
 import coil.Coil
 import coil.ImageLoader
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.paritytech.polkadotapp.app.logging.AppFileDebugTree
-import io.paritytech.polkadotapp.app.logging.CoinageFileDebugTree
+import io.paritytech.polkadotapp.app.logging.CoinageFileTree
 import io.paritytech.polkadotapp.app.root.presentation.debug.DebugShakeObserver
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.AppInitializerPipeline
@@ -30,10 +31,10 @@ class App : Application(), Configuration.Provider {
     lateinit var imageLoader: ImageLoader
 
     @Inject
-    lateinit var appFileDebugTree: AppFileDebugTree
+    lateinit var appFileDebugTree: Lazy<AppFileDebugTree>
 
     @Inject
-    lateinit var coinageFileDebugTree: CoinageFileDebugTree
+    lateinit var coinageFileTree: CoinageFileTree
 
     @Inject
     lateinit var debugShakeObserver: DebugShakeObserver
@@ -53,17 +54,19 @@ class App : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
+        Timber.plant(coinageFileTree)
+
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree(), appFileDebugTree.get())
+
+            ProcessLifecycleOwner.get().lifecycle
+                .addObserver(debugShakeObserver)
+        }
+
         remoteConfigService.init()
 
         with(ComputationalScope(ProcessLifecycleOwner.get().lifecycleScope)) {
             appInitializerPipeline.initialize()
-        }
-
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree(), appFileDebugTree, coinageFileDebugTree)
-
-            ProcessLifecycleOwner.get().lifecycle
-                .addObserver(debugShakeObserver)
         }
 
         Coil.setImageLoader(imageLoader)
