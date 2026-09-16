@@ -365,7 +365,7 @@ internal class RealVideoGameChatBotFooterInteractor @Inject constructor(
         val chainAsset = chainAssetProvider()
         val amount = when (environment) {
             TestnetEnvironment.TESTNET -> TESTNET_TOP_UP_AMOUNT
-            TestnetEnvironment.NIGHTLY, TestnetEnvironment.PRODUCTION -> NIGHTLY_TOP_UP_AMOUNT
+            TestnetEnvironment.NIGHTLY, TestnetEnvironment.SAFETY_NET, TestnetEnvironment.PRODUCTION -> NIGHTLY_TOP_UP_AMOUNT
         }
         val topUpAmount = amount.planksFromAmount(chainAsset.asset.precision)
         val recipientAccountId = accountRepository.getCandidateAccount().accountIdIn(chainAsset.chain)

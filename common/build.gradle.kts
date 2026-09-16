@@ -53,7 +53,7 @@ android {
         getByName("safetynet") {
             buildConfigField("boolean", "SAFETY_MODE", "true")
             buildConfigField("boolean", "TAB_BAR_CONNECTIVITY_INDICATOR", "true")
-            buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
+            buildConfigField("String", "TESTNET_ENVIRONMENT", "\"SAFETY_NET\"")
             buildConfigField("boolean", "ALLOW_SHORT_EVIDENCE_VIDEO", "false")
             buildConfigField("boolean", "PEER_BOT_BY_DEFAULT", "false")
             buildConfigField("boolean", "DIM1_BOT_BY_DEFAULT", "false")
@@ -103,6 +103,7 @@ dependencies {
     implementation(libs.coil.video)
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.junit)
 
     testImplementation(project(":test-shared"))

@@ -2,7 +2,7 @@ package io.paritytech.polkadotapp.common.data.network
 
 // Should be kept in-tact with common/build.gradle
 enum class TestnetEnvironment {
-    TESTNET, NIGHTLY, PRODUCTION;
+    TESTNET, NIGHTLY, SAFETY_NET, PRODUCTION;
 
     companion object {
         private val DEFAULT = NIGHTLY

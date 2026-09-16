@@ -69,7 +69,7 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     suspend fun testnetFund(): Result<Unit> {
         val amount = when (environment) {
             TestnetEnvironment.TESTNET -> TOP_UP_AMOUNT
-            TestnetEnvironment.NIGHTLY, TestnetEnvironment.PRODUCTION -> NIGHTLY_TOP_UP_AMOUNT
+            TestnetEnvironment.NIGHTLY, TestnetEnvironment.SAFETY_NET, TestnetEnvironment.PRODUCTION -> NIGHTLY_TOP_UP_AMOUNT
         }
 
         return coinageTestnetFundUseCase(amount)

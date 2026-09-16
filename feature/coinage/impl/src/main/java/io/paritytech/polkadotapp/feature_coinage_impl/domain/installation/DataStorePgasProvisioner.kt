@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_pgas_api.domain.OnExistingAllocationStr
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasChainAssetProvider
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasClaimer
 import kotlinx.coroutines.withTimeoutOrNull
+import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.minutes
 
@@ -67,13 +68,20 @@ class DataStorePgasProvisioner @Inject constructor(
 
     private suspend fun claim(account: AccountId, strategy: OnExistingAllocationStrategy): Result<Unit> {
         val collection = activePeopleCollectionUseCase.getActivePeopleCollection()
+        Timber.i("Installation registration: awaiting ring inclusion in $collection before claiming PGAS")
 
-        return peopleCheckMemberInRingUseCase.awaitIncluded(collection).flatMap {
+        return peopleCheckMemberInRingUseCase.awaitIncluded(collection).onSuccess {
+            Timber.i("Installation registration: ring inclusion in $collection confirmed")
+        }.onFailure {
+            Timber.e(it, "Installation registration: awaiting ring inclusion in $collection failed")
+        }.flatMap {
+            Timber.i("Installation registration: claiming PGAS with $strategy")
             // The claim waits for inclusion with no bound of its own, and a status stream that goes quiet would hold
             // the registration forever. Giving up is safe: a retry reads the balance first, and a claim for the same
             // slot proves the same alias, which the chain accepts once.
             withTimeoutOrNull(CLAIM_TIMEOUT) {
                 with(StalenessReportCollector.NoOp) { pgasClaimer.claim(account, strategy) }
+                    .onFailure { Timber.e(it, "Installation registration: PGAS claim failed") }
             } ?: run {
                 coinageLogW("Installation registration: PGAS claim did not report back within $CLAIM_TIMEOUT")
                 Result.failure(DataStorePgasClaimTimeoutError())

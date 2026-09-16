@@ -21,7 +21,7 @@ class RemoteConfigChainFetcher @Inject constructor(
 ) : ChainFetcher {
     private val chainsKey = when (environment) {
         TestnetEnvironment.PRODUCTION -> CONFIG_CHAINS_KEY_PRODUCTION
-        TestnetEnvironment.TESTNET, TestnetEnvironment.NIGHTLY -> CONFIG_CHAINS_KEY
+        TestnetEnvironment.TESTNET, TestnetEnvironment.NIGHTLY, TestnetEnvironment.SAFETY_NET -> CONFIG_CHAINS_KEY
     }
 
     override suspend fun getChains(): List<ChainRemote> {

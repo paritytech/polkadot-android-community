@@ -84,6 +84,7 @@ class FirebaseRemoteConfigDataSource @Inject constructor(
         return when (this) {
             TestnetEnvironment.TESTNET -> "unstable"
             TestnetEnvironment.NIGHTLY -> "nightly"
+            TestnetEnvironment.SAFETY_NET -> "safetynet"
             TestnetEnvironment.PRODUCTION -> "release"
         }
     }

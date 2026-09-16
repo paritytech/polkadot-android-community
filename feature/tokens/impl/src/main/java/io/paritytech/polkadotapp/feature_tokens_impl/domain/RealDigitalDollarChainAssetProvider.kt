@@ -38,7 +38,7 @@ class RealDigitalDollarChainAssetProvider @Inject constructor(
 
     private fun assetId(): ChainAssetId {
         return when (testnetEnvironment) {
-            TestnetEnvironment.NIGHTLY -> PUSD_PEOPLE_NIGHTLY
+            TestnetEnvironment.NIGHTLY, TestnetEnvironment.SAFETY_NET -> PUSD_PEOPLE_NIGHTLY
             TestnetEnvironment.PRODUCTION -> PUSD_PEOPLE_PRODUCTION
             TestnetEnvironment.TESTNET -> HOLLAR_PEOPLE_UNSTABLE
         }

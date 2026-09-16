@@ -21,7 +21,8 @@ class KnownChains(
                     hydration = null
                 )
 
-                TestnetEnvironment.NIGHTLY -> KnownChains(
+                TestnetEnvironment.NIGHTLY,
+                TestnetEnvironment.SAFETY_NET -> KnownChains(
                     people = Chain.Ids.NIGHTLY_PEOPLE,
                     assetHub = Chain.Ids.NIGHTLY_ASSET_HUB,
                     bulletIn = Chain.Ids.NIGHTLY_BULLET_IN,

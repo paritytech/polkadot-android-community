@@ -26,7 +26,7 @@ internal class RealTestnetTransactionOrigins @Inject constructor(
 
     override fun fundingOrigin(): SignedTransactionOrigin {
         return when (environment) {
-            TestnetEnvironment.TESTNET -> alice()
+            TestnetEnvironment.TESTNET, TestnetEnvironment.SAFETY_NET -> alice()
             TestnetEnvironment.NIGHTLY, TestnetEnvironment.PRODUCTION -> nightly()
         }
     }

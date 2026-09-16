@@ -23,6 +23,8 @@ import io.paritytech.polkadotapp.feature_members_api.domain.CheckMemberInRingUse
 import io.paritytech.polkadotapp.feature_members_api.domain.model.MemberSource
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onEach
+import timber.log.Timber
 import javax.inject.Inject
 
 class RealCheckMemberInRingUseCase @Inject constructor(
@@ -37,9 +39,12 @@ class RealCheckMemberInRingUseCase @Inject constructor(
         return combineResults(resolveKey(memberSource), membersRepository.getRingKeysPageSize(chainId)) { key, keysPerPage ->
             key to keysPerPage
         }.mapCatching { (key, keysPerPage) ->
+            Timber.i("Awaiting inclusion of $key in $collectionId on $chainId, keysPerPage=$keysPerPage")
             val included = awaitMemberIncluded(chainId, collectionId, key)
+            Timber.i("Member is included at ${included.describe()}, awaiting the ring to cover it")
             awaitRingIncludesKey(chainId, collectionId, included, keysPerPage)
-        }
+            Timber.i("Ring ${included.ringIndex.value} covers ${included.describe()}, inclusion complete")
+        }.onFailure { Timber.e(it, "Awaiting inclusion failed") }
     }
 
     override suspend fun checkIncludes(
@@ -66,6 +71,12 @@ class RealCheckMemberInRingUseCase @Inject constructor(
         key: BandersnatchPublicKey,
     ): RingPosition.Included {
         return membersRepository.subscribeMember(chainId, collectionId, key, FRESH)
+            .onEach { result ->
+                result.fold(
+                    onSuccess = { Timber.i("Member update: ${it?.describe() ?: "not a member"}") },
+                    onFailure = { Timber.w(it, "Member update failed, skipping it") },
+                )
+            }
             .mapNotNull { it.getOrNull() }
             .firstIsInstance()
     }
@@ -77,8 +88,26 @@ class RealCheckMemberInRingUseCase @Inject constructor(
         keysPerPage: Int,
     ) {
         membersRepository.subscribeRingStatus(chainId, collectionId, included.ringIndex)
+            .onEach { result ->
+                result.fold(
+                    onSuccess = { status ->
+                        val description = status?.let {
+                            "total=${it.total} included=${it.included} immutableSince=${it.immutableSince} " +
+                                "coversKey=${it.includesKey(included, keysPerPage)}"
+                        } ?: "no status"
+                        Timber.i("Ring ${included.ringIndex.value} status update: $description")
+                    },
+                    onFailure = { Timber.w(it, "Ring ${included.ringIndex.value} status update failed, skipping it") },
+                )
+            }
             .mapNotNull { it.getOrNull() }
             .first { it.includesKey(included, keysPerPage) }
+    }
+
+    private fun RingPosition.describe(): String = when (this) {
+        is RingPosition.Onboarding -> "onboarding (queuePage=$queuePage, queuedAt=$queuedAt)"
+        is RingPosition.Included -> "ring=${ringIndex.value} page=$ringPage position=$ringPosition"
+        RingPosition.Suspended -> "suspended"
     }
 
     private suspend fun resolveKey(memberSource: MemberSource): Result<BandersnatchPublicKey> = runCatching {
