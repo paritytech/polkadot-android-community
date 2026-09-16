@@ -16,10 +16,10 @@ sealed interface PocketCardUiModel {
 
         data class Amounts(
             val balance: TokenAmountModel,
-            val available: TokenAmountModel
+            val ready: TokenAmountModel
         ) {
-            val notFullyAvailable: Boolean
-                get() = balance.amount != available.amount
+            val notFullyReady: Boolean
+                get() = balance.amount != ready.amount
         }
     }
 

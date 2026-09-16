@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -19,14 +18,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.common.utils.CurrencyConfig
-import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
-import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowDownward
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpwards
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
-import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
@@ -40,6 +36,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.HoldingGeometry
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.rememberBarberPolePhase
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.holdings.rememberHoldingColors
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageBalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageCompositionUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import kotlinx.collections.immutable.persistentListOf
@@ -48,13 +45,13 @@ import io.paritytech.polkadotapp.common.R as RCommon
 /**
  * The total, the partition of it, and the holdings it is made of.
  *
- * The three category figures partition the total exactly, and the bar above them is a picture of the same
- * three buckets in the same order — both are read off one classification, so they cannot contradict each
+ * The two category figures partition the total exactly, and the bar above them is a picture of the same
+ * two buckets in the same order — both are read off one classification, so they cannot contradict each
  * other. Summing the details rows by availability reproduces the figures for the same reason.
  *
- * "Spendable", "Gaining privacy" and "Unavailable" are deliberately not the pallet's words: "recycler" and its
- * relatives stay in code identifiers and never reach the screen, and "Unavailable" avoids promising a remedy
- * for money that is simply in flight or past the age the chain accepts.
+ * "Ready" and "Clearing" are deliberately not the pallet's words: "recycler" and its relatives stay in code
+ * identifiers and never reach the screen. Clearing folds together everything that is not ready yet, whatever
+ * the reason, because to the user those reasons look alike.
  */
 @Composable
 internal fun CoinageStateCard(
@@ -62,55 +59,29 @@ internal fun CoinageStateCard(
     state: CoinageUiState.TokensState,
     detailsVisible: Boolean,
     keyVisible: Boolean,
-    shareLogsEnabled: Boolean,
     onDetailsToggled: () -> Unit,
-    onKeyToggled: () -> Unit,
-    onShareLogsClick: () -> Unit
+    onKeyToggled: () -> Unit
 ) {
     val colors = rememberHoldingColors()
     val stripePhase = rememberBarberPolePhase()
 
-    PolkadotSurface(
+    CoinageWidgetCard(
         modifier = modifier,
-        shape = RoundedCornerShape(HoldingGeometry.containerCorner),
-        color = PolkadotTheme.colors.bg.surface.container
+        title = stringResource(RCommon.string.pocket_coinage_balance_title)
     ) {
-        Column(
+        Headline(total = state.totalBalance)
+
+        CoinageCompositionBar(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(HoldingGeometry.containerPadding),
-            verticalArrangement = Arrangement.spacedBy(HoldingGeometry.containerSpacing)
-        ) {
-            NovaText(
-                text = stringResource(RCommon.string.pocket_coinage_balance_title),
-                style = PolkadotTheme.typography.title.medium,
-                color = PolkadotTheme.colors.fg.primary
-            )
+                .height(HoldingGeometry.summaryBarHeight),
+            composition = state.composition,
+            colors = colors
+        )
 
-            Headline(total = state.totalBalance)
+        CategoryLegend(state = state, colors = colors)
 
-            CoinageCompositionBar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(HoldingGeometry.summaryBarHeight),
-                composition = state.composition,
-                stripePhase = stripePhase,
-                colors = colors
-            )
-
-            CategoryLegend(state = state, stripePhase = stripePhase, colors = colors)
-
-            // Above the details disclosure rather than at the foot of the card: everything below this is
-            // the disclosure, and a button after it would move whenever the list opened.
-            if (shareLogsEnabled) {
-                PolkadotTextButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = stringResource(RCommon.string.pocket_coinage_share_logs),
-                    style = PolkadotButtonStyle.secondary(),
-                    onClick = onShareLogsClick
-                )
-            }
-
+        if (state.totalBalance.amount.signum() > 0) {
             DetailsToggle(expanded = detailsVisible, onClick = onDetailsToggled)
 
             // The key belongs to the details, not to the summary: it explains marks that are only on screen
@@ -138,39 +109,30 @@ internal fun CoinageStateCard(
 private fun Headline(total: TokenAmountModel) {
     val formatter = LocalTokenAmountFormatter.current
 
-    Column {
+    Row(horizontalArrangement = Arrangement.spacedBy(HoldingGeometry.headlineSpacing)) {
         NovaText(
-            text = stringResource(RCommon.string.pocket_coinage_total_balance),
-            style = PolkadotTheme.typography.body.small,
+            modifier = Modifier.alignByBaseline(),
+            text = formatter.formatTokenAmount(total, RoundPrecision.FIAT, withSymbol = false),
+            maxLines = 1,
+            style = PolkadotTheme.typography.headline.large,
+            color = PolkadotTheme.colors.fg.primary
+        )
+        NovaText(
+            modifier = Modifier.alignByBaseline(),
+            text = CurrencyConfig.symbol.withCurrencyTickerStyle(PolkadotTheme.typography.title.large),
+            style = PolkadotTheme.typography.title.large,
             color = PolkadotTheme.colors.fg.secondary
         )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(HoldingGeometry.headlineSpacing)) {
-            NovaText(
-                modifier = Modifier.alignByBaseline(),
-                text = formatter.formatTokenAmount(total, RoundPrecision.FIAT, withSymbol = false),
-                maxLines = 1,
-                style = PolkadotTheme.typography.headline.large,
-                color = PolkadotTheme.colors.fg.primary
-            )
-            NovaText(
-                modifier = Modifier.alignByBaseline(),
-                text = CurrencyConfig.symbol.withCurrencyTickerStyle(PolkadotTheme.typography.title.large),
-                style = PolkadotTheme.typography.title.large,
-                color = PolkadotTheme.colors.fg.secondary
-            )
-        }
     }
 }
 
 /**
- * Two rows rather than three stacked columns, so a label that wraps cannot push its own value onto a
- * different line. Every cell takes an equal third, leading-aligned.
+ * Two rows rather than stacked columns, so a label that wraps cannot push its own value onto a different
+ * line. Every cell takes an equal share, leading-aligned.
  */
 @Composable
 private fun CategoryLegend(
     state: CoinageUiState.TokensState,
-    stripePhase: androidx.compose.runtime.State<Float>,
     colors: HoldingColors
 ) {
     val formatter = LocalTokenAmountFormatter.current
@@ -179,32 +141,22 @@ private fun CategoryLegend(
         Row(horizontalArrangement = Arrangement.spacedBy(HoldingGeometry.legendColumnSpacing)) {
             LegendLabel(
                 modifier = Modifier.weight(1f),
-                label = stringResource(RCommon.string.pocket_coinage_spendable),
+                label = stringResource(RCommon.string.pocket_coinage_ready),
                 fill = colors.spendable,
-                gainingPrivacy = false,
-                stripePhase = stripePhase,
+                clearing = false,
                 colors = colors
             )
             LegendLabel(
                 modifier = Modifier.weight(1f),
-                label = stringResource(RCommon.string.pocket_coinage_gaining_privacy),
+                label = stringResource(RCommon.string.pocket_coinage_clearing),
                 fill = null,
-                gainingPrivacy = true,
-                stripePhase = stripePhase,
-                colors = colors
-            )
-            LegendLabel(
-                modifier = Modifier.weight(1f),
-                label = stringResource(RCommon.string.pocket_coinage_unavailable),
-                fill = colors.notSpendable,
-                gainingPrivacy = false,
-                stripePhase = stripePhase,
+                clearing = true,
                 colors = colors
             )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(HoldingGeometry.legendColumnSpacing)) {
-            listOf(state.spendableBalance, state.gainingPrivacyBalance, state.unavailableBalance).forEach { amount ->
+            listOf(state.readyBalance, state.clearingBalance).forEach { amount ->
                 NovaText(
                     modifier = Modifier.weight(1f),
                     text = formatter.formatTokenAmount(amount, RoundPrecision.FIAT, withSymbol = false),
@@ -222,12 +174,11 @@ private fun LegendLabel(
     modifier: Modifier = Modifier,
     label: String,
     fill: Color?,
-    gainingPrivacy: Boolean,
-    stripePhase: androidx.compose.runtime.State<Float>,
+    clearing: Boolean,
     colors: HoldingColors
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        CoinageLegendSwatch(fill = fill, gainingPrivacy = gainingPrivacy, stripePhase = stripePhase, colors = colors)
+        CoinageLegendSwatch(fill = fill, clearing = clearing, colors = colors)
 
         HorizontalSpacer { HoldingGeometry.legendSwatchLabelSpacing }
 
@@ -245,7 +196,8 @@ private fun DetailsToggle(expanded: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .padding(vertical = PolkadotTheme.spacings.small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -274,18 +226,21 @@ private fun CoinageStateCardPreview() {
                 modifier = Modifier.fillMaxWidth(),
                 state = CoinageUiState.TokensState(
                     totalBalance = TokenAmountModel.mock,
-                    spendableBalance = TokenAmountModel.mock,
-                    gainingPrivacyBalance = TokenAmountModel.mock,
-                    unavailableBalance = TokenAmountModel.mock,
-                    composition = CoinageCompositionUiModel(0.5f, 0.3f, 0.2f),
-                    holdings = persistentListOf()
+                    readyBalance = TokenAmountModel.mock,
+                    clearingBalance = TokenAmountModel.mock,
+                    composition = CoinageCompositionUiModel(readyFraction = 0.6f, clearingFraction = 0.4f),
+                    holdings = persistentListOf(),
+                    breakdown = CoinageBalanceBreakdownUiModel(
+                        availablePrivate = TokenAmountModel.mock,
+                        gainingPrivacy = TokenAmountModel.mock,
+                        pending = TokenAmountModel.mock,
+                        canSpendGainingPrivacy = true
+                    )
                 ),
                 detailsVisible = false,
                 keyVisible = false,
-                shareLogsEnabled = true,
                 onDetailsToggled = {},
-                onKeyToggled = {},
-                onShareLogsClick = {}
+                onKeyToggled = {}
             )
         }
     }

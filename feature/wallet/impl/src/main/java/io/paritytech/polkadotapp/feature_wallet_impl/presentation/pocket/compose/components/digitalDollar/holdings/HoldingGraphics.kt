@@ -144,8 +144,8 @@ internal fun rememberHoldingColors(): HoldingColors {
 }
 
 /**
- * One clock for every barber pole on screen — the summary bar, the voucher rows and the legend swatch — so
- * they cannot drift apart.
+ * One clock for every moving barber pole on screen — the voucher rows and the key — so they cannot drift
+ * apart.
  */
 @Composable
 internal fun rememberBarberPolePhase(): State<Float> =
@@ -342,7 +342,7 @@ internal const val MAX_INNER_DOTS = 4
 
 private val MARK_FRAME = Color(0xFF141418)
 
-private const val STRIPE_CYCLE_MILLIS = 600
+private const val STRIPE_CYCLE_MILLIS = 1800
 private const val STRIPE_SPLIT = 0.5f
 private const val STRIPE_EDGE = 0.001f
 

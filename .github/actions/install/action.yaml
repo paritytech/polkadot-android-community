@@ -37,6 +37,9 @@ runs:
 
     - name: 📱 Install Android SDK
       uses: android-actions/setup-android@v3
+      with:
+        # The action's default also requests the legacy `tools` package, which Google removed from the SDK repository
+        packages: platform-tools
 
     - name: 📦 Install Node.js
       uses: actions/setup-node@v6

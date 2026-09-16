@@ -50,6 +50,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.Digital
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketCardSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketContentSlide
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageBalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageCompositionUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.DigitalDollarCardDetailsUiState
@@ -277,11 +278,16 @@ private fun DigitalDollarCardDetailsPreview() {
                     CoinageUiState(
                         tokensState = CoinageUiState.TokensState(
                             totalBalance = TokenAmountModel.mock,
-                            spendableBalance = TokenAmountModel.mock,
-                            gainingPrivacyBalance = TokenAmountModel.mock,
-                            unavailableBalance = TokenAmountModel.mock,
+                            readyBalance = TokenAmountModel.mock,
+                            clearingBalance = TokenAmountModel.mock,
                             composition = CoinageCompositionUiModel.EMPTY,
-                            holdings = persistentListOf()
+                            holdings = persistentListOf(),
+                            breakdown = CoinageBalanceBreakdownUiModel(
+                                availablePrivate = TokenAmountModel.mock,
+                                gainingPrivacy = TokenAmountModel.mock,
+                                pending = TokenAmountModel.mock,
+                                canSpendGainingPrivacy = true
+                            )
                         ),
                         autoFundAvailable = true,
                         fundInProgress = false,
