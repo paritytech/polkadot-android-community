@@ -54,6 +54,8 @@ class App : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
+        // Planted before the initializers: the pipeline resumes unfinished top-ups, and Timber drops
+        // anything logged before a tree exists.
         Timber.plant(coinageFileTree)
 
         if (BuildConfig.DEBUG) {
