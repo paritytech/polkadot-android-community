@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.shareIn
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -73,6 +74,7 @@ class RealChainHealthMonitor @Inject constructor(
                 .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
 
             val context = ChainMetricContext(
+                chainId = chainId,
                 bestBlockNumber = bestBlock,
                 expectedBlockTime = blockTime,
                 pendingRequests = pendingRequests,
@@ -93,28 +95,27 @@ class RealChainHealthMonitor @Inject constructor(
         }
     }
 
-    private fun observeSocketState(chainId: ChainId): Flow<RawConnectivity> {
-        val socketStates = chainRegistry.chainsById
-            .map { connectionPool.getConnectionOrNull(chainId) }
-            .distinctUntilChanged()
-            .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
-
-        return rawConnectivity(socketStates, networkStateService.isNetworkAvailable)
-    }
+    private fun observeSocketState(chainId: ChainId): Flow<RawConnectivity> =
+        rawConnectivity(observeSocketStates(chainId), networkStateService.isNetworkAvailable)
 
     private fun observePendingRequests(chainId: ChainId): Flow<Set<Any>> =
-        chainRegistry.chainsById
-            .map { connectionPool.getConnectionOrNull(chainId) }
-            .distinctUntilChanged()
-            .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
-            .map { state -> state?.pendingRequests.orEmpty() }
+        observeSocketStates(chainId).map { state -> state?.pendingRequests.orEmpty() }
 
+    private fun observeSocketStates(chainId: ChainId) = chainRegistry.chainsById
+        .map { connectionPool.getConnectionOrNull(chainId) }
+        .distinctUntilChanged()
+        .flatMapLatest { connection -> connection?.state ?: flowOf(null) }
+
+    // Some chains set Babe::ExpectedBlockTime to 0 or 2ms, and only the Timestamp::MinimumPeriod branch
+    // of the repository sanity-checks it; unclamped, the node-silence threshold derived from it fires at once.
     private suspend fun resolveBlockTime(chainId: ChainId): Duration =
         runCatching { chainStateRepository.expectedBlockTime(chainId) }
             .getOrDefault(FALLBACK_BLOCK_TIME)
+            .coerceAtLeast(MIN_BLOCK_TIME)
 
     private companion object {
         const val CONNECTION_LABEL = "chain-health"
         val FALLBACK_BLOCK_TIME: Duration = 6.seconds
+        val MIN_BLOCK_TIME: Duration = 100.milliseconds
     }
 }

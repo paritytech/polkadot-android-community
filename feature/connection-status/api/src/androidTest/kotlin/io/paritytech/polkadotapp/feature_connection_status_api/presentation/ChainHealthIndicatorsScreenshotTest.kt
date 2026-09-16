@@ -22,7 +22,6 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.colors.PolkadotColorsPalette
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
 import kotlinx.collections.immutable.persistentListOf
@@ -36,6 +35,7 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 @RunWith(AndroidJUnit4::class)
@@ -44,49 +44,52 @@ class ChainHealthIndicatorsScreenshotTest {
     val compose = createComposeRule()
 
     @Test
-    fun healthyIsAFilledDisc() = renderAndAssert("healthy", ChainHealthIndicator.Healthy, FULL_RING, null) { it.fg.primary }
+    fun aFullShareIsAFilledDisc() =
+        renderAndAssert("share-full", producing(1f), FULL_RING, null) { it.fg.primary }
 
     @Test
     fun notProducingBlocksIsAThreeQuarterRing() =
         renderAndAssert("not-producing", ChainHealthIndicator.Outage, THREE_QUARTER_MIN, THREE_QUARTER_MAX) { it.stroke.secondary }
 
     @Test
-    fun goodSpeedIsThreeQuartersColourless() =
-        renderAndAssert("speed-good", ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.75f), THREE_QUARTER_MIN, THREE_QUARTER_MAX) { it.fg.primary }
+    fun aThreeQuarterShareFillsThreeQuartersOfTheRing() =
+        renderAndAssert("share-075", producing(0.75f), minimumFor(0.75f), maximumFor(0.75f)) { it.fg.primary }
 
     @Test
-    fun fairSpeedIsHalfAWarningArc() =
-        renderAndAssert("speed-fair", ChainHealthIndicator.ConnectionSpeed(Speed.Fair, arc = 0.5f), FAIR_MIN, FAIR_MAX) { it.fg.warning }
+    fun aHalfShareFillsHalfTheRing() =
+        renderAndAssert("share-050", producing(0.5f), minimumFor(0.5f), maximumFor(0.5f)) { it.fg.primary }
 
     @Test
-    fun lowSpeedIsAQuarterErrorArc() =
-        renderAndAssert("speed-low", ChainHealthIndicator.ConnectionSpeed(Speed.Low, arc = 0.25f), LOW_MIN, LOW_MAX) { it.fg.error }
+    fun aWarningShareDrawsInWarning() =
+        renderAndAssert("share-040", producing(0.4f), minimumFor(0.4f), maximumFor(0.4f)) { it.fg.warning }
 
-    // The band picks the colour, the arc picks the length: a Good score near its floor must draw a shorter
-    // ring than one near its ceiling, or the scale has collapsed back to one length per band.
     @Test
-    fun goodSpeedAtItsBandFloorDrawsAShorterArc() =
-        renderAndAssert("speed-good-floor", ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.5f), FAIR_MIN, FAIR_MAX) { it.fg.primary }
+    fun anErrorShareDrawsInError() =
+        renderAndAssert("share-020", producing(0.2f), minimumFor(0.2f), maximumFor(0.2f)) { it.fg.error }
 
     @Test
     fun connectingIsAColourlessRing() =
         renderAndAssert("connecting", ChainHealthIndicator.Connecting, FULL_RING, null) { it.stroke.secondary }
 
     @Test
-    fun disconnectedIsADottedRing() =
-        renderAndAssert("disconnected", ChainHealthIndicator.Disconnected, DOTTED_MIN, DOTTED_MAX) { it.stroke.secondary }
+    fun brokenIsADottedRing() =
+        renderAndAssert("broken", ChainHealthIndicator.Broken, DOTTED_MIN, DOTTED_MAX) { it.stroke.secondary }
+
+    @Test
+    fun noInternetCarriesTheSameMarkAsBroken() =
+        renderAndAssert("no-internet", ChainHealthIndicator.NoInternet, DOTTED_MIN, DOTTED_MAX) { it.stroke.secondary }
 
     // The panel draws the same states larger; a size not threaded through one drawing shows up here as a
     // ring band sampled at the wrong radius.
     @Test
-    fun panelSizeKeepsTheFairArcInItsBand() =
+    fun panelSizeKeepsTheArcAtItsShare() =
         renderAndAssert(
-            "speed-fair-panel",
-            ChainHealthIndicator.ConnectionSpeed(Speed.Fair, arc = 0.5f),
-            FAIR_MIN,
-            FAIR_MAX,
+            "share-050-panel",
+            producing(0.5f),
+            minimumFor(0.5f),
+            maximumFor(0.5f),
             indicatorSize = ChainIndicatorSize.Panel,
-        ) { it.fg.warning }
+        ) { it.fg.primary }
 
     @Test
     fun notProducingBlocksDrawsTheCrossInTheRingGap() {
@@ -118,6 +121,8 @@ class ChainHealthIndicatorsScreenshotTest {
         assertTrue("the cross should sit on the ring at the upper left", pixels[x, y].isClose(expected))
         assertTrue("the cross must not be the ring colour", !pixels[x, y].isClose(ring))
     }
+
+    private fun producing(share: Float) = ChainHealthIndicator.producing(share, BLOCK_TIME)
 
     private fun renderAndAssert(
         name: String,
@@ -152,7 +157,7 @@ class ChainHealthIndicatorsScreenshotTest {
         val share = surroundShare(image, expected)
         assertTrue("$name: the surround covers ${(share * 100).roundToInt()}% of the ring band", share >= minimumShare)
         if (maximumShare != null) {
-            assertTrue("$name: the surround covers ${(share * 100).roundToInt()}%, over this band's slice", share < maximumShare)
+            assertTrue("$name: the surround covers ${(share * 100).roundToInt()}%, over this share's slice", share < maximumShare)
         }
     }
 
@@ -168,7 +173,6 @@ class ChainHealthIndicatorsScreenshotTest {
         chainName = name,
         glyph = glyph,
         indicator = indicator,
-        lastBlockAt = null,
     )
 
     private fun surroundShare(image: ImageBitmap, expected: Color): Float {
@@ -196,24 +200,28 @@ class ChainHealthIndicatorsScreenshotTest {
         File(dir, "indicator-$name.png").outputStream().use { image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    // Round caps run the drawn arc past the path's own ends, so a sweep of the ring band reads a little long.
+    private fun minimumFor(share: Float): Float = share - MIN_SLACK
+
+    private fun maximumFor(share: Float): Float = share + MAX_SLACK
+
     private companion object {
         const val TAG = "indicators"
         const val OUTPUT_DIR_ARGUMENT = "additionalTestOutputDir"
         const val SAMPLES = 72
         val SQRT_TWO = sqrt(2f)
+        val BLOCK_TIME: Duration = 2.seconds
         const val RING_BAND_RADIUS = 0.45f
         // Must stay under the 0.098 that separates stroke.secondary from fg.disabled, or the two read as one.
         const val CHANNEL_TOLERANCE = 0.06f
         const val FULL_RING = 0.9f
+        const val MIN_SLACK = 0.07f
+        const val MAX_SLACK = 0.11f
         // The broken ring is dashed, so a ring-band sweep only ever lands on part of it.
         const val DOTTED_MIN = 0.35f
         const val DOTTED_MAX = 0.85f
-        // Each speed band drains the ring by a quarter, so each asserts its own slice and no other's.
+        // The design leaves the ring open at a fixed 270 degrees rather than reporting how far production fell.
         const val THREE_QUARTER_MIN = 0.68f
         const val THREE_QUARTER_MAX = 0.86f
-        const val FAIR_MIN = 0.43f
-        const val FAIR_MAX = 0.61f
-        const val LOW_MIN = 0.18f
-        const val LOW_MAX = 0.36f
     }
 }

@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -19,39 +17,29 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.delay
-import kotlin.time.Clock
+import kotlin.math.roundToInt
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
+import kotlin.time.DurationUnit
 import io.paritytech.polkadotapp.common.R as RCommon
 
-private val BLOCK_AGE_TICK = 1.seconds
+private const val PERCENT = 100
+private val PREVIEW_BLOCK_TIME: Duration = 2.seconds
 
 /**
- * The "Network Status" breakdown behind the tab bar's connectivity item: one row per monitored chain with
- * its indicator at panel size, its name, what the indicator is saying alongside the chain's block time,
- * and how long ago its last block landed.
+ * The "Network Status" breakdown behind the tab bar's connectivity item: one row per monitored chain
+ * with its indicator at panel size, its name, and what the indicator is saying. The figures appear only
+ * while the chain is connected and producing — in every other state the name says everything, and they
+ * would either be undefined or measure something other than the chain.
  */
 @Composable
 fun ChainHealthPanel(
     modifier: Modifier = Modifier,
     model: ChainHealthIndicatorsModel,
 ) {
-    // The rows only re-emit when the health changes, so a stalled chain would stop emitting entirely.
-    // Ageing the last block on this tick instead keeps the counter running through exactly that stall.
-    val now by produceState(Clock.System.now()) {
-        while (true) {
-            delay(BLOCK_AGE_TICK)
-            value = Clock.System.now()
-        }
-    }
-
     Column(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -64,13 +52,13 @@ fun ChainHealthPanel(
                 style = PolkadotTheme.typography.title.large,
                 color = PolkadotTheme.colors.fg.primary,
             )
-            model.chains.forEach { item -> ChainRow(item = item, now = now) }
+            model.chains.forEach { item -> ChainRow(item = item) }
         }
     }
 }
 
 @Composable
-private fun ChainRow(item: ChainHealthItemModel, now: Instant) {
+private fun ChainRow(item: ChainHealthItemModel) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
@@ -84,14 +72,9 @@ private fun ChainRow(item: ChainHealthItemModel, now: Instant) {
                 color = PolkadotTheme.colors.fg.primary,
             )
             NovaText(
-                text = stringResource(
-                    RCommon.string.chain_health_summary,
-                    stringResource(item.indicator.labelRes()),
-                    blockAge(item.lastBlockAt, now),
-                ),
+                text = item.indicator.summary(),
                 style = PolkadotTheme.typography.body.small,
                 color = PolkadotTheme.colors.fg.secondary,
-                // A long stall pushes the age into minutes; wrapping it would grow the row on a tick.
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -100,18 +83,19 @@ private fun ChainRow(item: ChainHealthItemModel, now: Instant) {
 }
 
 @Composable
-private fun blockAge(lastBlockAt: Instant?, now: Instant): String {
-    val age = lastBlockAt?.let { (now - it).coerceAtLeast(Duration.ZERO) }
+internal fun ChainHealthIndicator.summary(): String = when (this) {
+    is ChainHealthIndicator.Producing -> stringResource(
+        RCommon.string.chain_health_summary_producing,
+        stringResource(labelRes()),
+        (share * PERCENT).roundToInt(),
+        blockInterval.toDouble(DurationUnit.SECONDS).roundToInt(),
+    )
 
-    return when {
-        age == null -> stringResource(RCommon.string.chain_health_block_age_unknown)
-        age < 1.minutes -> stringResource(RCommon.string.chain_health_block_age_seconds, age.inWholeSeconds)
-        else -> stringResource(
-            RCommon.string.chain_health_block_age_minutes,
-            age.inWholeMinutes,
-            age.inWholeSeconds % 1.minutes.inWholeSeconds,
-        )
-    }
+    ChainHealthIndicator.Outage,
+    ChainHealthIndicator.Connecting,
+    ChainHealthIndicator.Broken,
+    ChainHealthIndicator.NoInternet,
+    -> stringResource(labelRes())
 }
 
 // The design names rows by the chain's role, not by the registry name of whichever network is active.
@@ -122,45 +106,29 @@ private fun ChainGlyph.nameRes(): Int = when (this) {
 }
 
 internal fun ChainHealthIndicator.labelRes(): Int = when (this) {
-    ChainHealthIndicator.Healthy -> RCommon.string.chain_health_state_speed_high
+    is ChainHealthIndicator.Producing -> RCommon.string.chain_health_state_connected
     ChainHealthIndicator.Outage -> RCommon.string.chain_health_state_not_producing
-    is ChainHealthIndicator.ConnectionSpeed -> when (speed) {
-        Speed.Good -> RCommon.string.chain_health_state_speed_good
-        Speed.Fair -> RCommon.string.chain_health_state_speed_fair
-        Speed.Low -> RCommon.string.chain_health_state_speed_low
-    }
     ChainHealthIndicator.Connecting -> RCommon.string.chain_health_state_connecting
-    ChainHealthIndicator.Disconnected -> RCommon.string.chain_health_state_broken
+    ChainHealthIndicator.Broken -> RCommon.string.chain_health_state_broken
+    ChainHealthIndicator.NoInternet -> RCommon.string.chain_health_state_no_internet
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ChainHealthPanelHealthyPreview() {
-    PanelPreview(
-        ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.72f),
-        ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.56f),
-        ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.68f),
-    )
+    PanelPreview(producing(1f), producing(0.93f), producing(0.9f))
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ChainHealthPanelMixedPreview() {
-    PanelPreview(
-        ChainHealthIndicator.Healthy,
-        ChainHealthIndicator.ConnectionSpeed(Speed.Fair, arc = 0.38f),
-        ChainHealthIndicator.Outage,
-    )
+    PanelPreview(producing(0.56f), producing(0.38f), ChainHealthIndicator.Outage)
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ChainHealthPanelDisconnectedPreview() {
-    PanelPreview(
-        ChainHealthIndicator.Disconnected,
-        ChainHealthIndicator.Disconnected,
-        ChainHealthIndicator.Connecting,
-    )
+    PanelPreview(ChainHealthIndicator.Broken, ChainHealthIndicator.NoInternet, ChainHealthIndicator.Connecting)
 }
 
 @Composable
@@ -170,19 +138,19 @@ private fun PanelPreview(people: ChainHealthIndicator, hub: ChainHealthIndicator
             modifier = Modifier.background(PolkadotTheme.colors.bg.surface.container),
             model = ChainHealthIndicatorsModel(
                 persistentListOf(
-                    previewItem("People Chain", ChainGlyph.People, people, 6.seconds),
-                    previewItem("Hub Chain", ChainGlyph.AssetHub, hub, 12.seconds),
-                    previewItem("Bulletin Chain", ChainGlyph.Bulletin, bulletin, 6.seconds),
+                    previewItem("People Chain", ChainGlyph.People, people),
+                    previewItem("Hub Chain", ChainGlyph.AssetHub, hub),
+                    previewItem("Bulletin Chain", ChainGlyph.Bulletin, bulletin),
                 ),
             ),
         )
     }
 }
 
-private fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator, blockAge: Duration) =
-    ChainHealthItemModel(
-        chainName = name,
-        glyph = glyph,
-        indicator = indicator,
-        lastBlockAt = Clock.System.now() - blockAge,
-    )
+private fun producing(share: Float) = ChainHealthIndicator.producing(share, PREVIEW_BLOCK_TIME)
+
+private fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+    chainName = name,
+    glyph = glyph,
+    indicator = indicator,
+)

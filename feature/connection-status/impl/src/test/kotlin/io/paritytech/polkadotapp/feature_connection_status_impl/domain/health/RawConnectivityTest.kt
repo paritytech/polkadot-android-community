@@ -25,11 +25,11 @@ class RawConnectivityTest {
     }
 
     @Test
-    fun `a device with no internet settles whatever the socket believes`() {
-        assertEquals(RawConnectivity.Settled, connectedSocket.toRawConnectivity(deviceOnline = false))
-        assertEquals(RawConnectivity.Settled, reconnectingSocket.toRawConnectivity(deviceOnline = false))
-        assertEquals(RawConnectivity.Settled, State.Disconnected.toRawConnectivity(deviceOnline = false))
-        assertEquals(RawConnectivity.Settled, null.toRawConnectivity(deviceOnline = false))
+    fun `a device with no internet is told apart from a socket that gave up`() {
+        assertEquals(RawConnectivity.Offline, connectedSocket.toRawConnectivity(deviceOnline = false))
+        assertEquals(RawConnectivity.Offline, reconnectingSocket.toRawConnectivity(deviceOnline = false))
+        assertEquals(RawConnectivity.Offline, State.Disconnected.toRawConnectivity(deviceOnline = false))
+        assertEquals(RawConnectivity.Offline, null.toRawConnectivity(deviceOnline = false))
     }
 
     @Test
@@ -43,7 +43,7 @@ class RawConnectivityTest {
             advanceTimeBy(300); runCurrent()
         }
 
-        assertEquals(listOf(RawConnectivity.Settled), results)
+        assertEquals(listOf(RawConnectivity.Offline), results)
     }
 
     @Test
@@ -57,12 +57,17 @@ class RawConnectivityTest {
     }
 
     @Test
-    fun `an offline start reaches the output without waiting out the settle delay`() = runTest {
+    fun `an offline start waits out the settle delay like any later loss`() = runTest {
         val online = MutableStateFlow(false)
         val results = collectResolved(online)
         advanceTimeBy(100); runCurrent()
 
-        assertEquals(listOf(RawConnectivity.Settled), results)
+        // The pipeline is rebuilt on every foreground transition, so a flag left stale while the phone
+        // slept arrives here as a first reading and would otherwise paint all three chains at once.
+        assertEquals(emptyList<RawConnectivity>(), results)
+
+        advanceTimeBy(1_500); runCurrent()
+        assertEquals(listOf(RawConnectivity.Offline), results)
     }
 
     @Test

@@ -129,6 +129,28 @@ class ConnectionSmootherTest {
         assertEquals(ChainConnectionPresentation.Connected, results.last())
     }
 
+    @Test
+    fun `no internet reports at once, without the wait a quiet socket earns`() = runTest {
+        val results = collectSmoothed()
+
+        source.emit(RawConnectivity.Connected); runCurrent()
+        source.emit(RawConnectivity.Offline); runCurrent()
+
+        assertEquals(ChainConnectionPresentation.NoInternet, results.last())
+    }
+
+    @Test
+    fun `a socket that merely went quiet still waits out the cooldown`() = runTest {
+        val results = collectSmoothed()
+
+        source.emit(RawConnectivity.Connected); runCurrent()
+        source.emit(RawConnectivity.Settled); runCurrent()
+        assertEquals(ChainConnectionPresentation.Connecting, results.last())
+
+        advanceTimeBy(5_500); runCurrent()
+        assertEquals(ChainConnectionPresentation.Disconnected, results.last())
+    }
+
     private lateinit var source: MutableSharedFlow<RawConnectivity>
 
     private fun TestScope.collectSmoothed(): List<ChainConnectionPresentation> {

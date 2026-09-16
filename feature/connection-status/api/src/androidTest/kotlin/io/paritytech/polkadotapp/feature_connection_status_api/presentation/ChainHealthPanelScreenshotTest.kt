@@ -23,7 +23,6 @@ import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator.Speed
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthItemModel
 import kotlinx.collections.immutable.persistentListOf
@@ -32,6 +31,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 // Renders the "Network Status" panel in every indicator state, inside the same rounded container the tab
@@ -42,16 +42,16 @@ class ChainHealthPanelScreenshotTest {
     val compose = createComposeRule()
 
     @Test
-    fun speedHigh() = render("speed-high", ChainHealthIndicator.Healthy)
+    fun fullShare() = render("share-full", producing(1f))
 
     @Test
-    fun speedGood() = render("speed-good", ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.68f))
+    fun whiteShare() = render("share-white", producing(0.68f))
 
     @Test
-    fun speedFair() = render("speed-fair", ChainHealthIndicator.ConnectionSpeed(Speed.Fair, arc = 0.38f))
+    fun warningShare() = render("share-warning", producing(0.38f))
 
     @Test
-    fun speedLow() = render("speed-low", ChainHealthIndicator.ConnectionSpeed(Speed.Low, arc = 0.18f))
+    fun errorShare() = render("share-error", producing(0.18f))
 
     @Test
     fun notProducingBlocks() = render("not-producing", ChainHealthIndicator.Outage)
@@ -60,15 +60,20 @@ class ChainHealthPanelScreenshotTest {
     fun connecting() = render("connecting", ChainHealthIndicator.Connecting)
 
     @Test
-    fun broken() = render("broken", ChainHealthIndicator.Disconnected)
+    fun broken() = render("broken", ChainHealthIndicator.Broken)
+
+    @Test
+    fun noInternet() = render("no-internet", ChainHealthIndicator.NoInternet)
 
     @Test
     fun mixed() = render(
         "mixed",
-        people = ChainHealthIndicator.ConnectionSpeed(Speed.Good, arc = 0.68f),
-        hub = ChainHealthIndicator.ConnectionSpeed(Speed.Low, arc = 0.18f),
-        bulletin = ChainHealthIndicator.Disconnected,
+        people = producing(0.68f),
+        hub = producing(0.18f),
+        bulletin = ChainHealthIndicator.NoInternet,
     )
+
+    private fun producing(share: Float) = ChainHealthIndicator.producing(share, BLOCK_TIME)
 
     private fun render(name: String, all: ChainHealthIndicator) = render(name, all, all, all)
 
@@ -96,9 +101,9 @@ class ChainHealthPanelScreenshotTest {
                             ChainHealthPanel(
                                 model = ChainHealthIndicatorsModel(
                                     persistentListOf(
-                                        item("People Chain", ChainGlyph.People, people, 6),
-                                        item("Hub Chain", ChainGlyph.AssetHub, hub, 12),
-                                        item("Bulletin Chain", ChainGlyph.Bulletin, bulletin, 6),
+                                        item("People Chain", ChainGlyph.People, people),
+                                        item("Hub Chain", ChainGlyph.AssetHub, hub),
+                                        item("Bulletin Chain", ChainGlyph.Bulletin, bulletin),
                                     ),
                                 ),
                             )
@@ -113,12 +118,11 @@ class ChainHealthPanelScreenshotTest {
         assertTrue("$name: no screenshot written", file.length() > 0)
     }
 
-    private fun item(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator, blockSeconds: Int) =
+    private fun item(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) =
         ChainHealthItemModel(
             chainName = name,
             glyph = glyph,
             indicator = indicator,
-            lastBlockAt = null,
         )
 
     // AGP hands the output dir over as a runner argument when it collects test outputs; without it the
@@ -137,5 +141,6 @@ class ChainHealthPanelScreenshotTest {
         const val OUTPUT_DIR_ARGUMENT = "additionalTestOutputDir"
         val PANEL_WIDTH = 370.dp
         val CONTAINER_RADIUS = 32.dp
+        val BLOCK_TIME: Duration = 2.seconds
     }
 }

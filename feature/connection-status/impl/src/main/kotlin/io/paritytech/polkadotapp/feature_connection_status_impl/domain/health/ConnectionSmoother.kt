@@ -21,6 +21,8 @@ enum class RawConnectivity {
     Connected,
     Pending,
     Settled,
+
+    Offline,
 }
 
 data class ConnectionSmoothingConfig(
@@ -45,7 +47,8 @@ data class ConnectionSmoothingConfig(
  * Hysteresis over the raw connectivity so reconnect storms read as a steady "connecting" rather than
  * flickering. A first connect reports [ChainConnectionPresentation.Connected] at once; every later one
  * waits out a stability window, extended while flapping. A settled disconnect waits out a cooldown
- * before reporting [ChainConnectionPresentation.Disconnected].
+ * before reporting [ChainConnectionPresentation.Disconnected]; a device with no network reports
+ * [ChainConnectionPresentation.NoInternet] straight away, having nothing left to confirm.
  */
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
 class ConnectionSmoother internal constructor(
@@ -79,6 +82,8 @@ class ConnectionSmoother internal constructor(
                         everConnected = true
                         emit(ChainConnectionPresentation.Connected)
                     }
+
+                    current == RawConnectivity.Offline -> emit(ChainConnectionPresentation.NoInternet)
 
                     current == RawConnectivity.Settled -> {
                         emit(ChainConnectionPresentation.Connecting)

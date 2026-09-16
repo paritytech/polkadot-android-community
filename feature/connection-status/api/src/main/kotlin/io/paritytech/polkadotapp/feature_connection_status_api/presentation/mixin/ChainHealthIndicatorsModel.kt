@@ -2,7 +2,11 @@ package io.paritytech.polkadotapp.feature_connection_status_api.presentation.mix
 
 import androidx.compose.runtime.Immutable
 import kotlinx.collections.immutable.ImmutableList
-import kotlin.time.Instant
+import kotlin.time.Duration
+
+private const val FULL_FROM = 5f / 6f
+private const val NEUTRAL_FROM = 0.5f
+private const val WARNING_FROM = 0.25f
 
 enum class ChainGlyph {
     People,
@@ -11,30 +15,57 @@ enum class ChainGlyph {
 }
 
 /**
- * What one chain's indicator draws, in the priority the health rules give them: connectivity first,
- * then block production, then connection speed; [Healthy] only when none of them has anything to say.
+ * What one chain's indicator draws, in the priority the health rules give them: reaching the chain
+ * comes first, then what it is producing. You cannot judge a chain you cannot see.
  */
 sealed interface ChainHealthIndicator {
-    data object Healthy : ChainHealthIndicator
+    /**
+     * Connected, with [share] of the expected blocks produced over the sampling window, and the block
+     * interval that share implies. The ring draws [share] of the circle directly.
+     */
+    data class Producing(
+        val share: Float,
+        val blockInterval: Duration,
+    ) : ChainHealthIndicator {
+        val band: Band
+            get() = Band.of(share)
+    }
 
+    /** Connected, producing nothing at all. */
     data object Outage : ChainHealthIndicator
-
-    /** [arc] is the share of the ring the indicator fills; it travels inside the [speed] band's quarter. */
-    data class ConnectionSpeed(
-        val speed: Speed,
-        val arc: Float,
-    ) : ChainHealthIndicator
 
     data object Connecting : ChainHealthIndicator
 
-    /** No node responding, a connected node that no longer answers, or a device with no internet. */
-    data object Disconnected : ChainHealthIndicator
+    /** The connection to the node will not hold, or the node stopped answering. */
+    data object Broken : ChainHealthIndicator
 
-    /** How far the chain has fallen from a speed that needs no comment; the band above these is [Healthy]. */
-    enum class Speed {
-        Good,
-        Fair,
-        Low,
+    /** The device has no network. */
+    data object NoInternet : ChainHealthIndicator
+
+    /** The quarters of the ring the design changes colour on. [Full] closes it into a solid disc. */
+    enum class Band {
+        Full,
+        Neutral,
+        Warning,
+        Error,
+        ;
+
+        companion object {
+            fun of(share: Float): Band = when {
+                share >= FULL_FROM -> Full
+                share >= NEUTRAL_FROM -> Neutral
+                share >= WARNING_FROM -> Warning
+                else -> Error
+            }
+        }
+    }
+
+    companion object {
+        /** A share of zero is not slow production but none at all, and has no interval to report. */
+        fun producing(share: Float, blockTime: Duration): ChainHealthIndicator = when {
+            share <= 0f -> Outage
+            else -> share.coerceAtMost(1f).let { Producing(share = it, blockInterval = blockTime / it.toDouble()) }
+        }
     }
 }
 
@@ -48,6 +79,4 @@ data class ChainHealthItemModel(
     val chainName: String,
     val glyph: ChainGlyph,
     val indicator: ChainHealthIndicator,
-    /** When the last block landed. The view ages it on its own tick, so a stalled chain keeps counting. */
-    val lastBlockAt: Instant?,
 )

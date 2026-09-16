@@ -8,4 +8,7 @@ sealed interface ChainConnectionPresentation {
     data object Connected : ChainConnectionPresentation
     data object Connecting : ChainConnectionPresentation
     data object Disconnected : ChainConnectionPresentation
+
+    /** The device has no network at all, which is not the chain's fault and reads differently. */
+    data object NoInternet : ChainConnectionPresentation
 }
