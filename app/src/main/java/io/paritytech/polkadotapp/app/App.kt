@@ -54,12 +54,6 @@ class App : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        remoteConfigService.init()
-
-        with(ComputationalScope(ProcessLifecycleOwner.get().lifecycleScope)) {
-            appInitializerPipeline.initialize()
-        }
-
         Timber.plant(coinageFileTree)
 
         if (BuildConfig.DEBUG) {
@@ -67,6 +61,12 @@ class App : Application(), Configuration.Provider {
 
             ProcessLifecycleOwner.get().lifecycle
                 .addObserver(debugShakeObserver)
+        }
+
+        remoteConfigService.init()
+
+        with(ComputationalScope(ProcessLifecycleOwner.get().lifecycleScope)) {
+            appInitializerPipeline.initialize()
         }
 
         Coil.setImageLoader(imageLoader)
