@@ -238,8 +238,9 @@ class RealSendEnterAmountInteractor @Inject constructor(
             withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
                 coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
                     .transformWhile { states ->
-                        emit(states.toSendState())
-                        states.values.any { it.status.isPending }
+                        val state = states.toSendState()
+                        emit(state)
+                        !state.isTerminal
                     }
                     .catch { error ->
                         if (error is CancellationException) throw error
@@ -289,8 +290,8 @@ private fun Map<AccountId, CoinagePaymentState>.toSendState(): SendState = when 
 
     values.any { it.status == CoinagePaymentStatus.AwaitingClaim } -> SendState.Detected
 
-    // Proven claims only: one seen in a best-chain block can be forked away, and this state is final.
-    values.all { (it.status as? CoinagePaymentStatus.Claimed)?.finalized == true } -> SendState.Complete
+    // A best-block claim is enough, although a fork can still undo it: finality is too long to keep the payer waiting.
+    values.all { it.status is CoinagePaymentStatus.Claimed } -> SendState.Complete
 
     values.any { it.status == CoinagePaymentStatus.Failed } ->
         SendState.Failed(IllegalStateException("Coins to settle were never minted on chain"))
@@ -298,5 +299,5 @@ private fun Map<AccountId, CoinagePaymentState>.toSendState(): SendState = when 
     else -> SendState.Detecting
 }
 
-private val CoinagePaymentStatus.isPending: Boolean
-    get() = this == CoinagePaymentStatus.AwaitingClaim || this == CoinagePaymentStatus.Detecting
+private val SendState.isTerminal: Boolean
+    get() = this is SendState.Complete || this is SendState.Failed
