@@ -7,6 +7,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.work.Configuration
 import coil.Coil
 import coil.ImageLoader
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.paritytech.polkadotapp.app.logging.AppFileDebugTree
 import io.paritytech.polkadotapp.app.logging.CoinageFileDebugTree
@@ -30,7 +31,7 @@ class App : Application(), Configuration.Provider {
     lateinit var imageLoader: ImageLoader
 
     @Inject
-    lateinit var appFileDebugTree: AppFileDebugTree
+    lateinit var appFileDebugTree: Lazy<AppFileDebugTree>
 
     @Inject
     lateinit var coinageFileDebugTree: CoinageFileDebugTree
@@ -59,8 +60,10 @@ class App : Application(), Configuration.Provider {
             appInitializerPipeline.initialize()
         }
 
+        Timber.plant(coinageFileDebugTree)
+
         if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree(), appFileDebugTree, coinageFileDebugTree)
+            Timber.plant(Timber.DebugTree(), appFileDebugTree.get())
 
             ProcessLifecycleOwner.get().lifecycle
                 .addObserver(debugShakeObserver)
