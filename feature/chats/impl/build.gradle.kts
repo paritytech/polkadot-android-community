@@ -39,7 +39,6 @@ dependencies {
     implementation(project(":feature:sso:api"))
     implementation(project(":feature:transaction-storage:api"))
     implementation(project(":feature:scan:api"))
-    implementation(project(":feature:connection-status:api"))
 
     implementation(project(":tools:push-notifications:api"))
     implementation(project(":tools:ipfs:api"))

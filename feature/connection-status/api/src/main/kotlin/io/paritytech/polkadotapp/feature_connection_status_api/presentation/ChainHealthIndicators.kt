@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -84,8 +87,8 @@ private const val CROSS_EXTENT_RATIO = 0.308f
 private const val CROSS_RADIUS_RATIO = 0.483f
 
 /**
- * The two lengths one indicator is drawn from. [Bar] is the Chats-header size and the default; [Panel] is
- * the same drawing at the size the "Network Status" rows use.
+ * The three lengths one indicator is drawn from. [Bar] is the top-bar and tab-bar size; [Panel] is the
+ * same drawing at the size the "Network Status" rows use.
  */
 @Immutable
 data class ChainIndicatorSize(
@@ -96,6 +99,31 @@ data class ChainIndicatorSize(
     companion object {
         val Bar = ChainIndicatorSize(diameter = 20.dp, glyph = 10.dp, ringStroke = 2.dp)
         val Panel = ChainIndicatorSize(diameter = 36.dp, glyph = 18.dp, ringStroke = 3.dp)
+    }
+}
+
+object ChainHealthBarDefaults {
+    /**
+     * Height of the bar's content row, excluding the status-bar inset. The root also inflates the
+     * content's top window inset by this amount so screens sit below the bar while their backgrounds
+     * still draw full-bleed behind it.
+     */
+    val ContentHeight = ChainIndicatorSize.Bar.diameter
+}
+
+/** Always-on, transparent, overlaid at the very top like the system status indicators. */
+@Composable
+fun ChainHealthBar(model: ChainHealthIndicatorsModel) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .height(ChainHealthBarDefaults.ContentHeight)
+            .padding(horizontal = PolkadotTheme.spacings.medium),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ChainHealthIndicators(model = model)
     }
 }
 

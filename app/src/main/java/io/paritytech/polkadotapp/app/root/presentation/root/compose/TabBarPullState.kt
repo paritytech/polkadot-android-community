@@ -68,6 +68,8 @@ class TabBarPullState(
 
     fun toggleScan() = toggle(ExpandedPanel.Scan)
 
+    fun openScan() { expandedPanel = ExpandedPanel.Scan }
+
     /** Snap to the screen's default posture: open when [forceShown] (Main), collapsed otherwise. */
     fun snapToDefault(forceShown: Boolean) {
         if (maxOffset <= 0f) return

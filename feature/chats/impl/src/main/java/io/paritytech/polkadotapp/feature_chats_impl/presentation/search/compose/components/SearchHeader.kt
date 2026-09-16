@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotButtonSize
@@ -26,6 +29,12 @@ internal fun SearchHeader(
     onScanClick: () -> Unit,
     onCancelClick: () -> Unit
 ) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -39,6 +48,7 @@ internal fun SearchHeader(
             onValueChange = onSearchChange,
             onClear = { onSearchChange("") },
             placeholder = stringResource(RCommon.string.add_contact_search_placeholder),
+            focusRequester = focusRequester,
         )
 
         PolkadotIconButton(

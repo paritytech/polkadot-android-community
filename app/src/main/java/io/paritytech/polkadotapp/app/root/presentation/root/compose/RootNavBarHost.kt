@@ -33,6 +33,7 @@ fun RootNavBarHost(navController: NavController, chainsHealth: ChainHealthIndica
         openApps = openApps,
         chainsHealth = chainsHealth,
         scannerTooltipVisible = tooltipVisible,
+        openScanPanelRequests = viewModel.scanPanelOpenRequests,
         onTabSelected = viewModel::onTabSelected,
         onUsernameSearchClick = viewModel::openUsernameSearch,
         onScannerTooltipDismiss = viewModel::dismissScannerTooltip,

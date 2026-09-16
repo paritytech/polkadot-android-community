@@ -39,7 +39,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.models.Chat
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatDraft
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatSummaryBadge
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.toUi
-import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.ChatListScreenUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.list.models.ChatListUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.util.CallResolutionContext
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.util.buildCallResolutionContext
@@ -47,10 +46,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.util.resolveCal
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.util.toCallPurposeUi
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatMessageMappingHelper
 import io.paritytech.polkadotapp.feature_chats_impl.utils.toAttachmentType
-import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -61,11 +58,8 @@ class ChatListViewModel @Inject constructor(
     private val interactor: ChatListInteractor,
     private val router: ChatsRouter,
     private val messageMappingHelper: ChatMessageMappingHelper,
-    chainHealthMixinFactory: ChainHealthMixin.Factory,
 ) : BaseViewModel() {
-    private val chainHealth = chainHealthMixinFactory.create(this)
-
-    private val chats = combine(
+    val state = combine(
         combineToPair(
             interactor.subscribeChats(),
             interactor.subscribeDrafts()
@@ -84,15 +78,11 @@ class ChatListViewModel @Inject constructor(
         )
     }
         .withLoading()
-
-    val state: StateFlow<ChatListScreenUiState> = combine(chats, chainHealth.model) { list, chainsHealth ->
-        ChatListScreenUiState(chainsHealth = chainsHealth, chats = list)
-    }
         .inBackground()
         .stateIn(
             scope = this,
             started = SharingStarted.Eagerly,
-            initialValue = ChatListScreenUiState(chainsHealth = chainHealth.model.value, chats = LoadingState.Loading)
+            initialValue = LoadingState.Loading
         )
 
     fun onSearchBarClick() {
@@ -103,6 +93,10 @@ class ChatListViewModel @Inject constructor(
         if (!interactor.handleChatOpen(chat.chatId)) {
             router.openChatFeed(ChatFeedPayload.existingChat(chat.chatId))
         }
+    }
+
+    fun onAddContactClick() {
+        router.openAddContact()
     }
 
     fun onNewRequestsClick() {

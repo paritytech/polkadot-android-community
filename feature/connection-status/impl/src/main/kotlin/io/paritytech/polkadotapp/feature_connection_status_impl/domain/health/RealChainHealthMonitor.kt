@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionR
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ConnectionPool
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
-import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.combine
 import io.paritytech.polkadotapp.common.utils.network.NetworkStateService
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
@@ -17,11 +16,8 @@ import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainHeadDa
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainHealthProbe
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.probe.ChainMetricContext
 import io.paritytech.polkadotapp.feature_connection_status_impl.domain.health.scoring.ChainHealthThresholds
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
@@ -38,8 +34,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Builds a per-chain [ChainHealth] from the smoothed socket state and the readings of the pluggable
  * probe set. The pipeline is foreground-gated by the mixin and holds the chain socket up via the ref
- * counter for as long as it runs. One pipeline serves every mixin (root tab bar, Chats header): the
- * combined flow is shared while subscribed, so the gate still releases the sockets once all of them stop.
+ * counter for as long as it runs.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
@@ -53,16 +48,9 @@ class RealChainHealthMonitor @Inject constructor(
     private val connectionSmoother: ConnectionSmoother,
     private val networkStateService: NetworkStateService,
     private val probes: Set<@JvmSuppressWildcards ChainHealthProbe>,
-    coroutineDispatchers: CoroutineDispatchers,
 ) : ChainHealthMonitor {
-    private val sharingScope = CoroutineScope(SupervisorJob() + coroutineDispatchers.computation)
-
-    private val chainsHealth: SharedFlow<List<ChainHealth>> = monitoredChainIds()
-        .map(::observeChainHealth)
-        .combine()
-        .shareIn(sharingScope, SharingStarted.WhileSubscribed(), replay = 1)
-
-    override fun observeChainsHealth(): Flow<List<ChainHealth>> = chainsHealth
+    override fun observeChainsHealth(): Flow<List<ChainHealth>> =
+        monitoredChainIds().map(::observeChainHealth).combine()
 
     private fun monitoredChainIds(): List<ChainId> = listOf(
         knownChains.people,

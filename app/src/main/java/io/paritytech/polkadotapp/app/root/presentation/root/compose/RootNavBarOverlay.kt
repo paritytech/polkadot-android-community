@@ -37,10 +37,12 @@ import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.common.presentation.tabbar.TabBarBaseInset
 import io.paritytech.polkadotapp.common.presentation.tabs.BottomTab
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
+import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import io.paritytech.polkadotapp.feature_products_api.domain.browser.TabInfo
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.coroutines.flow.Flow
 import kotlin.math.abs
 
 private val NUB_WIDTH = TabBarBaseInset
@@ -77,6 +79,7 @@ fun RootNavBarOverlay(
     openApps: ImmutableList<TabInfo>,
     chainsHealth: ChainHealthIndicatorsModel,
     scannerTooltipVisible: Boolean,
+    openScanPanelRequests: Flow<Unit>,
     onTabSelected: (BottomTab) -> Unit,
     onUsernameSearchClick: () -> Unit,
     onScannerTooltipDismiss: () -> Unit,
@@ -109,6 +112,11 @@ fun RootNavBarOverlay(
             onOffset(0.dp)
             onBarHeight(0.dp)
         }
+    }
+
+    openScanPanelRequests.collectAsEffect { _, _ ->
+        onScannerTooltipDismiss()
+        pull.openScan()
     }
 
     val scrimVisible by remember(hidden, forceShown) {
