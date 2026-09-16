@@ -49,7 +49,7 @@ class DurableSubmissionLauncher @Inject constructor(
             .onFailure { submissionOwned.release(id, attempt.txHash) }
     }
 
-    fun onSubmissionReleased() {
+    private fun onSubmissionReleased() {
         // Save a block of latency if a loop is already running, and schedule the worker in case none is.
         recoveryLoop.manualTrigger()
         recoveryScheduler.ensureRunning()

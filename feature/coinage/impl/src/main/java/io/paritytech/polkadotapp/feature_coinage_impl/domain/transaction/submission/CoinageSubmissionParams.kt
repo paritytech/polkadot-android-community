@@ -1,9 +1,9 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
-import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.decodeFromByteArray
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.utils.decodeFromByteArrayCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
 import kotlinx.serialization.Serializable
@@ -46,17 +46,18 @@ object CoinageSubmissionParams {
         ).toDataByteArray(),
     )
 
-    fun decodeTransfer(params: DataByteArray): Result<TransferSubmissionParams> = runCatching {
-        val scale = BinaryScale.decodeFromByteArray<TransferSubmissionParamsScale>(params.value)
+    fun decodeTransfer(params: DataByteArray): Result<TransferSubmissionParams> =
+        BinaryScale.decodeFromByteArrayCatching<TransferSubmissionParamsScale>(params.value).map { scale ->
+            TransferSubmissionParams(scale.retryUntilMillis?.let(Instant::fromEpochMilliseconds))
+        }
 
-        TransferSubmissionParams(scale.retryUntilMillis?.let(Instant::fromEpochMilliseconds))
-    }
+    fun decodeClaim(params: DataByteArray): Result<ClaimRetryParams> =
+        BinaryScale.decodeFromByteArrayCatching<ClaimRetryParamsScale>(params.value).map { scale ->
+            ClaimRetryParams(Instant.fromEpochMilliseconds(scale.retryUntilMillis), scale.receivedKey)
+        }
 
-    fun decodeClaim(params: DataByteArray): Result<ClaimRetryParams> = runCatching {
-        val scale = BinaryScale.decodeFromByteArray<ClaimRetryParamsScale>(params.value)
-
-        ClaimRetryParams(Instant.fromEpochMilliseconds(scale.retryUntilMillis), scale.receivedKey)
-    }
+    /** Only a transfer scheduled with a retry window is built again. */
+    fun hasRetryWindow(params: DataByteArray): Boolean = decodeTransfer(params).getOrNull()?.retryUntil != null
 
     private fun TransferSubmissionParams.encode() =
         BinaryScale.encodeToByteArray(TransferSubmissionParamsScale(retryUntil?.toEpochMilliseconds())).toDataByteArray()

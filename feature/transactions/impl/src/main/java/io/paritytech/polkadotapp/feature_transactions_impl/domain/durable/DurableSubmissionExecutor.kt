@@ -4,13 +4,14 @@ import dagger.Lazy
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPreparation
 import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableTxRepository
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -54,9 +55,6 @@ class DurableSubmissionExecutor @Inject constructor(
     private var collector: Job? = null
     private val buckets = mutableMapOf<Bucket, Job>()
 
-    /** Groups that gained a waiting transaction while their coroutine was already running. */
-    private val revisited = mutableSetOf<Bucket>()
-
     /** Idempotent. */
     fun ensureStarted() {
         scope.launch {
@@ -89,11 +87,7 @@ class DurableSubmissionExecutor @Inject constructor(
     }
 
     private suspend fun launchIfIdle(bucket: Bucket) = mutex.withLock {
-        if (buckets[bucket]?.isActive == true) {
-            revisited += bucket
-
-            return@withLock
-        }
+        if (buckets[bucket]?.isActive == true) return@withLock
 
         buckets[bucket] = scope.launch { runBucket(bucket) }
     }
@@ -138,19 +132,15 @@ class DurableSubmissionExecutor @Inject constructor(
 
         durabilityLogD("${bucket.logId()} preparing transactions=${transactions.map { it.id.value }}")
 
-        val outcomes = try {
-            policy.prepareSubmission(transactions)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            Result.failure(e)
-        }.getOrElse {
+        val outcomes = runCancellableCatching { policy.prepareSubmission(transactions) }.flatten().getOrElse {
             durabilityLogW("${bucket.logId()} prepare-failed error=$it")
 
             return false
         }
 
-        outcomes.filterKeys { id -> transactions.any { it.id == id } }
+        val ids = transactions.mapTo(mutableSetOf()) { it.id }
+
+        outcomes.filterKeys { it in ids }
             .forEach { (id, outcome) -> apply(bucket, id, outcome) }
 
         return outcomes.isNotEmpty()
@@ -185,8 +175,6 @@ class DurableSubmissionExecutor @Inject constructor(
      * left waiting for another ledger change to notice it.
      */
     private suspend fun finishBucket(bucket: Bucket): Boolean = mutex.withLock {
-        if (revisited.remove(bucket)) return@withLock false
-
         val stillPending = repository.getPendingSubmissions(bucket.policyId, bucket.groupId)
             .getOrNull()
             ?.isNotEmpty()

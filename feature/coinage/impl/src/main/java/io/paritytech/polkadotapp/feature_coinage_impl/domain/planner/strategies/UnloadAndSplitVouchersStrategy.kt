@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
@@ -64,22 +65,22 @@ class UnloadAndSplitVouchersStrategy(
     context(diagnostics: StalenessReportCollector)
     override suspend fun schedule(retryUntil: Instant?): Result<ScheduledTransfer> =
         diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
-            runCatching {
-                val minted = mintBatches()
-                val handoffCommit = transactionService.preCommitHandoff(minted.handedOff()).getOrThrow()
-                val policy = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(retryUntil))
+            runCatching { mintBatches() }.flatMap { minted ->
+                transactionService.preCommitHandoff(minted.handedOff()).map { handoffCommit ->
+                    val policy = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(retryUntil))
 
-                ScheduledTransfer(
-                    entries = minted.memoEntries(),
-                    handoffCommit = handoffCommit,
-                    transactions = minted.map { batch ->
-                        CoinageScheduledTransactionRequest(
-                            policy = policy,
-                            inputs = batch.assets.inputs,
-                            outputs = batch.assets.outputs,
-                        )
-                    },
-                )
+                    ScheduledTransfer(
+                        entries = minted.memoEntries(),
+                        handoffCommit = handoffCommit,
+                        transactions = minted.map { batch ->
+                            CoinageScheduledTransactionRequest(
+                                policy = policy,
+                                inputs = batch.assets.inputs,
+                                outputs = batch.assets.outputs,
+                            )
+                        },
+                    )
+                }
             }
         }
 

@@ -6,9 +6,12 @@ import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
@@ -42,8 +45,9 @@ class CoinageClaimSubmissionPolicy @Inject constructor(
 
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
-    ): Result<Map<DurableTxId, SubmissionPreparation>> = runCatching {
-        val (claims, unbuildable) = resolveClaims(transactions)
+    ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
+        val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrElse { return@runCancellableCatching Result.failure(it) }
+        val (claims, unbuildable) = resolveClaims(transactions, assets)
 
         val look = awaitInputs(
             presence = coinRepository.subscribeCoinPresence(chainId, claims.map { it.source }),
@@ -57,7 +61,8 @@ class CoinageClaimSubmissionPolicy @Inject constructor(
         val decided = claims.mapNotNull { claim ->
             when {
                 claim.source in look.present -> {
-                    val extrinsic = claimExtrinsicBuilder.build(chain, claim.keypair, claim.destination).getOrThrow()
+                    val extrinsic = claimExtrinsicBuilder.build(chain, claim.keypair, claim.destination)
+                        .getOrElse { return@runCancellableCatching Result.failure(it) }
                     claim.id to SubmissionPreparation.Ready(extrinsic)
                 }
 
@@ -70,12 +75,13 @@ class CoinageClaimSubmissionPolicy @Inject constructor(
             }
         }
 
-        (decided + unbuildable.map { it to SubmissionPreparation.GiveUp }).toMap()
-    }
+        Result.success((decided + unbuildable.map { it to SubmissionPreparation.GiveUp }).toMap())
+    }.flatten()
 
-    private suspend fun resolveClaims(transactions: List<ScheduledDurableTx>): Pair<List<Claim>, List<DurableTxId>> {
-        val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrThrow()
-
+    private fun resolveClaims(
+        transactions: List<ScheduledDurableTx>,
+        assets: Map<DurableTxId, EntryAssets>,
+    ): Pair<List<Claim>, List<DurableTxId>> {
         val claims = mutableListOf<Claim>()
         val unbuildable = mutableListOf<DurableTxId>()
 

@@ -30,13 +30,13 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinageAs
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.SpendScope
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
-import java.math.BigDecimal
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import kotlinx.coroutines.flow.first
+import java.math.BigDecimal
 import javax.inject.Inject
-import io.paritytech.polkadotapp.common.R as RCommon
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import io.paritytech.polkadotapp.common.R as RCommon
 
 class RealPrepareCoinageTransferUseCase @Inject constructor(
     private val assetSelector: CoinageAssetSelector,
@@ -110,18 +110,16 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
      * good. Building runs in the background, so this waits for its outcome rather than doing the work.
      */
     context(diagnostics: StalenessReportCollector)
-    private suspend fun submitNow(scheduled: ScheduledTransfer): Result<Unit> {
-        if (scheduled.transactions.isEmpty()) return Result.success(Unit)
-
-        val groupId = CoinageOperationGroupId.generateNew()
-
-        return transactionService.scheduleTransactions(scheduled.transactions, groupId)
-            .flatMap {
+    private suspend fun submitNow(scheduled: ScheduledTransfer): Result<Unit> =
+        scheduled.scheduleTransactions(transactionService).flatMap { groupId ->
+            if (groupId == null) {
+                Result.success(Unit)
+            } else {
                 diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
                     awaitSubmitted(groupId)
                 }
             }
-    }
+        }
 
     private suspend fun awaitSubmitted(groupId: CoinageOperationGroupId): Result<Unit> {
         val settled = transactionService.subscribeOperationGroupStatuses(groupId)
@@ -153,11 +151,17 @@ private class SchedulingHandoffCommit(
     private val transactionService: CoinageTransactionService,
 ) : CoinageHandoffCommit {
     override suspend fun commit(): Result<Unit> = scheduled.handoffCommit.commit().flatMap {
-        if (scheduled.transactions.isEmpty()) {
-            Result.success(Unit)
-        } else {
-            transactionService.scheduleTransactions(scheduled.transactions, CoinageOperationGroupId.generateNew())
-                .coerceToUnit()
-        }
+        scheduled.scheduleTransactions(transactionService).coerceToUnit()
     }
+}
+
+/** Returns the group the transactions were scheduled under, or null when there was nothing to schedule. */
+private suspend fun ScheduledTransfer.scheduleTransactions(
+    transactionService: CoinageTransactionService,
+): Result<CoinageOperationGroupId?> {
+    if (transactions.isEmpty()) return Result.success(null)
+
+    val groupId = CoinageOperationGroupId.generateNew()
+
+    return transactionService.scheduleTransactions(transactions, groupId).map { groupId }
 }

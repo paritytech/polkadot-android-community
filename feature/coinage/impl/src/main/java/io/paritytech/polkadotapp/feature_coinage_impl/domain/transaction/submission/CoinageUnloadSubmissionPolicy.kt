@@ -3,6 +3,8 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submis
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
@@ -10,6 +12,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ow
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.UnloadExtrinsicBuilder
@@ -46,17 +49,15 @@ class CoinageUnloadSubmissionPolicy @Inject constructor(
 ) : AsyncDurableSubmissionPolicy {
     override val chainId: ChainId get() = chainAssetProvider.chainId()
 
-    /**
-     * Only a transfer scheduled with a retry window is built again. Whether its rebuild can still land depends
-     * on the chain, which only [prepareSubmission] may read.
-     */
+    /** Whether a rebuild can still land depends on the chain, which only [prepareSubmission] may read. */
     override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray): Boolean =
-        CoinageSubmissionParams.decodeTransfer(params).getOrNull()?.retryUntil != null
+        CoinageSubmissionParams.hasRetryWindow(params)
 
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
-    ): Result<Map<DurableTxId, SubmissionPreparation>> = runCatching {
-        val (unloads, unbuildable) = resolveUnloads(transactions)
+    ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
+        val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrElse { return@runCancellableCatching Result.failure(it) }
+        val (unloads, unbuildable) = resolveUnloads(transactions, assets)
 
         val look = awaitInputs(
             presence = voucherRepository.subscribeVouchersInRecycler().map { vouchers ->
@@ -67,21 +68,21 @@ class CoinageUnloadSubmissionPolicy @Inject constructor(
             timeProvider = timeProvider,
         )
 
-        val ready = unloads.filter { look.present.containsAll(it.voucherIndices) }
-        val abandoned = (unloads - ready.toSet()).filter { unload ->
+        val (ready, notReady) = unloads.partition { look.present.containsAll(it.voucherIndices) }
+        val abandoned = notReady.filter { unload ->
             unload.voucherIndices.any { look.abandoned(it, unload.retryUntil) }
         }
 
         abandoned.forEach { coinageLogI("unload-rebuild-abandoned entry=${it.id.value} until=${it.retryUntil}") }
 
-        val built = build(ready)
+        build(ready).map { built ->
+            (built + abandoned.map { it.id to SubmissionPreparation.GiveUp } + unbuildable.map { it to SubmissionPreparation.GiveUp })
+                .toMap()
+        }
+    }.flatten()
 
-        (built + abandoned.map { it.id to SubmissionPreparation.GiveUp } + unbuildable.map { it to SubmissionPreparation.GiveUp })
-            .toMap()
-    }
-
-    private suspend fun build(ready: List<ScheduledUnload>): List<Pair<DurableTxId, SubmissionPreparation>> {
-        if (ready.isEmpty()) return emptyList()
+    private suspend fun build(ready: List<ScheduledUnload>): Result<List<Pair<DurableTxId, SubmissionPreparation>>> {
+        if (ready.isEmpty()) return Result.success(emptyList())
 
         // Re-read after the look, so every voucher carries the recycler location it is proven in now.
         val vouchers = voucherRepository.getByRingVrfKeyIndices(ready.flatMap { it.voucherIndices })
@@ -100,18 +101,17 @@ class CoinageUnloadSubmissionPolicy @Inject constructor(
                 peopleCollection = activePeopleCollectionUseCase.getActivePeopleCollection(),
                 chain = chainAssetProvider.chain(),
             )
-        }.getOrThrow()
+        }.getOrElse { return Result.failure(it) }
 
         unloadExtrinsicBuilder.noteUnloadsHappened(extrinsics.size)
 
-        return ready.zip(extrinsics) { unload, extrinsic -> unload.id to SubmissionPreparation.Ready(extrinsic) }
+        return Result.success(ready.zip(extrinsics) { unload, extrinsic -> unload.id to SubmissionPreparation.Ready(extrinsic) })
     }
 
     private suspend fun resolveUnloads(
         transactions: List<ScheduledDurableTx>,
+        assets: Map<DurableTxId, EntryAssets>,
     ): Pair<List<ScheduledUnload>, List<DurableTxId>> {
-        val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrThrow()
-
         val coinIndices = assets.values.flatMap { entry -> entry.outputs.mapNotNull { (it.asset as? OwnAsset.Coin)?.derivationIndex } }
         val coins = coinRepository.getCoinsBy(coinIndices).associateBy { it.derivationIndex }
 

@@ -3,10 +3,13 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submis
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.SplitExtrinsicBuilder
@@ -35,17 +38,15 @@ class CoinageSplitSubmissionPolicy @Inject constructor(
 ) : AsyncDurableSubmissionPolicy {
     override val chainId: ChainId get() = chainAssetProvider.chainId()
 
-    /**
-     * Only a transfer scheduled with a retry window is built again. Whether its rebuild can still land depends
-     * on the chain, which only [prepareSubmission] may read.
-     */
+    /** Whether a rebuild can still land depends on the chain, which only [prepareSubmission] may read. */
     override suspend fun canRetry(entry: DurableTxEntry, params: DataByteArray): Boolean =
-        CoinageSubmissionParams.decodeTransfer(params).getOrNull()?.retryUntil != null
+        CoinageSubmissionParams.hasRetryWindow(params)
 
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
-    ): Result<Map<DurableTxId, SubmissionPreparation>> = runCatching {
-        val (splits, unbuildable) = resolveSplits(transactions)
+    ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
+        val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrElse { return@runCancellableCatching Result.failure(it) }
+        val (splits, unbuildable) = resolveSplits(transactions, assets)
 
         val look = awaitInputs(
             presence = coinRepository.subscribeCoinPresence(chainId, splits.map { it.coinToSplit.accountId }),
@@ -61,7 +62,8 @@ class CoinageSplitSubmissionPolicy @Inject constructor(
 
             when {
                 input in look.present -> {
-                    val extrinsic = splitExtrinsicBuilder.build(chain, split.coinToSplit, split.outputs).getOrThrow()
+                    val extrinsic = splitExtrinsicBuilder.build(chain, split.coinToSplit, split.outputs)
+                        .getOrElse { return@runCancellableCatching Result.failure(it) }
                     split.id to SubmissionPreparation.Ready(extrinsic)
                 }
 
@@ -74,12 +76,13 @@ class CoinageSplitSubmissionPolicy @Inject constructor(
             }
         }
 
-        (decided + unbuildable.map { it to SubmissionPreparation.GiveUp }).toMap()
-    }
+        Result.success((decided + unbuildable.map { it to SubmissionPreparation.GiveUp }).toMap())
+    }.flatten()
 
-    private suspend fun resolveSplits(transactions: List<ScheduledDurableTx>): Pair<List<Split>, List<DurableTxId>> {
-        val assets = assetLedger.assetsOf(transactions.map { it.id }).getOrThrow()
-
+    private suspend fun resolveSplits(
+        transactions: List<ScheduledDurableTx>,
+        assets: Map<DurableTxId, EntryAssets>,
+    ): Pair<List<Split>, List<DurableTxId>> {
         val indices = assets.values.flatMap { entry -> (entry.inputs + entry.outputs).mapNotNull { (it.asset as? OwnAsset.Coin)?.derivationIndex } }
         val coins = coinRepository.getCoinsBy(indices).associateBy { it.derivationIndex }
 

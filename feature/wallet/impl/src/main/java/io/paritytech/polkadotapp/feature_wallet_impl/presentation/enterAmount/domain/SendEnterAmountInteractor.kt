@@ -3,10 +3,10 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.d
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.util.fullId
 import io.paritytech.polkadotapp.chains.util.planksFromAmount
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.validation.Validation
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.filterResultSuccessNotNull
 import io.paritytech.polkadotapp.common.utils.flatMap

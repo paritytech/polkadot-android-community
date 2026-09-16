@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
+import io.novasama.substrate_sdk_android.encrypt.keypair.Keypair
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
@@ -62,17 +63,20 @@ class RealCoinageTransferSubmissionUseCase @Inject constructor(
         groupId: CoinageOperationGroupId,
         retryUntil: Instant,
     ): Result<Unit> {
-        val keyed = coinKeys.map { it to it.deriveKeypair().publicKey.toDataByteArray() }
+        val keyed = coinKeys.map { key ->
+            val keypair = key.deriveKeypair()
+            KeyedCoin(key, keypair, keypair.publicKey.toDataByteArray())
+        }
 
         // The crowd the arriving coins hide in: every coin this operation actually moves, counted before any
         // claim is built so all of them record the same bundle.
-        val bundleSize = keyed.count { (_, accountId) -> coinsInfo.containsKey(accountId) }
+        val bundleSize = keyed.count { coinsInfo.containsKey(it.accountId) }
 
-        val claims = keyed.mapAsync { (key, accountId) ->
-            coinsInfo[accountId]?.let { info ->
-                buildClaim(ValueExponent(info.value), key, groupId, bundleSize, retryUntil)
+        val claims = keyed.mapAsync { coin ->
+            coinsInfo[coin.accountId]?.let { info ->
+                buildClaim(ValueExponent(info.value), coin, groupId, bundleSize, retryUntil)
             } ?: run {
-                coinageLogW("Claim skipped, no coin on chain group=${groupId.value} coin=$accountId")
+                coinageLogW("Claim skipped, no coin on chain group=${groupId.value} coin=${coin.accountId}")
                 Result.success(null)
             }
         }
@@ -94,15 +98,14 @@ class RealCoinageTransferSubmissionUseCase @Inject constructor(
      */
     private suspend fun buildClaim(
         valueExponent: ValueExponent,
-        key: CoinPrivateKey,
+        coin: KeyedCoin,
         groupId: CoinageOperationGroupId,
         bundleSize: Int,
         retryUntil: Instant,
     ): Result<CoinageTransactionRequest> {
         val chain = chainAssetProvider.chain()
         val transaction = coinageTransactionFactory.newTransaction()
-        val keypair = key.deriveKeypair()
-        val source = keypair.publicKey.toDataByteArray()
+        val source = coin.accountId
 
         // Nothing is known about where this coin has been: its age arrives later, from the ownership
         // subscription, and only then can its history be written. See CoinPresenceSyncService.
@@ -115,13 +118,19 @@ class RealCoinageTransferSubmissionUseCase @Inject constructor(
 
         coinageLogD("Claim built group=${groupId.value} coin=$source value=${valueExponent.value}")
 
-        return claimExtrinsicBuilder.build(chain, keypair, destination.accountId).map { extrinsic ->
+        return claimExtrinsicBuilder.build(chain, coin.keypair, destination.accountId).map { extrinsic ->
             CoinageTransactionRequest(
                 extrinsic = extrinsic,
                 inputs = assets.inputs,
                 outputs = assets.outputs,
-                policy = CoinageSubmissionParams.claimPolicy(ClaimRetryParams(retryUntil, key)),
+                policy = CoinageSubmissionParams.claimPolicy(ClaimRetryParams(retryUntil, coin.key)),
             )
         }
     }
+
+    private class KeyedCoin(
+        val key: CoinPrivateKey,
+        val keypair: Keypair,
+        val accountId: AccountId,
+    )
 }
