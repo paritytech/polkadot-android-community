@@ -1,29 +1,42 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
+import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferPlan
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PreparedTransferMemo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferMemoBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlanner
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlannerFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.TransferSubmissionFailedException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategyFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ScheduledTransfer
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.SplitCoinStrategyFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.TransferStrategy
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.UnloadAndSplitVouchersStrategyFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinageAssetSelector
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.SpendScope
-import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import java.math.BigDecimal
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class RealPrepareCoinageTransferUseCase @Inject constructor(
     private val assetSelector: CoinageAssetSelector,
@@ -32,8 +45,8 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     private val splitStrategyFactory: SplitCoinStrategyFactory,
     private val unloadAndSplitStrategyFactory: UnloadAndSplitVouchersStrategyFactory,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
-    private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase,
-    private val memoBuilder: TransferMemoBuilder
+    private val memoBuilder: TransferMemoBuilder,
+    private val transactionService: CoinageTransactionService,
 ) : PrepareCoinageTransferUseCase {
     /**
      * Plans against spendable funds first and only widens if they cannot cover the amount.
@@ -63,22 +76,88 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
         else -> coinageLogE("Failed to construct transfer plan for amount: $amount", error)
     }
 
+    /**
+     * The same scheduled path as [prepareScheduledMemo], registered at once and without a retry window, then
+     * held until every transaction is on the wire — so the memo only leaves once its coins are on their way.
+     */
     context(diagnostics: StalenessReportCollector)
     override suspend fun prepareMemo(plan: TransferPlan): Result<PreparedTransferMemo> {
-        val chain = chainAssetProvider.chain()
-
-        val peopleCollection = activePeopleCollectionUseCase.getActivePeopleCollection()
-        val strategy = when (val strategyType = plan.strategyType) {
-            is StrategyType.ExactCoins -> exactMatchStrategyFactory.create(strategyType)
-            is StrategyType.Split -> splitStrategyFactory.create(strategyType, chain)
-            is StrategyType.UnloadAndSplit -> unloadAndSplitStrategyFactory.create(strategyType, peopleCollection, chain)
-        }
-
-        return strategy.run()
-            .flatMap { prepared ->
-                memoBuilder.buildMemo(prepared.entries)
-                    .map { memo -> PreparedTransferMemo(memo, prepared.handoffCommit) }
+        return createStrategy(plan).schedule(retryUntil = null)
+            .flatMap { scheduled -> submitNow(scheduled).map { scheduled } }
+            .flatMap { scheduled ->
+                memoBuilder.buildMemo(scheduled.entries)
+                    .map { memo -> PreparedTransferMemo(memo, scheduled.handoffCommit) }
             }
             .onSuccess { coinageLogD("TransferMemo built: coins=${it.memo.coins.size}, total=${it.memo.totalValue}") }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    context(diagnostics: StalenessReportCollector)
+    override suspend fun prepareScheduledMemo(plan: TransferPlan, retryUntil: Instant): Result<PreparedTransferMemo> {
+        return createStrategy(plan).schedule(retryUntil)
+            .flatMap { scheduled ->
+                memoBuilder.buildMemo(scheduled.entries).map { memo ->
+                    PreparedTransferMemo(memo, SchedulingHandoffCommit(scheduled, transactionService))
+                }
+            }
+            .onSuccess {
+                coinageLogD("Scheduled TransferMemo built: coins=${it.memo.coins.size}, total=${it.memo.totalValue}")
+            }
+    }
+
+    /**
+     * Schedules [scheduled]'s transactions and waits until each one has either been submitted or failed for
+     * good. Building runs in the background, so this waits for its outcome rather than doing the work.
+     */
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun submitNow(scheduled: ScheduledTransfer): Result<Unit> {
+        if (scheduled.transactions.isEmpty()) return Result.success(Unit)
+
+        val groupId = CoinageOperationGroupId.generateNew()
+
+        return transactionService.scheduleTransactions(scheduled.transactions, groupId)
+            .flatMap {
+                diagnostics.markRegion(RCommon.string.stall_submitting_transaction) {
+                    awaitSubmitted(groupId)
+                }
+            }
+    }
+
+    private suspend fun awaitSubmitted(groupId: CoinageOperationGroupId): Result<Unit> {
+        val settled = transactionService.subscribeOperationGroupStatuses(groupId)
+            .first { states -> states.none { it.status == DurableTxStatus.PENDING_SUBMISSION } }
+
+        return if (settled.any { it.status == DurableTxStatus.FAILURE }) {
+            coinageLogW("Transfer could not be submitted group=${groupId.value}")
+            Result.failure(TransferSubmissionFailedException())
+        } else {
+            Result.success(Unit)
+        }
+    }
+
+    private suspend fun createStrategy(plan: TransferPlan): TransferStrategy {
+        return when (val strategyType = plan.strategyType) {
+            is StrategyType.ExactCoins -> exactMatchStrategyFactory.create(strategyType)
+            is StrategyType.Split -> splitStrategyFactory.create(strategyType)
+            is StrategyType.UnloadAndSplit -> unloadAndSplitStrategyFactory.create(strategyType, chainAssetProvider.chain())
+        }
+    }
+}
+
+/**
+ * The payment's transactions are registered in the same step that makes its handoff final, so they share the
+ * transaction that persists the memo: a saved payment always has its transactions, and a lost one never does.
+ */
+private class SchedulingHandoffCommit(
+    private val scheduled: ScheduledTransfer,
+    private val transactionService: CoinageTransactionService,
+) : CoinageHandoffCommit {
+    override suspend fun commit(): Result<Unit> = scheduled.handoffCommit.commit().flatMap {
+        if (scheduled.transactions.isEmpty()) {
+            Result.success(Unit)
+        } else {
+            transactionService.scheduleTransactions(scheduled.transactions, CoinageOperationGroupId.generateNew())
+                .coerceToUnit()
+        }
     }
 }

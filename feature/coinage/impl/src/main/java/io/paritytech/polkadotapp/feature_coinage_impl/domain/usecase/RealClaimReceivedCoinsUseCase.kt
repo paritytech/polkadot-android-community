@@ -67,19 +67,22 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     ): Flow<CoinageTransferDetection> = channelFlow {
         send(CoinageTransferDetection.Detecting)
 
-        val keypairs = coinKeys.associate { key -> key.deriveKeypair().let { it.accountId() to it } }
+        val keys = coinKeys.associateBy { key -> key.deriveKeypair().accountId() }
 
-        coinageLogI("Claim starting group=${groupId.value} coins=${keypairs.size} until=$retryUntil")
+        coinageLogI("Claim starting group=${groupId.value} coins=${keys.size} until=$retryUntil")
 
         // Its a channel so we only process each on-chain state update once
         // To prevent a case where failing submit would cause us to loop at CPU speed (since awaitOnChainWithTimeout will remain the same)
-        val onChain = subscribeCoinInfos(keypairs.keys.toList()).produceIn(this)
+        val onChain = subscribeCoinInfos(keys.keys.toList()).produceIn(this)
 
         var settled: List<CoinageTransactionState>
 
         while (true) {
-            settled = awaitKnownOperationsSettled(groupId, keypairs.keys, report = ::send)
-            val unclaimed = keypairs.keys - settled.finalizedCoins()
+            settled = awaitKnownOperationsSettled(groupId, keys.keys, report = ::send)
+
+            // A claim that failed is built again by the engine, into the same coin, for as long as its window
+            // allows — so a settled group only ever holds finalized claims and ones that can never land.
+            val unclaimed = keys.keys - settled.finalizedCoins()
 
             // Every coin has a claim that finalized. Claim finished.
             if (unclaimed.isEmpty()) break
@@ -88,7 +91,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
             when {
                 // Coin detected => try to claim
-                claimable.isNotEmpty() -> submit(keypairs, claimable, groupId, isRetrying = settled.isNotEmpty())
+                claimable.isNotEmpty() -> submit(keys, claimable, groupId, retryUntil, isRetrying = settled.isNotEmpty())
 
                 // Timeout to limit claim of remaining coins in case they never appeared on-chain
                 timeProvider.now() >= retryUntil -> {
@@ -103,7 +106,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
         // Nothing further will be attempted, so this is the last word — and the only place a shortfall
         // may be called final. Logged like any other report: how a claim ended is the line worth having
         // when someone says they were paid less than they were sent.
-        val verdict = settled.toVerdict(keypairs.keys)
+        val verdict = settled.toVerdict(keys.keys)
         logDetection(groupId, verdict)
         send(verdict)
 
@@ -162,14 +165,15 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     }
 
     private suspend fun submit(
-        keypairs: Map<AccountId, Keypair>,
+        keys: Map<AccountId, CoinPrivateKey>,
         claimable: Map<AccountId, OnChainCoinInfo>,
         groupId: CoinageOperationGroupId,
+        retryUntil: Instant,
         isRetrying: Boolean,
     ) {
         coinageLogI("Claim submitting group=${groupId.value} claims=${claimable.size} retry=$isRetrying")
 
-        submissionUseCase(claimable.keys.mapNotNull(keypairs::get), claimable, groupId)
+        submissionUseCase(claimable.keys.mapNotNull(keys::get), claimable, groupId, retryUntil)
             .onFailure { coinageLogE("Claim submission failed group=${groupId.value}", it) }
     }
 
@@ -193,9 +197,13 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     private fun List<CoinageTransactionState>.finalizedCoins(): Set<AccountId> =
         filter { it.status == DurableTxStatus.FINALIZED_SUCCESS }.receivedInputs()
 
-    /** Coins an attempt of ours failed on, so they are waiting on a retry rather than on a block. */
+    /**
+     * Coins an attempt of ours failed on, so they are waiting on a retry rather than on a block — whether the
+     * engine is building that retry or a later look at the chain will submit a new claim.
+     */
     private fun List<CoinageTransactionState>.failedCoins(): Set<AccountId> =
-        filter { it.status == DurableTxStatus.FAILURE }.receivedInputs()
+        filter { it.status == DurableTxStatus.FAILURE || it.status == DurableTxStatus.PENDING_SUBMISSION }
+            .receivedInputs()
 
     private fun List<CoinageTransactionState>.receivedInputs(): Set<AccountId> =
         flatMap { it.inputs }

@@ -31,6 +31,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUBMISSION
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
@@ -89,7 +90,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     fun openTheWindow() {
         every { chainAssetProvider.chainId() } returns "test-chain"
         every { timeProvider.now() } returns WINDOW_OPEN
-        coEvery { submissionUseCase(any(), any(), any()) } returns Result.success(Unit)
+        coEvery { submissionUseCase(any(), any(), any(), any()) } returns Result.success(Unit)
         coEvery { assetValueUseCase.valueOf(any()) } answers {
             // One unit per minted output, so what a claim is said to be worth stays visible in assertions.
             Result.success(BigInteger.valueOf(firstArg<List<OwnAsset>>().size.toLong()).intoBalance())
@@ -133,6 +134,38 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     /**
+     * The same failure, left behind by a claim registered before claims carried a retry policy: nothing but
+     * this use case will ever try that coin again. The case above is exactly that row, kept under its own
+     * name so the two meanings of a failed claim stay visible side by side.
+     */
+    @Test
+    fun `a legacy failed claim without a policy is still submitted again`() = runTest {
+        val coin = key(1)
+        givenChainSees(listOf(coin.accountId))
+        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId)))
+
+        reportsOf(coin)
+
+        assertClaimedOnce(coin.keypair)
+    }
+
+    /**
+     * A claim's attempt was proven unable to land, and the engine is building it again into the same coin.
+     * The coin is still on chain, but that is the rebuild's to claim — a second claim here would be refused
+     * at best and mint a coin nobody is waiting for at worst. The claim stays open until the rebuild settles.
+     */
+    @Test
+    fun `a failed claim with a retry policy is left to the engine`() = runTest {
+        val coin = key(1)
+        givenChainSees(listOf(coin.accountId))
+        givenGroupReports(listOf(entry(PENDING_SUBMISSION, claiming = coin.accountId)))
+
+        assertDoesNotComplete(coin)
+
+        coVerify(exactly = 0) { submissionUseCase(any(), any(), any(), any()) }
+    }
+
+    /**
      * A claim of ours already finalized against this coin, so the coin is ours and the chain read that still
      * shows it is stale. Claiming it again would spend a key that is already spent.
      */
@@ -144,7 +177,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         reportsOf(coin)
 
-        coVerify(exactly = 0) { submissionUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { submissionUseCase(any(), any(), any(), any()) }
     }
 
     /**
@@ -164,7 +197,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         reportsOf(coin)
 
-        coVerify(exactly = 0) { submissionUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { submissionUseCase(any(), any(), any(), any()) }
     }
 
     /** Nothing to claim: submitting against a coin the chain does not hold only gets it refused. */
@@ -176,7 +209,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         reportsOf(coin)
 
-        coVerify(exactly = 0) { submissionUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { submissionUseCase(any(), any(), any(), any()) }
     }
 
     /**
@@ -243,7 +276,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         reportsOf(coin)
 
-        coVerify(exactly = 1) { submissionUseCase(any(), any(), any()) }
+        coVerify(exactly = 1) { submissionUseCase(any(), any(), any(), any()) }
     }
 
     /**
@@ -262,7 +295,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         reportsOf(coin)
 
-        coVerify(exactly = 2) { submissionUseCase(any(), any(), any()) }
+        coVerify(exactly = 2) { submissionUseCase(any(), any(), any(), any()) }
     }
 
     /**
@@ -354,7 +387,7 @@ class RealClaimReceivedCoinsUseCaseTest {
         val reported = reportsOfCompleted(coin)
 
         assertEquals(CoinageTransferDetection.NotClaimed, reported.last())
-        coVerify(exactly = 0) { submissionUseCase(any(), any(), any()) }
+        coVerify(exactly = 0) { submissionUseCase(any(), any(), any(), any()) }
     }
 
     /**
@@ -392,7 +425,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         reportsOf(coin)
 
-        coVerify(exactly = 2) { submissionUseCase(any(), any(), any()) }
+        coVerify(exactly = 2) { submissionUseCase(any(), any(), any(), any()) }
     }
 
     /**
@@ -555,7 +588,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     @Test
     fun `a submission the ledger refuses leaves the claim open`() = runTest {
         val coin = key(1)
-        coEvery { submissionUseCase(any(), any(), any()) } returns Result.failure(IllegalStateException("refused"))
+        coEvery { submissionUseCase(any(), any(), any(), any()) } returns Result.failure(IllegalStateException("refused"))
         givenChainSees(listOf(coin.accountId))
         givenGroupReports(noEntries())
 
@@ -589,8 +622,11 @@ class RealClaimReceivedCoinsUseCaseTest {
      * of a different shape — the very thing double-claiming looks like — would go unnoticed.
      */
     private fun assertClaimedOnce(vararg keypairs: Keypair) {
-        coVerify(exactly = 1) { submissionUseCase(any(), any(), any()) }
-        coVerify(exactly = 1) { submissionUseCase(keypairs.toList(), any(), groupId) }
+        // Read outside the verification block, which would otherwise record these reads as calls to verify.
+        val keys = keypairs.map { it.publicKey.toDataByteArray() }
+
+        coVerify(exactly = 1) { submissionUseCase(any(), any(), any(), any()) }
+        coVerify(exactly = 1) { submissionUseCase(keys, any(), groupId, RETRY_UNTIL) }
     }
 
     private fun claimOf(vararg coins: PeerCoin): Flow<CoinageTransferDetection> =
@@ -699,7 +735,7 @@ class RealClaimReceivedCoinsUseCaseTest {
         val ledger = MutableStateFlow(noEntries())
 
         every { transactionService.subscribeOperationGroupStatuses(groupId) } returns ledger
-        coEvery { submissionUseCase(any(), any(), any()) } answers {
+        coEvery { submissionUseCase(any(), any(), any(), any()) } answers {
             ledger.value = listOf(entry(status, claiming = claiming))
             signal.complete(Unit)
 
@@ -708,7 +744,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     private fun givenSubmissionSignals(signal: CompletableDeferred<Unit>, outcome: Result<Unit>) {
-        coEvery { submissionUseCase(any(), any(), any()) } answers {
+        coEvery { submissionUseCase(any(), any(), any(), any()) } answers {
             signal.complete(Unit)
             outcome
         }

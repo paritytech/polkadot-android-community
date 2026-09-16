@@ -102,6 +102,12 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.service.RealInstall
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE_DOMAIN_ID
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.RealCoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageResourceOracle
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_CLAIM_POLICY_ID
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_SPLIT_POLICY_ID
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_UNLOAD_POLICY_ID
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageClaimSubmissionPolicy
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSplitSubmissionPolicy
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageUnloadSubmissionPolicy
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.CoinageOnboardingSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.CoinageTransferSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealClaimReceivedCoinsUseCase
@@ -121,6 +127,8 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealShareCo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealTotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxCompletionOracle
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainKey
 import javax.inject.Singleton
@@ -257,6 +265,22 @@ interface CoinageFeatureModule {
     @IntoMap
     @TxDomainKey(COINAGE_DOMAIN_ID)
     fun bindCoinageCompletionOracle(impl: CoinageResourceOracle): TxCompletionOracle
+
+    /** Builds coinage transactions again, with the same assets, once an attempt is proven unable to land. */
+    @Binds
+    @IntoMap
+    @SubmissionPolicyKey(COINAGE_SPLIT_POLICY_ID)
+    fun bindCoinageSplitSubmissionPolicy(impl: CoinageSplitSubmissionPolicy): AsyncDurableSubmissionPolicy
+
+    @Binds
+    @IntoMap
+    @SubmissionPolicyKey(COINAGE_UNLOAD_POLICY_ID)
+    fun bindCoinageUnloadSubmissionPolicy(impl: CoinageUnloadSubmissionPolicy): AsyncDurableSubmissionPolicy
+
+    @Binds
+    @IntoMap
+    @SubmissionPolicyKey(COINAGE_CLAIM_POLICY_ID)
+    fun bindCoinageClaimSubmissionPolicy(impl: CoinageClaimSubmissionPolicy): AsyncDurableSubmissionPolicy
 
     @Binds
     fun bindCoinageBalanceConverterUseCase(impl: RealCoinageBalanceConverterUseCase): CoinageBalanceConverterUseCase

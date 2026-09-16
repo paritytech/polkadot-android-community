@@ -11,7 +11,9 @@ import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableSubmission
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxState
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
@@ -337,8 +339,15 @@ class CoinageInstallationRegistrarTest {
 
         override suspend fun submitAll(
             domain: TxDomainId,
-            extrinsics: List<EnrichedSendableExtrinsic>,
+            submissions: List<DurableSubmission>,
             groupId: OperationGroupId,
+            onRegister: suspend RegistrationScope.(List<DurableTxId>) -> Unit,
+        ): Result<List<DurableTxId>> = error("not used")
+
+        override suspend fun schedule(
+            domain: TxDomainId,
+            groupId: OperationGroupId,
+            policies: List<SubmissionPolicy>,
             onRegister: suspend RegistrationScope.(List<DurableTxId>) -> Unit,
         ): Result<List<DurableTxId>> = error("not used")
 

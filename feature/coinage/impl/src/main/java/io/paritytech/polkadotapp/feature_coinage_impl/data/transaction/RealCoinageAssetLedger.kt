@@ -261,6 +261,7 @@ private fun DurableTxLocal.Status.toDomain() = when (this) {
     DurableTxLocal.Status.PENDING_SUCCESS -> DurableTxStatus.PENDING_SUCCESS
     DurableTxLocal.Status.FINALIZED_SUCCESS -> DurableTxStatus.FINALIZED_SUCCESS
     DurableTxLocal.Status.FAILURE -> DurableTxStatus.FAILURE
+    DurableTxLocal.Status.PENDING_SUBMISSION -> DurableTxStatus.PENDING_SUBMISSION
 }
 
 private fun OwnAsset.kind() = when (this) {

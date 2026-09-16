@@ -1,5 +1,34 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferMemo
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageScheduledTransactionRequest
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferMemoBuilder
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.TransferSubmissionFailedException
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategy
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategyFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ScheduledTransfer
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.SplitCoinStrategy
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.SplitCoinStrategyFactory
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUBMISSION
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
+import kotlinx.coroutines.flow.flowOf
+import org.mockito.ArgumentMatchers.isNull
+import org.mockito.Mockito
+import io.paritytech.polkadotapp.chains.network.binding.Balance
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
@@ -27,20 +56,29 @@ import java.math.BigDecimal
  * Backs both the send and the running plan preview, so it has to reach the funds a confirmed send may use —
  * and no further than it must, or a transfer that never needed the offer spends privacy for nothing.
  */
+@OptIn(ExperimentalTime::class)
 class RealPrepareCoinageTransferUseCaseTest {
     private val planner: TransferPlanner = mock()
     private val plannerFactory: TransferPlannerFactory = mock()
     private val assetSelector: CoinageAssetSelector = mock()
+    private val exactMatchStrategyFactory: ExactMatchStrategyFactory = mock()
+    private val splitStrategyFactory: SplitCoinStrategyFactory = mock()
+    private val memoBuilder: TransferMemoBuilder = mock()
+    private val transactionService: CoinageTransactionService = mock()
+
+    private val splitStrategy: SplitCoinStrategy = mock()
+    private val exactStrategy: ExactMatchStrategy = mock()
+    private val handoffCommit: CoinageHandoffCommit = mock()
 
     private val useCase = RealPrepareCoinageTransferUseCase(
         assetSelector = assetSelector,
         plannerFactory = plannerFactory,
-        exactMatchStrategyFactory = mock(),
-        splitStrategyFactory = mock(),
+        exactMatchStrategyFactory = exactMatchStrategyFactory,
+        splitStrategyFactory = splitStrategyFactory,
         unloadAndSplitStrategyFactory = mock(),
         chainAssetProvider = mock(),
-        activePeopleCollectionUseCase = mock(),
-        memoBuilder = mock(),
+        memoBuilder = memoBuilder,
+        transactionService = transactionService,
     )
 
     private val amount: BigDecimal = BigDecimal.TEN
@@ -93,6 +131,148 @@ class RealPrepareCoinageTransferUseCaseTest {
         verify(planner, never()).plan(any(), any(), any())
     }
 
+    // ---- sending: chat payments schedule on commit, merchant payments submit before handing over ----
+
+    @Test
+    fun `a chat send completes without scheduling or building anything`() = runBlocking<Unit> {
+        withSplitScheduling()
+
+        val prepared = prepareChatSend()
+
+        assertTrue(prepared.isSuccess)
+        verifyNothingScheduled()
+    }
+
+    /**
+     * The commit runs inside the transaction that saves the payment message, so registering the transactions
+     * there is what ties them to the message: a saved payment always has them, a lost one never does.
+     */
+    @Test
+    fun `a chat send schedules its transactions only when the handoff is committed`() = runBlocking<Unit> {
+        withSplitScheduling()
+        withSchedulingAccepted()
+
+        val prepared = prepareChatSend().getOrThrow()
+        verifyNothingScheduled()
+
+        assertTrue(prepared.handoffCommit.commit().isSuccess)
+
+        verify(handoffCommit).commit()
+        verify(transactionService).scheduleTransactions(eq(listOf(splitTransaction)), anyGroupId())
+    }
+
+    /** A refusal thrown out of the commit is what rolls the payment message back with it. */
+    @Test
+    fun `a scheduling refusal fails the commit`() = runBlocking<Unit> {
+        withSplitScheduling()
+        whenever(transactionService.scheduleTransactions(any(), anyGroupId()))
+            .thenReturn(Result.failure(IllegalStateException("input already claimed")))
+
+        val prepared = prepareChatSend().getOrThrow()
+
+        assertTrue(prepared.handoffCommit.commit().isFailure)
+    }
+
+    @Test
+    fun `an exact-coins chat send schedules nothing`() = runBlocking<Unit> {
+        withExactScheduling()
+
+        val prepared = prepareChatSend(plan).getOrThrow()
+
+        assertTrue(prepared.handoffCommit.commit().isSuccess)
+        verify(handoffCommit).commit()
+        verifyNothingScheduled()
+    }
+
+    /**
+     * A merchant takes the keys the moment they are handed over and watches for the coins right away, so the
+     * memo only leaves once every transaction is on the wire — never while one is still waiting to be built.
+     */
+    @Test
+    fun `a merchant send schedules at once and waits until every transaction is submitted`() = runBlocking<Unit> {
+        withSplitScheduling()
+        withSchedulingAccepted()
+        withGroupReports(listOf(stateOf(PENDING_SUBMISSION)), listOf(stateOf(PENDING)))
+
+        val prepared = prepareMerchantSend()
+
+        assertTrue(prepared.isSuccess)
+        verify(transactionService).scheduleTransactions(eq(listOf(splitTransaction)), anyGroupId())
+        verify(handoffCommit, never()).commit()
+    }
+
+    @Test
+    fun `a merchant send fails when a transaction could not be submitted`() = runBlocking<Unit> {
+        withSplitScheduling()
+        withSchedulingAccepted()
+        withGroupReports(listOf(stateOf(PENDING_SUBMISSION)), listOf(stateOf(FAILURE)))
+
+        val prepared = prepareMerchantSend()
+
+        assertTrue(prepared.exceptionOrNull() is TransferSubmissionFailedException)
+    }
+
+    /** Low latency is the merchant flow's whole point, so nothing about it may wait hours on a rebuild. */
+    @Test
+    fun `a merchant send is never retried`() = runBlocking<Unit> {
+        withSplitScheduling()
+        withSchedulingAccepted()
+        withGroupReports(listOf(stateOf(PENDING)))
+
+        prepareMerchantSend()
+
+        val verified = verify(splitStrategy)
+        with(eq(StalenessReportCollector.NoOp)) { verified.schedule(isNull()) }
+    }
+
+    private suspend fun prepareChatSend(chatPlan: TransferPlan = splitPlan) =
+        with(StalenessReportCollector.NoOp) { useCase.prepareScheduledMemo(chatPlan, RETRY_UNTIL) }
+
+    private suspend fun prepareMerchantSend() =
+        with(StalenessReportCollector.NoOp) { useCase.prepareMemo(splitPlan) }
+
+    private suspend fun withSplitScheduling() {
+        whenever(splitStrategyFactory.create(any())).thenReturn(splitStrategy)
+        whenever(with(eq(StalenessReportCollector.NoOp)) { splitStrategy.schedule(any()) })
+            .thenReturn(Result.success(ScheduledTransfer(emptyList(), handoffCommit, listOf(splitTransaction))))
+        withMemoAndCommit()
+    }
+
+    private suspend fun withExactScheduling() {
+        whenever(exactMatchStrategyFactory.create(any())).thenReturn(exactStrategy)
+        whenever(with(eq(StalenessReportCollector.NoOp)) { exactStrategy.schedule(any()) })
+            .thenReturn(Result.success(ScheduledTransfer(emptyList(), handoffCommit, emptyList())))
+        withMemoAndCommit()
+    }
+
+    private suspend fun withMemoAndCommit() {
+        whenever(memoBuilder.buildMemo(any())).thenReturn(Result.success(TransferMemo(emptyList(), Balance.ZERO)))
+        whenever(handoffCommit.commit()).thenReturn(Result.success(Unit))
+    }
+
+    private suspend fun withSchedulingAccepted() {
+        whenever(transactionService.scheduleTransactions(any(), anyGroupId()))
+            .thenReturn(Result.success(listOf(CoinageTransactionId(1))))
+    }
+
+    private fun withGroupReports(vararg emissions: List<CoinageTransactionState>) {
+        whenever(transactionService.subscribeOperationGroupStatuses(anyGroupId())).thenReturn(flowOf(*emissions))
+    }
+
+    private suspend fun verifyNothingScheduled() {
+        verify(transactionService, never()).scheduleTransactions(any(), anyGroupId())
+    }
+
+    private fun stateOf(status: DurableTxStatus) = CoinageTransactionState(
+        id = CoinageTransactionId(1),
+        status = status,
+        inputs = splitTransaction.inputs,
+        outputs = splitTransaction.outputs,
+    )
+
+    /** A value class over String: the matcher is what counts, the wrapped value only has to be non-null. */
+    private fun anyGroupId() = CoinageOperationGroupId(Mockito.any<String>() ?: "")
+
     private suspend fun withPlanner() {
         whenever(plannerFactory.create()).thenReturn(Result.success(planner))
     }
@@ -107,6 +287,25 @@ class RealPrepareCoinageTransferUseCaseTest {
     }
 
     private fun <T> failure(): Result<T> = Result.failure(InsufficientBalanceException())
+
+    private val splitPlan get() = TransferPlan(
+        StrategyType.Split(
+            splitFrom = spendableCoin,
+            recipientDenominations = emptyList(),
+            changeDenominations = emptyList(),
+            exactCoins = emptyList(),
+        )
+    )
+
+    private val splitTransaction = CoinageScheduledTransactionRequest(
+        policy = SubmissionPolicy("split", byteArrayOf().toDataByteArray()),
+        inputs = listOf(CoinageInput.Coin.Own(testKey(1))),
+        outputs = listOf(OwnAsset.Coin(testKey(2))),
+    )
+
+    private companion object {
+        val RETRY_UNTIL: Instant = Instant.fromEpochSeconds(1_000)
+    }
 
     private fun coinOf(derivationIndex: Int) = Coin(
         derivationIndex = testKey(derivationIndex),
