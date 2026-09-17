@@ -51,6 +51,14 @@ class InputGatedSubmissionPolicy<T : Any, K>(
         resolve(transactions).flatMap { resolution -> decide(resolution) }
     }.flatten()
 
+    private suspend fun resolve(transactions: List<ScheduledDurableTx>): Result<Resolution<T, K>> =
+        assetLedger.assetsOf(transactions.map { it.id }).map { assets ->
+            val waiting = waitingOf(transactions, rebuild.resolve(transactions, assets))
+            val unbuildable = transactions.map { it.id } - waiting.mapToSet { it.id }
+
+            Resolution(waiting, unbuildable.onEach(::logUnbuildable))
+        }
+
     private suspend fun decide(resolution: Resolution<T, K>): Result<Map<DurableTxId, SubmissionPreparation>> {
         if (resolution.waiting.isEmpty()) return Result.success(resolution.unbuildable.givenUp())
 
@@ -59,14 +67,6 @@ class InputGatedSubmissionPolicy<T : Any, K>(
 
         return build(ready).map { built -> built + abandoned(notReady, look).givenUp() + resolution.unbuildable.givenUp() }
     }
-
-    private suspend fun resolve(transactions: List<ScheduledDurableTx>): Result<Resolution<T, K>> =
-        assetLedger.assetsOf(transactions.map { it.id }).map { assets ->
-            val waiting = waitingOf(transactions, rebuild.resolve(transactions, assets))
-            val unbuildable = transactions.map { it.id } - waiting.mapToSet { it.id }
-
-            Resolution(waiting, unbuildable.onEach(::logUnbuildable))
-        }
 
     private fun waitingOf(transactions: List<ScheduledDurableTx>, resolved: Map<DurableTxId, T>): List<Waiting<T, K>> =
         transactions.mapNotNull { tx ->
