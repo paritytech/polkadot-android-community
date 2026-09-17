@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.LaptopOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.NotificationsBellOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.PaletteOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.Settings
+import io.paritytech.polkadotapp.design.components.icon.vectors.StoreOutlined
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuList
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuListCustomItem
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
@@ -57,7 +58,8 @@ fun SettingsScreen() {
         onConnectedDevicesClick = viewModel::onLinkedDevicesClick,
         onPrivacyPolicyClick = viewModel::onPrivacyPolicyClick,
         onTermsOfUseClick = viewModel::onTermsOfUseClick,
-        onDebugMenuClick = viewModel::onDebugMenuClick
+        onDebugMenuClick = viewModel::onDebugMenuClick,
+        onMerchantModeClick = viewModel::onMerchantModeClick
     )
 }
 
@@ -74,7 +76,8 @@ private fun SettingsScreenInternal(
     onConnectedDevicesClick: () -> Unit,
     onPrivacyPolicyClick: () -> Unit,
     onTermsOfUseClick: () -> Unit,
-    onDebugMenuClick: () -> Unit
+    onDebugMenuClick: () -> Unit,
+    onMerchantModeClick: () -> Unit
 ) {
     PolkadotSurface {
         Column(
@@ -192,6 +195,18 @@ private fun SettingsScreenInternal(
                     VerticalSpacer { large }
                 }
 
+                PolkadotMenuList(
+                    headerText = stringResource(RCommon.string.settings_section_other)
+                ) {
+                    SettingsMenuItem(
+                        icon = NovaIcons.StoreOutlined,
+                        title = stringResource(RCommon.string.settings_merchant_mode),
+                        onClick = onMerchantModeClick
+                    )
+                }
+
+                VerticalSpacer { large }
+
                 AppDeviceInfoSection(state.isDebug)
             }
         }
@@ -224,7 +239,8 @@ private fun SettingsScreenPreview() {
             onConnectedDevicesClick = {},
             onPrivacyPolicyClick = {},
             onTermsOfUseClick = {},
-            onDebugMenuClick = {}
+            onDebugMenuClick = {},
+            onMerchantModeClick = {}
         )
     }
 }

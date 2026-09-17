@@ -105,4 +105,8 @@ class SettingsViewModel @Inject constructor(
     fun onDebugMenuClick() {
         router.openDebugMenu()
     }
+
+    fun onMerchantModeClick() {
+        router.openMerchantMode()
+    }
 }

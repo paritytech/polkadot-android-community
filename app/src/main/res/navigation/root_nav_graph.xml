@@ -70,6 +70,11 @@
         android:name="io.paritytech.polkadotapp.feature_products_impl.presentation.spaBrowser.SpaBrowserFragment"
         android:label="SpaBrowserFragment" />
 
+    <fragment
+        android:id="@+id/merchantModeFragment"
+        android:name="io.paritytech.polkadotapp.feature_products_impl.presentation.merchantMode.MerchantModeFragment"
+        android:label="MerchantModeFragment" />
+
     <dialog
         android:id="@+id/spaSheetBottomSheet"
         android:name="io.paritytech.polkadotapp.feature_products_impl.presentation.spaSheet.SpaSheetBottomSheet"
@@ -299,6 +304,14 @@
     <action
         android:id="@+id/action_global_to_spaSheetBottomSheet"
         app:destination="@id/spaSheetBottomSheet" />
+
+    <action
+        android:id="@+id/action_global_to_merchantModeFragment"
+        app:destination="@id/merchantModeFragment"
+        app:enterAnim="@anim/slide_in_bottom"
+        app:exitAnim="@anim/no_op"
+        app:popEnterAnim="@anim/no_op"
+        app:popExitAnim="@anim/slide_out_bottom" />
 
     <action
         android:id="@+id/action_global_to_pairRequestBottomSheet"
