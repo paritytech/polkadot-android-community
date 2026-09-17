@@ -10,7 +10,6 @@ import io.paritytech.polkadotapp.chains.util.Sr25519SecretKey
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocatableResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocatedResource
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ApAllocationOutcome
@@ -76,26 +75,25 @@ fun EncodedMessage.decodeAlwaysDecodableSsoMessagePart(): Result<AlwaysDecodable
     return runCatching { BinaryScale.decodeFromByteArray<AlwaysDecodableSsoMessagePart>(this) }
 }
 
-fun EncodedMessage.toSsoSessionRequest(sessionId: SsoSessionId, tld: DotNsTld): Result<SsoSessionRequest> {
+fun EncodedMessage.toSsoSessionRequest(sessionId: SsoSessionId): Result<SsoSessionRequest> {
     return decodeSsoSessionMessage().mapCatching { message ->
-        message.toSsoSessionRequest(sessionId, tld)
+        message.toSsoSessionRequest(sessionId)
     }
 }
 
 // ==================== Scale -> Domain mappers ====================
 
-private fun SsoSessionMessage.toSsoSessionRequest(sessionId: SsoSessionId, tld: DotNsTld): SsoSessionRequest {
+private fun SsoSessionMessage.toSsoSessionRequest(sessionId: SsoSessionId): SsoSessionRequest {
     return when (versioned) {
-        is VersionedSsoSessionMessage.V1 -> versioned.message.toSsoSessionRequest(id, sessionId, tld)
+        is VersionedSsoSessionMessage.V1 -> versioned.message.toSsoSessionRequest(id, sessionId)
     }
 }
 
 private fun SsoSessionMessageV1.toSsoSessionRequest(
     messageId: String,
     sessionId: SsoSessionId,
-    tld: DotNsTld
 ): SsoSessionRequest {
-    val requestContent = content.toRequestContent(tld)
+    val requestContent = content.toRequestContent()
     return SsoSessionRequest(
         sessionId = sessionId,
         requestId = messageId,
@@ -103,7 +101,7 @@ private fun SsoSessionMessageV1.toSsoSessionRequest(
     )
 }
 
-private fun SsoMessageContent.toRequestContent(tld: DotNsTld): SsoSessionRequest.Content {
+private fun SsoMessageContent.toRequestContent(): SsoSessionRequest.Content {
     return when (this) {
         SsoMessageContent.Disconnected -> SsoSessionRequest.Content.Disconnected
         is SsoMessageContent.SigningRequest -> SsoSessionRequest.Content.SigningRequest(request.toDomain())
