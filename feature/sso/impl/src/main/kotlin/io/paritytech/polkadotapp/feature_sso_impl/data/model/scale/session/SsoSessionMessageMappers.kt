@@ -148,7 +148,7 @@ private fun SsoMessageContent.toRequestContent(tld: DotNsTld): SsoSessionRequest
         )
         is SsoMessageContent.SignRawLegacyResponse -> error("SignRawLegacyResponse is a response-only message type")
         is SsoMessageContent.ProductSubtreeRequest -> SsoSessionRequest.Content.ProductSubtreeRequest(
-            productId = ProductId.fromString(productId, tld).getOrThrow(),
+            productId = ProductId.fromWireValue(productId),
         )
         is SsoMessageContent.ProductSubtreeResponse -> error("ProductSubtreeResponse is a response-only message type")
         is SsoMessageContent.RegisterRingVrfKeyRequest -> SsoSessionRequest.Content.RegisterRingVrfKeyRequest(

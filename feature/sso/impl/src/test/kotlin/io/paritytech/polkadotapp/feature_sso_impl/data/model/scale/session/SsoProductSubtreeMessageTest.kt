@@ -29,6 +29,34 @@ class SsoProductSubtreeMessageTest {
         assertEquals("browse.dot", content.productId.value)
     }
 
+    /**
+     * A product id names the same product on every network, so a peer may send one minted under a
+     * different suffix. Requiring this device's TLD here rejected the message in the mapper, and
+     * the throw left the peer waiting out its full response deadline with no reply at all.
+     */
+    @Test
+    fun `request from a peer on another network still decodes`() {
+        val request = productSubtreeRequest()
+
+        val decoded = request.toEncodedMessage()
+            .toSsoSessionRequest(SESSION_ID, requireNotNull(DotNsTld.parse("paseo")))
+            .getOrThrow()
+
+        val content = decoded.content as SsoSessionRequest.Content.ProductSubtreeRequest
+        assertEquals("browse.dot", content.productId.value)
+    }
+
+    /** Normalization still applies: the executable label names no product of its own. */
+    @Test
+    fun `request normalizes case and drops the executable label`() {
+        val decoded = productSubtreeRequest(productId = "APP.Coinflip.DOT").toEncodedMessage()
+            .toSsoSessionRequest(SESSION_ID, requireNotNull(DotNsTld.parse("dot")))
+            .getOrThrow()
+
+        val content = decoded.content as SsoSessionRequest.Content.ProductSubtreeRequest
+        assertEquals("coinflip.dot", content.productId.value)
+    }
+
     @Test
     fun `successful response carries the product public key`() {
         val publicKey = ByteArray(32) { it.toByte() }.toDataByteArray()
@@ -59,10 +87,10 @@ class SsoProductSubtreeMessageTest {
         assertEquals(17, variantIndexOf(response))
     }
 
-    private fun productSubtreeRequest() = SsoSessionRequest(
+    private fun productSubtreeRequest(productId: String = "browse.dot") = SsoSessionRequest(
         sessionId = SESSION_ID,
         requestId = REQUEST_ID,
-        content = SsoSessionRequest.Content.ProductSubtreeRequest(ProductId.fromStoredValue("browse.dot")),
+        content = SsoSessionRequest.Content.ProductSubtreeRequest(ProductId.fromStoredValue(productId)),
     )
 
     private fun decodeResponseContent(content: SsoSessionResponse.Content): SsoMessageContent.ProductSubtreeResponse {
