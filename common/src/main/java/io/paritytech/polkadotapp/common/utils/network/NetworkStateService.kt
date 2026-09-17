@@ -8,11 +8,8 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.common.utils.awaitTrue
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 interface NetworkStateService {
@@ -37,13 +34,11 @@ suspend fun <T> NetworkStateService.withNetworkRetries(compute: suspend () -> T)
 
 @SuppressLint("MissingPermission")
 class RealNetworkStateService @Inject constructor(@ApplicationContext context: Context) : NetworkStateService {
-    private val connectivityManager =
-        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    private val networksWithInternet = ConcurrentHashMap.newKeySet<Network>()
-    private val _isNetworkAvailable = MutableStateFlow(false)
-    override val isNetworkAvailable: StateFlow<Boolean> = _isNetworkAvailable.asStateFlow()
+    private val presence = NetworkPresence()
+    override val isNetworkAvailable: StateFlow<Boolean> = presence.isAvailable
 
     init {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val networkRequest = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
@@ -51,26 +46,9 @@ class RealNetworkStateService @Inject constructor(@ApplicationContext context: C
         connectivityManager.registerNetworkCallback(
             networkRequest,
             object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) = publish { networksWithInternet.add(network) }
+                override fun onAvailable(network: Network) = presence.add(network)
 
-                // activeNetwork may still name the dying network, and no later callback corrects a stale true.
-                override fun onLost(network: Network) = publish { networksWithInternet.remove(network) }
-
-                override fun onCapabilitiesChanged(
-                    network: Network,
-                    networkCapabilities: NetworkCapabilities,
-                ) = publish {
-                    if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                        networksWithInternet.add(network)
-                    } else {
-                        networksWithInternet.remove(network)
-                    }
-                }
+                override fun onLost(network: Network) = presence.remove(network)
             })
-    }
-
-    private inline fun publish(update: () -> Unit) {
-        update()
-        _isNetworkAvailable.value = networksWithInternet.isNotEmpty()
     }
 }
