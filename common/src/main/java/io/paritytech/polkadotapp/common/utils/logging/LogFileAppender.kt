@@ -9,7 +9,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import timber.log.Timber
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException
@@ -17,22 +16,19 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-/**
- * This is a basic implementation of a Timber.DebugTree that saves logs to a file using the provided coroutineScope
- * @param coroutineScope should be managed by the consumer
- */
 @SuppressLint("LogNotTimber")
-abstract class CoroutineFileDebugTree(
+class LogFileAppender(
     coroutineScope: CoroutineScope,
-    private val fallbackLogTag: String,
+    private val fallbackTag: String,
     private val logFile: File
-) : Timber.DebugTree() {
-    companion object {
-        private val LOG_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+) {
+    private companion object {
+        val LOG_TIMESTAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
-        private val MAX_LOG_FILE_SIZE = 4.megabytes
-        private const val ROTATED_FILE_SUFFIX = ".1"
-        private const val SIZE_CHECK_EVERY_N_MESSAGES = 200
+        val MAX_LOG_FILE_SIZE = 4.megabytes
+        const val ROTATED_FILE_SUFFIX = ".1"
+        const val SIZE_CHECK_EVERY_N_MESSAGES = 200
+        const val INTERNAL_LOG_TAG = "LogFileAppender"
     }
 
     private val logChannel = Channel<String>(Channel.UNLIMITED)
@@ -47,13 +43,16 @@ abstract class CoroutineFileDebugTree(
                 logWriter = FileWriter(logFile, true)
                 listenForLogs()
             } catch (e: IOException) {
-                Log.e("CoroutineFileDebugTree", "Cannot open log file for writing. Logger is disabled", e)
+                // Closing makes the later trySend calls fail instead of queueing into a channel nobody
+                // drains any more, which would grow for the life of the process on a device out of space.
+                logChannel.close()
+                Log.e(INTERNAL_LOG_TAG, "Cannot open ${logFile.name} for writing. Logger is disabled", e)
             }
         }
     }
 
-    override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-        val finalTag = tag ?: fallbackLogTag
+    fun append(priority: Int, tag: String?, message: String, t: Throwable?) {
+        val finalTag = tag ?: fallbackTag
 
         var fullMessage = "$finalTag ${priorityToString(priority)} $message"
 
@@ -73,7 +72,7 @@ abstract class CoroutineFileDebugTree(
                     logWriter?.flush()
                     rotateIfNeeded()
                 } catch (e: IOException) {
-                    Log.e("CoroutineFileDebugTree", "Failed to write to log file", e)
+                    Log.e(INTERNAL_LOG_TAG, "Failed to write to ${logFile.name}", e)
                 }
             }
         } finally {
@@ -81,9 +80,8 @@ abstract class CoroutineFileDebugTree(
                 try {
                     logWriter?.close()
                     logWriter = null
-                    Log.d("CoroutineFileDebugTree", "File logger stopped and file closed")
                 } catch (e: IOException) {
-                    Log.e("CoroutineFileDebugTree", "Failed to close log writer", e)
+                    Log.e(INTERNAL_LOG_TAG, "Failed to close the writer for ${logFile.name}", e)
                 }
             }
         }
