@@ -1,236 +1,158 @@
-## Build Project
-
-Clone [paritytech/polkadot-android-community](https://github.com/paritytech/polkadot-android-community)
-and follow the public setup instructions in the root [README](../README.md).
-Build-time configuration, signing, and distribution requirements are documented in
-[docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md). Never commit keystores,
-`google-services.json`, service-account files, or credentials.
-
-## Utility Scripts
-
-### Generate BIP39 Mnemonic
-Generate a random 12-word mnemonic for testing:
-```bash
-python3 scripts/generate-mnemonic.py
-```
-
 # CI/CD Workflows
 
-This document describes all continuous integration and delivery flows for the Polkadot Android application.
+This document describes the GitHub Actions workflows under `.github/workflows`: what
+each one does, what it needs from the repository settings, and where its output goes.
+Building the app locally is covered by the root [README](../README.md); build-time
+configuration, signing and publishing by [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
 
-## Repository Configuration
+The workflows are the maintainers' own build and distribution flows. A fork does not
+need them to build the app, and the distribution steps (Firebase App Distribution,
+object storage, Allure, Matrix notifications) are tied to the maintainers' accounts, so
+a fork either points them at its own services or removes them.
 
-Configure these values under **Settings → Secrets and variables → Actions**. GitHub
-does not expose repository configuration to a runner automatically; the workflows
-under `.github/workflows` explicitly map build values to the environment read by
-Gradle and notification values to action inputs.
+## Repository configuration
 
-### Build Variables
+Configure these under **Settings → Secrets and variables → Actions**. The workflows map
+them into the environment explicitly; GitHub does not expose repository configuration to
+a runner on its own.
 
-These values are public application configuration and are intentionally stored as
-GitHub Actions Variables rather than Secrets. They are embedded in the APK and must
-not contain credentials.
+**Build-time values** — everything the Gradle build reads (`APPLICATION_ID`,
+`CURRENCY_SYMBOL`, `GOOGLE_OAUTH_ID`, `NIGHTLY_FUNDING_MNEMONIC`, signing passwords, …)
+is documented once, in [DEPLOYMENT §5](../docs/DEPLOYMENT.md#5-environment-variables--secrets-reference).
+Public values live in Actions **variables**, credentials and mnemonics in Actions
+**secrets**; the workflows only forward them as environment variables.
 
-Most variables below are **mandatory**: the build reads them with `readSecretOrThrow`
-and fails at configuration time when one is missing or empty, so a deploy can never ship
-a placeholder fallback. Only `signingConfigs` still uses `readSecretOrDefault`.
-`SENTRY_DSN`, `REFERRAL_WEB_HOST` and `GAME_RESULTS_FALLBACK_URL` are optional and keep a
-fallback — the features they configure are not part of the current production build.
+**Workflow-only configuration** — what the workflows read in addition to the build values:
 
-| Variable | Purpose |
-|----------|---------|
-| `APPLICATION_ID` | Base Android application ID. The build adds `.debug`, `.nightly` or `.safetynet` for those build types. Every resulting id must match a client in `google-services.json`. |
-| `APPLICATION_NAME` | Launcher name of the application. `DEBUG_APPLICATION_NAME`, `NIGHTLY_APPLICATION_NAME` and `SAFETYNET_APPLICATION_NAME` optionally override it per build type; when unset they are derived from this value. |
-| `PRIVACY_POLICY_URL` | Privacy-policy destination shown by the application. |
-| `CURRENCY_SYMBOL` | Symbol of the in-app digital currency shown in the UI — card title, send/get actions, and every formatted amount. |
-| `TERMS_OF_USE_URL` | Terms-of-use destination shown by the application. |
-| `LOG_COLLECTION_EMAIL` | Recipient used by the debug log-sharing flow. |
-| `SENTRY_DSN` | Client DSN embedded in debug/nightly manifests for runtime error reporting. Optional; an empty value disables runtime reporting. |
-| `SENTRY_ORG` | Sentry organization slug used by the Gradle plugin. |
-| `SENTRY_PROJECT` | Sentry project slug used by the Gradle plugin. |
-| `REFERRAL_WEB_HOST` | Allowed web host for referral-ticket deeplinks. Supply a host only, without a scheme or path. Optional. |
-| `GAME_RESULTS_FALLBACK_URL` | Final HTTPS fallback for the game-results webview when DotNs and Remote Config do not provide a URL. Optional. |
+| Name | Kind | Workflows | Purpose |
+|------|------|-----------|---------|
+| `GOOGLE_SERVICES_JSON_BASE64` | secret | all builds | Base64 of `google-services.json`, decoded to `app/google-services.json` by `actions/prepare-android-build`. |
+| `CI_GITHUB_KEYSTORE_KEY_FILE` | secret | pr, instrumental tests, debug, nightly | Base64 of the dev keystore, decoded to `develop_key.jks`. |
+| `RELEASE_GITHUB_KEYSTORE_KEY_FILE` | secret | release | Base64 of the release keystore, decoded to `release_key.jks`. |
+| `SENTRY_AUTH_TOKEN` | secret | debug, nightly, release | Sentry Gradle plugin upload token (release variant is ignored by the plugin). |
+| `FIREBASE_GOOGLE_SERVICE_ACCOUNT` | secret | debug, nightly, release | Service-account JSON for Firebase App Distribution. |
+| `ANDROID_FIREBASE_APP_ID` | secret | debug | App Distribution app id for `gpDebug`. |
+| `ANDROID_FIREBASE_RELEASE_APP_ID` | secret | release | App Distribution app id for `gpRelease`. |
+| `ANDROID_FIREBASE_NIGHTLY_APP_ID` | secret | nightly | App Distribution app id for `gpNightly` and `vanillaNightly` (flavors add no `applicationIdSuffix`, so both share it). |
+| `ANDROID_FIREBASE_SAFETYNET_APP_ID` | secret | nightly | App Distribution app id for `gpSafetynet`. |
+| `SCW_ACCESS_KEY`, `SCW_SECRET_KEY` | secret | debug, nightly, release | Credentials for the object-storage upload (see *Build artifacts storage*). |
+| `ALLURE_TOKEN` | secret | nightly | Triggers the Allure TestOps launch. |
+| `NOTIFICATION_BOT_URL`, `NOTIFICATION_BOT_TOKEN` | secret | nightly | Bot that posts the release notification to Matrix. |
+| `CI_MATRIX_ROOM_IDS` | variable | nightly | Comma-separated Matrix room ids that receive the notification. |
+| `NIGHTLY_DOWNLOAD_LINKS` | variable | nightly | Multiline Markdown list of download links included in the notification. |
 
-### Workflow Variables
+Firebase tester groups are not repository settings: they are `env` constants at the top
+of each distribution workflow (`CI_FIREBASE_GROUP_MAIN`, `CI_FIREBASE_GROUP_TRUAPI_DEV`
+in the debug flow; `CI_FIREBASE_GROUP`, `CI_FIREBASE_GROUP_VANILLA`,
+`CI_FIREBASE_GROUP_SAFETYNET` in the nightly flow; `dev-team` inline in the release flow).
 
-These values configure CI notifications and are not consumed by the Android build.
+## Flows
 
-| Variable | Purpose |
-|----------|---------|
-| `CI_MATRIX_ROOM_IDS` | Comma-separated Matrix room IDs that receive nightly release notifications. |
-| `NIGHTLY_DOWNLOAD_LINKS` | Multiline Markdown list of download links included in nightly release notifications. |
+### Pull request validation
 
-### Build Secret
+**Trigger:** every pull request and merge-group run, except PRs from `release-*` branches
+(those are built by the release flow instead).
 
-| Secret | Purpose |
-|--------|---------|
-| `NIGHTLY_FUNDING_MNEMONIC` | Funding account used by nightly and production test contours. It is provided only to Gradle build/test steps. |
+- [`pr.yml`](workflows/pr.yml) — unit tests (`testGpDebugUnitTest`, `testGpReleaseUnitTest`,
+  `testDebugUnitTest`, `testReleaseUnitTest`) and an `assembleGpDebug` build, in parallel jobs.
+- [`detekt.yaml`](workflows/detekt.yaml) — static analysis.
+- [`instrumental_tests.yaml`](workflows/instrumental_tests.yaml) — instrumentation tests,
+  run only when the PR carries the `run-instrumental-tests` label.
 
-`NIGHTLY_FUNDING_MNEMONIC` is protected while stored by GitHub and is masked in
-workflow logs. The current application places it in `BuildConfig`, however, so it
-can be extracted from a distributed APK. Use only a tightly funded test account;
-never use a treasury, production, or otherwise valuable mnemonic here.
+### Development build distribution
 
-See [Deployment §5](../docs/DEPLOYMENT.md#5-environment-variables--secrets-reference)
-for signing, Google/Firebase, Sentry, publishing, and local-build configuration.
+**Trigger:** a PR merged into `main` or `truapi-dev`, or manual dispatch.
+**Workflow:** [`firebase_debug_distribution.yml`](workflows/firebase_debug_distribution.yml)
 
-## Flows Overview
+1. The `resolve` job picks the target branch, the Firebase tester group for it and the
+   release notes; closed-but-unmerged PRs and `release-*` PRs stop here.
+2. Build number `10000 + github.run_number` is written into `Versions.kt` for the build.
+3. `assembleGpDebug` with the dev keystore.
+4. Upload to Firebase App Distribution (`ANDROID_FIREBASE_APP_ID`) and to object storage.
 
-### 1. Pull Request Validation Flow
-**Trigger:** Pull requests to any branch (except release branches)  
-**Purpose:** Validate code changes through automated testing
+### Production release
 
-**Steps:**
-1. Check for `skip-ci` label
-2. Setup Android development environment
-3. Run unit tests
-4. Run build
+**Trigger:** manual dispatch of the preparation workflow.
 
-**Workflows:**
-- [`pr.yml`](workflows/pr.yml)
+**Phase 1 — [`release_prepare.yml`](workflows/release_prepare.yml)**
 
----
+1. Creates `release-<version>` from `source_ref` (default `main`).
+2. Optionally bumps the marketing version (`no` / `patch` / `minor` / `major`) in
+   `Versions.kt` and commits it.
+3. Opens a PR `release-<version>` → `main` with the source ref embedded in the PR body.
+4. Dispatches the distribution workflow for the release branch.
 
-### 2. Development Build Distribution Flow
-**Trigger:** Manual dispatch or PR merge to `main` branch  
-**Purpose:** Distribute development builds to QA team via Firebase
+**Phase 2 — [`firebase_release_distribution.yml`](workflows/firebase_release_distribution.yml)**,
+on that dispatch and on every update of the release PR
 
-**Steps:**
-1. Setup Android environment
-2. Calculate and update build number (10100 + run_number)
-3. Build app with Debug configuration
-4. Upload to Firebase App Distribution
-5. Notify configured groups
+1. Security check: a `workflow_dispatch` must come from `github-actions[bot]` (via phase 1)
+   and a `pull_request` must be authored by `github-actions[bot]`.
+2. `CI_BUILD_ID` is `github.run_number`; the new build number is written back into
+   `Versions.kt` on the release branch.
+3. Unit tests, then `assembleGpRelease` with the release keystore.
+4. Upload to Firebase App Distribution (`ANDROID_FIREBASE_RELEASE_APP_ID`, group
+   `dev-team`) and to object storage; a comment with the build details is posted on the PR.
 
-**Workflows:**
-- [`firebase_debug_distribution.yml`](workflows/firebase_debug_distribution.yml)
+**Phase 3 — backport**, same workflow, when the release PR is merged
 
-**Configuration:**
-- Build type: Debug
-- Default groups: `android-dev-testers`
+1. Reads `source_ref` from the merged PR body.
+2. Opens a backport PR `release-<version>` → `source_ref` carrying the bumped version and
+   build number plus any hotfixes made on the release branch.
 
----
+### Nightly
 
-### 3. Production Release Flow
-**Trigger:** Manual workflow dispatch  
-**Purpose:** Prepare and distribute production releases to Firebase
+**Trigger:** daily at 17:00 UTC, or manual dispatch.
+**Workflow:** [`nightly_release.yaml`](workflows/nightly_release.yaml)
 
-**Steps:**
+Skipped when nothing was merged since the previous nightly. Otherwise it builds
+`gpNightly`, `vanillaNightly`, `gpSafetynet` and a `gpDebug` preview, uploads the three
+nightly variants to Firebase App Distribution with their groups, uploads the APKs to
+object storage, triggers an Allure TestOps launch, creates or replaces the GitHub
+release `v<version>-<build>` with all four APKs attached, and posts a Matrix notification.
 
-#### Phase 1: Release Preparation
-1. Validate user permissions (optional)
-2. Create release branch from source ref (default: `main`)
-3. Optionally bump version (major/minor/patch/no-bump)
-4. Commit version changes to release branch
-5. Create pull request to `main`
-6. Trigger Firebase Release workflow
+### Monthly PR summary
 
-#### Phase 2: Firebase Distribution (triggered automatically or by PR updates)
-1. Security verification (only bot-initiated PRs allowed)
-2. Increment build number in Release configuration
-3. Commit build number update
-4. Run tests
-5. Build and upload to Firebase
-6. Comment on PR with build information
+[`collect_prs_summary.yml`](workflows/collect_prs_summary.yml) runs on the 1st of each
+month (or on demand with a `days` input) and reuses
+`novasamatech/github-actions/.github/workflows/pr-summary-report.yml` to produce a report
+of merged PRs.
 
-#### Phase 3: Backport to Source Branch (triggered after PR merge)
-1. Extract source branch metadata from merged PR
-2. Validate source branch exists
-3. Create backport PR: `release-{version}` → `source_ref` (e.g., `main`)
-4. Include incremented build numbers and any hotfixes from release branch
+## Version and build number
 
-**Workflows:**
-- [`release_prepare.yml`](workflows/release_prepare.yml) - Phase 1
-- [`firebase_release_distribution.yml`](workflows/firebase_release_distribution.yml) - Phase 2 & 3
+Both live in `build-logic/convention/src/main/kotlin/Versions.kt`.
 
-**Configuration:**
-- Build type: Release
-- Branches: `release-{version}` → `main` → backport to `source_ref`
-- Source branch tracking: Embedded in PR metadata
+- **Marketing version** (`DefaultVersionName`) changes only through `release_prepare.yml`
+  or by hand.
+- **Build number**: debug builds use `10000 + github.run_number` for the run and do not
+  commit it; release builds write the new value into `DefaultVersionCode` on the release
+  branch; nightly builds read the committed value.
 
----
+Scripts in [`scripts/`](scripts/):
 
-## Version and Build Number Management
+- `read_versions.py` — prints the current version and build number.
+- `update_marketing_version.py` — sets `DefaultVersionName`.
+- `update_build_number.py` — sets or increments `DefaultVersionCode`.
 
-### Debug Builds
-- **Version:** Read from `Versions.kt` (not changed)
-- **Build number:** `10000 + github.run_number`
+## Build artifacts storage
 
-### Release Builds
-- **Version:**
-  - Format: `X.Y.Z` (major.minor.patch)
-  - Updated by `release_prepare.yml` based on bump level
-  - Stored in `Versions.kt` → `DefaultVersionName`
-- **Build number:**
-  - Auto-incremented by `firebase_release_distribution.yml`
-  - Stored in `Versions.kt` → `DefaultVersionCode`
+The debug, release and nightly flows upload their APKs to an S3-compatible bucket owned by
+the maintainers. The bucket and region are `env` constants in each workflow (`S3_BUCKET`,
+`S3_REGION` in the debug and release flows, inline `s3_bucket` / `s3_region` in the nightly
+flow) and the credentials are `SCW_ACCESS_KEY` / `SCW_SECRET_KEY`. A fork points these at
+its own bucket or deletes the upload steps.
 
----
+| Flow | Versioned path | Static path (latest) |
+|------|----------------|----------------------|
+| Debug | `/android/debug/polkadot-app-{version}-{build}.apk` | `/android/debug/polkadot-app.apk` |
+| Release | `/android/releases/polkadot-app-{version}-{build}.apk` | `/android/releases/polkadot-app.apk` |
+| Nightly `gp` | `/android/nightly/polkadot-app-{version}-{build}.apk` | `/android/nightly/polkadot-app.apk` |
+| Nightly `vanilla` | `/android/nightly/polkadot-app-vanilla-{version}-{build}.apk` | `/android/nightly/polkadot-app-vanilla.apk` |
 
-## Firebase Distribution
+## Composite actions
 
-### Debug Builds
-- **App ID:** `ANDROID_FIREBASE_APP_ID` (from secrets)
-- **Groups:** `dev-team`
-- **APK:** Debug variant with debug keystore
-
-### Release Builds
-- **App ID:** `ANDROID_FIREBASE_RELEASE_APP_ID` (from secrets)
-- **Groups:** `dev-team`
-- **APK:** Release variant with release keystore
-
-### Nightly Builds
-Each build type carries its own `applicationIdSuffix`, so App Distribution treats it
-as a separate Firebase app and needs its own App ID secret.
-
-| Variant | App ID | Groups |
-|---------|--------|--------|
-| `gpNightly` | `ANDROID_FIREBASE_NIGHTLY_APP_ID` | `CI_FIREBASE_GROUP` |
-| `vanillaNightly` | `ANDROID_FIREBASE_NIGHTLY_APP_ID` (product flavors add no suffix) | `CI_FIREBASE_GROUP_VANILLA` |
-| `gpSafetynet` | `ANDROID_FIREBASE_SAFETYNET_APP_ID` | `CI_FIREBASE_GROUP_SAFETYNET` |
-
----
-
-## Security
-
-### Release Workflows
-Both `release_prepare.yml` and `firebase_release_distribution.yml` include security checks:
-
-1. **`release_prepare.yml`:**
-  - Only authorized users can run (optional, can be enabled in job condition)
-
-2. **`firebase_release_distribution.yml`:**
-  - `workflow_dispatch`: Must be triggered by `github-actions[bot]`
-  - `pull_request`: PR must be created by `github-actions[bot]`
-
-This ensures release builds can only be initiated through the official release process.
-
----
-
-## Build Artifacts Storage (S3)
-
-All Android builds are automatically uploaded to Scaleway Object Storage for archival and distribution.
-
-**Bucket:** `polkadot-app-artefacts` (region: `fr-par`)
-
-### File Naming Scheme
-
-| Workflow | Path Pattern | Static Path | Example URL |
-|----------|-------------|-------------|-------------|
-| Debug (Firebase) | `/android/debug/polkadot-app-{version}-{build}.apk` | `/android/debug/polkadot-app.apk` | `http://polkadot-app-artefacts.s3.fr-par.scw.cloud/android/debug/polkadot-app-1.2.3-10150.apk` |
-| Release (Firebase via PR) | `/android/releases/polkadot-app-{version}-{build}.apk` | `/android/releases/polkadot-app.apk` | `http://polkadot-app-artefacts.s3.fr-par.scw.cloud/android/releases/polkadot-app-1.0.0-456.apk` |
-| Nightly Release | `/android/nightly/polkadot-app-{version}-{build}.apk` | `/android/nightly/polkadot-app.apk` | `http://polkadot-app-artefacts.s3.fr-par.scw.cloud/android/nightly/polkadot-app-1.0.0-1456.apk` |
-
-**Static paths** always point to the latest build from that workflow, while **versioned paths** preserve all historical builds.
-
----
-
-## Scripts
-
-Version management scripts located in `.github/scripts/`:
-
-- **`read_versions.py`** - Reads current version and build number from `Versions.kt`
-- **`update_marketing_version.py`** - Updates version (DefaultVersionName) in `Versions.kt`
-- **`update_build_number.py`** - Updates or increments build number (DefaultVersionCode) in `Versions.kt`
-
-All scripts work with `build-logic/convention/src/main/kotlin/Versions.kt` file.
+- [`actions/install`](actions/install/action.yaml) — JDK 21, Android SDK, Node 24,
+  Python 3.13, GitHub CLI, NDK r29, Clang 21, Rust with the Android targets.
+- [`actions/prepare-android-build`](actions/prepare-android-build/action.yaml) — decodes
+  `google-services.json` and the requested keystore from their base64 secrets.
+- [`actions/setup-clang`](actions/setup-clang/action.yaml) — installs the requested Clang.
+- [`actions/upload-to-firebase`](actions/upload-to-firebase/action.yaml) — App Distribution upload.

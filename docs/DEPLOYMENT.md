@@ -501,14 +501,9 @@ For a fork or another deployment, store non-sensitive branding and endpoint
 configuration as **GitHub Actions variables**, and credentials, signing material,
 and mnemonics as **GitHub Actions secrets**. Expose both as environment variables;
 the Gradle build reads them through the helpers in §5, so no code changes are needed.
-A minimal sketch follows the table.
-
-The nightly release notification also reads two workflow-only repository variables:
-
-| Variable | Description |
-|----------|-------------|
-| `CI_MATRIX_ROOM_IDS` | Comma-separated Matrix room IDs that receive the notification. |
-| `NIGHTLY_DOWNLOAD_LINKS` | Multiline Markdown list passed to the notification action as its download links. |
+Everything the maintainers' workflows read beyond these build values (Firebase App
+Distribution ids, object-storage credentials, notification bots) is listed in
+[`.github/README.md`](../.github/README.md). A minimal sketch:
 
 ```yaml
 name: Build
