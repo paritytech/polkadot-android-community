@@ -29,11 +29,6 @@ class ChatsNavigator @Inject constructor(
         scanPanelRequests.requestOpen()
     }
 
-    override fun openScan() {
-        if (isCurrentDestination(R.id.scanQrFragment)) return
-        performNavigation(R.id.action_global_to_scan_graph)
-    }
-
     override fun openEnterAmount(payload: SendEnterAmountPayload) {
         performNavigation(
             actionId = R.id.action_global_to_send_enter_amount_graph,
