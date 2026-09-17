@@ -12,7 +12,6 @@ import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchEntropy
 import io.paritytech.polkadotapp.bandersnatch_crypto.aliasInContext
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
@@ -32,7 +31,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.Coinag
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
-import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.toSplitDestinations
@@ -48,49 +46,41 @@ import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleC
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.ScheduledDurableTx
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPreparation
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionOrigin
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.math.BigInteger
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * Building a payment's recycler unloads in the background: for the first time once the payment is saved, and
- * again once an attempt is proven unable to land.
+ * What a payment's recycler unloads contribute to being built in the background: the vouchers each one redeems
+ * and the coins it mints, read back from the ledger, and every unload of one call built together. When they are
+ * built is not this suite's.
  *
- * An unload's inputs are vouchers, and a voucher counts as present while it sits in a recycler — that is where
- * an unload proves it. The ring-VRF proofs make building the slow part, so everything that can be built in one
- * call is built together: one pinned block, one person proof, one token resolution.
- *
- * The builder is real, over mocked collaborators: its `build` takes a context parameter and returns a
- * `Result`, which mockk cannot stub, and building together is exactly what these tests are about.
+ * The builder is real, over mocked collaborators: its `build` takes a context parameter and returns a `Result`,
+ * which mockk cannot stub, and building together is exactly what these tests are about.
  */
 @OptIn(ExperimentalTime::class)
-class CoinageUnloadSubmissionPolicyTest {
+class UnloadRebuildTest {
     private val chain: Chain = mockk()
     private val peopleCollection: PeopleCollection = mockk()
     private val chainAssetProvider: ChainAssetProvider = mockk()
-    private val assetLedger: CoinageAssetLedger = mockk()
     private val coinRepository: CoinRepository = mockk()
     private val voucherRepository: VoucherRepository = mockk()
     private val activePeopleCollectionUseCase: ActivePeopleCollectionUseCase = mockk()
-    private val timeProvider: TimeProvider = mockk()
 
     private val chainStateRepository: ChainStateRepository = mockk()
     private val originFactory: CoinageTransactionOrigins = mockk()
@@ -117,14 +107,12 @@ class CoinageUnloadSubmissionPolicyTest {
         coinageInstanceIdProvider = instanceIdProvider,
     )
 
-    private val policy = CoinageUnloadSubmissionPolicy(
+    private val rebuild = UnloadRebuild(
         chainAssetProvider = chainAssetProvider,
-        assetLedger = assetLedger,
         coinRepository = coinRepository,
         voucherRepository = voucherRepository,
         activePeopleCollectionUseCase = activePeopleCollectionUseCase,
         unloadExtrinsicBuilder = unloadExtrinsicBuilder,
-        timeProvider = timeProvider,
     )
 
     private val knownCoins = mutableListOf<Coin>()
@@ -137,22 +125,18 @@ class CoinageUnloadSubmissionPolicyTest {
     private val destinationsBuilt = mutableListOf<List<Coin>>()
     private val originVouchers = mutableMapOf<TransactionOrigin, List<CoinageKeyIndex>>()
 
-    @Before
-    fun mockExtensions() {
-        mockkStatic(TOKEN_RESOLVER_FILE, ALIAS_FILE, DESTINATIONS_FILE)
-    }
-
     @After
     fun unmockExtensions() {
         unmockkStatic(TOKEN_RESOLVER_FILE, ALIAS_FILE, DESTINATIONS_FILE)
     }
 
     @Before
-    fun openTheWindow() {
+    fun setUp() {
+        // Before any stub below: the builder's collaborators include top-level extensions.
+        mockkStatic(TOKEN_RESOLVER_FILE, ALIAS_FILE, DESTINATIONS_FILE)
         every { chainAssetProvider.chainId() } returns "test-chain"
         coEvery { chainAssetProvider.chain() } returns chain
         coEvery { activePeopleCollectionUseCase.getActivePeopleCollection() } returns peopleCollection
-        every { timeProvider.now() } returns WINDOW_OPEN
         coEvery { coinRepository.getCoinsBy(any()) } answers {
             val requested = firstArg<List<CoinageKeyIndex>>()
             knownCoins.filter { it.derivationIndex in requested }
@@ -165,190 +149,142 @@ class CoinageUnloadSubmissionPolicyTest {
         givenBuildsSucceed()
     }
 
-    // ---- when a transfer is built ----
+    // ---- reading back ----
 
     @Test
-    fun `a scheduled transfer is built once its inputs are on chain`() = runTest {
+    fun `an unload resolves to its recorded vouchers and outputs, in order`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenRecyclers(holding(unload))
+        knownCoins.reverse()
+        knownVouchers.reverse()
 
-        val outcome = prepare(unload)
+        val resolved = rebuild.resolve(listOf(unload.scheduled), assetsOf(unload)).getValue(unload.id)
 
-        assertBuilt(outcome, unload)
+        assertEquals(unload.voucherIndices, resolved.voucherIndices)
+        assertEquals(unload.outputCoins, resolved.outputs)
     }
 
-    /** A voucher not yet in a recycler may still be landing there, so its absence is no reason to give up. */
     @Test
-    fun `a transfer whose input is not on chain yet is not built`() = runTest {
+    fun `an unload with a voucher not known locally is left out`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenRecyclers(holding())
+        knownVouchers -= unload.vouchers.last()
 
-        val outcome = prepare(unload)
-
-        assertLeftWaiting(outcome, unload)
-        verifyNothingBuilt()
+        assertTrue(rebuild.resolve(listOf(unload.scheduled), assetsOf(unload)).isEmpty())
     }
 
     @Test
-    fun `an input that appears later is built when it does`() = runTest {
+    fun `an unload with an output not known locally is left out`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenRecyclers(holding(), after(10.seconds), holding(unload))
+        knownCoins -= unload.outputCoins.last()
 
-        val outcome = prepare(unload)
-
-        assertBuilt(outcome, unload)
+        assertTrue(rebuild.resolve(listOf(unload.scheduled), assetsOf(unload)).isEmpty())
     }
 
+    /** An unload redeems vouchers only; a coin recorded as its input cannot be this kind of transaction. */
     @Test
-    fun `a bucket holds out for every entry's inputs before building`() = runTest {
-        val first = unloadOf(1)
-        val second = unloadOf(2)
-        givenLedgerRecords(first, second)
-        givenRecyclers(holding(first), after(10.seconds), holding(first, second))
-
-        val outcome = prepare(first, second)
-
-        assertBuilt(outcome, first)
-        assertBuilt(outcome, second)
-        assertEquals("expected the whole bucket in one build", 1, buildCalls.size)
-    }
-
-    @Test
-    fun `a partial detection builds only the entries whose inputs arrived`() = runTest {
-        val arrived = unloadOf(1)
-        val missing = unloadOf(2)
-        givenLedgerRecords(arrived, missing)
-        givenRecyclers(holding(arrived))
-
-        val outcome = prepare(arrived, missing)
-
-        assertBuilt(outcome, arrived)
-        assertLeftWaiting(outcome, missing)
-    }
-
-    /** A voucher that left its recycler since the last look is not unloaded on the strength of that look. */
-    @Test
-    fun `an input a fork took away is not built on the strength of an older look`() = runTest {
-        val forked = unloadOf(1)
-        val missing = unloadOf(2)
-        givenLedgerRecords(forked, missing)
-        givenRecyclers(holding(forked), after(5.seconds), holding())
-
-        val outcome = prepare(forked, missing)
-
-        assertLeftWaiting(outcome, forked)
-        verifyNothingBuilt()
-    }
-
-    // ---- when a transfer ends ----
-
-    @Test
-    fun `a transfer gives up when the window closes on inputs that never arrived`() = runTest {
+    fun `an unload recorded with an input that is not a voucher is left out`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenWindowClosed()
-        givenRecyclers(holding())
+        val coin = unload.outputCoins.first()
+        val assets = mapOf(
+            unload.id to EntryAssets(
+                inputs = listOf(LedgerAsset(CoinageAssetKind.COIN, OwnAsset.Coin(coin.derivationIndex), coin.accountId)),
+                outputs = unload.outputCoins.map { it.asLedgerAsset() },
+            )
+        )
 
-        val outcome = prepare(unload)
-
-        assertGaveUp(outcome, unload)
+        assertTrue(rebuild.resolve(listOf(unload.scheduled), assets).isEmpty())
     }
 
     @Test
-    fun `an input still on chain is built however long ago the payment was sent`() = runTest {
+    fun `an unload with no recorded vouchers is left out`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenWindowClosed()
-        givenRecyclers(holding(unload))
+        val assets = mapOf(unload.id to EntryAssets(inputs = emptyList(), outputs = unload.outputCoins.map { it.asLedgerAsset() }))
 
-        val outcome = prepare(unload)
-
-        assertBuilt(outcome, unload)
+        assertTrue(rebuild.resolve(listOf(unload.scheduled), assets).isEmpty())
     }
 
-    @Test
-    fun `building carries on past the window while the input is still there`() = runTest {
-        val stillThere = unloadOf(1)
-        val gone = unloadOf(2)
-        givenLedgerRecords(stillThere, gone)
-        givenWindowClosed()
-        givenRecyclers(holding(stillThere))
-
-        val outcome = prepare(stillThere, gone)
-
-        assertBuilt(outcome, stillThere)
-        assertGaveUp(outcome, gone)
-    }
+    // ---- what it waits for ----
 
     @Test
-    fun `a first build is made even when the window has already closed`() = runTest {
-        val neverBuilt = unloadOf(1)
-        givenLedgerRecords(neverBuilt)
-        givenWindowClosed()
-        givenRecyclers(holding(neverBuilt))
-
-        val outcome = prepare(neverBuilt)
-
-        assertBuilt(outcome, neverBuilt)
-    }
-
-    @Test
-    fun `an input that has not appeared keeps the transfer open`() = runTest {
+    fun `an unload waits on every voucher it redeems`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenRecyclers(holding(), after(1.seconds), holding())
+        val resolved = rebuild.resolve(listOf(unload.scheduled), assetsOf(unload)).getValue(unload.id)
 
-        val outcome = prepare(unload)
-
-        assertLeftWaiting(outcome, unload)
+        assertEquals(unload.voucherIndices.toSet(), rebuild.inputsOf(resolved))
     }
 
-    // ---- what a rebuild is ----
+    /** A voucher is present while it sits in a recycler: that is where an unload proves it. */
+    @Test
+    fun `presence reports the vouchers sitting in a recycler`() = runTest {
+        val unload = unloadOf(1)
+        every { voucherRepository.subscribeVouchersInRecycler() } returns flow {
+            emit(listOf(unload.vouchers.first()))
+            awaitCancellation()
+        }
+
+        val looks = rebuild.presence(unload.voucherIndices.toSet()).take(1).toList()
+
+        assertEquals(listOf(setOf(unload.voucherIndices.first())), looks)
+    }
+
+    // ---- how long it is retried ----
+
+    @Test
+    fun `terms carry the build deadline and whether failures are retried`() {
+        val params = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(RETRY_UNTIL, retryFailures = true)).params
+
+        assertEquals(RebuildTerms(RETRY_UNTIL, retriesFailures = true), rebuild.termsOf(params))
+    }
+
+    @Test
+    fun `unreadable params give no terms`() {
+        assertNull(rebuild.termsOf(byteArrayOf(1).toDataByteArray()))
+    }
+
+    // ---- building ----
 
     /** The recipient holds the keys of exactly these coins, and destinations are positional. */
     @Test
     fun `a rebuild mints to exactly the outputs recorded in the ledger, in order`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenRecyclers(holding(unload))
         knownCoins.reverse()
         knownVouchers.reverse()
 
-        prepare(unload)
+        build(unload)
 
         assertEquals(listOf(unload.outputCoins), destinationsBuilt)
         assertEquals(listOf(listOf(unload.voucherIndices)), buildCalls)
     }
 
     @Test
-    fun `a build failure is reported as a failure, not a give-up`() = runTest {
+    fun `every unload is built, in the order given`() = runTest {
+        val first = unloadOf(1)
+        val second = unloadOf(2)
+
+        val extrinsics = build(second, first).getOrThrow()
+
+        assertEquals(listOf(builtFor[second.voucherIndices.first()], builtFor[first.voucherIndices.first()]), extrinsics)
+    }
+
+    @Test
+    fun `an unload that cannot be built fails the whole build`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenRecyclers(holding(unload))
         givenBuildFails()
 
-        val outcome = policy.prepareSubmission(listOf(unload.scheduled))
-
-        assertTrue("expected a failure but was $outcome", outcome.isFailure)
+        assertTrue(build(unload).isFailure)
     }
 
     // ---- building together ----
 
     /**
-     * The pinned block, the person proof and the token resolution are paid once per call, so every unload
-     * ready in one call is built on them rather than each paying for its own.
+     * The pinned block, the person proof and the token resolution are paid once per call, so every unload built in
+     * one call is built on them rather than each paying for its own.
      */
     @Test
     fun `one pinned block, one prover and one token resolution per call`() = runTest {
         val first = unloadOf(1)
         val second = unloadOf(2)
-        givenLedgerRecords(first, second)
-        givenRecyclers(holding(first, second))
 
-        prepare(first, second)
+        build(first, second)
 
         coVerify(exactly = 1) { chainStateRepository.currentBlockHash(any()) }
         coVerify(exactly = 1) { peopleMembershipProver.precomputeForMember(any(), any(), any()) }
@@ -360,10 +296,8 @@ class CoinageUnloadSubmissionPolicyTest {
     fun `every entry in a call gets a distinct free unload token`() = runTest {
         val first = unloadOf(1)
         val second = unloadOf(2)
-        givenLedgerRecords(first, second)
-        givenRecyclers(holding(first, second))
 
-        prepare(first, second)
+        build(first, second)
 
         assertEquals(2, tokensUsed.size)
         assertEquals(2, tokensUsed.map { it.counter }.distinct().size)
@@ -373,93 +307,24 @@ class CoinageUnloadSubmissionPolicyTest {
     @Test
     fun `the unload quota is noted only after a build succeeds`() = runTest {
         val unload = unloadOf(1)
-        givenLedgerRecords(unload)
-        givenRecyclers(holding(unload))
         givenBuildFails()
 
-        policy.prepareSubmission(listOf(unload.scheduled))
+        build(unload)
 
         coVerify(exactly = 0) { quotaTracker.noteUnloadsHappened(any()) }
 
         givenBuildsSucceed()
-        prepare(unload)
+        build(unload)
 
         coVerify(exactly = 1) { quotaTracker.noteUnloadsHappened(1) }
     }
 
-    // ---- whether a failure is retried ----
-
-    @Test
-    fun `a transfer scheduled without a retry window is never retried`() = runTest {
-        val unload = unloadOf(1, retryFailures = false)
-
-        assertFalse(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.EXPIRED))
-    }
-
-    @Test
-    fun `a transfer scheduled with a retry window is retried`() = runTest {
-        val unload = unloadOf(1)
-
-        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.EXPIRED))
-    }
-
-    /** An attempt that simply never got included may land if built again, however late that is. */
-    @Test
-    fun `an attempt that expired is retried even after the window`() = runTest {
-        val unload = unloadOf(1)
-        givenWindowClosed()
-
-        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.EXPIRED))
-    }
-
-    /** A dispatch failure would most likely repeat, so only the window bounds how often it is rebuilt. */
-    @Test
-    fun `a dispatch failure is retried only while the window is open`() = runTest {
-        val unload = unloadOf(1)
-
-        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
-
-        givenWindowClosed()
-
-        assertFalse(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.DISPATCH_FAILED))
-    }
-
-    @Test
-    fun `a rejected attempt is retried only while the window is open`() = runTest {
-        val unload = unloadOf(1)
-
-        assertTrue(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.REJECTED))
-
-        givenWindowClosed()
-
-        assertFalse(policy.canRetry(mockk(), unload.scheduled.policy.params, DurableFailureKind.REJECTED))
-    }
-
     // ---- harness ----
 
-    private suspend fun prepare(vararg unloads: ScheduledUnload): Map<DurableTxId, SubmissionPreparation> =
-        policy.prepareSubmission(unloads.map { it.scheduled }).getOrThrow()
+    private suspend fun build(vararg unloads: ScheduledUnload): Result<List<EnrichedSendableExtrinsic>> {
+        val resolved = rebuild.resolve(unloads.map { it.scheduled }, assetsOf(*unloads))
 
-    private fun assertBuilt(outcome: Map<DurableTxId, SubmissionPreparation>, unload: ScheduledUnload) {
-        val ready = outcome[unload.id]
-        assertTrue("expected ${unload.id} to be built but was $ready", ready is SubmissionPreparation.Ready)
-        assertEquals(builtFor[unload.voucherIndices.first()], (ready as SubmissionPreparation.Ready).extrinsic)
-    }
-
-    private fun assertLeftWaiting(outcome: Map<DurableTxId, SubmissionPreparation>, unload: ScheduledUnload) {
-        assertTrue("expected ${unload.id} to keep waiting but was ${outcome[unload.id]}", unload.id !in outcome)
-    }
-
-    private fun assertGaveUp(outcome: Map<DurableTxId, SubmissionPreparation>, unload: ScheduledUnload) {
-        assertEquals(SubmissionPreparation.GiveUp, outcome[unload.id])
-    }
-
-    private fun verifyNothingBuilt() {
-        assertTrue("expected no build but got $buildCalls", buildCalls.isEmpty())
-    }
-
-    private fun givenWindowClosed() {
-        every { timeProvider.now() } returns WINDOW_CLOSED
+        return rebuild.build(unloads.map { resolved.getValue(it.id) })
     }
 
     private fun givenBuilderCollaborators() {
@@ -520,7 +385,7 @@ class CoinageUnloadSubmissionPolicyTest {
     }
 
     /** Two vouchers unloaded into two coins; a seed keeps different unloads' assets apart. */
-    private fun unloadOf(seed: Int, retryUntil: Instant = RETRY_UNTIL, retryFailures: Boolean = true): ScheduledUnload {
+    private fun unloadOf(seed: Int): ScheduledUnload {
         val vouchers = listOf(voucherOf(seed * 10), voucherOf(seed * 10 + 1))
         val outputs = listOf(coinOf(seed * 10 + 2), coinOf(seed * 10 + 3))
         knownVouchers += vouchers
@@ -530,7 +395,7 @@ class CoinageUnloadSubmissionPolicyTest {
             id = DurableTxId(seed.toLong()),
             domainId = COINAGE_DOMAIN,
             groupId = GROUP,
-            policy = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(retryUntil, retryFailures)),
+            policy = CoinageSubmissionParams.unloadPolicy(TransferSubmissionParams(RETRY_UNTIL, retryFailures = true)),
         )
 
         return ScheduledUnload(scheduled, vouchers, outputs)
@@ -555,43 +420,15 @@ class CoinageUnloadSubmissionPolicyTest {
         provenance = CoinProvenance.UNKNOWN,
     )
 
-    private fun givenLedgerRecords(vararg unloads: ScheduledUnload) {
-        coEvery { assetLedger.assetsOf(any()) } returns Result.success(
-            unloads.associate { unload ->
-                unload.id to EntryAssets(
-                    inputs = unload.voucherIndices.map { index ->
-                        LedgerAsset(CoinageAssetKind.VOUCHER, OwnAsset.Voucher(index), byteArrayOf(index.item.toByte(), 1).toDataByteArray())
-                    },
-                    outputs = unload.outputCoins.map {
-                        LedgerAsset(CoinageAssetKind.COIN, OwnAsset.Coin(it.derivationIndex), it.accountId)
-                    },
-                )
-            }
+    private fun Coin.asLedgerAsset() = LedgerAsset(CoinageAssetKind.COIN, OwnAsset.Coin(derivationIndex), accountId)
+
+    private fun assetsOf(vararg unloads: ScheduledUnload): Map<DurableTxId, EntryAssets> = unloads.associate { unload ->
+        unload.id to EntryAssets(
+            inputs = unload.voucherIndices.map { index ->
+                LedgerAsset(CoinageAssetKind.VOUCHER, OwnAsset.Voucher(index), byteArrayOf(index.item.toByte(), 1).toDataByteArray())
+            },
+            outputs = unload.outputCoins.map { it.asLedgerAsset() },
         )
-    }
-
-    private sealed interface RecyclerStep
-
-    private class Holding(val indices: Set<CoinageKeyIndex>) : RecyclerStep
-
-    private class Pause(val duration: Duration) : RecyclerStep
-
-    private fun holding(vararg unloads: ScheduledUnload): RecyclerStep =
-        Holding(unloads.flatMapTo(mutableSetOf()) { it.voucherIndices })
-
-    private fun after(duration: Duration): RecyclerStep = Pause(duration)
-
-    /** One emission per change of the recyclers, and a subscription that stays open after the last one. */
-    private fun givenRecyclers(vararg steps: RecyclerStep) {
-        every { voucherRepository.subscribeVouchersInRecycler() } returns flow {
-            steps.forEach { step ->
-                when (step) {
-                    is Pause -> delay(step.duration)
-                    is Holding -> emit(knownVouchers.filter { it.ringVrfKeyIndex in step.indices })
-                }
-            }
-            awaitCancellation()
-        }
     }
 
     private companion object {
@@ -602,7 +439,5 @@ class CoinageUnloadSubmissionPolicyTest {
         val GROUP = OperationGroupId("chat-send")
 
         val RETRY_UNTIL = Instant.fromEpochSeconds(1_000)
-        val WINDOW_OPEN = Instant.fromEpochSeconds(500)
-        val WINDOW_CLOSED = Instant.fromEpochSeconds(1_500)
     }
 }

@@ -35,8 +35,9 @@ Coinage is the payment primitive: money is held as a set of power-of-2-denominat
 8. **`major`** — Background workers that submit coinage extrinsics use `ChainConnectionRefCounter.withConnectionEnabled(...)`. The default chain connection isn't active off-screen. (`architecture/transactions.md § Background chain work`.)
 9. **`blocking`** — New coins and vouchers are allocated only in the current installation (`CoinageInstallationRepository.getOrCreateCurrent()`), and the next index is scoped to it. Assets recovered from previous installations never influence it. Why: a reinstall that re-derived an index handed off before would give a peer a key it already holds.
 10. **`blocking`** — A coinage retry mints into the same outputs its failed attempt registered. Claims and in-chat sends register with a submission policy (`coinage-claim`, `coinage-split`, `coinage-unload`) and never re-submit with freshly allocated coins: a payment already made out of a claim's output keeps waiting on that exact coin.
-11. **`major`** — A transfer strategy only prepares (`TransferStrategy.schedule`): it allocates, reserves handoffs and returns the transactions to schedule. Extrinsics are built by the policies through the shared builders (`SplitExtrinsicBuilder`, `UnloadExtrinsicBuilder`, `ClaimExtrinsicBuilder`). The chat send schedules inside the message's save transaction; the merchant send schedules with no retry window and waits until every transaction is submitted.
-12. **`major`** — The installation registration is a durable-engine domain (`coinage-installation`) decided by `CoinageInstallationRegistrationOracle`. Keep at most one live attempt per installation group — the monotone oracle credits every live attempt with the same record.
+11. **`major`** — A new kind of rebuildable coinage transaction adds a `CoinageRebuild` (resolve from the ledger, inputs, presence, build) and is provided as an `InputGatedSubmissionPolicy`. When to wait, build, give up or retry is never reimplemented per kind.
+12. **`major`** — A transfer strategy only prepares (`TransferStrategy.schedule`): it allocates, reserves handoffs and returns the transactions to schedule. Extrinsics are built by the policies through the shared builders (`SplitExtrinsicBuilder`, `UnloadExtrinsicBuilder`, `ClaimExtrinsicBuilder`). The chat send schedules inside the message's save transaction; the merchant send schedules with no retry window and waits until every transaction is submitted.
+13. **`major`** — The installation registration is a durable-engine domain (`coinage-installation`) decided by `CoinageInstallationRegistrationOracle`. Keep at most one live attempt per installation group — the monotone oracle credits every live attempt with the same record.
 
 ## Seams (composition points)
 
@@ -71,8 +72,8 @@ If a new feature crosses any of these, name the alignment in the architect plan.
 
 ## Canonical examples
 
-- Transfer (reserve → schedule → policy builds → reconcile): `RealPrepareCoinageTransferUseCase.prepareScheduledMemo` → `CoinageSplitSubmissionPolicy` / `CoinageUnloadSubmissionPolicy`.
-- Claim retried by the engine into the same coin: `RealCoinageTransferSubmissionUseCase` → `CoinageClaimSubmissionPolicy`.
+- Transfer (reserve → schedule → policy builds → reconcile): `RealPrepareCoinageTransferUseCase.prepareScheduledMemo` → `InputGatedSubmissionPolicy` with `SplitRebuild` / `UnloadRebuild`.
+- Claim retried by the engine into the same coin: `RealCoinageTransferSubmissionUseCase` → `InputGatedSubmissionPolicy` with `ClaimRebuild`.
 - Chat-watches-chain pattern: `CoinagePaymentProcessingExtension`.
 - Multi-key extrinsic submission: any caller of `submitExtrinsicsAndAwaitInBlock { keyPairs.forEach { ... } }`.
 - Custom-origin via composition: `AsCoinageTxExtensionFactory.create(info)` — sealed-branch composition, not inheritance.
