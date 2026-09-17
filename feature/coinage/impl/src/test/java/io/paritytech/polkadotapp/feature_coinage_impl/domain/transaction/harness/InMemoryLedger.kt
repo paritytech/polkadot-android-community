@@ -453,7 +453,6 @@ private fun InMemoryLedger.groupStates(groupId: CoinageOperationGroupId) =
             status = entry.status,
             inputs = entryAssets.inputs.map { it.toCoinageInput() },
             outputs = entryAssets.outputs.mapNotNull { it.asset },
-            hasSubmissionPolicy = entry.id in policies,
         )
     }
 

@@ -409,7 +409,6 @@ class RealCoinageRecyclingUseCaseTest {
         status = status,
         inputs = listOf(CoinageInput.Coin.Own(testKey(100 + voucherIndex))),
         outputs = listOf(OwnAsset.Voucher(testKey(voucherIndex))),
-        hasSubmissionPolicy = false,
     )
 
     private fun voucherInRecycler(ringVrfKeyIndex: Int) = createVoucher(

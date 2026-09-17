@@ -80,27 +80,26 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
         while (true) {
             settled = awaitKnownOperationsSettled(groupId, keys.keys, report = ::send)
 
-            // A claim that failed is built again by the engine, into the same coin, for as long as its policy
-            // allows. One its policy gave up on is not claimed again here: a new claim would mint into a coin
-            // nothing that spends the recorded one would ever see.
-            val unclaimed = keys.keys - settled.finalizedCoins() - settled.coinsGivenUpByPolicy()
+            // Each coin is registered once. Rebuilding a claim that failed is its submission policy's job, into
+            // the coin it recorded; a second claim here would mint into a coin nothing would ever wait on.
+            val unregistered = keys.keys - settled.registeredCoins()
 
-            // Every coin has a claim that finalized. Claim finished.
-            if (unclaimed.isEmpty()) break
+            // Every coin has a claim, and none of them can change any more. Claim finished.
+            if (unregistered.isEmpty()) break
 
-            val claimable = awaitOnChainWithTimeout(onChain, unclaimed)
+            val claimable = awaitOnChainWithTimeout(onChain, unregistered)
 
             when {
-                // Coin detected => try to claim
-                claimable.isNotEmpty() -> submit(keys, claimable, groupId, retryUntil, isRetrying = settled.isNotEmpty())
+                // Coin detected => register its claim
+                claimable.isNotEmpty() -> submit(keys, claimable, groupId, retryUntil)
 
                 // Timeout to limit claim of remaining coins in case they never appeared on-chain
                 timeProvider.now() >= retryUntil -> {
-                    coinageLogW("Claim window closed group=${groupId.value} unclaimed=${unclaimed.size}")
+                    coinageLogW("Claim window closed group=${groupId.value} unregistered=${unregistered.size}")
                     break
                 }
 
-                else -> coinageLogD("Claim still waiting group=${groupId.value} unclaimed=${unclaimed.size}")
+                else -> coinageLogD("Claim still waiting group=${groupId.value} unregistered=${unregistered.size}")
             }
         }
 
@@ -170,9 +169,8 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
         claimable: Map<AccountId, OnChainCoinInfo>,
         groupId: CoinageOperationGroupId,
         retryUntil: Instant,
-        isRetrying: Boolean,
     ) {
-        coinageLogI("Claim submitting group=${groupId.value} claims=${claimable.size} retry=$isRetrying")
+        coinageLogI("Claim submitting group=${groupId.value} claims=${claimable.size}")
 
         submissionUseCase(claimable.keys.mapNotNull(keys::get), claimable, groupId, retryUntil)
             .onFailure { coinageLogE("Claim submission failed group=${groupId.value}", it) }
@@ -198,14 +196,10 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     private fun List<CoinageTransactionState>.finalizedCoins(): Set<AccountId> =
         filter { it.status == DurableTxStatus.FINALIZED_SUCCESS }.receivedInputs()
 
-    /** Coins whose claim failed after every rebuild its submission policy allowed. */
-    private fun List<CoinageTransactionState>.coinsGivenUpByPolicy(): Set<AccountId> =
-        filter { it.status == DurableTxStatus.FAILURE && it.hasSubmissionPolicy }.receivedInputs() - finalizedCoins()
+    /** Coins a claim of ours was registered for, whatever became of it. */
+    private fun List<CoinageTransactionState>.registeredCoins(): Set<AccountId> = receivedInputs()
 
-    /**
-     * Coins an attempt of ours failed on, so they are waiting on a retry rather than on a block — whether the
-     * engine is building that retry or a later look at the chain will submit a new claim.
-     */
+    /** Coins whose claim failed, or is being rebuilt after failing, rather than simply waiting on a block. */
     private fun List<CoinageTransactionState>.failedCoins(): Set<AccountId> =
         filter { it.status == DurableTxStatus.FAILURE || it.status == DurableTxStatus.PENDING_SUBMISSION }
             .receivedInputs()

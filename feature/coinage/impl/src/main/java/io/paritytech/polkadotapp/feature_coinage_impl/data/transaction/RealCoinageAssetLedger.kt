@@ -224,7 +224,6 @@ private fun List<CoinageEntryWithAssets>.toTransactionStates() = map { row ->
         status = row.entry.status.toDomain(),
         inputs = row.inputs.sortedBy { it.position }.map { it.toDomain().toCoinageInput() },
         outputs = row.outputs.sortedBy { it.position }.mapNotNull { it.toDomain().asset },
-        hasSubmissionPolicy = row.entry.submissionPolicyId != null,
     )
 }
 

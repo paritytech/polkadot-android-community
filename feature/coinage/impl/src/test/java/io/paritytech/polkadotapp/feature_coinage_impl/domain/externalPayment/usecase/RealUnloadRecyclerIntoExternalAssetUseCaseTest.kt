@@ -410,7 +410,6 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
             status = status,
             inputs = unloads.map { CoinageInput.Voucher(it.ringVrfKeyIndex) },
             outputs = mints.map { OwnAsset.Voucher(it.ringVrfKeyIndex) },
-            hasSubmissionPolicy = false,
         )
 
     private fun entry(status: DurableTxStatus) = CoinageTransactionState(
@@ -418,7 +417,6 @@ class RealUnloadRecyclerIntoExternalAssetUseCaseTest {
         status = status,
         inputs = listOf(CoinageInput.Voucher(testKey(status.ordinal))),
         outputs = listOf(OwnAsset.Voucher(testKey(status.ordinal))),
-        hasSubmissionPolicy = false,
     )
 
     private fun voucherInRecycler(index: Int, recycler: Int = index, exponent: Int = 1) = voucherOf(

@@ -311,7 +311,6 @@ class RealPrepareCoinageTransferUseCaseTest {
         status = status,
         inputs = splitTransaction.inputs,
         outputs = splitTransaction.outputs,
-        hasSubmissionPolicy = true,
     )
 
     /** A value class over String: the matcher is what counts, the wrapped value only has to be non-null. */

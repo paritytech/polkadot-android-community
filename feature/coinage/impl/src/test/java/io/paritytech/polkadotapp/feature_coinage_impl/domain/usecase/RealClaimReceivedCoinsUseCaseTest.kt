@@ -116,40 +116,6 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     /**
-     * The claim the previous attempt submitted failed, and the coin it was for is still on chain — so it is
-     * still unclaimed, and still the peer's money sitting there. It is submitted again.
-     *
-     * This is the case that stranded 0.88 of a 1.00 payment on a device: three claims were refused before
-     * submission and nothing ever tried them again.
-     */
-    @Test
-    fun `a claim that failed is submitted again while its coin is still on chain`() = runTest {
-        val coin = key(1)
-        givenChainSees(listOf(coin.accountId))
-        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId)))
-
-        reportsOf(coin)
-
-        assertClaimedOnce(coin.keypair)
-    }
-
-    /**
-     * The same failure, left behind by a claim registered before claims carried a retry policy: nothing but
-     * this use case will ever try that coin again. The case above is exactly that row, kept under its own
-     * name so the two meanings of a failed claim stay visible side by side.
-     */
-    @Test
-    fun `a legacy failed claim without a policy is still submitted again`() = runTest {
-        val coin = key(1)
-        givenChainSees(listOf(coin.accountId))
-        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId)))
-
-        reportsOf(coin)
-
-        assertClaimedOnce(coin.keypair)
-    }
-
-    /**
      * A claim's attempt was proven unable to land, and the engine is building it again into the same coin.
      * The coin is still on chain, but that is the rebuild's to claim — a second claim here would be refused
      * at best and mint a coin nobody is waiting for at worst. The claim stays open until the rebuild settles.
@@ -166,15 +132,15 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     /**
-     * The engine already rebuilt this claim for as long as its policy allowed, into the coin it first recorded.
-     * A new claim here would mint into a different coin, which a payment made out of the recorded one would
-     * never see — so the claim ends instead, however much of the coin is still on chain.
+     * The claim for this coin failed for good: its policy already rebuilt it for as long as it could, into the
+     * coin it recorded. A new claim here would mint into a different coin, which a payment made out of the
+     * recorded one would never see — so the claim ends instead, however much of the coin is still on chain.
      */
     @Test
-    fun `a claim its policy gave up on is not claimed again into a new coin`() = runTest {
+    fun `a failed claim is never claimed again into a new coin`() = runTest {
         val coin = key(1)
         givenChainSees(listOf(coin.accountId))
-        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId, hasSubmissionPolicy = true)))
+        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId)))
 
         val reported = reportsOfCompleted(coin)
 
@@ -399,7 +365,7 @@ class RealClaimReceivedCoinsUseCaseTest {
         val coin = key(1)
         every { timeProvider.now() } returns WINDOW_CLOSED
         givenChainSees(emptyList())
-        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId)))
+        givenGroupReports(noEntries())
 
         val reported = reportsOfCompleted(coin)
 
@@ -408,9 +374,8 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     /**
-     * A payment received long ago whose claim failed, retried a day later. The coin is still sitting on
-     * chain, so it is still the peer's money waiting to be collected, and the window has nothing to say
-     * about it.
+     * A payment received long ago whose coin only now shows on chain. It is still the peer's money waiting to
+     * be collected, and the window has nothing to say about it.
      *
      * Giving up here would abandon funds permanently: nothing else in the app collects a coin handed over in
      * a chat, and the sender cannot take it back.
@@ -420,14 +385,14 @@ class RealClaimReceivedCoinsUseCaseTest {
         val coin = key(1)
         every { timeProvider.now() } returns WINDOW_CLOSED
         givenChainSees(listOf(coin.accountId))
-        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId)))
+        givenGroupReports(noEntries())
 
         reportsOf(coin)
 
         assertClaimedOnce(coin.keypair)
     }
 
-    /** And it keeps claiming for as long as the chain keeps showing the coin, window or no window. */
+    /** A claim the ledger refused is registered again for as long as the chain keeps showing the coin, window or no window. */
     @Test
     fun `claiming carries on past the window while the coin is still there`() = runTest {
         val coin = key(1)
@@ -436,9 +401,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         givenSubmissionSignals(refused, Result.failure(IllegalStateException("refused")))
         givenChainSeesAgainAfter(refused)
-        // A group that already holds a failed attempt, so this is squarely a retry, not a first try —
-        // otherwise the first-attempt exemption would carry the test rather than the rule under it.
-        givenGroupReports(listOf(entry(FAILURE, claiming = coin.accountId)))
+        givenGroupReports(noEntries())
 
         reportsOf(coin)
 
@@ -795,13 +758,11 @@ class RealClaimReceivedCoinsUseCaseTest {
         status: DurableTxStatus,
         claiming: AccountId,
         outputs: Int = 1,
-        hasSubmissionPolicy: Boolean = false,
     ) = CoinageTransactionState(
         id = CoinageTransactionId(claiming.value.first().toLong() * 10 + status.ordinal),
         status = status,
         inputs = listOf(CoinageInput.Coin.Received(claiming)),
         outputs = List(outputs) { OwnAsset.Coin(testKey(it)) },
-        hasSubmissionPolicy = hasSubmissionPolicy,
     )
 
     private companion object {
