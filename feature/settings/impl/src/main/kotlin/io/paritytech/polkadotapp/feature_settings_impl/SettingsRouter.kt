@@ -21,6 +21,7 @@ interface SettingsRouter : ReturnableRouter {
     fun openPrivacyPolicy()
     fun openTermsOfUse()
     fun openThemes()
+    fun openMerchantMode()
 
     // TODO: should not be here, remove after W3S
     fun openClaimUsername()

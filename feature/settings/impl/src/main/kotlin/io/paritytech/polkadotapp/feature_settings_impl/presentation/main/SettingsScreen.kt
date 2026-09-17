@@ -17,6 +17,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.BlockOutlined
+import io.paritytech.polkadotapp.design.components.icon.vectors.CashOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.FileOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.GridOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.Language
@@ -57,7 +58,8 @@ fun SettingsScreen() {
         onConnectedDevicesClick = viewModel::onLinkedDevicesClick,
         onPrivacyPolicyClick = viewModel::onPrivacyPolicyClick,
         onTermsOfUseClick = viewModel::onTermsOfUseClick,
-        onDebugMenuClick = viewModel::onDebugMenuClick
+        onDebugMenuClick = viewModel::onDebugMenuClick,
+        onMerchantModeClick = viewModel::onMerchantModeClick
     )
 }
 
@@ -74,7 +76,8 @@ private fun SettingsScreenInternal(
     onConnectedDevicesClick: () -> Unit,
     onPrivacyPolicyClick: () -> Unit,
     onTermsOfUseClick: () -> Unit,
-    onDebugMenuClick: () -> Unit
+    onDebugMenuClick: () -> Unit,
+    onMerchantModeClick: () -> Unit
 ) {
     PolkadotSurface {
         Column(
@@ -192,6 +195,18 @@ private fun SettingsScreenInternal(
                     VerticalSpacer { large }
                 }
 
+                PolkadotMenuList(
+                    headerText = stringResource(RCommon.string.settings_section_other)
+                ) {
+                    SettingsMenuItem(
+                        icon = NovaIcons.CashOutlined,
+                        title = stringResource(RCommon.string.settings_merchant_mode),
+                        onClick = onMerchantModeClick
+                    )
+                }
+
+                VerticalSpacer { large }
+
                 AppDeviceInfoSection(state.isDebug)
             }
         }
@@ -224,7 +239,8 @@ private fun SettingsScreenPreview() {
             onConnectedDevicesClick = {},
             onPrivacyPolicyClick = {},
             onTermsOfUseClick = {},
-            onDebugMenuClick = {}
+            onDebugMenuClick = {},
+            onMerchantModeClick = {}
         )
     }
 }

@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.Statemen
 import io.paritytech.polkadotapp.feature_products_api.domain.sponsoring.TransactionSponsoring
 import io.paritytech.polkadotapp.feature_products_api.presentation.spaHost.SpaHost
 import io.paritytech.polkadotapp.feature_products_impl.data.config.RemoteConfigFundingDomainProvider
+import io.paritytech.polkadotapp.feature_products_impl.data.config.RemoteConfigMerchantDomainProvider
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.BrowserTabRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductFundingOperationRepository
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductIntegrationRepository
@@ -64,6 +65,9 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.allowance.
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.sponsoring.RealStatementStoreSubmissionSponsoring
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.sponsoring.SponsorPreimageWithBulletin
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.sponsoring.SponsorReviveCallsWithPgas
+import io.paritytech.polkadotapp.feature_products_impl.domain.merchantMode.MerchantDomainProvider
+import io.paritytech.polkadotapp.feature_products_impl.domain.merchantMode.MerchantProductLoader
+import io.paritytech.polkadotapp.feature_products_impl.domain.merchantMode.RealMerchantProductLoader
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.ProductNotificationScheduler
 import io.paritytech.polkadotapp.feature_products_impl.domain.notifications.RealProductNotificationScheduler
 import io.paritytech.polkadotapp.feature_products_impl.domain.operation.ProductOperationService
@@ -297,6 +301,12 @@ internal interface ProductsModule {
     @Binds
     @Singleton
     fun bindFundingDomainProvider(impl: RemoteConfigFundingDomainProvider): FundingDomainProvider
+
+    @Binds
+    fun bindMerchantDomainProvider(impl: RemoteConfigMerchantDomainProvider): MerchantDomainProvider
+
+    @Binds
+    fun bindMerchantProductLoader(impl: RealMerchantProductLoader): MerchantProductLoader
 
     @Binds
     fun bindWhitelistedProductsProvider(impl: RealWhitelistedProductsProvider): WhitelistedProductsProvider

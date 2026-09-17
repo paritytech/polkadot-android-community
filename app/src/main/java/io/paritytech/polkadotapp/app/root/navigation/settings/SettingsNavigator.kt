@@ -98,6 +98,10 @@ class SettingsNavigator @Inject constructor(
         performNavigation(R.id.action_global_to_change_theme)
     }
 
+    override fun openMerchantMode() {
+        performNavigation(R.id.action_global_to_merchantModeFragment)
+    }
+
     override fun openClaimUsername() {
         performNavigationToGraph(
             actionId = R.id.action_global_to_claim_username_graph,

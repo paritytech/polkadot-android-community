@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServi
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
+import io.paritytech.polkadotapp.feature_products_impl.domain.merchantMode.MerchantProductLoader
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.SyncPriceCurrencyChange
 import io.paritytech.polkadotapp.feature_splash_api.presentation.SplashPassedObserver
 import io.paritytech.polkadotapp.feature_sso_impl.domain.SsoService
@@ -51,6 +52,7 @@ class RootViewModel @Inject constructor(
     private val ssoService: SsoService,
     private val chatRequestServiceCoordinator: ChatRequestServiceCoordinator,
     private val exploreProductsService: ExploreProductsService,
+    private val merchantProductLoader: MerchantProductLoader,
     private val jwtAuthWarmUpService: JwtAuthWarmUpService,
     chatBotStateController: ChatBotStateController,
     chatEngine: ChatEngine,
@@ -74,6 +76,7 @@ class RootViewModel @Inject constructor(
                     externalPaymentWorkerStarter.start()
                     launch { statementStoreSlotAllocator.scheduleSlotRenewals() }
                     launch { warmUpWebProducts() }
+                    launch { merchantProductLoader.warmUpMerchantLoading() }
                     startUpdateSystems()
                 }
         }

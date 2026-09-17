@@ -653,6 +653,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="spa_browser_page_no_app_surface">This product doesn\'t have an app on this device.</string>
     <string name="product_resolution_error_malformed_manifest">This product published a manifest this app can\'t read. Contact the product\'s developer.</string>
     <string name="product_resolution_error_unknown">Couldn\'t load this product.</string>
+    <string name="merchant_mode_unavailable">Merchant mode isn\'t available right now. Please try again later.</string>
     <string name="debug_menu_enable_retro_mode">Enable retro mode</string>
     <string name="debug_menu_disable_retro_mode">Disable retro mode</string>
     <string name="debug_menu_randomize_account">Randomize account (Test Dev Reset)</string>
@@ -772,6 +773,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="stall_report_details">Details</string>
     <string name="stall_report_details_title">What\'s happening</string>
     <string name="stall_reading_chain_state">Reading chain state</string>
+    <string name="merchant_mode_stall_opening">Opening merchant mode</string>
     <string name="stall_submitting_transaction">Submitting transaction</string>
     <string name="sso_stall_responding_to_device">Responding to device</string>
     <string name="statement_store_stall_allocating_voucher">Allocating statement store usage voucher</string>
@@ -1274,6 +1276,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_section_legal">Legal</string>
     <string name="settings_section_payments">Payments</string>
     <string name="settings_section_debug">Debug</string>
+    <string name="settings_section_other">Other</string>
 
     <string name="settings_notifications">Notifications</string>
     <string name="settings_theme">Theme</string>
@@ -1289,6 +1292,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_terms_of_use">Terms of use</string>
     <string name="settings_privacy_policy">Privacy policy</string>
     <string name="settings_products">Apps</string>
+    <string name="settings_merchant_mode">Merchant mode</string>
     <string name="settings_blocked_contacts">Blocked contacts</string>
     <string name="settings_contact_us">Contact us</string>
     <string name="settings_email_copied">Email copied to clipboard</string>
