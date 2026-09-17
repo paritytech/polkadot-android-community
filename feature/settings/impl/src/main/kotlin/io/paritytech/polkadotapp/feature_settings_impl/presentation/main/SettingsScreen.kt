@@ -17,7 +17,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.BlockOutlined
-import io.paritytech.polkadotapp.design.components.icon.vectors.CashOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.FileOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.GridOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.Language
@@ -25,6 +24,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.LaptopOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.NotificationsBellOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.PaletteOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.Settings
+import io.paritytech.polkadotapp.design.components.icon.vectors.StoreOutlined
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuList
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuListCustomItem
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
@@ -199,7 +199,7 @@ private fun SettingsScreenInternal(
                     headerText = stringResource(RCommon.string.settings_section_other)
                 ) {
                     SettingsMenuItem(
-                        icon = NovaIcons.CashOutlined,
+                        icon = NovaIcons.StoreOutlined,
                         title = stringResource(RCommon.string.settings_merchant_mode),
                         onClick = onMerchantModeClick
                     )
