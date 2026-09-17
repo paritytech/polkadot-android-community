@@ -40,15 +40,19 @@ internal class RealChainHealthMixin(
         ChainHealthIndicatorsModel(map { health -> toItem(health, previous) }.toImmutableList())
 
     private fun toItem(health: ChainHealth, previous: ChainHealthIndicatorsModel): ChainHealthItemModel {
-        val glyph = glyphFor(health.chainId)
         val indicator = health.toIndicator()
-        val shown = previous.chains.firstOrNull { it.glyph == glyph }
+        val shown = previous.chains.firstOrNull { it.chainId == health.chainId }
             // While a connected chain is being asked how fast it has been going, what it showed before stands.
             ?.takeIf { indicator == UNMEASURED && health.isAnchorPending() && it.indicator.isProduction() }
             ?.indicator
             ?: indicator
 
-        return ChainHealthItemModel(chainName = health.chainName, glyph = glyph, indicator = shown)
+        return ChainHealthItemModel(
+            chainId = health.chainId,
+            chainName = health.chainName,
+            glyph = glyphFor(health.chainId),
+            indicator = shown,
+        )
     }
 
     private fun ChainHealthIndicator.isProduction(): Boolean = when (this) {

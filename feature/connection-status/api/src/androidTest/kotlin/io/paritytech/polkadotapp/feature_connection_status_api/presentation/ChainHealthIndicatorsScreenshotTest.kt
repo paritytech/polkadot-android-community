@@ -166,6 +166,7 @@ class ChainHealthIndicatorsScreenshotTest {
     )
 
     private fun item(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+        chainId = name,
         chainName = name,
         glyph = glyph,
         indicator = indicator,

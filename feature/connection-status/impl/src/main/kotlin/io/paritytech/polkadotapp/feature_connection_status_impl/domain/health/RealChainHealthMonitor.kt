@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEn
 import io.paritytech.polkadotapp.chains.repository.ChainStateRepository
 import io.paritytech.polkadotapp.common.utils.combine
 import io.paritytech.polkadotapp.common.utils.network.NetworkStateService
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealth
 import io.paritytech.polkadotapp.feature_connection_status_impl.data.ChainHeadDataSource
@@ -114,7 +115,8 @@ class RealChainHealthMonitor @Inject constructor(
             .map { state -> state?.pendingRequests.orEmpty() }
 
     private suspend fun resolveBlockTime(chainId: ChainId): Duration =
-        runCatching { chainStateRepository.expectedBlockTime(chainId) }
+        runCancellableCatching { chainStateRepository.expectedBlockTime(chainId) }
+            .onFailure { chainHealthLog.w(it, "%s block time unavailable, measuring against %s", chainId, FALLBACK_BLOCK_TIME) }
             .getOrDefault(FALLBACK_BLOCK_TIME)
 
     private companion object {

@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin
 
 import androidx.compose.runtime.Immutable
+import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import kotlinx.collections.immutable.ImmutableList
 import kotlin.math.roundToLong
 import kotlin.time.Duration
@@ -79,6 +80,7 @@ data class ChainHealthIndicatorsModel(
 
 @Immutable
 data class ChainHealthItemModel(
+    val chainId: ChainId,
     val chainName: String,
     val glyph: ChainGlyph,
     val indicator: ChainHealthIndicator,

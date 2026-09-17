@@ -150,7 +150,6 @@ fun ChainHealthIndicators(
     }
 }
 
-/** One chain's indicator on its own: the glyph inside the disc or ring for its [ChainHealthIndicator]. */
 @Composable
 internal fun ChainIndicator(
     modifier: Modifier = Modifier,
@@ -395,10 +394,7 @@ private fun ChainHealthIndicatorsPreview() {
     }
 }
 
-/**
- * The arc is the share of expected blocks the chain produced, which no single state of the app can step
- * through; this walks every count from none to all fifteen.
- */
+// No state of the app steps the arc through its range, so the gradation is only visible here.
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 private fun ChainProductionScalePreview() {
@@ -424,6 +420,7 @@ private fun ChainProductionScalePreview() {
 }
 
 private fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+    chainId = name,
     chainName = name,
     glyph = glyph,
     indicator = indicator,

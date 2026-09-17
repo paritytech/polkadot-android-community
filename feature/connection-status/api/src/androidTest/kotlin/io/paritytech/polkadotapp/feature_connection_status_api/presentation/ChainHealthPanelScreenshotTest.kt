@@ -124,6 +124,7 @@ class ChainHealthPanelScreenshotTest {
         item(name, glyph, ChainHealthIndicator.of(share, blockTime))
 
     private fun item(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+        chainId = name,
         chainName = name,
         glyph = glyph,
         indicator = indicator,

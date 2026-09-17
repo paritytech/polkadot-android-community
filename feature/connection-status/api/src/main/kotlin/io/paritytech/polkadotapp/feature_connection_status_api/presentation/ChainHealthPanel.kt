@@ -182,6 +182,7 @@ private fun previewItem(name: String, glyph: ChainGlyph, share: Float, blockTime
     previewItem(name, glyph, ChainHealthIndicator.of(share, blockTime))
 
 private fun previewItem(name: String, glyph: ChainGlyph, indicator: ChainHealthIndicator) = ChainHealthItemModel(
+    chainId = name,
     chainName = name,
     glyph = glyph,
     indicator = indicator,
