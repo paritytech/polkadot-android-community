@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 interface NetworkStateService {
@@ -38,7 +39,8 @@ suspend fun <T> NetworkStateService.withNetworkRetries(compute: suspend () -> T)
 class RealNetworkStateService @Inject constructor(@ApplicationContext context: Context) : NetworkStateService {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    private val _isNetworkAvailable = MutableStateFlow(isNetworkAvailable())
+    private val networksWithInternet = ConcurrentHashMap.newKeySet<Network>()
+    private val _isNetworkAvailable = MutableStateFlow(false)
     override val isNetworkAvailable: StateFlow<Boolean> = _isNetworkAvailable.asStateFlow()
 
     init {
@@ -49,27 +51,26 @@ class RealNetworkStateService @Inject constructor(@ApplicationContext context: C
         connectivityManager.registerNetworkCallback(
             networkRequest,
             object : ConnectivityManager.NetworkCallback() {
-                // Callbacks fire per-Network; recompute from the system's active
-                // network so losing one transport while another stays up can't
-                // strand the flag at false.
-                override fun onAvailable(network: Network) = recompute()
+                override fun onAvailable(network: Network) = publish { networksWithInternet.add(network) }
 
-                override fun onLost(network: Network) = recompute()
+                // activeNetwork may still name the dying network, and no later callback corrects a stale true.
+                override fun onLost(network: Network) = publish { networksWithInternet.remove(network) }
 
                 override fun onCapabilitiesChanged(
                     network: Network,
                     networkCapabilities: NetworkCapabilities,
-                ) = recompute()
+                ) = publish {
+                    if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                        networksWithInternet.add(network)
+                    } else {
+                        networksWithInternet.remove(network)
+                    }
+                }
             })
     }
 
-    private fun recompute() {
-        _isNetworkAvailable.value = isNetworkAvailable()
-    }
-
-    private fun isNetworkAvailable(): Boolean {
-        val activeNetwork = connectivityManager.activeNetwork ?: return false
-        val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
-        return networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    private inline fun publish(update: () -> Unit) {
+        update()
+        _isNetworkAvailable.value = networksWithInternet.isNotEmpty()
     }
 }
