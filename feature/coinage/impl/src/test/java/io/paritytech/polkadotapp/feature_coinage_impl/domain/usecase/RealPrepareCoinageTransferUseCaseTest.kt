@@ -238,6 +238,31 @@ class RealPrepareCoinageTransferUseCaseTest {
         assertTrue(prepared.exceptionOrNull() is TransferSubmissionFailedException)
     }
 
+    /** The memo never reaches the merchant, so its coins are released now rather than on the next launch. */
+    @Test
+    fun `a merchant send that could not be submitted releases its reservation`() = runBlocking<Unit> {
+        withSplitScheduling()
+        withSchedulingAccepted()
+        withGroupReports(listOf(stateOf(PENDING_SUBMISSION)), listOf(stateOf(FAILURE)))
+        whenever(handoffCommit.release()).thenReturn(Result.success(Unit))
+
+        prepareMerchantSend()
+
+        verify(handoffCommit).release()
+        verify(handoffCommit, never()).commit()
+    }
+
+    @Test
+    fun `a merchant send that was submitted keeps its reservation`() = runBlocking<Unit> {
+        withSplitScheduling()
+        withSchedulingAccepted()
+        withGroupReports(listOf(stateOf(PENDING)))
+
+        prepareMerchantSend()
+
+        verify(handoffCommit, never()).release()
+    }
+
     /**
      * Low latency is the merchant flow's whole point, so nothing about it may wait hours on a rebuild: it is
      * built once, and only waits a moment for its inputs to be seen.

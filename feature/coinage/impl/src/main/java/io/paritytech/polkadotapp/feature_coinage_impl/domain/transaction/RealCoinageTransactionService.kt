@@ -191,4 +191,8 @@ private class LedgerHandoffCommit(
     override suspend fun commit(): Result<Unit> = assetLedger.commitHandoffs(keys)
         .onSuccess { coinageLogI("handoff-committed keys=${keys.map { it.shortKey() }}") }
         .onFailure { error -> coinageLogW("handoff-commit-failed keys=${keys.map { it.shortKey() }} error=$error") }
+
+    override suspend fun release(): Result<Unit> = assetLedger.releaseUncommittedHandoffs(keys)
+        .onSuccess { coinageLogI("handoff-released keys=${keys.map { it.shortKey() }}") }
+        .onFailure { error -> coinageLogW("handoff-release-failed keys=${keys.map { it.shortKey() }} error=$error") }
 }

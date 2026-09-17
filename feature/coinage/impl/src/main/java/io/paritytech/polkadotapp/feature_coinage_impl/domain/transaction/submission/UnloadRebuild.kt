@@ -1,13 +1,15 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission
 
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.asCoinOrNull
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.asVoucherOrNull
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.UnloadExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
@@ -42,28 +44,47 @@ class UnloadRebuild @Inject constructor(
         transactions: List<ScheduledDurableTx>,
         assets: Map<DurableTxId, EntryAssets>,
     ): Map<DurableTxId, Unload> {
-        val coinIndices = assets.values.flatMap { entry -> entry.outputs.mapNotNull { (it.asset as? OwnAsset.Coin)?.derivationIndex } }
-        val coins = coinRepository.getCoinsBy(coinIndices).associateBy { it.derivationIndex }
-
-        val voucherIndices = assets.values.flatMap { entry -> entry.inputs.mapNotNull { (it.asset as? OwnAsset.Voucher)?.ringVrfIndex } }
-        val knownVouchers = voucherRepository.getByRingVrfKeyIndices(voucherIndices).mapTo(mutableSetOf()) { it.ringVrfKeyIndex }
+        val coins = outputCoinsOf(assets.values)
+        val knownVouchers = knownVouchersOf(assets.values)
 
         return transactions.mapNotNull { tx ->
             val entry = assets[tx.id] ?: return@mapNotNull null
-            val inputs = entry.inputs.map { (it.asset as? OwnAsset.Voucher)?.ringVrfIndex }
-            val outputs = entry.outputs.map { (it.asset as? OwnAsset.Coin)?.let { coin -> coins[coin.derivationIndex] } }
+            val inputs = validInputs(entry, knownVouchers) ?: return@mapNotNull null
+            val outputs = validOutputs(entry, coins) ?: return@mapNotNull null
 
-            val resolvedInputs = inputs.filterNotNull().takeIf { it.size == inputs.size && it.isNotEmpty() && knownVouchers.containsAll(it) }
-            val resolvedOutputs = outputs.filterNotNull().takeIf { it.size == outputs.size }
-
-            if (resolvedInputs == null || resolvedOutputs == null) null else tx.id to Unload(resolvedInputs, resolvedOutputs)
+            tx.id to Unload(inputs, outputs)
         }.toMap()
     }
+
+    private suspend fun outputCoinsOf(entries: Collection<EntryAssets>): Map<CoinageKeyIndex, Coin> {
+        val indices = entries.flatMap { entry -> entry.outputs.mapNotNull { it.asCoinOrNull()?.derivationIndex } }
+
+        return coinRepository.getCoinsBy(indices).associateBy { it.derivationIndex }
+    }
+
+    private suspend fun knownVouchersOf(entries: Collection<EntryAssets>): Set<CoinageKeyIndex> {
+        val indices = entries.flatMap { entry -> entry.inputs.mapNotNull { it.asVoucherOrNull()?.ringVrfIndex } }
+
+        return voucherRepository.getByRingVrfKeyIndices(indices).mapToSet { it.ringVrfKeyIndex }
+    }
+
+    /** Every input a voucher we still hold, or nothing: an unload redeems exactly what was recorded. */
+    private fun validInputs(entry: EntryAssets, knownVouchers: Set<CoinageKeyIndex>): List<CoinageKeyIndex>? {
+        if (entry.inputs.isEmpty()) return null
+
+        return entry.inputs.map { input ->
+            input.asVoucherOrNull()?.ringVrfIndex?.takeIf { it in knownVouchers } ?: return null
+        }
+    }
+
+    /** Every output a coin we recorded, or nothing: a partial unload would mint something else. */
+    private fun validOutputs(entry: EntryAssets, coins: Map<CoinageKeyIndex, Coin>): List<Coin>? =
+        entry.outputs.map { output -> output.asCoinOrNull()?.let { coins[it.derivationIndex] } ?: return null }
 
     override fun inputsOf(transaction: Unload): Set<CoinageKeyIndex> = transaction.voucherIndices.toSet()
 
     override suspend fun presence(inputs: Set<CoinageKeyIndex>): Flow<Set<CoinageKeyIndex>> =
-        voucherRepository.subscribeVouchersInRecycler().map { vouchers -> vouchers.mapTo(mutableSetOf()) { it.ringVrfKeyIndex } }
+        voucherRepository.subscribeVouchersInRecycler().map { vouchers -> vouchers.mapToSet { it.ringVrfKeyIndex } }
 
     override suspend fun build(transactions: List<Unload>): Result<List<EnrichedSendableExtrinsic>> {
         // Re-read after the look, so every voucher carries the recycler location it is proven in now.

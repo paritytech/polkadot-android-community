@@ -102,7 +102,12 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
         val params = TransferSubmissionParams(buildUntil = timeProvider.now() + IMMEDIATE_BUILD_WINDOW, retryFailures = false)
 
         return createStrategy(plan).schedule(params)
-            .flatMap { scheduled -> submitNow(scheduled).map { scheduled } }
+            .flatMap { scheduled ->
+                // The memo never leaves when its transactions do not, so its coins need not wait for a relaunch.
+                submitNow(scheduled)
+                    .onFailure { scheduled.handoffCommit.release() }
+                    .map { scheduled }
+            }
             .flatMap { scheduled ->
                 memoBuilder.buildMemo(scheduled.entries)
                     .map { memo -> PreparedTransferMemo(memo, scheduled.handoffCommit) }
@@ -131,7 +136,7 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
      */
     context(diagnostics: StalenessReportCollector)
     private suspend fun submitNow(scheduled: ScheduledTransfer): Result<Unit> =
-        scheduled.scheduleTransactions(transactionService).flatMap { groupId ->
+        transactionService.scheduleTransferTransactions(scheduled).flatMap { groupId ->
             if (groupId == null) {
                 Result.success(Unit)
             } else {
@@ -173,17 +178,19 @@ private class SchedulingHandoffCommit(
     private val transactionService: CoinageTransactionService,
 ) : CoinageHandoffCommit {
     override suspend fun commit(): Result<Unit> = scheduled.handoffCommit.commit().flatMap {
-        scheduled.scheduleTransactions(transactionService).coerceToUnit()
+        transactionService.scheduleTransferTransactions(scheduled).coerceToUnit()
     }
+
+    override suspend fun release(): Result<Unit> = scheduled.handoffCommit.release()
 }
 
 /** Returns the group the transactions were scheduled under, or null when there was nothing to schedule. */
-private suspend fun ScheduledTransfer.scheduleTransactions(
-    transactionService: CoinageTransactionService,
+private suspend fun CoinageTransactionService.scheduleTransferTransactions(
+    transfer: ScheduledTransfer,
 ): Result<CoinageOperationGroupId?> {
-    if (transactions.isEmpty()) return Result.success(null)
+    if (transfer.transactions.isEmpty()) return Result.success(null)
 
     val groupId = CoinageOperationGroupId.generateNew()
 
-    return transactionService.scheduleTransactions(transactions, groupId).map { groupId }
+    return scheduleTransactions(transfer.transactions, groupId).map { groupId }
 }

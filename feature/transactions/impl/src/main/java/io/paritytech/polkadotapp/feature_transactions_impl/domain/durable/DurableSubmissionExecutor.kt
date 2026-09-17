@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionR
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
@@ -20,7 +21,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -86,13 +86,8 @@ class DurableSubmissionExecutor @Inject constructor(
         var lastPending = emptySet<DurableTxId>()
 
         repository.subscribePendingSubmissions()
-            .retryWhen { error, attempt ->
-                durabilityLogW("pending-submissions-subscription-failed attempt=$attempt error=$error")
-                delay(backoffAfter(attempt.toInt() + 1))
-                true
-            }
             .collect { pending ->
-                val ids = pending.mapTo(mutableSetOf()) { it.id }
+                val ids = pending.mapToSet { it.id }
                 if (ids.isEmpty()) {
                     lastPending = ids
                     return@collect
@@ -104,7 +99,7 @@ class DurableSubmissionExecutor @Inject constructor(
                 }
                 lastPending = ids
 
-                pending.mapTo(mutableSetOf()) { it.bucket() }.forEach { launchIfIdle(it) }
+                pending.mapToSet { it.bucket() }.forEach { launchIfIdle(it) }
             }
     }
 
@@ -167,7 +162,7 @@ class DurableSubmissionExecutor @Inject constructor(
             return false
         }
 
-        val ids = transactions.mapTo(mutableSetOf()) { it.id }
+        val ids = transactions.mapToSet { it.id }
         val relevant = outcomes.filterKeys { it in ids }
 
         return relevant.map { (id, outcome) -> apply(bucket, id, outcome) }.any { it }

@@ -3,7 +3,9 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submis
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
@@ -46,39 +48,50 @@ class InputGatedSubmissionPolicy<T : Any, K>(
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
     ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
-        val assets = assetLedger.assetsOf(transactions.map { it.id })
-            .getOrElse { return@runCancellableCatching Result.failure(it) }
+        resolve(transactions).flatMap { resolution -> decide(resolution) }
+    }.flatten()
 
-        val resolved = rebuild.resolve(transactions, assets)
-        val waiting = transactions.mapNotNull { tx ->
-            val transaction = resolved[tx.id]
-            val terms = rebuild.termsOf(tx.policy.params)
+    private suspend fun decide(resolution: Resolution<T, K>): Result<Map<DurableTxId, SubmissionPreparation>> {
+        if (resolution.waiting.isEmpty()) return Result.success(resolution.unbuildable.givenUp())
 
-            if (transaction != null && terms != null) Waiting(tx.id, transaction, rebuild.inputsOf(transaction), terms) else null
+        val look = awaitInputsOf(resolution.waiting)
+        val (ready, notReady) = resolution.waiting.partition { look.present.containsAll(it.inputs) }
+
+        return build(ready).map { built -> built + abandoned(notReady, look).givenUp() + resolution.unbuildable.givenUp() }
+    }
+
+    private suspend fun resolve(transactions: List<ScheduledDurableTx>): Result<Resolution<T, K>> =
+        assetLedger.assetsOf(transactions.map { it.id }).map { assets ->
+            val waiting = waitingOf(transactions, rebuild.resolve(transactions, assets))
+            val unbuildable = transactions.map { it.id } - waiting.mapToSet { it.id }
+
+            Resolution(waiting, unbuildable.onEach(::logUnbuildable))
         }
 
-        val unbuildable = (transactions.map { it.id } - waiting.map { it.id }.toSet())
-            .onEach { coinageLogE("${policyId.value}-rebuild-impossible entry=${it.value} reason=ledger-or-params-unreadable") }
-            .associateWith { SubmissionPreparation.GiveUp }
+    private fun waitingOf(transactions: List<ScheduledDurableTx>, resolved: Map<DurableTxId, T>): List<Waiting<T, K>> =
+        transactions.mapNotNull { tx ->
+            val transaction = resolved[tx.id] ?: return@mapNotNull null
+            val terms = rebuild.termsOf(tx.policy.params) ?: return@mapNotNull null
 
-        if (waiting.isEmpty()) return@runCancellableCatching Result.success(unbuildable)
+            Waiting(tx.id, transaction, rebuild.inputsOf(transaction), terms)
+        }
 
+    private suspend fun awaitInputsOf(waiting: List<Waiting<T, K>>): InputsLook<K> {
         val inputs = waiting.flatMapTo(mutableSetOf()) { it.inputs }
-        val look = awaitInputs(
+
+        return awaitInputs(
             presence = rebuild.presence(inputs),
             wanted = inputs,
-            earliestDeadline = waiting.minOf { it.terms.deadline },
+            deadline = waiting.minOf { it.terms.deadline },
             timeProvider = timeProvider,
         )
+    }
 
-        val (ready, notReady) = waiting.partition { look.present.containsAll(it.inputs) }
-        val abandoned = notReady
+    private fun abandoned(notReady: List<Waiting<T, K>>, look: InputsLook<K>): List<DurableTxId> =
+        notReady
             .filter { transaction -> transaction.inputs.any { look.abandoned(it, transaction.terms.deadline) } }
             .onEach { coinageLogI("${policyId.value}-rebuild-abandoned entry=${it.id.value} until=${it.terms.deadline}") }
-            .associate { it.id to SubmissionPreparation.GiveUp }
-
-        build(ready).map { built -> built + abandoned + unbuildable }
-    }.flatten()
+            .map { it.id }
 
     private suspend fun build(ready: List<Waiting<T, K>>): Result<Map<DurableTxId, SubmissionPreparation>> {
         if (ready.isEmpty()) return Result.success(emptyMap())
@@ -87,6 +100,18 @@ class InputGatedSubmissionPolicy<T : Any, K>(
             ready.zip(extrinsics) { waiting, extrinsic -> waiting.id to SubmissionPreparation.Ready(extrinsic) }.toMap()
         }
     }
+
+    private fun logUnbuildable(id: DurableTxId) {
+        coinageLogE("${policyId.value}-rebuild-impossible entry=${id.value} reason=ledger-or-params-unreadable")
+    }
+
+    private fun List<DurableTxId>.givenUp(): Map<DurableTxId, SubmissionPreparation> =
+        associateWith { SubmissionPreparation.GiveUp }
+
+    private class Resolution<T : Any, K>(
+        val waiting: List<Waiting<T, K>>,
+        val unbuildable: List<DurableTxId>,
+    )
 
     private class Waiting<T : Any, K>(
         val id: DurableTxId,

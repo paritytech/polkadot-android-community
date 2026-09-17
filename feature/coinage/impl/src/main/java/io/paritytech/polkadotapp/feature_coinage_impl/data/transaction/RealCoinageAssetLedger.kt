@@ -102,6 +102,10 @@ class RealCoinageAssetLedger @Inject constructor(
         dao.deleteUncommittedHandoffs()
     }
 
+    override suspend fun releaseUncommittedHandoffs(keys: List<AssetPublicKey>): Result<Unit> = runCatching {
+        dao.deleteUncommittedHandoffs(keys.map { it.value })
+    }
+
     override suspend fun getHandoffKeys(): Result<Set<AssetPublicKey>> = runCatching {
         dao.getHandoffs().mapTo(mutableSetOf()) { it.onChainKey.toDataByteArray() }
     }

@@ -5,9 +5,10 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.mapAsync
 import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
+import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.asCoinOrNull
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.SplitExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -35,18 +36,23 @@ class SplitRebuild @Inject constructor(
         transactions: List<ScheduledDurableTx>,
         assets: Map<DurableTxId, EntryAssets>,
     ): Map<DurableTxId, Split> {
-        val indices = assets.values.flatMap { entry ->
-            (entry.inputs + entry.outputs).mapNotNull { (it.asset as? OwnAsset.Coin)?.derivationIndex }
-        }
-        val coins = coinRepository.getCoinsBy(indices).associateBy { it.derivationIndex }
+        val coins = coinsOf(assets.values)
 
-        return transactions.mapNotNull { tx ->
-            val entry = assets[tx.id] ?: return@mapNotNull null
-            val input = (entry.inputs.singleOrNull()?.asset as? OwnAsset.Coin)?.let { coins[it.derivationIndex] }
-            val outputs = entry.outputs.map { (it.asset as? OwnAsset.Coin)?.let { coin -> coins[coin.derivationIndex] } }
+        return transactions.mapNotNull { tx -> assets[tx.id]?.let { entry -> splitOf(entry, coins) }?.let { tx.id to it } }.toMap()
+    }
 
-            if (input == null || outputs.any { it == null }) null else tx.id to Split(input, outputs.filterNotNull())
-        }.toMap()
+    private suspend fun coinsOf(entries: Collection<EntryAssets>): Map<CoinageKeyIndex, Coin> {
+        val indices = entries.flatMap { entry -> (entry.inputs + entry.outputs).mapNotNull { it.asCoinOrNull()?.derivationIndex } }
+
+        return coinRepository.getCoinsBy(indices).associateBy { it.derivationIndex }
+    }
+
+    /** One coin in and every recorded output resolved, or nothing: a partial split would mint something else. */
+    private fun splitOf(entry: EntryAssets, coins: Map<CoinageKeyIndex, Coin>): Split? {
+        val input = entry.inputs.singleOrNull()?.asCoinOrNull()?.let { coins[it.derivationIndex] } ?: return null
+        val outputs = entry.outputs.map { output -> output.asCoinOrNull()?.let { coins[it.derivationIndex] } ?: return null }
+
+        return Split(input, outputs)
     }
 
     override fun inputsOf(transaction: Split): Set<AccountId> = setOf(transaction.coinToSplit.accountId)

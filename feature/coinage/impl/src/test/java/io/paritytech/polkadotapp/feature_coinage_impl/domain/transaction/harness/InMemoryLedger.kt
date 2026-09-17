@@ -365,6 +365,10 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
         store.handoffs = store.handoffs.filterValues { it.committed }
     }
 
+    override suspend fun releaseUncommittedHandoffs(keys: List<AssetPublicKey>): Result<Unit> = store.transaction {
+        store.handoffs = store.handoffs.filter { (key, row) -> row.committed || key !in keys }
+    }
+
     override suspend fun getHandoffKeys(): Result<Set<AssetPublicKey>> = store.read { store.handoffs.keys.toSet() }
 
     override suspend fun assetsOf(

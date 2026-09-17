@@ -45,7 +45,7 @@ class InputsLook<K>(
 
 /**
  * The inputs of [wanted] that [presence] shows, once every one of them is visible, once [HOLD_OUT] has passed
- * since some of them were, or once [earliestDeadline] passes after a look was taken — waking at the deadline
+ * since some of them were, or once [deadline] passes after a look was taken — waking at the deadline
  * rather than waiting for the chain to change.
  *
  * [presence] reports the whole set it can see on each look; a look it cannot take must not be emitted, so a
@@ -56,7 +56,7 @@ class InputsLook<K>(
 suspend fun <K> awaitInputs(
     presence: Flow<Set<K>>,
     wanted: Set<K>,
-    earliestDeadline: Instant,
+    deadline: Instant,
     timeProvider: TimeProvider,
 ): InputsLook<K> = coroutineScope {
     val looks = presence.produceIn(this)
@@ -65,7 +65,7 @@ suspend fun <K> awaitInputs(
         var latest: Set<K>? = null
 
         withTimeoutOrNull(IDLE_LIMIT) {
-            var look = looks.receive().intersect(wanted)
+            var look = looks.receiveFor(wanted)
 
             while (true) {
                 latest = look
@@ -76,11 +76,10 @@ suspend fun <K> awaitInputs(
                         latest = holdOut(looks, wanted, look)
                         break
                     }
-                    timeProvider.now() >= earliestDeadline -> break
+                    timeProvider.now() >= deadline -> break
                 }
 
-                look = withTimeoutOrNull(earliestDeadline - timeProvider.now()) { looks.receive() }?.intersect(wanted)
-                    ?: look
+                look = withTimeoutOrNull(deadline - timeProvider.now()) { looks.receiveFor(wanted) } ?: look
             }
         }
 
@@ -101,9 +100,11 @@ private suspend fun <K> holdOut(
         while (!latest.containsAll(wanted)) {
             // The newest look wins outright, even when it holds fewer inputs than the one before: a fork can
             // take one away, and building against the widest view ever seen would spend what is no longer there.
-            latest = looks.receive().intersect(wanted)
+            latest = looks.receiveFor(wanted)
         }
     }
 
     return latest
 }
+
+private suspend fun <K> ReceiveChannel<Set<K>>.receiveFor(wanted: Set<K>): Set<K> = receive().intersect(wanted)
