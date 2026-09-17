@@ -3,9 +3,9 @@ package io.paritytech.polkadotapp.feature_transactions_impl.domain.durable
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.ExtrinsicOutcome
 import io.paritytech.polkadotapp.chains.network.binding.BlockHash
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.CheckpointBlock
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxEntry
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableFailureKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.HeadKind
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView

@@ -2,8 +2,8 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submis
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
-import io.paritytech.polkadotapp.common.utils.mapAsync
 import io.paritytech.polkadotapp.common.utils.flattenResult
+import io.paritytech.polkadotapp.common.utils.mapAsync
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository

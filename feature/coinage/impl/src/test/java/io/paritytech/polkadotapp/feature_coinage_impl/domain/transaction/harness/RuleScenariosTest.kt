@@ -45,6 +45,7 @@ class RuleScenariosTest {
      * Asserted as a transition rather than a non-event: the same evidence that leaves the entry PENDING
      * inside the window fails it outside, so a pass that silently skipped the entry could not produce both.
      */
+
     /**
      * A retriable entry's window closes with its input still on chain, which proves it never ran.
      * The pass writes it back to its policy rather than failing it, and its input stays locked meanwhile.

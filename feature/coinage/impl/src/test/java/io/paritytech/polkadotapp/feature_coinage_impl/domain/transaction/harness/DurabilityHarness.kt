@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness
 
+import dagger.Lazy
 import io.mockk.every
 import io.mockk.mockk
 import io.paritytech.polkadotapp.chains.extrinsic.ExtrinsicStatus
@@ -12,14 +13,13 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.RealCoi
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageEvidenceCollector
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageResourceOracle
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
-import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableRecoveryLoop
-import dagger.Lazy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableRecoveryLoop
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableRecoveryScheduler
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableSubmissionExecutor
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableSubmissionLauncher
-import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableVerdictWriter
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableSubmissionTracker
+import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.DurableVerdictWriter
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.RealDurableRecoveryPass
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.RealDurableTransactionService
 import io.paritytech.polkadotapp.feature_transactions_impl.domain.durable.SubmissionOwnedTransactions

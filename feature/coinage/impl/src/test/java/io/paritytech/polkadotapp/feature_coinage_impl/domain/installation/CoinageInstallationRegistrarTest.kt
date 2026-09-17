@@ -13,7 +13,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageI
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableSubmission
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxState
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
@@ -23,6 +22,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.OperationGroupId
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.TxDomainId
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.AccountOnboardingStatus
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAccountOnboardingStatusUseCase

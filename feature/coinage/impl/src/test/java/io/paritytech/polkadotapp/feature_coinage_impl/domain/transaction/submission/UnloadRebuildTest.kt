@@ -27,9 +27,9 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.UnloadTokenRe
 import io.paritytech.polkadotapp.feature_coinage_impl.data.helpers.createForCollection
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.RecyclerProofDataProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.CoinageSigningContextProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.origins.CoinageTransactionOrigins
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.VoucherRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
@@ -40,8 +40,8 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingRevision
-import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
+import io.paritytech.polkadotapp.feature_people_api.domain.PeopleMembershipProver
 import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleCollectionUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic

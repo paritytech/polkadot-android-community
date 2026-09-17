@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_coinage_impl.di
 
 import dagger.Binds
 import dagger.Module
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -10,6 +9,7 @@ import dagger.multibindings.IntoMap
 import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.chains.network.updaters.system.UpdateSystemFactory
 import io.paritytech.polkadotapp.common.data.storage.SingleValueStorageFactory
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.presentation.tabs.TabWarningProvider
 import io.paritytech.polkadotapp.feature_coinage_api.data.updaters.CoinageUpdateSystem
 import io.paritytech.polkadotapp.feature_coinage_api.domain.CoinsInteractor
