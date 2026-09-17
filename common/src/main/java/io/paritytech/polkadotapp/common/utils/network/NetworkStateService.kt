@@ -16,6 +16,9 @@ import javax.inject.Inject
 
 interface NetworkStateService {
     val isNetworkAvailable: StateFlow<Boolean>
+
+    /** Re-reads the system's view; the callbacks that normally move [isNetworkAvailable] can be withheld while the device dozes. */
+    fun refresh()
 }
 
 suspend fun NetworkStateService.awaitNetworkAvailable() = isNetworkAvailable.awaitTrue()
@@ -49,21 +52,21 @@ class RealNetworkStateService @Inject constructor(@ApplicationContext context: C
         connectivityManager.registerNetworkCallback(
             networkRequest,
             object : ConnectivityManager.NetworkCallback() {
-                // Callbacks fire per-Network; recompute from the system's active
+                // Callbacks fire per-Network; re-read from the system's active
                 // network so losing one transport while another stays up can't
                 // strand the flag at false.
-                override fun onAvailable(network: Network) = recompute()
+                override fun onAvailable(network: Network) = refresh()
 
-                override fun onLost(network: Network) = recompute()
+                override fun onLost(network: Network) = refresh()
 
                 override fun onCapabilitiesChanged(
                     network: Network,
                     networkCapabilities: NetworkCapabilities,
-                ) = recompute()
+                ) = refresh()
             })
     }
 
-    private fun recompute() {
+    override fun refresh() {
         _isNetworkAvailable.value = isNetworkAvailable()
     }
 

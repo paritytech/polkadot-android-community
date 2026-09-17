@@ -1469,18 +1469,18 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="collectibles_title">Collectibles</string>
     <string name="collectibles_unavailable">Collectibles are temporarily unavailable. Please try again later.</string>
 
-    <string name="chain_health_state_speed_high">Speed is High</string>
-    <string name="chain_health_state_speed_good">Speed is Good</string>
-    <string name="chain_health_state_speed_fair">Speed is Fair</string>
-    <string name="chain_health_state_speed_low">Speed is Low</string>
+    <string name="chain_health_state_connected">Connected</string>
     <string name="chain_health_state_not_producing">Not producing blocks</string>
     <string name="chain_health_state_connecting">Connecting…</string>
     <string name="chain_health_state_broken">Chain broken</string>
-    <string name="chain_health_summary">%1$s · Last block %2$s ago</string>
+    <string name="chain_health_state_offline">No internet</string>
+    <string name="chain_health_connected_summary">%1$s · Live %2$s · Block %3$s</string>
+    <string name="chain_health_live_percent">%1$d%%</string>
+    <string name="chain_health_block_interval">~%1$s</string>
+    <string name="chain_health_value_unknown">—</string>
     <string name="chain_health_panel_title">Network Status</string>
-    <string name="chain_health_block_age_seconds">%1$ds</string>
-    <string name="chain_health_block_age_minutes">%1$dm %2$ds</string>
-    <string name="chain_health_block_age_unknown">—</string>
+    <string name="chain_health_duration_seconds">%1$ds</string>
+    <string name="chain_health_duration_minutes">%1$dm %2$ds</string>
     <string name="chain_health_indicator_description">%1$s, %2$s</string>
     <string name="chain_health_chain_people">People Chain</string>
     <string name="chain_health_chain_hub">Hub Chain</string>

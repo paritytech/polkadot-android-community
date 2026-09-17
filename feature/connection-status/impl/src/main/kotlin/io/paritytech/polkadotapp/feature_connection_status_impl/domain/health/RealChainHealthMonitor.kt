@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -73,6 +74,7 @@ class RealChainHealthMonitor @Inject constructor(
                 .shareIn(this@channelFlow, SharingStarted.WhileSubscribed(), replay = 1)
 
             val context = ChainMetricContext(
+                chainId = chainId,
                 bestBlockNumber = bestBlock,
                 expectedBlockTime = blockTime,
                 pendingRequests = pendingRequests,
@@ -89,7 +91,9 @@ class RealChainHealthMonitor @Inject constructor(
                     expectedBlockTime = blockTime,
                     readings = readingList,
                 )
-            }.collect { send(it) }
+            }
+                .onEach { chainHealthLog.d("%s is %s with %s", it.chainName, it.connection, it.readings) }
+                .collect { send(it) }
         }
     }
 

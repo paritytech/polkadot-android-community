@@ -5,6 +5,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.common.data.keypair.ClientKeypairStore
 import io.paritytech.polkadotapp.common.data.keypair.RealClientKeypairStore
 import io.paritytech.polkadotapp.common.data.memory.ComputationalCache
@@ -25,6 +26,7 @@ import io.paritytech.polkadotapp.common.data.storage.preferences.encrypted.RealE
 import io.paritytech.polkadotapp.common.data.time.RealTimeProvider
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
+import io.paritytech.polkadotapp.common.presentation.AppInitializer
 import io.paritytech.polkadotapp.common.presentation.BrowserNavigator
 import io.paritytech.polkadotapp.common.presentation.RealBrowserNavigator
 import io.paritytech.polkadotapp.common.presentation.camera.CameraQrReader
@@ -56,6 +58,7 @@ import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.RealCoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.calendar.CalendarEventsMixin
 import io.paritytech.polkadotapp.common.utils.calendar.RealCalendarEventsMixin
+import io.paritytech.polkadotapp.common.utils.network.NetworkStateRefreshInitializer
 import io.paritytech.polkadotapp.common.utils.network.NetworkStateService
 import io.paritytech.polkadotapp.common.utils.network.RealNetworkStateService
 import io.paritytech.polkadotapp.common.utils.permissions.PermissionAsker
@@ -133,6 +136,10 @@ internal interface CommonModule {
     @Binds
     @Singleton
     fun findNetworkStateService(impl: RealNetworkStateService): NetworkStateService
+
+    @Binds
+    @IntoSet
+    fun bindNetworkStateRefreshInitializer(impl: NetworkStateRefreshInitializer): AppInitializer
 
     @Binds
     fun bindCameraQrReader(impl: RealCameraQrReader): CameraQrReader
