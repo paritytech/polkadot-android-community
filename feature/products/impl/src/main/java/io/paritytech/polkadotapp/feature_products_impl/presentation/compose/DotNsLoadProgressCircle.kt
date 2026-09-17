@@ -31,7 +31,7 @@ import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
  * whose total is unknown — still reads as working rather than as a stalled arc.
  */
 @Composable
-fun DotNsLoadProgressCircle(modifier: Modifier = Modifier, progress: DotNsLoadProgress) {
+fun DotNsLoadProgressCircle(progress: DotNsLoadProgress) {
     val target = when (progress) {
         // Nothing has been requested yet, but the screen is already waiting on the first resolve.
         DotNsLoadProgress.Idle, DotNsLoadProgress.Resolving -> RESOLVE_BAND_END
@@ -66,7 +66,7 @@ fun DotNsLoadProgressCircle(modifier: Modifier = Modifier, progress: DotNsLoadPr
     )
 
     NovaCircularProgressIndicator(
-        modifier = modifier
+        modifier = Modifier
             .size(INDICATOR_SIZE)
             // Read in the layer block so each frame of the spin redraws without recomposing.
             .graphicsLayer { rotationZ = spin.value },

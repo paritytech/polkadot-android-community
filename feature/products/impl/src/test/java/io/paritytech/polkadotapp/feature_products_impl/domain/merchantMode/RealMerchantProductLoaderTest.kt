@@ -2,72 +2,87 @@ package io.paritytech.polkadotapp.feature_products_impl.domain.merchantMode
 
 import android.net.Uri
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
-import kotlinx.coroutines.flow.Flow
+import io.paritytech.polkadotapp.test_shared.any
+import io.paritytech.polkadotapp.test_shared.eq
+import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
+
+private const val MERCHANT_DOMAIN = "terminal.paseo"
 
 class RealMerchantProductLoaderTest {
-    private val resolvedUri = mock(Uri::class.java)
+    private val merchantDomainProvider = mock(MerchantDomainProvider::class.java)
+    private val dotNsResolver = mock(DotNsResolver::class.java)
+
+    private val loader = RealMerchantProductLoader(merchantDomainProvider, dotNsResolver)
 
     @Test
     fun `resolves the content before handing out the url`() = runBlocking<Unit> {
-        val resolver = FakeDotNsResolver(Result.success(resolvedUri))
+        withMerchantDomain(Result.success(MERCHANT_DOMAIN))
+        withResolvedContent()
 
-        val url = loader(Result.success("terminal.paseo"), resolver).merchantUrl()
+        val url = loader.merchantUrl()
 
-        assertEquals("https://terminal.paseo", url.getOrNull())
-        assertEquals(listOf("terminal.paseo"), resolver.resolvedNames)
+        assertEquals("https://$MERCHANT_DOMAIN", assertSuccess(url))
+        verifyContentResolvedFor(MERCHANT_DOMAIN)
     }
 
     @Test
     fun `fails when the terminal publishes no content`() = runBlocking<Unit> {
-        val resolver = FakeDotNsResolver(Result.failure(IllegalStateException("not registered")))
+        val unpublished = IllegalStateException("not registered")
+        withMerchantDomain(Result.success(MERCHANT_DOMAIN))
+        whenever(dotNsResolver.resolveToLocalUri(MERCHANT_DOMAIN)).thenReturn(Result.failure(unpublished))
 
-        assertTrue(loader(Result.success("terminal.paseo"), resolver).merchantUrl().isFailure)
+        assertEquals(unpublished, assertFailure(loader.merchantUrl()))
     }
 
     @Test
     fun `does not reach for content when the domain is unknown`() = runBlocking<Unit> {
-        val resolver = FakeDotNsResolver(Result.success(resolvedUri))
+        val chainDown = IllegalStateException("chain is down")
+        withMerchantDomain(Result.failure(chainDown))
 
-        val url = loader(Result.failure(IllegalStateException("chain is down")), resolver).merchantUrl()
+        val url = loader.merchantUrl()
 
-        assertTrue(url.isFailure)
-        assertTrue(resolver.resolvedNames.isEmpty())
+        assertEquals(chainDown, assertFailure(url))
+        verifyNoContentResolved()
     }
 
-    private fun loader(domain: Result<String>, resolver: DotNsResolver) =
-        RealMerchantProductLoader(FakeMerchantDomainProvider(domain), resolver)
+    private suspend fun withMerchantDomain(domain: Result<String>) {
+        whenever(with(eq(StalenessReportCollector.NoOp)) { merchantDomainProvider.getMerchantDomain() })
+            .thenReturn(domain)
+    }
+
+    private suspend fun withResolvedContent() {
+        whenever(dotNsResolver.resolveToLocalUri(MERCHANT_DOMAIN)).thenReturn(Result.success(mock(Uri::class.java)))
+    }
+
+    private suspend fun verifyContentResolvedFor(domain: String) {
+        verify(dotNsResolver).resolveToLocalUri(domain)
+    }
+
+    private suspend fun verifyNoContentResolved() {
+        verify(dotNsResolver, never()).resolveToLocalUri(any())
+    }
 
     private suspend fun MerchantProductLoader.merchantUrl(): Result<String> = with(StalenessReportCollector.NoOp) {
         getMerchantUrl()
     }
-}
 
-private class FakeMerchantDomainProvider(private val domain: Result<String>) : MerchantDomainProvider {
-    context(diagnostics: StalenessReportCollector)
-    override suspend fun getMerchantDomain(): Result<String> = domain
-}
+    private fun <T> assertSuccess(result: Result<T>): T {
+        assertTrue("expected Result.success but was ${result.exceptionOrNull()}", result.isSuccess)
 
-private class FakeDotNsResolver(private val resolved: Result<Uri>) : DotNsResolver {
-    val resolvedNames = mutableListOf<String>()
-
-    override suspend fun resolveToLocalUri(dotNsName: String): Result<Uri> {
-        resolvedNames += dotNsName
-
-        return resolved
+        return result.getOrNull()!!
     }
 
-    override suspend fun getMetadataEntry(dotNsName: String, key: String): Result<String?> = notUsed()
+    private fun assertFailure(result: Result<*>): Throwable {
+        assertTrue("expected Result.failure but was ${result.getOrNull()}", result.isFailure)
 
-    override fun getProgressByDomain(dotNsName: String): Flow<DotNsLoadProgress> = notUsed()
-
-    override suspend fun clearCache() = notUsed()
-
-    private fun notUsed(): Nothing = throw UnsupportedOperationException("Not used by the loader")
+        return result.exceptionOrNull()!!
+    }
 }

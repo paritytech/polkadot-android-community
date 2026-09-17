@@ -96,8 +96,7 @@ class MerchantModeViewModel @Inject constructor(
         connectionsResumed.value = true
     }
 
-    // The screen can be backgrounded while the address is still resolving, so the lifecycle is applied
-    // once the session exists rather than when the call arrives.
+    // A pause or resume arriving before the session exists must not be lost, hence the held flow.
     private fun applyLifecycleToSession() = launch {
         val session = host.filterIsInstance<MerchantHost.Ready>().first().session
 
@@ -122,7 +121,7 @@ private fun MerchantHost.sessionOrNull(): SpaHostSession? = (this as? MerchantHo
 
 // Once the first archive is served the terminal owns the screen — navigations it makes afterwards
 // must not blank it back out.
-private fun MerchantModePageState.next(progress: DotNsLoadProgress): MerchantModePageState = when {
+internal fun MerchantModePageState.next(progress: DotNsLoadProgress): MerchantModePageState = when {
     this == MerchantModePageState.Content -> MerchantModePageState.Content
     progress == DotNsLoadProgress.Completed -> MerchantModePageState.Content
     progress is DotNsLoadProgress.Failed -> MerchantModePageState.Unavailable

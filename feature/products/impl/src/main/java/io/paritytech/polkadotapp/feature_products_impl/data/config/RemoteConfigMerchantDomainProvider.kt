@@ -24,8 +24,8 @@ internal class RemoteConfigMerchantDomainProvider @Inject constructor(
         }
     }
 
-    // Read unsynced: the app's single sync() is never retried, so a synced read would park here forever on
-    // the one launch where the built-in label below is the answer. Unset and unfetched both read back empty.
+    // Read unsynced: the only sync retry loop dies with the splash (SplashInteractor), so a fetch that fails
+    // after it is never retried and a synced read would park for the rest of the process. Unset reads empty.
     private suspend fun configuredHost(): String? {
         val configured = remoteConfigService.getString(CONFIG_KEY)
             .logFailure("Failed to read $CONFIG_KEY")

@@ -26,7 +26,7 @@ class RemoteConfigMerchantDomainProviderTest {
         withTld(PASEO)
         withConfiguredValue("shop.paseo")
 
-        assertEquals("shop.paseo", merchantDomain().getOrNull())
+        assertEquals("shop.paseo", assertSuccess(merchantDomain()))
     }
 
     @Test
@@ -34,7 +34,7 @@ class RemoteConfigMerchantDomainProviderTest {
         withTld(PASEO)
         withConfiguredValue("")
 
-        assertEquals("terminal.paseo", merchantDomain().getOrNull())
+        assertEquals("terminal.paseo", assertSuccess(merchantDomain()))
     }
 
     @Test
@@ -43,7 +43,7 @@ class RemoteConfigMerchantDomainProviderTest {
         whenever(remoteConfigService.getString(MERCHANT_URL_KEY))
             .thenReturn(Result.failure(IllegalStateException("no network")))
 
-        assertEquals("terminal.paseo", merchantDomain().getOrNull())
+        assertEquals("terminal.paseo", assertSuccess(merchantDomain()))
     }
 
     @Test
@@ -51,7 +51,7 @@ class RemoteConfigMerchantDomainProviderTest {
         withTld(PASEO)
         withConfiguredValue("https://shop.paseo/checkout?table=4")
 
-        assertEquals("shop.paseo", merchantDomain().getOrNull())
+        assertEquals("shop.paseo", assertSuccess(merchantDomain()))
     }
 
     @Test
@@ -59,7 +59,7 @@ class RemoteConfigMerchantDomainProviderTest {
         withTld(PASEO)
         withConfiguredValue("://")
 
-        assertEquals("terminal.paseo", merchantDomain().getOrNull())
+        assertEquals("terminal.paseo", assertSuccess(merchantDomain()))
     }
 
     @Test
@@ -67,7 +67,7 @@ class RemoteConfigMerchantDomainProviderTest {
         withNoTld()
         withConfiguredValue("shop.paseo")
 
-        assertEquals("shop.paseo", merchantDomain().getOrNull())
+        assertEquals("shop.paseo", assertSuccess(merchantDomain()))
     }
 
     @Test
@@ -75,7 +75,7 @@ class RemoteConfigMerchantDomainProviderTest {
         withNoTld()
         withConfiguredValue("")
 
-        assertTrue(merchantDomain().isFailure)
+        assertFailure(merchantDomain())
     }
 
     private suspend fun merchantDomain(): Result<String> = with(StalenessReportCollector.NoOp) {
@@ -92,5 +92,17 @@ class RemoteConfigMerchantDomainProviderTest {
 
     private suspend fun withConfiguredValue(value: String) {
         whenever(remoteConfigService.getString(MERCHANT_URL_KEY)).thenReturn(Result.success(value))
+    }
+
+    private fun <T> assertSuccess(result: Result<T>): T {
+        assertTrue("expected Result.success but was ${result.exceptionOrNull()}", result.isSuccess)
+
+        return result.getOrNull()!!
+    }
+
+    private fun assertFailure(result: Result<*>): Throwable {
+        assertTrue("expected Result.failure but was ${result.getOrNull()}", result.isFailure)
+
+        return result.exceptionOrNull()!!
     }
 }
