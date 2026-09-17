@@ -29,7 +29,6 @@ import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import io.paritytech.polkadotapp.feature_products_impl.presentation.compose.DotNsLoadProgressCircle
 import io.paritytech.polkadotapp.feature_products_impl.presentation.compose.ProductWebViewHost
 import io.paritytech.polkadotapp.feature_products_impl.presentation.merchantMode.MerchantModePageState
-import io.paritytech.polkadotapp.feature_products_impl.presentation.merchantMode.MerchantModeUiState
 import io.paritytech.polkadotapp.feature_products_impl.presentation.merchantMode.MerchantModeViewModel
 import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -53,7 +52,7 @@ fun MerchantModeScreen(viewModel: MerchantModeViewModel) {
 
 @Composable
 private fun MerchantModeScreenInternal(
-    state: MerchantModeUiState,
+    state: MerchantModePageState,
     webView: WebView?,
     stallReport: @Composable () -> Unit,
     onCloseClick: () -> Unit,
@@ -77,7 +76,7 @@ private fun MerchantModeScreenInternal(
                     .imePadding(),
                 contentAlignment = Alignment.Center,
             ) {
-                when (state.pageState) {
+                when (state) {
                     MerchantModePageState.Content -> ProductWebViewHost(
                         modifier = Modifier.fillMaxSize(),
                         webView = webView,
@@ -88,8 +87,8 @@ private fun MerchantModeScreenInternal(
                         text = stringResource(RCommon.string.merchant_mode_unavailable),
                     )
 
-                    MerchantModePageState.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        DotNsLoadProgressCircle(progress = state.loadProgress)
+                    is MerchantModePageState.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        DotNsLoadProgressCircle(progress = state.progress)
 
                         stallReport()
                     }
@@ -104,10 +103,7 @@ private fun MerchantModeScreenInternal(
 private fun MerchantModeScreenPreview() {
     PolkadotTheme {
         MerchantModeScreenInternal(
-            state = MerchantModeUiState(
-                loadProgress = DotNsLoadProgress.Downloading(0.4f),
-                pageState = MerchantModePageState.Loading,
-            ),
+            state = MerchantModePageState.Loading(DotNsLoadProgress.Downloading(0.4f)),
             webView = null,
             stallReport = { PreviewStallReport() },
             onCloseClick = {},

@@ -16,7 +16,6 @@ internal class RemoteConfigMerchantDomainProvider @Inject constructor(
 ) : MerchantDomainProvider {
     context(diagnostics: StalenessReportCollector)
     override suspend fun getMerchantDomain(): Result<String> {
-        // A configured domain already carries its TLD, so it must not be gated on reading one from the chain.
         configuredHost()?.let { return Result.success(it) }
 
         return diagnostics.markRegion(RCommon.string.stall_reading_chain_state) {
@@ -24,8 +23,7 @@ internal class RemoteConfigMerchantDomainProvider @Inject constructor(
         }
     }
 
-    // Read unsynced: the only sync retry loop dies with the splash (SplashInteractor), so a fetch that fails
-    // after it is never retried and a synced read would park for the rest of the process. Unset reads empty.
+    // Unsynced on purpose: nothing retries a failed sync after the splash, so a synced read could park forever.
     private suspend fun configuredHost(): String? {
         val configured = remoteConfigService.getString(CONFIG_KEY)
             .logFailure("Failed to read $CONFIG_KEY")

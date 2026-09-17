@@ -5,11 +5,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MerchantModePageStateTest {
+    private val loading = MerchantModePageState.Loading(DotNsLoadProgress.Resolving)
+
     @Test
     fun `a served archive shows the terminal`() {
         assertEquals(
             MerchantModePageState.Content,
-            MerchantModePageState.Loading.next(DotNsLoadProgress.Completed)
+            loading.next(DotNsLoadProgress.Completed)
         )
     }
 
@@ -35,15 +37,15 @@ class MerchantModePageStateTest {
     fun `a failure before the first archive leaves the terminal unavailable`() {
         assertEquals(
             MerchantModePageState.Unavailable,
-            MerchantModePageState.Loading.next(DotNsLoadProgress.Failed(IllegalStateException("no content")))
+            loading.next(DotNsLoadProgress.Failed(IllegalStateException("no content")))
         )
     }
 
     @Test
-    fun `an archive still in flight keeps the screen loading`() {
+    fun `an archive still in flight keeps the screen loading with its progress`() {
         assertEquals(
-            MerchantModePageState.Loading,
-            MerchantModePageState.Loading.next(DotNsLoadProgress.Downloading(0.5f))
+            MerchantModePageState.Loading(DotNsLoadProgress.Downloading(0.5f)),
+            loading.next(DotNsLoadProgress.Downloading(0.5f))
         )
     }
 }

@@ -20,8 +20,7 @@ class RealMerchantProductLoader @Inject constructor(
     private val merchantDomainProvider: MerchantDomainProvider,
     private val dotNsResolver: DotNsResolver,
 ) : MerchantProductLoader {
-    // Resolving the content up front is what turns an unpublished terminal into an error state: the WebView's
-    // own resolve failure never reaches the session's progress, leaving the screen on an empty page forever.
+    // Resolves eagerly: the WebView's own resolve failure never surfaces in the session's progress.
     context(diagnostics: StalenessReportCollector)
     override suspend fun getMerchantUrl(): Result<String> = diagnostics.markRegion(RCommon.string.merchant_mode_stall_opening) {
         merchantDomainProvider.getMerchantDomain().flatMap { domain ->

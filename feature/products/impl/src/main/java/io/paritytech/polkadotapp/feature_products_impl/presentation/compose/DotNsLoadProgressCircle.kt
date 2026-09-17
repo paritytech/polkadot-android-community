@@ -20,20 +20,9 @@ import io.paritytech.polkadotapp.design.components.progress.NovaCircularProgress
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 
-/**
- * Circular counterpart of the browser's progress bar: the phases map onto fixed arcs so the ring
- * only ever fills forward.
- * - **Idle / Resolving** animate `0 → [RESOLVE_BAND_END]` over [BAND_ANIM_MILLIS]ms,
- * - **Downloading** tracks bytes across the middle band `[RESOLVE_BAND_END, DOWNLOAD_BAND_END]`,
- * - **Unpacking** animates `[DOWNLOAD_BAND_END] → 1` over [BAND_ANIM_MILLIS]ms.
- *
- * The ring also spins throughout, so a phase that reports no byte counts — resolving, or a download
- * whose total is unknown — still reads as working rather than as a stalled arc.
- */
 @Composable
-fun DotNsLoadProgressCircle(progress: DotNsLoadProgress) {
+fun DotNsLoadProgressCircle(modifier: Modifier = Modifier, progress: DotNsLoadProgress) {
     val target = when (progress) {
-        // Nothing has been requested yet, but the screen is already waiting on the first resolve.
         DotNsLoadProgress.Idle, DotNsLoadProgress.Resolving -> RESOLVE_BAND_END
 
         is DotNsLoadProgress.Downloading ->
@@ -43,11 +32,7 @@ fun DotNsLoadProgressCircle(progress: DotNsLoadProgress) {
         is DotNsLoadProgress.Failed -> 0f
     }
 
-    val animationSpec: AnimationSpec<Float> = if (progress is DotNsLoadProgress.Downloading) {
-        spring(stiffness = Spring.StiffnessLow)
-    } else {
-        tween(BAND_ANIM_MILLIS)
-    }
+    val animationSpec = if (progress is DotNsLoadProgress.Downloading) DOWNLOADING_SPEC else BAND_SPEC
 
     val animatedFraction by animateFloatAsState(
         targetValue = target,
@@ -55,6 +40,7 @@ fun DotNsLoadProgressCircle(progress: DotNsLoadProgress) {
         label = "dotNsLoadFraction",
     )
 
+    // Spins even while determinate so a phase without byte counts still reads as working.
     val spin = rememberInfiniteTransition(label = "dotNsLoadSpin").animateFloat(
         initialValue = 0f,
         targetValue = FULL_TURN_DEGREES,
@@ -66,9 +52,8 @@ fun DotNsLoadProgressCircle(progress: DotNsLoadProgress) {
     )
 
     NovaCircularProgressIndicator(
-        modifier = Modifier
+        modifier = modifier
             .size(INDICATOR_SIZE)
-            // Read in the layer block so each frame of the spin redraws without recomposing.
             .graphicsLayer { rotationZ = spin.value },
         progress = { animatedFraction },
         color = PolkadotTheme.colors.fg.link,
@@ -82,3 +67,5 @@ private const val BAND_ANIM_MILLIS = 300
 private const val SPIN_MILLIS = 1200
 private const val FULL_TURN_DEGREES = 360f
 private val INDICATOR_SIZE = 48.dp
+private val DOWNLOADING_SPEC: AnimationSpec<Float> = spring(stiffness = Spring.StiffnessLow)
+private val BAND_SPEC: AnimationSpec<Float> = tween(BAND_ANIM_MILLIS)

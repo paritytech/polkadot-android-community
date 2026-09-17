@@ -5,7 +5,7 @@ import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import kotlinx.coroutines.flow.StateFlow
 
 interface MerchantModeContract {
-    val state: StateFlow<MerchantModeUiState>
+    val state: StateFlow<MerchantModePageState>
 
     val stalenessReport: StalenessReportDisplay
 
@@ -14,13 +14,9 @@ interface MerchantModeContract {
     fun onBackPressed()
 }
 
-data class MerchantModeUiState(
-    val loadProgress: DotNsLoadProgress,
-    val pageState: MerchantModePageState,
-)
-
 sealed interface MerchantModePageState {
-    data object Loading : MerchantModePageState
+    data class Loading(val progress: DotNsLoadProgress) : MerchantModePageState
+
     data object Content : MerchantModePageState
 
     data object Unavailable : MerchantModePageState

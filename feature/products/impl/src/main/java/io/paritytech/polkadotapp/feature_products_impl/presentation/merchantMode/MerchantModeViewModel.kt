@@ -12,10 +12,8 @@ import io.paritytech.polkadotapp.feature_products_api.presentation.spaHost.SpaHo
 import io.paritytech.polkadotapp.feature_products_impl.domain.merchantMode.MerchantProductLoader
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -34,46 +32,32 @@ class MerchantModeViewModel @Inject constructor(
 ) : BaseViewModel(), MerchantModeContract {
     override val stalenessReport = StalenessReport(this)
 
-    private val host: StateFlow<MerchantHost> = flow {
+    private val session: StateFlow<MerchantSession> = flow {
         val resolved = with(stalenessReport) { merchantProductLoader.getMerchantUrl() }
             .logFailure("Merchant mode is unavailable")
             .fold(
-                onSuccess = { MerchantHost.Ready(spaHost.createSession(it)) },
-                onFailure = { MerchantHost.Unavailable },
+                onSuccess = { MerchantSession.Ready(spaHost.createSession(it)) },
+                onFailure = { MerchantSession.Unavailable },
             )
 
         emit(resolved)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, MerchantHost.Resolving)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, MerchantSession.Resolving)
 
-    private val connectionsResumed = MutableStateFlow(true)
-
-    val webView: StateFlow<WebView?> = host
-        .flatMapLatest { current -> current.sessionOrNull()?.webView ?: flowOf(null) }
+    val webView: StateFlow<WebView?> = session
+        .flatMapLatest { current -> current.spaSessionOrNull()?.webView ?: flowOf(null) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    override val state: StateFlow<MerchantModeUiState> = host
+    override val state: StateFlow<MerchantModePageState> = session
         .flatMapLatest { current ->
             when (current) {
-                MerchantHost.Resolving -> flowOf(resolvingState)
-
-                MerchantHost.Unavailable -> flowOf(
-                    MerchantModeUiState(
-                        loadProgress = DotNsLoadProgress.Idle,
-                        pageState = MerchantModePageState.Unavailable,
-                    )
-                )
-
-                is MerchantHost.Ready -> current.session.loadProgress
-                    .scan(resolvingState) { previous, progress ->
-                        MerchantModeUiState(loadProgress = progress, pageState = previous.pageState.next(progress))
-                    }
+                MerchantSession.Resolving -> flowOf(resolvingState)
+                MerchantSession.Unavailable -> flowOf(MerchantModePageState.Unavailable)
+                is MerchantSession.Ready -> current.spaSession.loadProgress.scan(resolvingState) { previous, progress ->
+                    previous.next(progress)
+                }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, resolvingState)
-
-    init {
-        applyLifecycleToSession()
-    }
 
     override fun onCloseClick() {
         router.back()
@@ -89,41 +73,32 @@ class MerchantModeViewModel @Inject constructor(
     }
 
     fun pauseConnections() {
-        connectionsResumed.value = false
+        launch { awaitSpaSession()?.pauseConnections() }
     }
 
     fun resumeConnections() {
-        connectionsResumed.value = true
+        launch { awaitSpaSession()?.resumeConnections() }
     }
 
-    // A pause or resume arriving before the session exists must not be lost, hence the held flow.
-    private fun applyLifecycleToSession() = launch {
-        val session = host.filterIsInstance<MerchantHost.Ready>().first().session
-
-        connectionsResumed.collect { resumed ->
-            if (resumed) session.resumeConnections() else session.pauseConnections()
-        }
+    private suspend fun awaitSpaSession(): SpaHostSession? {
+        return session.first { it != MerchantSession.Resolving }.spaSessionOrNull()
     }
 }
 
-private val resolvingState = MerchantModeUiState(
-    loadProgress = DotNsLoadProgress.Resolving,
-    pageState = MerchantModePageState.Loading,
-)
+private val resolvingState: MerchantModePageState = MerchantModePageState.Loading(DotNsLoadProgress.Resolving)
 
-private sealed interface MerchantHost {
-    data object Resolving : MerchantHost
-    data object Unavailable : MerchantHost
-    data class Ready(val session: SpaHostSession) : MerchantHost
+private sealed interface MerchantSession {
+    data object Resolving : MerchantSession
+    data object Unavailable : MerchantSession
+    data class Ready(val spaSession: SpaHostSession) : MerchantSession
 }
 
-private fun MerchantHost.sessionOrNull(): SpaHostSession? = (this as? MerchantHost.Ready)?.session
+private fun MerchantSession.spaSessionOrNull(): SpaHostSession? = (this as? MerchantSession.Ready)?.spaSession
 
-// Once the first archive is served the terminal owns the screen — navigations it makes afterwards
-// must not blank it back out.
+// Once the first archive is served the terminal owns the screen; its later navigations must not blank it out.
 internal fun MerchantModePageState.next(progress: DotNsLoadProgress): MerchantModePageState = when {
     this == MerchantModePageState.Content -> MerchantModePageState.Content
     progress == DotNsLoadProgress.Completed -> MerchantModePageState.Content
     progress is DotNsLoadProgress.Failed -> MerchantModePageState.Unavailable
-    else -> MerchantModePageState.Loading
+    else -> MerchantModePageState.Loading(progress)
 }
