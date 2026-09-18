@@ -102,13 +102,17 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handle
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.UserIdentityAccessPermissionHandler
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.AssetPinnedPocketCards
+import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.DebugPocketCards
+import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.OkHttpRemoteFaceSource
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.PinnedPocketCards
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.PocketCardStore
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.PocketFaceStreams
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.PocketImageResolver
+import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.PrefsDebugPocketCards
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.RealPocketCollection
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.RealPocketFaceSource
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.RealPocketImageResolver
+import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.RemoteFaceSource
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.ProductRegistrar
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.ProductScriptResolver
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.RealProductContentWarmUp
@@ -151,6 +155,10 @@ internal interface ProductsModule {
     @Binds
     @Singleton
     fun bindWidgetSerializer(impl: ScaleWidgetSerializer): JsWidgetSerializer
+
+    @Binds
+    @Singleton
+    fun bindRemoteFaceSource(impl: OkHttpRemoteFaceSource): RemoteFaceSource
 
     @Binds
     @Singleton
@@ -392,6 +400,14 @@ internal interface ProductsModule {
                 .build()
 
         private const val CHAIN_SOCKET_PING_SECONDS = 30L
+
+        @Provides
+        @Singleton
+        fun provideDebugPocketCards(@ApplicationContext context: Context): DebugPocketCards =
+            PrefsDebugPocketCards(
+                prefs = context.getSharedPreferences("debug_pocket_cards", Context.MODE_PRIVATE),
+                isDebugBuild = BuildConfig.DEBUG,
+            )
 
         @Provides
         @Singleton
