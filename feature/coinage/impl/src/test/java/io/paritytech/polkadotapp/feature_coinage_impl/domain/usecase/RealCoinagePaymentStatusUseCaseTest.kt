@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isTerminal
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReader
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
@@ -22,6 +23,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
+import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUBMISSION
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -142,6 +145,20 @@ class RealCoinagePaymentStatusUseCaseTest {
         givenCoin(onChain = false, everSeen = false, minter = PENDING, atFinalized = ABSENT)
 
         assertEquals(CoinagePaymentStatus.Detecting, statusOfCoin())
+    }
+
+    /**
+     * The payment is saved and its transaction waits to be built — or to be built again after an attempt that
+     * could never land. The coin does not exist yet, and nothing has decided it never will.
+     */
+    @Test
+    fun `a coin whose minter is waiting to be built reads as detecting`() = runTest {
+        givenCoin(onChain = false, everSeen = false, minter = PENDING_SUBMISSION, atFinalized = ABSENT)
+
+        val status = statusOfCoin()
+
+        assertEquals(CoinagePaymentStatus.Detecting, status)
+        assertFalse("a payment waiting on a rebuild must stay open", status.isTerminal)
     }
 
     /**
