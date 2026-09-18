@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -48,20 +50,26 @@ private fun LegalAndSupportScreenInternal(
 
             VerticalSpacer { large }
 
-            PolkadotMenuList(
-                modifier = Modifier.padding(horizontal = PolkadotTheme.spacings.large),
-                headerText = stringResource(RCommon.string.settings_section_general)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = PolkadotTheme.spacings.large)
             ) {
-                SettingsMenuItem(
-                    icon = null,
-                    title = stringResource(RCommon.string.settings_privacy_policy),
-                    onClick = onPrivacyPolicyClick
-                )
-                SettingsMenuItem(
-                    icon = null,
-                    title = stringResource(RCommon.string.settings_terms_of_use),
-                    onClick = onTermsOfUseClick
-                )
+                PolkadotMenuList(
+                    headerText = stringResource(RCommon.string.settings_section_general)
+                ) {
+                    SettingsMenuItem(
+                        icon = null,
+                        title = stringResource(RCommon.string.settings_privacy_policy),
+                        onClick = onPrivacyPolicyClick
+                    )
+                    SettingsMenuItem(
+                        icon = null,
+                        title = stringResource(RCommon.string.settings_terms_of_use),
+                        onClick = onTermsOfUseClick
+                    )
+                }
             }
         }
     }
