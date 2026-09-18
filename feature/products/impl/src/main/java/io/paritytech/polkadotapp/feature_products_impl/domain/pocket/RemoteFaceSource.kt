@@ -1,7 +1,9 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.pocket
 
+import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.feature_products_api.model.JsWidget
-import okhttp3.OkHttpClient
+import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.Request
 import java.io.InputStream
 import javax.inject.Inject
@@ -30,18 +32,23 @@ interface RemoteFaceSource {
  * does not control, so the same bound applies as to a face inside an archive.
  */
 class OkHttpRemoteFaceSource @Inject constructor(
-    private val client: OkHttpClient,
+    private val calls: Call.Factory,
     private val faceDecoder: PocketFaceJsonDecoder,
+    private val dispatchers: CoroutineDispatchers,
 ) : RemoteFaceSource {
-    override suspend fun fetch(url: String): Result<JsWidget> = runCatching {
-        val request = Request.Builder().url(url).build()
+    // `execute` blocks, and both callers collect on the main thread. Left there, Android answers with
+    // a `NetworkOnMainThreadException`, which carries no message and so tells the screen nothing.
+    override suspend fun fetch(url: String): Result<JsWidget> = withContext(dispatchers.io) {
+        runCatching {
+            val request = Request.Builder().url(url).build()
 
-        client.newCall(request).execute().use { response ->
-            require(response.isSuccessful) { "face at $url answered ${response.code}" }
-            val body = requireNotNull(response.body) { "face at $url has no body" }
+            calls.newCall(request).execute().use { response ->
+                require(response.isSuccessful) { "face at $url answered ${response.code}" }
+                val body = requireNotNull(response.body) { "face at $url has no body" }
 
-            body.byteStream().readFaceWithinBound()
+                body.byteStream().readFaceWithinBound()
+            }
         }
+            .fold(onSuccess = faceDecoder::decode, onFailure = Result.Companion::failure)
     }
-        .fold(onSuccess = faceDecoder::decode, onFailure = Result.Companion::failure)
 }

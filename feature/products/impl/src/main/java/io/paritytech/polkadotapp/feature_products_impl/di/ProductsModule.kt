@@ -145,6 +145,7 @@ import io.paritytech.polkadotapp.feature_products_impl.presentation.initializati
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.feature_products_impl.presentation.spaHost.RuntimeSelectingSpaHost
 import io.paritytech.polkadotapp.feature_scan_api.domain.ScanContentParser
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
@@ -400,6 +401,11 @@ internal interface ProductsModule {
                 .build()
 
         private const val CHAIN_SOCKET_PING_SECONDS = 30L
+
+        /** `OkHttpClient` is a `Call.Factory`; naming the interface keeps the face source testable. */
+        @Provides
+        @Singleton
+        fun provideFaceCallFactory(client: OkHttpClient): Call.Factory = client
 
         @Provides
         @Singleton

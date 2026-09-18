@@ -35,13 +35,20 @@ adb reverse tcp:5173 tcp:5173
 over this tunnel works with no further setup. Any other host needs HTTPS.
 
 A face file is a renderer tree in the generated TypeScript shape — `{ tag, value }` per variant,
-PascalCase enum names. The smallest one that draws:
+PascalCase enum names. Two encoding rules catch most first attempts:
+
+- **A `Padding` or `Margin` needs `top` and `end`.** They are a shorthand: `bottom` defaults to `top`
+  and `start` defaults to `end`, so `{ "top": 16, "end": 16 }` is 16 all round. Omitting `end` is
+  rejected as a missing field.
+- **Sizes are non-negative whole numbers.** `16.5` is refused, not rounded.
+
+The smallest face that draws:
 
 ```json
 {
   "tag": "Column",
   "value": {
-    "modifiers": [{ "tag": "Padding", "value": { "top": 16, "start": 16 } }],
+    "modifiers": [{ "tag": "Padding", "value": { "top": 16, "end": 16 } }],
     "props": {},
     "children": [
       {

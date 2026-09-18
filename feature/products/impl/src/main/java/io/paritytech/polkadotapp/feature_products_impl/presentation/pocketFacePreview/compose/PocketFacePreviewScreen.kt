@@ -118,8 +118,9 @@ private fun FaceOrExplanation(face: LoadingState<JsWidget>?) {
             LoadingState.Loading -> NovaCircularProgressIndicator()
 
             // The decoder's own message names what it refused, which is the useful half of a failure.
+            // Some failures carry none at all, and the type is then the only thing left to go on.
             is LoadingState.Error -> Explanation(
-                face.exception.message ?: stringResource(RCommon.string.pocket_face_preview_failed)
+                face.exception.message ?: face.exception.javaClass.simpleName
             )
 
             is LoadingState.Loaded -> JsWidgetRenderer(
