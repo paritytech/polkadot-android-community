@@ -5,10 +5,8 @@ import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.common.utils.encodeToByteArrayCatching
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.NotificationPayloadMode
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toNotificationPayload
-import io.paritytech.polkadotapp.feature_chats_impl.data.model.toStripped
-import io.paritytech.polkadotapp.feature_chats_impl.data.model.toWireContent
-import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.NotificationChatMessageContentV1
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import timber.log.Timber
 import javax.inject.Inject
@@ -20,25 +18,22 @@ class ChatNotificationPayloadEncoder @Inject constructor() {
     }
 
     fun encode(message: ChatMessage): Result<EncodedMessage> {
-        return message.toWireContent().flatMap { content ->
-            encode(message, NotificationChatMessageContentV1.Full(content)).flatMap { full ->
-                if (full.fitsBudget()) {
-                    Result.success(full)
-                } else {
-                    content.toStripped()
-                        .flatMap { encode(message, NotificationChatMessageContentV1.Stripped(it)) }
-                        .onSuccess { stripped ->
-                            if (!stripped.fitsBudget()) {
-                                Timber.w("Stripped push payload of ${stripped.size} bytes still exceeds $PAYLOAD_BUDGET")
-                            }
-                        }
+        return encode(message, NotificationPayloadMode.FULL).flatMap { full ->
+            if (full.fitsBudget()) {
+                Result.success(full)
+            } else {
+                encode(message, NotificationPayloadMode.STRIPPED).onSuccess { stripped ->
+                    if (!stripped.fitsBudget()) {
+                        Timber.w("Stripped push payload of ${stripped.size} bytes still exceeds $PAYLOAD_BUDGET")
+                    }
                 }
             }
         }
     }
 
-    private fun encode(message: ChatMessage, content: NotificationChatMessageContentV1): Result<EncodedMessage> {
-        return BinaryScale.encodeToByteArrayCatching(message.toNotificationPayload(content))
+    private fun encode(message: ChatMessage, mode: NotificationPayloadMode): Result<EncodedMessage> {
+        return message.toNotificationPayload(mode)
+            .flatMap { BinaryScale.encodeToByteArrayCatching(it) }
     }
 
     private fun EncodedMessage.fitsBudget(): Boolean = size.bytes <= PAYLOAD_BUDGET
