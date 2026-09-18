@@ -110,7 +110,7 @@ class RealSendEnterAmountInteractorTest {
         coinagePaymentStatusUseCase = statusUseCase,
         coinageDebugSettings = mockk(),
         coroutineDispatchers = mockk<CoroutineDispatchers> { every { computation } returns dispatcher },
-        timeProvider = mockk(),
+        timeProvider = mockk { every { now() } returns Instant.fromEpochMilliseconds(0) },
         sendValidation = mockk(),
     )
 
@@ -125,8 +125,10 @@ class RealSendEnterAmountInteractorTest {
 
         override suspend fun preparePlan(amount: BigDecimal) = Result.success(plan)
 
+        @OptIn(ExperimentalTime::class)
         context(diagnostics: StalenessReportCollector)
-        override suspend fun prepareMemo(plan: TransferPlan) = Result.success(PreparedTransferMemo(memo, handoffCommit))
+        override suspend fun prepareMemo(plan: TransferPlan, retryUntil: Instant) =
+            Result.success(PreparedTransferMemo(memo, handoffCommit))
 
         @OptIn(ExperimentalTime::class)
         context(diagnostics: StalenessReportCollector)

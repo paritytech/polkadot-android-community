@@ -60,7 +60,7 @@ import java.util.UUID
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 import io.paritytech.polkadotapp.common.R as RCommon
 
 interface SendEnterAmountInteractor {
@@ -103,7 +103,10 @@ class RealSendEnterAmountInteractor @Inject constructor(
 ) : SendEnterAmountInteractor {
     companion object {
         private const val WALLET_PAYMENT_ORIGIN = "native-payment"
-        private val SETTLEMENT_TIMEOUT = 30.seconds
+
+        /** A merchant payment's transactions keep being rebuilt within this window, so the screen waits as long. */
+        private val MERCHANT_PAYMENT_RETRY_WINDOW = 5.minutes
+        private val SETTLEMENT_TIMEOUT = MERCHANT_PAYMENT_RETRY_WINDOW
 
         /**
          * How long a chat payment's transactions keep being rebuilt while their inputs are gone from the chain.
@@ -212,7 +215,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
         }
 
         diagnostics.markRegion(RCommon.string.wallet_stall_sending) {
-            prepareCoinageTransferUseCase.prepareMemo(value)
+            prepareCoinageTransferUseCase.prepareMemo(value, retryUntil = timeProvider.now() + MERCHANT_PAYMENT_RETRY_WINDOW)
                 .flatMap { prepared -> handOverToSubmitter(submitter, prepared, value, method) }
                 .logFailure("Coins submission via '${method.submitterId}' failed")
                 .onSuccess { memo -> emitAll(settlementStates(memo)) }
