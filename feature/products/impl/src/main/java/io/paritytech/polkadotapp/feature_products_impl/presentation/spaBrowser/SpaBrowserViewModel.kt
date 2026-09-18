@@ -6,16 +6,17 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
 import io.paritytech.polkadotapp.feature_products_api.domain.browser.ProductSessionController
-import io.paritytech.polkadotapp.feature_products_api.domain.error.ProductResolutionError
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
-import io.paritytech.polkadotapp.feature_products_api.model.ResolvedProduct
 import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
 import io.paritytech.polkadotapp.feature_products_impl.domain.spaBrowser.SpaBrowserInteractor
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
+import io.paritytech.polkadotapp.feature_products_impl.presentation.productLoad.PageLoad
+import io.paritytech.polkadotapp.feature_products_impl.presentation.productLoad.hasAppSurface
+import io.paritytech.polkadotapp.feature_products_impl.presentation.productLoad.toProductResolutionError
+import io.paritytech.polkadotapp.feature_products_impl.presentation.productLoad.toProgress
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -129,30 +130,9 @@ class SpaBrowserViewModel @Inject constructor(
     }
 }
 
-private sealed interface PageLoad {
-    /** The tab is on an ordinary web page: nothing to resolve, and no archive to fetch. */
-    data object NotAProduct : PageLoad
-    data object Resolving : PageLoad
-    data class Serving(val resolved: ResolvedProduct, val progress: DotNsLoadProgress) : PageLoad
-    data class Failed(val error: ProductResolutionError) : PageLoad
-}
-
-private fun PageLoad.toProgress(): DotNsLoadProgress = when (this) {
-    PageLoad.NotAProduct -> DotNsLoadProgress.Idle
-    PageLoad.Resolving -> DotNsLoadProgress.Resolving
-    is PageLoad.Serving -> progress
-    is PageLoad.Failed -> DotNsLoadProgress.Failed(error)
-}
-
 private fun PageLoad.toPageState(): SpaBrowserPageState = when (this) {
     // Nothing to show yet is still the product's own page — the progress bar carries the wait.
     PageLoad.NotAProduct, PageLoad.Resolving -> SpaBrowserPageState.Content
-    is PageLoad.Serving -> {
-        if (resolved.executables.app != null) SpaBrowserPageState.Content else SpaBrowserPageState.NoAppSurface
-    }
-
+    is PageLoad.Serving -> if (hasAppSurface()) SpaBrowserPageState.Content else SpaBrowserPageState.NoAppSurface
     is PageLoad.Failed -> SpaBrowserPageState.Failed(error)
 }
-
-private fun Throwable.toProductResolutionError(): ProductResolutionError =
-    this as? ProductResolutionError ?: ProductResolutionError.Unknown

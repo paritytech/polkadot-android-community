@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_products_impl.presentation.merchantMod
 
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,7 +88,10 @@ private fun MerchantModeScreenInternal(
                         text = stringResource(RCommon.string.merchant_mode_unavailable),
                     )
 
-                    is MerchantModePageState.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    is MerchantModePageState.Loading -> Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.mediumIncreased),
+                    ) {
                         DotNsLoadProgressCircle(progress = state.progress)
 
                         stallReport()

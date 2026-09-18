@@ -653,7 +653,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="spa_browser_page_no_app_surface">This product doesn\'t have an app on this device.</string>
     <string name="product_resolution_error_malformed_manifest">This product published a manifest this app can\'t read. Contact the product\'s developer.</string>
     <string name="product_resolution_error_unknown">Couldn\'t load this product.</string>
-    <string name="merchant_mode_unavailable">Merchant mode isn\'t available right now. Please try again later.</string>
+    <string name="merchant_mode_unavailable">Merchant mode isn\'t available right now.</string>
     <string name="debug_menu_enable_retro_mode">Enable retro mode</string>
     <string name="debug_menu_disable_retro_mode">Disable retro mode</string>
     <string name="debug_menu_randomize_account">Randomize account (Test Dev Reset)</string>
