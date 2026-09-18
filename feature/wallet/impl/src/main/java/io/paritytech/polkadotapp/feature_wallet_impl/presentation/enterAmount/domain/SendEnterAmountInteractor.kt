@@ -248,7 +248,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
             withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
                 coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
                     .transformWhile { states ->
-                        val state = states.toSendState()
+                        val state = states.toSendState(accountIds)
                         emit(state)
                         !state.isTerminal
                     }
@@ -287,7 +287,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
 }
 
 private fun Result<*>.toTerminalState(): SendState = fold(
-    onSuccess = { SendState.Complete },
+    onSuccess = { SendState.Complete(unfinalizedCoins = null) },
     onFailure = { SendState.Failed(it) }
 )
 
@@ -296,13 +296,13 @@ private fun Result<*>.toTerminalState(): SendState = fold(
  * one not on chain yet means we have not. An empty map is not agreement that nothing is left — it is not
  * knowing yet.
  */
-private fun Map<AccountId, CoinagePaymentState>.toSendState(): SendState = when {
+private fun Map<AccountId, CoinagePaymentState>.toSendState(coins: List<AccountId>): SendState = when {
     isEmpty() -> SendState.Detecting
 
     values.any { it.status == CoinagePaymentStatus.AwaitingClaim } -> SendState.Detected
 
     // A best-block claim is enough, although a fork can still undo it: finality is too long to keep the payer waiting.
-    values.all { it.status is CoinagePaymentStatus.Claimed } -> SendState.Complete
+    values.all { it.status is CoinagePaymentStatus.Claimed } -> SendState.Complete(unfinalizedCoins = coins)
 
     values.any { it.status == CoinagePaymentStatus.Failed } ->
         SendState.Failed(IllegalStateException("Coins to settle were never minted on chain"))

@@ -69,14 +69,14 @@ class RealSendEnterAmountInteractorTest {
     fun `a claim seen at the best block completes the payment`() = runTest {
         givenStatuses(listOf(AwaitingClaim), listOf(Claimed(finalized = false)))
 
-        assertEquals(listOf(SendState.Detected, SendState.Complete), sendViaSubmitter())
+        assertEquals(listOf(SendState.Detected, SendState.Complete(listOf(accountId))), sendViaSubmitter())
     }
 
     @Test
     fun `an empty first reading keeps watching`() = runTest {
         givenStatuses(emptyList(), listOf(AwaitingClaim), listOf(Claimed(finalized = false)))
 
-        assertEquals(listOf(SendState.Detecting, SendState.Detected, SendState.Complete), sendViaSubmitter())
+        assertEquals(listOf(SendState.Detecting, SendState.Detected, SendState.Complete(listOf(accountId))), sendViaSubmitter())
     }
 
     private fun givenStatuses(vararg readings: List<CoinagePaymentStatus>) {

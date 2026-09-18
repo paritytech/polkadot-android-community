@@ -1241,6 +1241,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="asset_details_balance_CTA_update">Update</string>
 
     <string name="transaction_success_title">Your transaction was sent successfully</string>
+    <string name="transaction_success_finality_pending">The payment went through. You can wait here for the final confirmation report, it usually arrives in ~30 seconds</string>
+    <string name="transaction_success_finality_confirmed">The payment is confirmed</string>
     <string name="send_transaction_failure_title">Payment failed</string>
     <string name="send_transaction_failure_description">Please review the details of your transaction and try to send it again</string>
 

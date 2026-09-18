@@ -42,6 +42,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.do
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.asSendError
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.transactionResult.TransactionSuccessPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -193,23 +194,27 @@ class SendEnterAmountViewModel @Inject constructor(
                 when (state) {
                     is SendState.Detecting -> sendProgress.value = SendProgress.Settling(Stage.DETECTING)
                     is SendState.Detected -> sendProgress.value = SendProgress.Settling(Stage.DETECTED)
-                    is SendState.Complete -> handleTransactionResult(error = null)
-                    is SendState.Failed -> handleTransactionResult(error = state.error)
+                    is SendState.Complete -> handleTransactionSuccess(state)
+                    is SendState.Failed -> handleTransactionFailure(state.error)
                 }
             }
     }
 
-    private fun handleTransactionResult(error: Throwable?) {
-        return when {
-            payload.showTransactionResult && error == null -> walletRouter.openSuccess()
-            payload.showTransactionResult && error != null -> walletRouter.openFailure()
+    private fun handleTransactionSuccess(state: SendState.Complete) {
+        if (payload.showTransactionResult) {
+            val unfinalizedCoins = state.unfinalizedCoins?.map { it.value }
+            walletRouter.openSuccess(TransactionSuccessPayload(unfinalizedCoins))
+        } else {
+            walletRouter.back()
+        }
+    }
 
-            !payload.showTransactionResult && error != null -> {
-                showPresentationError(error.asSendError().toPresentationError())
-                walletRouter.back()
-            }
-
-            else -> walletRouter.back()
+    private fun handleTransactionFailure(error: Throwable) {
+        if (payload.showTransactionResult) {
+            walletRouter.openFailure()
+        } else {
+            showPresentationError(error.asSendError().toPresentationError())
+            walletRouter.back()
         }
     }
 
