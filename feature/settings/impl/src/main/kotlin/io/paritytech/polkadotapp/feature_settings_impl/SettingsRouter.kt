@@ -18,6 +18,7 @@ interface SettingsRouter : ReturnableRouter {
     fun openContactChat(accountId: AccountId)
     fun openNotificationSettings()
     fun openLanguageSettings()
+    fun openLegalAndSupport()
     fun openPrivacyPolicy()
     fun openTermsOfUse()
     fun openThemes()

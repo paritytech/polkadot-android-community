@@ -86,6 +86,10 @@ class SettingsNavigator @Inject constructor(
         context.openAppLanguageSettings()
     }
 
+    override fun openLegalAndSupport() {
+        performNavigation(R.id.action_global_to_legalAndSupportFragment)
+    }
+
     override fun openPrivacyPolicy() {
         browserNavigator.open(LegalUrls.PRIVACY_POLICY)
     }
