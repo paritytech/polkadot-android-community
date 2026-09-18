@@ -408,7 +408,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="bottom_nav_menu_pocket">Pocket</string>
     <string name="bottom_nav_menu_explore">Browse</string>
     <string name="bottom_nav_menu_settings">Settings</string>
-    <string name="bottom_nav_scanner_tooltip">Use this button to add contacts, send funds, and more</string>
+    <string name="bottom_nav_scanner_tooltip_title">Scan a QR code</string>
+    <string name="bottom_nav_scanner_tooltip_message">Scan to pay or add a contact.</string>
     <string name="tab_bar_no_open_products">No open products</string>
     <string name="tab_bar_close_tab">Close tab</string>
 
@@ -1486,6 +1487,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chain_health_chain_people">People Chain</string>
     <string name="chain_health_chain_hub">Hub Chain</string>
     <string name="chain_health_chain_bulletin">Bulletin Chain</string>
+    <string name="chain_health_tooltip_title">Network status</string>
+    <string name="chain_health_tooltip_message">These rings track your connection to each chain.</string>
 
     <string name="splash_waiting_for_network_title">Waiting for network connection…</string>
     <string name="splash_waiting_for_network_message">Turn off Airplane Mode or check your internet</string>

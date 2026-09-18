@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.common.utils.shareInBackground
+import io.paritytech.polkadotapp.common.utils.stateInBackground
 import io.paritytech.polkadotapp.feature_chats_api.domain.chatRequest.ChatRequestServiceCoordinator
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBotStateController
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
@@ -34,6 +35,7 @@ import io.paritytech.polkadotapp.tools_jwt_auth_impl.domain.warmUp.JwtAuthWarmUp
 import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -68,6 +70,17 @@ class RootViewModel @Inject constructor(
     override val isOnboarded = observeAccountOnboardingStatus().map { it.isOnboarded }
     override val bottomNavHeight = bottomNavHeightProvider.heightDp
     override val chainsHealth = chainHealthMixinFactory.create(this).model
+
+    private val networkStatusTooltipDismissed = MutableStateFlow(!rootInteractor.shouldShowNetworkStatusTooltip())
+
+    // Waits for the rings it points at: they arrive asynchronously, and the bar also draws over onboarding.
+    override val isNetworkStatusTooltipVisible = combine(
+        networkStatusTooltipDismissed,
+        isOnboarded,
+        chainsHealth,
+    ) { dismissed, onboarded, health ->
+        !dismissed && onboarded && health.chains.isNotEmpty()
+    }.stateInBackground(initialValue = false)
 
     private val servicesScope = ComputationalScope(viewModelScope + coroutineDispatchers.computation)
 
@@ -115,6 +128,12 @@ class RootViewModel @Inject constructor(
 
     override fun onDevResetDismissClick() {
         showDevResetPrompt.disable()
+    }
+
+    override fun dismissNetworkStatusTooltip() {
+        if (networkStatusTooltipDismissed.value) return
+        networkStatusTooltipDismissed.value = true
+        rootInteractor.markNetworkStatusTooltipShown()
     }
 
     private suspend fun checkDevReset() {
