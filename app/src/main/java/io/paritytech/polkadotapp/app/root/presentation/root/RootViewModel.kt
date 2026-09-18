@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServi
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
+import io.paritytech.polkadotapp.feature_products_impl.domain.funding.FundingProductsWarmUp
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.SyncPriceCurrencyChange
 import io.paritytech.polkadotapp.feature_splash_api.presentation.SplashPassedObserver
 import io.paritytech.polkadotapp.feature_sso_impl.domain.SsoService
@@ -56,6 +57,7 @@ class RootViewModel @Inject constructor(
     private val ssoService: SsoService,
     private val chatRequestServiceCoordinator: ChatRequestServiceCoordinator,
     private val exploreProductsService: ExploreProductsService,
+    private val fundingProductsWarmUp: FundingProductsWarmUp,
     private val jwtAuthWarmUpService: JwtAuthWarmUpService,
     chatBotStateController: ChatBotStateController,
     chatEngine: ChatEngine,
@@ -93,18 +95,19 @@ class RootViewModel @Inject constructor(
             launch { depositService.startObserveAndConvert() }
             launch { syncPriceCurrencyChange.startObserving() }
             launch { statementStoreSlotAllocator.scheduleSlotRenewals() }
-            launch { warmUpWebProducts() }
 
             coinageServiceStarter.start()
             externalPaymentWorkerStarter.start()
             rootInteractor.startUpdateSystems().shareInBackground()
         }
+        warmUpWebProducts(servicesScope)
     }
 
-    private suspend fun warmUpWebProducts() {
+    private fun warmUpWebProducts(scope: ComputationalScope) {
         if (FeatureOption.BROWSE_TAB.isEnabled) {
-            exploreProductsService.warmUpExploreLoading()
+            scope.launch { exploreProductsService.warmUpExploreLoading() }
         }
+        scope.launch { fundingProductsWarmUp.warmUp() }
     }
 
     override val showDevResetPrompt = MutableStateFlow(false)
