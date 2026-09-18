@@ -1,6 +1,7 @@
-package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components
+package io.paritytech.polkadotapp.feature_settings_impl.presentation.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -23,13 +24,13 @@ import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 fun PolkadotMenuListScope.SettingsMenuItem(
-    icon: ImageVector,
+    icon: ImageVector?,
     onClick: () -> Unit,
     title: String,
     label: String? = null
 ) {
-    PolkadotMenuListItem(
-        leading = {
+    val leading: @Composable (BoxScope.() -> Unit)? = if (icon != null) {
+        {
             NovaIcon(
                 modifier = Modifier
                     .size(20.dp)
@@ -37,7 +38,11 @@ fun PolkadotMenuListScope.SettingsMenuItem(
                 imageVector = icon,
                 tint = PolkadotTheme.colors.fg.secondary
             )
-        },
+        }
+    } else null
+
+    PolkadotMenuListItem(
+        leading = leading,
         title = {
             NovaText(
                 text = title,

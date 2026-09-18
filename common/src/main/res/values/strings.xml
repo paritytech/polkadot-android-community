@@ -1273,7 +1273,6 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_section_general">General</string>
     <string name="settings_section_connections">Connections</string>
     <string name="settings_section_security">Security &amp; privacy</string>
-    <string name="settings_section_legal">Legal</string>
     <string name="settings_section_payments">Payments</string>
     <string name="settings_section_debug">Debug</string>
 
@@ -1292,6 +1291,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_privacy_policy">Privacy policy</string>
     <string name="settings_products">Apps</string>
     <string name="settings_blocked_contacts">Blocked contacts</string>
+    <string name="settings_legal_and_support">Legal &amp; Support</string>
     <string name="settings_contact_us">Contact us</string>
     <string name="settings_email_copied">Email copied to clipboard</string>
     <string name="settings_currency">Currency</string>
