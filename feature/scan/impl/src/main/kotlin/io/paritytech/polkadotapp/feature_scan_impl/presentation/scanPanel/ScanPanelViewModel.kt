@@ -1,4 +1,4 @@
-package io.paritytech.polkadotapp.feature_scan_impl.presentation.scanTab
+package io.paritytech.polkadotapp.feature_scan_impl.presentation.scanPanel
 
 import androidx.camera.core.SurfaceRequest
 import androidx.lifecycle.LifecycleOwner
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
 @HiltViewModel
-class ScanTabViewModel @Inject constructor(
+class ScanPanelViewModel @Inject constructor(
     private val qrScanning: QrScanningMixin,
 ) : BaseViewModel() {
     val surfaceRequest: StateFlow<SurfaceRequest?> = qrScanning.surfaceRequest
@@ -23,7 +23,9 @@ class ScanTabViewModel @Inject constructor(
 
     val cameraPermissionDenied: StateFlow<Boolean> = qrScanning.cameraPermissionDenied
 
-    val leaveScanTab: SharedFlow<(() -> Unit)?>
+    val cameraPermissionMissing: StateFlow<Boolean> = qrScanning.cameraPermissionMissing
+
+    val scanHandled: SharedFlow<(() -> Unit)?>
         field = MutableSharedFlow(extraBufferCapacity = 1)
 
     init {
@@ -50,6 +52,6 @@ class ScanTabViewModel @Inject constructor(
             PostParseAction.Nothing -> null
         }
 
-        leaveScanTab.emit(navigate)
+        scanHandled.emit(navigate)
     }
 }

@@ -576,6 +576,30 @@ fun <K, V> List<Flow<Pair<K, V>>>.toMultiSubscription(expectedSize: Int): Flow<M
         .filter { it.size == expectedSize }
 }
 
+/**
+ * Re-applies [transform] only to the entries whose value differs from the previous emission; the rest keep their
+ * previous result. Entries missing from the current emission are dropped.
+ */
+fun <K, V, R> Flow<Map<K, V>>.mapValuesDiffed(transform: suspend (key: K, value: V) -> R): Flow<Map<K, R>> = flow {
+    var previous = emptyMap<K, DiffedValue<V, R>>()
+
+    collect { current ->
+        val next = LinkedHashMap<K, DiffedValue<V, R>>(current.size)
+
+        current.forEach { (key, value) ->
+            val cached = previous[key]
+
+            next[key] = if (cached != null && cached.input == value) cached else DiffedValue(value, transform(key, value))
+        }
+
+        previous = next
+
+        emit(next.mapValues { (_, diffed) -> diffed.output })
+    }
+}
+
+private class DiffedValue<V, R>(val input: V, val output: R)
+
 @Suppress("UNCHECKED_CAST")
 fun <T1, T2, T3, T4, T5, T6, R> combine(
     flow: Flow<T1>,

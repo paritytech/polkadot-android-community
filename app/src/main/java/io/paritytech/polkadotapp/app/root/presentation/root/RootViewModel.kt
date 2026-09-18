@@ -1,13 +1,16 @@
 package io.paritytech.polkadotapp.app.root.presentation.root
 
 import android.net.Uri
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.app.root.domain.RootInteractor
 import io.paritytech.polkadotapp.app.root.presentation.main.BottomNavHeightProvider
+import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeepLinkHandler
 import io.paritytech.polkadotapp.common.presentation.deeplink.DeeplinkProcessingOutcome
 import io.paritytech.polkadotapp.common.presentation.deeplink.flatten
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.FeatureOption
 import io.paritytech.polkadotapp.common.utils.OneShotEventChannel
 import io.paritytech.polkadotapp.common.utils.disable
@@ -29,11 +32,13 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocato
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAccountOnboardingStatusUseCase
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.domain.warmUp.JwtAuthWarmUpService
 import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -57,36 +62,43 @@ class RootViewModel @Inject constructor(
     observeAccountOnboardingStatus: ObserveAccountOnboardingStatusUseCase,
     bottomNavHeightProvider: BottomNavHeightProvider,
     chainHealthMixinFactory: ChainHealthMixin.Factory,
+    coroutineDispatchers: CoroutineDispatchers,
 ) : BaseViewModel(), RootContract {
     override val chatOverlays = chatEngine.observeActiveOverlays()
     override val isOnboarded = observeAccountOnboardingStatus().map { it.isOnboarded }
     override val bottomNavHeight = bottomNavHeightProvider.heightDp
     override val chainsHealth = chainHealthMixinFactory.create(this).model
 
+    private val servicesScope = ComputationalScope(viewModelScope + coroutineDispatchers.computation)
+
     init {
-        launch {
-            remoteConfigService.sync()
-                .onSuccess {
-                    launch { rootInteractor.syncPrices() }
-                    launch { depositService.startObserveAndConvert() }
-                    launch { syncPriceCurrencyChange.startObserving() }
-                    launch { coinageServiceStarter.start() }
-                    externalPaymentWorkerStarter.start()
-                    launch { statementStoreSlotAllocator.scheduleSlotRenewals() }
-                    launch { warmUpWebProducts() }
-                    startUpdateSystems()
-                }
+        with(servicesScope) {
+            launch {
+                remoteConfigService.sync()
+                    .onSuccess { launchServicesBasedOnRemoteConfig() }
+            }
+
+            launch { jwtAuthWarmUpService.warmUpToken() }
+            launch { chatRequestServiceCoordinator.runChatRequestServices() }
+            launch { chatBotStateController.activateDefaultBots() }
+            launch { rootInteractor.printAccountAddresses() }
+            launch { checkDevReset() }
         }
+        watchSsoEvents(servicesScope)
+    }
 
-        launch { jwtAuthWarmUpService.warmUpToken() }
+    private fun launchServicesBasedOnRemoteConfig() {
+        with(servicesScope) {
+            launch { rootInteractor.syncPrices() }
+            launch { depositService.startObserveAndConvert() }
+            launch { syncPriceCurrencyChange.startObserving() }
+            launch { statementStoreSlotAllocator.scheduleSlotRenewals() }
+            launch { warmUpWebProducts() }
 
-        watchSsoEvents()
-        launch { chatRequestServiceCoordinator.runChatRequestServices() }
-        launch { chatBotStateController.activateDefaultBots() }
-
-        launch { rootInteractor.printAccountAddresses() }
-
-        launch { checkDevReset() }
+            coinageServiceStarter.start()
+            externalPaymentWorkerStarter.start()
+            rootInteractor.startUpdateSystems().shareInBackground()
+        }
     }
 
     private suspend fun warmUpWebProducts() {
@@ -122,13 +134,9 @@ class RootViewModel @Inject constructor(
         _showDeeplinkOutcome.trySend(outcome)
     }
 
-    private fun startUpdateSystems() {
-        rootInteractor.startUpdateSystems().shareInBackground()
-    }
-
-    private fun watchSsoEvents() {
+    private fun watchSsoEvents(scope: CoroutineScope) {
         if (FeatureOption.LINKED_DEVICES.isEnabled) {
-            ssoService.watchSsoEvents().launchIn(this)
+            ssoService.watchSsoEvents().launchIn(scope)
         }
     }
 }
