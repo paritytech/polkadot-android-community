@@ -62,8 +62,16 @@ private fun Finality.textRes(): Int = when (this) {
 
 @Preview
 @Composable
-private fun PaymentFinalityLabelPreview() {
+private fun PaymentFinalityPendingLabelPreview() {
     PolkadotTheme {
         PaymentFinalityLabel(finality = Finality.PENDING)
+    }
+}
+
+@Preview
+@Composable
+private fun PaymentFinalityConfirmedLabelPreview() {
+    PolkadotTheme {
+        PaymentFinalityLabel(finality = Finality.CONFIRMED)
     }
 }
