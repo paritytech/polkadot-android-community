@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.model
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.decodeFromByteArray
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.ChatPushContent
@@ -18,15 +19,28 @@ import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.Versione
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedNotificationChatMessageContent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 
-internal fun ChatMessage.toNotificationPayload(content: NotificationChatMessageContentV1): NotificationMessagePayload {
-    return NotificationMessagePayload(
-        id = id,
-        timestamp = timestamp.toULong(),
-        message = NotificationChatMessage(VersionedNotificationChatMessageContent.V1(content)),
-    )
+internal enum class NotificationPayloadMode {
+    FULL, STRIPPED
 }
 
-internal fun ChatMessageStatementContent.toStripped(): Result<StrippedChatMessageContentV1> {
+internal fun ChatMessage.toNotificationPayload(mode: NotificationPayloadMode): Result<NotificationMessagePayload> {
+    return toWireContent()
+        .flatMap { content ->
+            when (mode) {
+                NotificationPayloadMode.FULL -> Result.success(NotificationChatMessageContentV1.Full(content))
+                NotificationPayloadMode.STRIPPED -> content.toStripped().map(NotificationChatMessageContentV1::Stripped)
+            }
+        }
+        .map { content ->
+            NotificationMessagePayload(
+                id = id,
+                timestamp = timestamp.toULong(),
+                message = NotificationChatMessage(VersionedNotificationChatMessageContent.V1(content)),
+            )
+        }
+}
+
+private fun ChatMessageStatementContent.toStripped(): Result<StrippedChatMessageContentV1> {
     return runCatching {
         when (this) {
             is ChatMessageStatementContent.Text -> StrippedChatMessageContentV1.Text(text)
