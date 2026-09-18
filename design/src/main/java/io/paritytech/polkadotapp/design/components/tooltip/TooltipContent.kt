@@ -19,13 +19,12 @@ private val MaxWidth = 240.dp
 
 @Composable
 fun PolkadotTooltipContent(
-    modifier: Modifier = Modifier,
     title: String,
     message: String,
     onDismiss: () -> Unit,
 ) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .widthIn(max = MaxWidth)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
