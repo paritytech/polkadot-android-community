@@ -168,6 +168,9 @@ fun <T> Flow<T>.gate(flag: Flow<Boolean>) = combineToPair(this, flag)
     .filter { it.second }
     .map { it.first }
 
+fun <T> Flow<T>.reevaluate(trigger: Flow<*>): Flow<T> =
+    combine(this, trigger.map { }.onStart { emit(Unit) }) { value, _ -> value }
+
 fun <T> Flow<T>.zipWithPrevious(): Flow<Pair<T?, T>> =
     flow {
         var current: T? = null
