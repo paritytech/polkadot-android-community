@@ -72,14 +72,14 @@ class RootViewModel @Inject constructor(
     override val chainsHealth = chainHealthMixinFactory.create(this).model
 
     private val networkStatusTooltipDismissed = MutableStateFlow(!rootInteractor.shouldShowNetworkStatusTooltip())
+    private val chainRingsOnScreen = chainsHealth.map { it.chains.isNotEmpty() }
 
-    // Waits for the rings it points at: they arrive asynchronously, and the bar also draws over onboarding.
     override val isNetworkStatusTooltipVisible = combine(
         networkStatusTooltipDismissed,
         isOnboarded,
-        chainsHealth,
-    ) { dismissed, onboarded, health ->
-        !dismissed && onboarded && health.chains.isNotEmpty()
+        chainRingsOnScreen,
+    ) { dismissed, onboarded, ringsOnScreen ->
+        !dismissed && onboarded && ringsOnScreen
     }.stateInBackground(initialValue = false)
 
     private val servicesScope = ComputationalScope(viewModelScope + coroutineDispatchers.computation)
