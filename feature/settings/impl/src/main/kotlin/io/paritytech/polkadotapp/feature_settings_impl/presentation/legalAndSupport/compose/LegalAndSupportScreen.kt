@@ -60,12 +60,10 @@ private fun LegalAndSupportScreenInternal(
                     headerText = stringResource(RCommon.string.settings_section_general)
                 ) {
                     SettingsMenuItem(
-                        icon = null,
                         title = stringResource(RCommon.string.settings_privacy_policy),
                         onClick = onPrivacyPolicyClick
                     )
                     SettingsMenuItem(
-                        icon = null,
                         title = stringResource(RCommon.string.settings_terms_of_use),
                         onClick = onTermsOfUseClick
                     )
