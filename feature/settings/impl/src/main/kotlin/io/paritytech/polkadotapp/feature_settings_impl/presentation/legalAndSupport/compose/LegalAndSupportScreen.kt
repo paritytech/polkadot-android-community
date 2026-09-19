@@ -26,7 +26,8 @@ fun LegalAndSupportScreen(contract: LegalAndSupportContract) {
     LegalAndSupportScreenInternal(
         onBackClick = contract::onBackClick,
         onPrivacyPolicyClick = contract::onPrivacyPolicyClick,
-        onTermsOfUseClick = contract::onTermsOfUseClick
+        onTermsOfUseClick = contract::onTermsOfUseClick,
+        onContactUsClick = contract::onContactUsClick
     )
 }
 
@@ -34,7 +35,8 @@ fun LegalAndSupportScreen(contract: LegalAndSupportContract) {
 private fun LegalAndSupportScreenInternal(
     onBackClick: () -> Unit,
     onPrivacyPolicyClick: () -> Unit,
-    onTermsOfUseClick: () -> Unit
+    onTermsOfUseClick: () -> Unit,
+    onContactUsClick: () -> Unit
 ) {
     PolkadotSurface {
         Column(
@@ -57,7 +59,7 @@ private fun LegalAndSupportScreenInternal(
                     .padding(horizontal = PolkadotTheme.spacings.large)
             ) {
                 PolkadotMenuList(
-                    headerText = stringResource(RCommon.string.settings_section_general)
+                    headerText = stringResource(RCommon.string.settings_section_legal)
                 ) {
                     SettingsMenuItem(
                         title = stringResource(RCommon.string.settings_privacy_policy),
@@ -66,6 +68,17 @@ private fun LegalAndSupportScreenInternal(
                     SettingsMenuItem(
                         title = stringResource(RCommon.string.settings_terms_of_use),
                         onClick = onTermsOfUseClick
+                    )
+                }
+
+                VerticalSpacer { large }
+
+                PolkadotMenuList(
+                    headerText = stringResource(RCommon.string.settings_section_support)
+                ) {
+                    SettingsMenuItem(
+                        title = stringResource(RCommon.string.settings_contact_us),
+                        onClick = onContactUsClick
                     )
                 }
             }
@@ -80,7 +93,8 @@ private fun LegalAndSupportScreenPreview() {
         LegalAndSupportScreenInternal(
             onBackClick = {},
             onPrivacyPolicyClick = {},
-            onTermsOfUseClick = {}
+            onTermsOfUseClick = {},
+            onContactUsClick = {}
         )
     }
 }

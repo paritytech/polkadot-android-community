@@ -240,8 +240,8 @@ An empty value counts as missing. Three helpers exist:
 - `readSecretOrNull` — optional; `null` selects the built-in fallback.
 
 The mandatory set, in the order Gradle reports them when absent:
-`APPLICATION_ID`, `APPLICATION_NAME`, `LOG_COLLECTION_EMAIL`, `PRIVACY_POLICY_URL`,
-`TERMS_OF_USE_URL`, `SENTRY_ORG`, `SENTRY_PROJECT`, `CURRENCY_SYMBOL`,
+`APPLICATION_ID`, `APPLICATION_NAME`, `CONTACT_EMAIL`, `LOG_COLLECTION_EMAIL`,
+`PRIVACY_POLICY_URL`, `TERMS_OF_USE_URL`, `SENTRY_ORG`, `SENTRY_PROJECT`, `CURRENCY_SYMBOL`,
 `NIGHTLY_FUNDING_MNEMONIC`, `GOOGLE_OAUTH_ID`, `FIRESTORE_DATABASE_ID`,
 `GOOGLE_PROJECT_ID`.
 
@@ -293,6 +293,7 @@ or a `BuildConfig` field. Mandatory ones have no fallback; optional ones list th
 | `PRIVACY_POLICY_URL`        | `app`                         | yes      | —                              | Privacy-policy destination                                                   |
 | `TERMS_OF_USE_URL`          | `app`                         | yes      | —                              | Terms-of-use destination                                                     |
 | `LOG_COLLECTION_EMAIL`      | `app`                         | yes      | —                              | Recipient address for the in-app "collect logs" debug share action          |
+| `CONTACT_EMAIL`             | `app`                         | yes      | —                              | Recipient address for the "Contact us" action on the Legal & Support screen |
 | `CURRENCY_SYMBOL`           | `common`                      | yes      | —                              | Symbol of the in-app digital currency rendered in the UI                     |
 | `FIRESTORE_DATABASE_ID`     | `tools/backup/impl`           | yes      | —                              | Firestore database holding the backup encryption-key records (§4); `(default)` for the project's default database |
 | `NIGHTLY_FUNDING_MNEMONIC`  | `feature/transactions/impl`   | yes      | —                              | Mnemonic of the funding account used to top up accounts on nightly/production test contours |
@@ -524,6 +525,7 @@ jobs:
       PRIVACY_POLICY_URL: ${{ vars.PRIVACY_POLICY_URL }}
       TERMS_OF_USE_URL: ${{ vars.TERMS_OF_USE_URL }}
       LOG_COLLECTION_EMAIL: ${{ vars.LOG_COLLECTION_EMAIL }}
+      CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
       CURRENCY_SYMBOL: ${{ vars.CURRENCY_SYMBOL }}
       REFERRAL_WEB_HOST: ${{ vars.REFERRAL_WEB_HOST }}
       GAME_RESULTS_FALLBACK_URL: ${{ vars.GAME_RESULTS_FALLBACK_URL }}

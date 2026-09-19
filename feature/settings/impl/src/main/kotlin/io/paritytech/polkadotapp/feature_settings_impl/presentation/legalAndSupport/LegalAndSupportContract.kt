@@ -6,4 +6,6 @@ interface LegalAndSupportContract {
     fun onPrivacyPolicyClick()
 
     fun onTermsOfUseClick()
+
+    fun onContactUsClick()
 }

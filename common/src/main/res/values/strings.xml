@@ -1275,6 +1275,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_section_security">Security &amp; privacy</string>
     <string name="settings_section_payments">Payments</string>
     <string name="settings_section_debug">Debug</string>
+    <string name="settings_section_legal">Legal</string>
+    <string name="settings_section_support">Support</string>
 
     <string name="settings_notifications">Notifications</string>
     <string name="settings_theme">Theme</string>

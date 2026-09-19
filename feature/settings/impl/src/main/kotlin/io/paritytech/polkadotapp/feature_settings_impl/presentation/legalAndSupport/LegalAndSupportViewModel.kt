@@ -20,4 +20,8 @@ class LegalAndSupportViewModel @Inject constructor(
     override fun onTermsOfUseClick() {
         router.openTermsOfUse()
     }
+
+    override fun onContactUsClick() {
+        router.openContactUs()
+    }
 }

@@ -21,6 +21,7 @@ interface SettingsRouter : ReturnableRouter {
     fun openLegalAndSupport()
     fun openPrivacyPolicy()
     fun openTermsOfUse()
+    fun openContactUs()
     fun openThemes()
 
     // TODO: should not be here, remove after W3S
