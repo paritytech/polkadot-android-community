@@ -62,7 +62,8 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
         when (state) {
             is LoadingState.Loaded -> SendEnterAmountScreenInternal(
                 state = state.data,
-                stallReport = { contract.stalenessReport.DisplayReport() },
+                // Hidden for now: diagnostics are still collected, just not shown.
+                stallReport = {},
                 onAmountChange = contract::onNewInput,
                 onConfirmClick = contract::onConfirmClick,
                 onBackClick = contract::onBackClick

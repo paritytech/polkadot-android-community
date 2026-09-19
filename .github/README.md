@@ -1,3 +1,6 @@
+> [!WARNING]
+> This is a prototype, reference implementation, and proof-of-concept. This open source code is developed and published by Parity Technologies for research, experimentation, and developer education only. It has not been audited, is actively experimental, and may contain bugs, vulnerabilities, or incomplete features. The app is a self-custodial wallet that can hold real assets — use at your own risk.
+
 ## Build Project
 
 Clone [paritytech/polkadot-android-community](https://github.com/paritytech/polkadot-android-community)
