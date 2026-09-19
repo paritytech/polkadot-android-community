@@ -82,6 +82,7 @@ APPLICATION_NAME=Polkadot
 PRIVACY_POLICY_URL=https://example.com/privacy
 TERMS_OF_USE_URL=https://example.com/terms
 LOG_COLLECTION_EMAIL=logs@example.com
+CONTACT_EMAIL=support@example.com
 CURRENCY_SYMBOL=CASH
 
 # Your Google Cloud / Firebase project (docs/DEPLOYMENT.md §4, §5.2)
