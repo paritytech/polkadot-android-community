@@ -3,9 +3,14 @@
   Debug-variant override of the main config. A variant resource replaces the whole file, so the
   entries from src/main are repeated here rather than merged.
 
-  The local addresses serve products from a development server on the developer's machine, reached
-  over `adb reverse`; 10.0.2.2 is the emulator's alias for its host. Cleartext stays off everywhere
-  else, and this file does not exist on release, nightly or safetynet builds.
+  The local addresses serve products from a development server on the developer's machine. Over USB
+  that is `localhost` via `adb reverse`; over Wi-Fi it is the machine's own private address, which is
+  what reaches more than one device. The Wi-Fi entry names that machine, not the devices, so one line
+  covers every device on the network — but it has to be edited when the machine's address changes.
+
+  Network Security Config cannot express address ranges, so this stays an explicit list rather than a
+  blanket `cleartextTrafficPermitted` on base-config. Cleartext stays off everywhere else, and this
+  file does not exist on release, nightly or safetynet builds.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">
@@ -16,6 +21,9 @@
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">127.0.0.1</domain>
         <domain includeSubdomains="false">10.0.2.2</domain>
+
+        <!--  developer machine on the local network  -->
+        <domain includeSubdomains="false">192.168.1.59</domain>
     </domain-config>
     <base-config cleartextTrafficPermitted="false"/>
 </network-security-config>

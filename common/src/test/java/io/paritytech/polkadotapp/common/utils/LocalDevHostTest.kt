@@ -43,6 +43,27 @@ class LocalDevHostTest {
     }
 
     @Test
+    fun `accepts a private lan address, so other devices on the network reach the dev server`() {
+        assertEquals("http://192.168.1.59:3000", LocalDevHost.parseOrigin("http://192.168.1.59:3000"))
+        assertEquals("http://10.1.2.3:3000", LocalDevHost.parseOrigin("10.1.2.3:3000"))
+        assertEquals("http://172.16.0.1:3000", LocalDevHost.parseOrigin("172.16.0.1:3000"))
+        assertEquals("http://172.31.255.254:8080", LocalDevHost.parseOrigin("172.31.255.254:8080"))
+    }
+
+    @Test
+    fun `rejects a public address, which is never a dev server`() {
+        listOf("8.8.8.8:3000", "172.15.0.1:3000", "172.32.0.1:3000", "192.169.1.1:3000", "1.2.3.4")
+            .forEach { assertNull("expected '$it' to be rejected", LocalDevHost.parseOrigin(it)) }
+    }
+
+    @Test
+    fun `rejects something merely shaped like an address`() {
+        assertNull(LocalDevHost.parseOrigin("192.168.1"))
+        assertNull(LocalDevHost.parseOrigin("192.168.1.300:3000"))
+        assertNull(LocalDevHost.parseOrigin("192.168.1.x.5:3000"))
+    }
+
+    @Test
     fun `does not treat a host merely containing a local name as local`() {
         assertNull(LocalDevHost.parseOrigin("localhost.example.com:5173"))
         assertNull(LocalDevHost.parseOrigin("notlocalhost:5173"))
