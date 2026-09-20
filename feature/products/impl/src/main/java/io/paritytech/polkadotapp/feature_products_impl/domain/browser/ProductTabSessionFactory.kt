@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.core.net.toUri
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
+import io.paritytech.polkadotapp.feature_products_api.model.toUrl
 import io.paritytech.polkadotapp.feature_products_impl.domain.bot.ProductsBotApiImpl
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiEnvironment
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiSession
@@ -40,11 +41,15 @@ class ProductTabSessionFactory @Inject constructor(
      * take. Returns the provider the caller wires its page/progress listeners to.
      */
     fun create(url: String, scope: CoroutineScope, onDeeplink: (Uri) -> Unit): BrowserWebViewProvider {
+        // Minting the identity is the gate: a build that cannot mint one gets no dev origin either.
+        val localDevOrigin = ProductId.fromLocalDevUrl(url).getOrNull()?.toUrl()
+
         val provider = browserWebViewProviderFactory.create(
             url,
             NavigationPolicy.InlineNavigation(onDeeplinkNavigation = onDeeplink),
             allowIframes = true,
             scope,
+            localDevOrigin,
         )
 
         // Keep the product's worker alive for as long as its full-page screen is open. A product

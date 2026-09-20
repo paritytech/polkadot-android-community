@@ -65,7 +65,8 @@ class RealSpaHost @Inject constructor(
             initialUrl = initialUrl,
             navigationPolicy = webViewNavigation,
             allowIframes = true,
-            scope = scope
+            scope = scope,
+            localDevOrigin = null,
         )
 
         val callingProductIdProvider = webViewProvider.callingProductIdProvider

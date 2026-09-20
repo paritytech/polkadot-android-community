@@ -29,6 +29,12 @@ android {
     }
 
     buildTypes {
+        // LOCAL ONLY — do not commit. Debug otherwise reports `unstable` to Remote Config, and that
+        // profile currently serves dead Asset Hub nodes and an empty account_data_store_config, so
+        // coinage never registers. `nightly` is the profile safetynet uses and it resolves.
+        getByName("debug") {
+            buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
+        }
         getByName("release") {
             initWith(getByName("release"))
             buildConfigField("boolean", "SAFETY_MODE", "true")

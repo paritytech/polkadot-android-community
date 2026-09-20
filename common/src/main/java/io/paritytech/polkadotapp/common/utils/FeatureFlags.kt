@@ -11,6 +11,7 @@ object FeatureFlags {
             FeatureOption.SHORT_WORKER_BACKOFF,
             FeatureOption.LOW_BATTERY_EVIDENCE_PROVISION,
             FeatureOption.SKIP_MOBRULE_CASE,
+            FeatureOption.LOCAL_DEV_PRODUCTS,
             FeatureOption.DEBUG_MENU -> BuildConfig.DEBUG
 
             FeatureOption.ARBITRARY_PRODUCTS,
@@ -68,7 +69,12 @@ enum class FeatureOption {
     PRODUCT_SETTINGS,
     PERSONHOOD,
     COLLECTIBLES,
-    ARBITRARY_PRODUCTS
+    ARBITRARY_PRODUCTS,
+
+    // Serving a product from a development server on the machine rather than from dotNS. It grants a
+    // local origin a product identity, which is an isolation hole anywhere but a developer's own
+    // build — hence BuildConfig.DEBUG rather than SAFETY_MODE or a runtime toggle.
+    LOCAL_DEV_PRODUCTS
 }
 
 val FeatureOption.isEnabled

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-variant override of the main config. A variant resource replaces the whole file, so the
+  entries from src/main are repeated here rather than merged.
+
+  The local addresses serve products from a development server on the developer's machine, reached
+  over `adb reverse`; 10.0.2.2 is the emulator's alias for its host. Cleartext stays off everywhere
+  else, and this file does not exist on release, nightly or safetynet builds.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!--  temporary solution for video game to work since it uses ws and not wss  -->
+        <domain includeSubdomains="false">163.172.160.22</domain>
+        <domain includeSubdomains="false">192.168.100.3</domain>
+
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false"/>
+</network-security-config>

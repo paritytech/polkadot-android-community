@@ -1,8 +1,11 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.webView
 
+import android.net.Uri
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.core.net.toUri
+import io.paritytech.polkadotapp.common.utils.LocalDevHost
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsNavigationType
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
@@ -24,16 +27,24 @@ class BrowserWebViewClient(
     servingHostResolver: DotNsServingHostResolver,
     private val navigationPolicy: NavigationPolicy,
     mainDocumentResponseHeaders: Map<String, String>,
+    private val localDevOrigin: String?,
 ) : DotNsWebViewClient(dotNsResolver, dotNsTldProvider, servingHostResolver, mainDocumentResponseHeaders) {
+    /**
+     * A request to the dev origin is never a dotNS one, so it is answered before [DotNsWebViewClient]
+     * blocks this thread waiting for the active network's TLD — which a dev product never needs, and
+     * which never arrives when the chain config is unavailable.
+     */
+    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+        if (localDevOrigin != null && request.url.isOnLocalDevOrigin()) return null
+
+        return super.shouldInterceptRequest(view, request)
+    }
+
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val origin = view.url?.toUri()
         val destination = request.url
         val tld = dotNsTldProvider.currentTldOrNull()
-        val type = if (tld == null) {
-            DotNsNavigationType.EXTERNAL
-        } else {
-            DotNsUtils.classifyNavigation(origin, destination, tld)
-        }
+        val type = DotNsUtils.classifyNavigation(origin, destination, tld, localDevOrigin)
         val result = navigationPolicy.handleNavigation(type, destination)
 
         return when (result) {
@@ -41,4 +52,6 @@ class BrowserWebViewClient(
             NavigationResult.DELEGATE_TO_WEBVIEW -> false
         }
     }
+
+    private fun Uri.isOnLocalDevOrigin(): Boolean = LocalDevHost.parseOrigin(toString()) == localDevOrigin
 }

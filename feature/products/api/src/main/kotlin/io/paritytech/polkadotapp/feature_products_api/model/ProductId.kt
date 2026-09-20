@@ -2,7 +2,10 @@ package io.paritytech.polkadotapp.feature_products_api.model
 
 import android.net.Uri
 import androidx.core.net.toUri
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.LocalDevHost
 import io.paritytech.polkadotapp.common.utils.Urls
+import io.paritytech.polkadotapp.common.utils.isDisabled
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatExtensionId
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsUtils
@@ -45,6 +48,25 @@ data class ProductId private constructor(val value: String) {
         }
 
         /**
+         * Construct ProductId for a product served from a local development server, which has no
+         * dotNS name to take an identity from. The origin is the identity, so two dev servers on
+         * different ports are different products and cannot reach each other's storage.
+         *
+         * Fails unless [FeatureOption.LOCAL_DEV_PRODUCTS] is enabled — this is the only place a
+         * non-dotNS identity can be minted, so it is the only gate.
+         */
+        fun fromLocalDevUrl(url: String): Result<ProductId> {
+            if (FeatureOption.LOCAL_DEV_PRODUCTS.isDisabled) {
+                return Result.failure(IllegalStateException("Local dev products are disabled"))
+            }
+
+            val origin = LocalDevHost.parseOrigin(url)
+                ?: return Result.failure(IllegalArgumentException("Not a local dev url: $url"))
+
+            return Result.success(ProductId(origin.removePrefix(Urls.HTTP_PREFIX)))
+        }
+
+        /**
          * Reconstruct ProductId from a stored value (e.g. database).
          * Trusts that the value is already a valid dotNS domain.
          */
@@ -79,6 +101,8 @@ fun ProductId.toChatExtensionId(): ChatExtensionId {
     return "ProductBot_$value"
 }
 
-fun ProductId.toUrl() = Urls.ensureHasProtocolOrHttps(value)
+// A local dev id is an origin, not a dotNS name: it carries a port and is served in the clear, so the
+// https default would round-trip it to an address nothing listens on.
+fun ProductId.toUrl() = LocalDevHost.parseOrigin(value) ?: Urls.ensureHasProtocolOrHttps(value)
 
 fun ProductId.toUri() = toUrl().toUri()

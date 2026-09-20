@@ -48,7 +48,8 @@ sealed interface NavigationPolicy {
                     NavigationResult.INTERCEPTED_BY_POLICY
                 }
 
-                DotNsNavigationType.SAME_DOTNS_DOMAIN -> NavigationResult.DELEGATE_TO_WEBVIEW
+                DotNsNavigationType.SAME_DOTNS_DOMAIN,
+                DotNsNavigationType.SAME_LOCAL_ORIGIN -> NavigationResult.DELEGATE_TO_WEBVIEW
             }
         }
     }
@@ -79,6 +80,12 @@ sealed interface NavigationPolicy {
                     webViewLoader(normalized.toString())
                     NavigationResult.INTERCEPTED_BY_POLICY
                 }
+
+                // A dev origin has no dotNS name to normalize against — it is already the address served.
+                DotNsNavigationType.SAME_LOCAL_ORIGIN -> {
+                    webViewLoader(destination.toString())
+                    NavigationResult.INTERCEPTED_BY_POLICY
+                }
             }
         }
     }
@@ -102,6 +109,7 @@ sealed interface NavigationPolicy {
                     NavigationResult.INTERCEPTED_BY_POLICY
                 }
 
+                DotNsNavigationType.SAME_LOCAL_ORIGIN,
                 DotNsNavigationType.EXTERNAL -> NavigationResult.DELEGATE_TO_WEBVIEW
             }
         }

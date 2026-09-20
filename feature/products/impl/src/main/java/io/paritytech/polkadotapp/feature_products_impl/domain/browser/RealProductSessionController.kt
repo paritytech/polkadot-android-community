@@ -143,6 +143,12 @@ class RealProductSessionController @Inject constructor(
         activeTabId.value?.let(::closeTab)
     }
 
+    override fun reload() {
+        val webView = activeTabOrNull()?.webView?.value ?: return
+        webView.clearCache(true)
+        webView.reload()
+    }
+
     override fun ensureActiveLive() {
         val tab = activeTabOrNull() ?: return
         tab.lastActive = now()
@@ -294,6 +300,7 @@ class RealProductSessionController @Inject constructor(
         url = url,
         isLoading = progress.isLoading(),
         loadFraction = (progress as? DotNsLoadProgress.Downloading)?.fraction,
+        isLocalDev = ProductId.fromLocalDevUrl(url).isSuccess,
     )
 
     private fun displayTitle(url: String, title: String): String =

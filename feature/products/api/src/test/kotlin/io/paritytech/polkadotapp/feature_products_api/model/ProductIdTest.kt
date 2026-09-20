@@ -60,4 +60,26 @@ class ProductIdTest {
         listOf("example.com", "dot", "coin_flip.dot", "coinflip.dotcom", "", "  ", "coinflip.dot/x")
             .forEach { assertTrue("expected '$it' to be rejected", ProductId.fromString(it, dot).isFailure) }
     }
+
+    @Test
+    fun `takes a local dev origin as the identity, so two ports are two products`() {
+        assertEquals("localhost:5173", ProductId.fromLocalDevUrl("http://localhost:5173").getOrThrow().value)
+        assertEquals("localhost:3000", ProductId.fromLocalDevUrl("localhost:3000").getOrThrow().value)
+    }
+
+    @Test
+    fun `rejects a non-local url as a local dev id`() {
+        listOf("coinflip.dot", "https://localhost:5173", "http://example.com:5173", "")
+            .forEach { assertTrue("expected '$it' to be rejected", ProductId.fromLocalDevUrl(it).isFailure) }
+    }
+
+    @Test
+    fun `round-trips a local dev id back to the address it is served from`() {
+        assertEquals("http://localhost:5173", ProductId.fromLocalDevUrl("http://localhost:5173").getOrThrow().toUrl())
+    }
+
+    @Test
+    fun `still serves a dotNS id over https`() {
+        assertEquals("https://coinflip.dot", ProductId.fromString("coinflip.dot", dot).getOrThrow().toUrl())
+    }
 }

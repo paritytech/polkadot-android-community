@@ -100,7 +100,8 @@ class DebugMenuViewModel @Inject constructor(
 
     override fun onSpaBrowserUrlEntered(url: String) {
         state.update { it.copy(showSpaBrowserDialog = false) }
-        router.openSpaBrowser(SpaBrowserPayload.ByUrl(Urls.ensureHttpsProtocol(url)))
+        // Keeps an entered http:// url intact — a local dev server has no certificate to upgrade to.
+        router.openSpaBrowser(SpaBrowserPayload.ByUrl(Urls.ensureHasProtocolOrHttps(url)))
     }
 
     override fun onSpaBrowserDialogDismissed() {

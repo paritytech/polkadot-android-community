@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import dagger.assisted.Assisted
@@ -19,7 +20,9 @@ import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsContentLoader
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.FixedProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.PageLifecycleSource
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.UrlDerivedProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.navigation.NavigationPolicy
@@ -43,24 +46,28 @@ class BrowserWebViewProvider @AssistedInject constructor(
     private val dotNsTldProvider: DotNsTldProvider,
     private val servingHostResolver: DotNsServingHostResolver,
     dispatchers: CoroutineDispatchers,
-    @Assisted private val initialUrl: String,
+    @Assisted("initialUrl") private val initialUrl: String,
     @Assisted private val navigationPolicy: NavigationPolicy,
     @Assisted private val allowIframes: Boolean,
     @Assisted private val scope: CoroutineScope,
+    @Assisted("localDevOrigin") private val localDevOrigin: String?,
 ) : WebViewProvider(dispatchers), PageLifecycleSource {
     @AssistedFactory
     interface Factory {
         fun create(
-            initialUrl: String,
+            @Assisted("initialUrl") initialUrl: String,
             navigationPolicy: NavigationPolicy,
             allowIframes: Boolean,
-            scope: CoroutineScope
+            scope: CoroutineScope,
+            @Assisted("localDevOrigin") localDevOrigin: String?,
         ): BrowserWebViewProvider
     }
 
-    override val callingProductIdProvider: CallingProductIdProvider = UrlDerivedProductId(dotNsTldProvider) {
-        accessWebView(WebView::getUrl)
-    }
+    // A dev product has no dotNS name in its url to derive an identity from, so the session carries the
+    // identity minted when the tab opened. Falling back keeps a rejected mint from silently granting one.
+    override val callingProductIdProvider: CallingProductIdProvider =
+        localDevOrigin?.let { ProductId.fromLocalDevUrl(it).getOrNull() }?.let(::FixedProductId)
+            ?: UrlDerivedProductId(dotNsTldProvider) { accessWebView(WebView::getUrl) }
 
     // Per-session decorator over the resolver: tracks the domain currently being served and
     // exposes its download/unpack progress for the host UI to render.
@@ -69,7 +76,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
     /** Load progress of the domain the WebView is currently resolving content for. */
     val loadProgress: Flow<DotNsLoadProgress> = contentLoader.loadProgress
 
-    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider, firstPartyOrigin = null)
+    private val permissionClient = webViewPermissionClientFactory.create(callingProductIdProvider, firstPartyOrigin = localDevOrigin)
     private val chromeClient = productWebChromeClientFactory.create(
         logPrefix = "Browser: $initialUrl",
         callingProductIdProvider = callingProductIdProvider,
@@ -79,6 +86,8 @@ class BrowserWebViewProvider @AssistedInject constructor(
 
     @SuppressLint("SetJavaScriptEnabled")
     override suspend fun createWebView(): WebView {
+        if (localDevOrigin != null) WebView.setWebContentsDebuggingEnabled(true)
+
         return WebView(context).apply {
             // This is needed so webView has a proper initial viewport height when the page renders. With overflow: hidden and height: 100%, if the WebView's layout height isn't resolved yet, the
             //  content box collapses to 0px
@@ -94,6 +103,10 @@ class BrowserWebViewProvider @AssistedInject constructor(
                 // A camera preview is a MediaStream in an autoplaying <video>; the default gesture
                 // requirement would keep it black even once the capture permission is granted.
                 mediaPlaybackRequiresUserGesture = false
+
+                // A dev server serves changed bytes from unchanged urls, which the http cache would
+                // hide behind the previous build.
+                if (localDevOrigin != null) cacheMode = WebSettings.LOAD_NO_CACHE
             }
 
             val innerClient =
@@ -103,6 +116,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
                     servingHostResolver,
                     navigationPolicy,
                     frameEmbeddingResponseHeaders(allowIframes),
+                    localDevOrigin,
                 )
             webViewClient = InternalWebViewClient(innerClient)
             webChromeClient = chromeClient
