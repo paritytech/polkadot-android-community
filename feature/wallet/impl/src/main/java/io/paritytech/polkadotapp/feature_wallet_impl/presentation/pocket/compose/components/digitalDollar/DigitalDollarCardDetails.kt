@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -51,7 +52,7 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.
 import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
-private val ActionRowMinHeight = 48.dp
+private val ActionButtonMinHeight = 48.dp
 
 @Composable
 fun DigitalDollarCardDetails(
@@ -196,13 +197,14 @@ private fun SendCashActions(
         modifier = Modifier
             .height(IntrinsicSize.Min)
             .then(modifier),
-        horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
+        horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         PolkadotTextButton(
             text = stringResource(RCommon.string.common_send),
             modifier = Modifier
                 .weight(1f)
-                .defaultMinSize(minHeight = ActionRowMinHeight),
+                .defaultMinSize(minHeight = ActionButtonMinHeight),
             size = PolkadotButtonSize.large(),
             shape = PolkadotButtonShape.pill,
             onClick = onSendClick
@@ -222,7 +224,7 @@ private fun SendCashActions(
             text = stringResource(RCommon.string.common_withdraw),
             modifier = Modifier
                 .weight(1f)
-                .defaultMinSize(minHeight = ActionRowMinHeight),
+                .defaultMinSize(minHeight = ActionButtonMinHeight),
             size = PolkadotButtonSize.large(),
             shape = PolkadotButtonShape.pill,
             onClick = onWithdrawClick
