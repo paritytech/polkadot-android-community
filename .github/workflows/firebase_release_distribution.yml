@@ -262,8 +262,11 @@ jobs:
   create_backport_pr:
     name: Create backport PR to source branch
     runs-on: ubuntu-latest
-    # Only run when release PR is merged (closed + merged flag)
-    if: startsWith(github.head_ref, 'release-') && github.event.action == 'closed' && (github.event.pull_request.merged == true)
+    # Held: it carries back the build-number commit that check_and_build
+    # makes, and that job is held, so there is nothing left to carry.
+    # The condition this replaces:
+    #   if: startsWith(github.head_ref, 'release-') && github.event.action == 'closed' && (github.event.pull_request.merged == true)
+    if: false
 
     steps:
       - name: Extract source_ref from PR body and create backport PR

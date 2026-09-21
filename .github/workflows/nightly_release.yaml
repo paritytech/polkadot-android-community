@@ -268,7 +268,11 @@ jobs:
           destination_path: /android/nightly/polkadot-app-vanilla.apk
 
       - name: Trigger Allure TestOps tests
-        if: steps.collect_prs.outputs.should_build == 'true'
+        # Held: it reports on the nightly build, which is no longer
+        # produced here, so it would describe a frozen artifact.
+        # The condition this replaces:
+        #   if: steps.collect_prs.outputs.should_build == 'true'
+        if: false
         uses: novasamatech/github-actions/trigger-allure-testops@v5
         with:
           testplan_id: '733'
@@ -306,7 +310,11 @@ jobs:
             "$SAFETYNET_APK_PATH"
 
       - name: Send release notification
-        if: steps.collect_prs.outputs.should_build == 'true'
+        # Held: it reports on the nightly build, which is no longer
+        # produced here, so it would describe a frozen artifact.
+        # The condition this replaces:
+        #   if: steps.collect_prs.outputs.should_build == 'true'
+        if: false
         uses: novasamatech/github-actions/send-release-notification@v5
         with:
           platform: Android
