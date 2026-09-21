@@ -5,12 +5,12 @@
 # Workflows and GitHub Actions configuration
 /.github/ @kogeler
 
-/design @foxwoosh
+/design @valentunn
 /chains @valentunn @mikhail98
-/database @valentunn @foxwoosh @mikhail98
+/database @valentunn @mikhail98
 
-/scripts @Alexander-Kaish
-/config/detekt @Alexander-Kaish
+/scripts @valentunn
+/config/detekt @valentunn
 /bindings @valentunn
 /tools/car-parser @valentunn
 /tools/ipfs @valentunn
@@ -18,35 +18,35 @@
 /tools/backup @mikhail98 @valentunn
 /tools/integrity @mikhail98
 /tools/remoteconfig @mikhail98 @valentunn
-/tools/jwt-auth @mikhail98 @valentunn @Alexander-Kaish
-/tools/media-connection @antonijzelinskij @foxwoosh @valentunn
+/tools/jwt-auth @mikhail98 @valentunn
+/tools/media-connection @antonijzelinskij @valentunn
 
-/feature/chats @valentunn @foxwoosh
-/feature/people @valentunn @foxwoosh
+/feature/chats @valentunn
+/feature/people @valentunn
 /feature/fund @valentunn @mikhail98
-/feature/statement-store @foxwoosh @valentunn @antonijzelinskij
-/feature/videogame @valentunn @foxwoosh
+/feature/statement-store @valentunn @antonijzelinskij
+/feature/videogame @valentunn
 /feature/balances @valentunn @mikhail98
 /feature/cross-chain-transfers @valentunn
-/feature/become-citizen @valentunn @foxwoosh
-/feature/backup @valentunn @mikhail98 @foxwoosh
+/feature/become-citizen @valentunn
+/feature/backup @valentunn @mikhail98
 /feature/sso @valentunn
 /feature/tokens @valentunn @mikhail98
-/feature/transactions @valentunn @foxwoosh @mikhail98
+/feature/transactions @valentunn @mikhail98
 /feature/usernames @mikhail98 @valentunn
 /feature/upgrade-username @mikhail98
-/feature/vouchers @valentunn @foxwoosh
+/feature/vouchers @valentunn
 /feature/wallet @mikhail98 @valentunn
 /feature/xcm @valentunn
 /feature/swap @valentunn
-/feature/account @valentunn @mikhail98 @foxwoosh
+/feature/account @valentunn @mikhail98
 /feature/transfers @valentunn
 /feature/dotns @valentunn
 /feature/revive @valentunn
 /feature/products @valentunn @antonijzelinskij
-/feature/calls @foxwoosh @valentunn
+/feature/calls @valentunn
 /feature/coinage @mikhail98 @valentunn @antonijzelinskij
-/feature/members @Alexander-Kaish @valentunn @mikhail98
+/feature/members @valentunn @mikhail98
 /feature/pgas @valentunn
 /feature/transaction-storage @valentunn
 /feature/connection-status @valentunn
