@@ -30,6 +30,8 @@ env:
 
 jobs:
   prepare_release:
+    # Held: this configuration ships from host-rust-core.
+    if: false
     name: Bump version, create PR, and trigger distributions
     runs-on: ubuntu-latest
     #    if: contains('["ERussel","stepanLav", "kogeler"]', github.actor)
