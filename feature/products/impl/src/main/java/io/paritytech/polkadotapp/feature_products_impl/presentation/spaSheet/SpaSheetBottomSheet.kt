@@ -15,8 +15,7 @@ class SpaSheetBottomSheet : BaseComposeBottomSheet<SpaSheetViewModel>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // The hosted product scrolls its own content; leaving the sheet draggable steals every
-        // upward gesture, so the product can be scrolled down but never back up.
+        // A draggable sheet consumes the drag before the hosted product can scroll.
         bottomSheetBehavior?.isDraggable = false
     }
 

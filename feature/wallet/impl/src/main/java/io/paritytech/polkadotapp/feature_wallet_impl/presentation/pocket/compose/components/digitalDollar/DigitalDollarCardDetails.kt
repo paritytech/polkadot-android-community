@@ -194,9 +194,7 @@ private fun SendCashActions(
     onWithdrawClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .height(IntrinsicSize.Min)
-            .then(modifier),
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -211,13 +209,10 @@ private fun SendCashActions(
         )
 
         PolkadotIconButton(
-            modifier = Modifier
-                .fillMaxHeight()
-                .aspectRatio(1f),
             icon = NovaIcons.Add,
             onClick = onGetCashClick,
             shape = PolkadotButtonShape.pill,
-            size = PolkadotIconButtonSize.medium()
+            size = PolkadotIconButtonSize.mediumIncreased()
         )
 
         PolkadotTextButton(
