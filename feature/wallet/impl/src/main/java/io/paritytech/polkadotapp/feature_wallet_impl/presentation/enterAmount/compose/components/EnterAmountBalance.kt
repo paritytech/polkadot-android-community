@@ -1,18 +1,27 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.design.components.icon.NovaIcon
+import io.paritytech.polkadotapp.design.components.icon.NovaIcons
+import io.paritytech.polkadotapp.design.components.icon.vectors.Info
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.common.R as RCommon
+
+private val InfoIconSize = 20.dp
 
 /**
  * [gainingPrivacy] is named on its own line rather than added to the balance: it is spendable, but only at
@@ -28,19 +37,33 @@ internal fun EnterAmountBalance(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            NovaText(
-                text = stringResource(RCommon.string.send_enter_amount_max_balance_prefix),
-                style = PolkadotTheme.typography.body.large,
-                color = PolkadotTheme.colors.fg.secondary
-            )
-
-            HorizontalSpacer { tiny }
-
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             NovaText(
                 text = amount,
                 style = PolkadotTheme.typography.body.large,
                 color = PolkadotTheme.colors.fg.primary
+            )
+
+            HorizontalSpacer { extraSmall }
+
+            // The label yields the width so the icon beside it keeps its size on a narrow screen.
+            NovaText(
+                modifier = Modifier.weight(1f, fill = false),
+                text = stringResource(RCommon.string.send_enter_amount_ready_to_send),
+                style = PolkadotTheme.typography.body.large,
+                color = PolkadotTheme.colors.fg.secondary
+            )
+
+            HorizontalSpacer { extraSmall }
+
+            NovaIcon(
+                modifier = Modifier.size(InfoIconSize),
+                imageVector = NovaIcons.Info,
+                tint = PolkadotTheme.colors.fg.secondary
             )
         }
 
@@ -62,8 +85,8 @@ internal fun EnterAmountBalance(
 private fun EnterAmountBalancePreview() {
     PolkadotTheme {
         EnterAmountBalance(
-            amount = "$300",
-            gainingPrivacy = "$150"
+            amount = "300",
+            gainingPrivacy = "150"
         )
     }
 }
@@ -73,7 +96,18 @@ private fun EnterAmountBalancePreview() {
 private fun EnterAmountBalanceNothingExposedPreview() {
     PolkadotTheme {
         EnterAmountBalance(
-            amount = "$300",
+            amount = "999,999.99",
+            gainingPrivacy = null
+        )
+    }
+}
+
+@Preview(widthDp = 320, fontScale = 2f)
+@Composable
+private fun EnterAmountBalanceNarrowLargeFontPreview() {
+    PolkadotTheme {
+        EnterAmountBalance(
+            amount = "999,999.99",
             gainingPrivacy = null
         )
     }
