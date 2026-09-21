@@ -2,9 +2,6 @@
 # Lines starting with '#' are comments.
 # Each line is a file pattern followed by one or more owners.
 
-# Workflows and GitHub Actions configuration
-/.github/ @kogeler
-
 /design @valentunn
 /chains @valentunn @mikhail98
 /database @valentunn @mikhail98
@@ -19,12 +16,12 @@
 /tools/integrity @mikhail98
 /tools/remoteconfig @mikhail98 @valentunn
 /tools/jwt-auth @mikhail98 @valentunn
-/tools/media-connection @antonijzelinskij @valentunn
+/tools/media-connection @valentunn
 
 /feature/chats @valentunn
 /feature/people @valentunn
 /feature/fund @valentunn @mikhail98
-/feature/statement-store @valentunn @antonijzelinskij
+/feature/statement-store @valentunn
 /feature/videogame @valentunn
 /feature/balances @valentunn @mikhail98
 /feature/cross-chain-transfers @valentunn
@@ -43,11 +40,11 @@
 /feature/transfers @valentunn
 /feature/dotns @valentunn
 /feature/revive @valentunn
-/feature/products @valentunn @antonijzelinskij
+/feature/products @valentunn
 /feature/calls @valentunn
-/feature/coinage @mikhail98 @valentunn @antonijzelinskij
+/feature/coinage @mikhail98 @valentunn
 /feature/members @valentunn @mikhail98
 /feature/pgas @valentunn
 /feature/transaction-storage @valentunn
-/feature/connection-status @valentunn
-/feature/device-sync @antonijzelinskij @valentunn
+/feature/connection-status @valentunn @subhannaeem
+/feature/device-sync @valentunn
