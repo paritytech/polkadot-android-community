@@ -39,13 +39,13 @@ internal fun EnterAmountRecipient(
         NovaText(
             text = stringResource(R.string.common_to).lowercase(),
             style = PolkadotTheme.typography.body.large,
-            color = PolkadotTheme.colors.fg.tertiary,
+            color = PolkadotTheme.colors.fg.secondary,
         )
 
         HorizontalSpacer { small }
 
         PolkadotSurface(
-            shape = PolkadotTheme.shapes.extraLarge,
+            shape = PolkadotTheme.shapes.full,
             color = PolkadotTheme.colors.bg.surface.container,
             border = BorderStroke(PolkadotTheme.borders.default, PolkadotTheme.colors.stroke.primary),
         ) {

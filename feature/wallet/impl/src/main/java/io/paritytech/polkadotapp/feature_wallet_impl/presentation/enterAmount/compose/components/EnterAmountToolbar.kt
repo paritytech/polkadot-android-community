@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Close
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
+import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleSize
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -19,7 +20,8 @@ internal fun EnterAmountToolbar(onBackClick: () -> Unit) {
             action = onBackClick,
             icon = NovaIcons.Close
         ),
-        title = stringResource(id = RCommon.string.send_payment_toolbar_title),
+        title = stringResource(id = RCommon.string.send_enter_amount_title),
         titleAlignment = TopBarTitleAlignment.Center,
+        titleSize = TopBarTitleSize.Medium,
     )
 }
