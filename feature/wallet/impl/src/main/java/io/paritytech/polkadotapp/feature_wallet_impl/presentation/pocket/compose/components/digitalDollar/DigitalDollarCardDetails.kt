@@ -19,26 +19,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.loading.onLoaded
-import io.paritytech.polkadotapp.common.utils.CurrencyConfig
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
-import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
-import io.paritytech.polkadotapp.design.components.button.default.PolkadotButton
+import io.paritytech.polkadotapp.design.components.button.default.PolkadotButtonSize
+import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButtonSize
-import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.Add
-import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpRight
-import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpwards
 import io.paritytech.polkadotapp.design.components.navigationbar.LocalAppNavigationBarInsets
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
-import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
@@ -202,8 +195,11 @@ private fun SendCashActions(
         horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SendCashButton(
+        PolkadotTextButton(
+            text = stringResource(RCommon.string.common_send),
             modifier = Modifier.weight(1f),
+            size = PolkadotButtonSize.large(),
+            shape = PolkadotButtonShape.pill,
             onClick = onSendClick
         )
 
@@ -217,43 +213,13 @@ private fun SendCashActions(
             size = PolkadotIconButtonSize.medium()
         )
 
-        PolkadotIconButton(
-            modifier = Modifier
-                .fillMaxHeight()
-                .aspectRatio(1f),
-            icon = NovaIcons.ArrowUpRight,
-            onClick = onWithdrawClick,
+        PolkadotTextButton(
+            text = stringResource(RCommon.string.common_withdraw),
+            modifier = Modifier.weight(1f),
+            size = PolkadotButtonSize.large(),
             shape = PolkadotButtonShape.pill,
-            size = PolkadotIconButtonSize.medium()
+            onClick = onWithdrawClick
         )
-    }
-}
-
-@Composable
-private fun SendCashButton(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    PolkadotButton(
-        modifier = modifier,
-        onClick = onClick,
-        style = PolkadotButtonStyle.primary(),
-        shape = PolkadotButtonShape.pill
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
-        ) {
-            NovaIcon(
-                modifier = Modifier.size(16.dp),
-                imageVector = NovaIcons.ArrowUpwards
-            )
-
-            NovaText(
-                stringResource(RCommon.string.pocket_digital_dollar_send_button, CurrencyConfig.symbol)
-                    .withCurrencyTickerStyle(PolkadotTheme.typography.title.large)
-            )
-        }
     }
 }
 

@@ -96,6 +96,7 @@
     <string name="home_citizenship_registering_person">Registering as a person</string>
 
     <string name="common_send">Send</string>
+    <string name="common_withdraw">Withdraw</string>
     <string name="common_edit">Edit</string>
     <string name="common_reply">Reply</string>
 
@@ -1499,7 +1500,6 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
 
     <string name="pocket_digital_dollar_title">Balance Card</string>
     <string name="pocket_digital_dollar_card_title">%1$s</string>
-    <string name="pocket_digital_dollar_send_button">Send %1$s</string>
     <string name="pocket_digital_dollar_faucet_top_up">Faucet Top Up</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
