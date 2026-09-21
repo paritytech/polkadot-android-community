@@ -160,6 +160,11 @@ the host releasing the render when the card leaves the screen.
   one leaves the worker with no card rather than failing later. Check logcat for `pocket:` if a card
   you named does not appear.
 - **Faces are capped at 256 KiB**, wherever they are served from.
+- **The worker bundle is cached by the WebView, and the worker is kept warm.** Rebuilding and
+  switching tabs is not enough to pick up a change: the same worker process keeps running, and even a
+  fresh one can be served the old bundle from cache. Serve with `Cache-Control: no-store` and
+  `adb shell am force-stop <package>` before retesting, or you will be reading results from the code
+  you replaced.
 
 ## When you are ready to publish
 
