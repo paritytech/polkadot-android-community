@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.paritytech.polkadotapp.chains.network.binding.BlockNumber
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
@@ -27,8 +28,11 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainView
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.PinnedChainViewFactory
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -172,6 +176,24 @@ class RealCoinagePaymentStatusUseCaseTest {
         assertEquals(CoinagePaymentStatus.Detecting, statusOfCoin())
     }
 
+    /**
+     * An exact-coins payment hands over coins whose mint finalized long ago, and the claim is the peer's own
+     * transaction, so nothing local changes when it finalizes. Only a new finalized head can prove it.
+     */
+    @Test
+    fun `a claim finalizing with nothing local changing is proven at the next finalized head`() = runTest {
+        givenCoin(onChain = false, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = PRESENT)
+        every { chainViewFactory.finalizedHeads(any()) } returns flowOf(BlockNumber(101.toBigInteger()))
+        coEvery { stateReader.coinsAt(any(), any()) } returnsMany listOf(
+            Result.success(mapOf(ACCOUNT to OnChainCoinInfo(instanceId = 0, value = 3, age = 0))),
+            Result.success(emptyMap()),
+        )
+
+        val statuses = useCase.subscribeStatuses(listOf(ACCOUNT)).take(2).toList().map { it.getValue(ACCOUNT).status }
+
+        assertEquals(listOf(CoinagePaymentStatus.Claimed(finalized = false), CoinagePaymentStatus.Claimed(finalized = true)), statuses)
+    }
+
     /** A finalized read that cannot be taken proves nothing, and must not be read as the coin being gone. */
     @Test
     fun `a coin whose finalized read fails is not proven claimed`() = runTest {
@@ -205,6 +227,7 @@ class RealCoinagePaymentStatusUseCaseTest {
         )
 
         every { coinageAssetsUseCase.subscribeCoinsBy(any()) } returns flowOf(listOf(tracked))
+        every { chainViewFactory.finalizedHeads(any()) } returns emptyFlow()
 
         coEvery { chainViewFactory.pin(any()) } returns when (atFinalized) {
             UNREADABLE -> Result.failure(IllegalStateException("no view"))

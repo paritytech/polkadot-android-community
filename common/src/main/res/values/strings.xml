@@ -408,7 +408,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="bottom_nav_menu_pocket">Pocket</string>
     <string name="bottom_nav_menu_explore">Browse</string>
     <string name="bottom_nav_menu_settings">Settings</string>
-    <string name="bottom_nav_scanner_tooltip">Use this button to add contacts, send funds, and more</string>
+    <string name="bottom_nav_scanner_tooltip_title">Scan a QR code</string>
+    <string name="bottom_nav_scanner_tooltip_message">Scan to pay or add a contact.</string>
     <string name="tab_bar_no_open_products">No open products</string>
     <string name="tab_bar_close_tab">Close tab</string>
 
@@ -1246,6 +1247,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="asset_details_balance_CTA_update">Update</string>
 
     <string name="transaction_success_title">Your transaction was sent successfully</string>
+    <string name="transaction_success_finality_pending">The payment went through. You can wait here for the final confirmation report, it usually arrives in ~30 seconds</string>
+    <string name="transaction_success_finality_confirmed">The payment is confirmed</string>
     <string name="send_transaction_failure_title">Payment failed</string>
     <string name="send_transaction_failure_description">Please review the details of your transaction and try to send it again</string>
 
@@ -1277,9 +1280,10 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_section_general">General</string>
     <string name="settings_section_connections">Connections</string>
     <string name="settings_section_security">Security &amp; privacy</string>
-    <string name="settings_section_legal">Legal</string>
     <string name="settings_section_payments">Payments</string>
     <string name="settings_section_debug">Debug</string>
+    <string name="settings_section_legal">Legal</string>
+    <string name="settings_section_support">Support</string>
 
     <string name="settings_notifications">Notifications</string>
     <string name="settings_theme">Theme</string>
@@ -1296,6 +1300,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_privacy_policy">Privacy policy</string>
     <string name="settings_products">Apps</string>
     <string name="settings_blocked_contacts">Blocked contacts</string>
+    <string name="settings_legal_and_support">Legal &amp; Support</string>
     <string name="settings_contact_us">Contact us</string>
     <string name="settings_email_copied">Email copied to clipboard</string>
     <string name="settings_currency">Currency</string>
@@ -1490,6 +1495,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chain_health_chain_people">People Chain</string>
     <string name="chain_health_chain_hub">Hub Chain</string>
     <string name="chain_health_chain_bulletin">Bulletin Chain</string>
+    <string name="chain_health_tooltip_title">Network status</string>
+    <string name="chain_health_tooltip_message">These rings track your connection to each chain.</string>
 
     <string name="splash_waiting_for_network_title">Waiting for network connection…</string>
     <string name="splash_waiting_for_network_message">Turn off Airplane Mode or check your internet</string>

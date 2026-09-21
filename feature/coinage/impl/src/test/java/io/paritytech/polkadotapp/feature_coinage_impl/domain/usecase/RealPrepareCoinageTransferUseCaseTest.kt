@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
@@ -54,7 +53,6 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import java.math.BigDecimal
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -75,7 +73,6 @@ class RealPrepareCoinageTransferUseCaseTest {
     private val splitStrategy: SplitCoinStrategy = mock()
     private val exactStrategy: ExactMatchStrategy = mock()
     private val handoffCommit: CoinageHandoffCommit = mock()
-    private val timeProvider: TimeProvider = mock<TimeProvider>().also { whenever(it.now()).thenReturn(NOW) }
 
     private val useCase = RealPrepareCoinageTransferUseCase(
         assetSelector = assetSelector,
@@ -86,7 +83,6 @@ class RealPrepareCoinageTransferUseCaseTest {
         chainAssetProvider = mock(),
         memoBuilder = memoBuilder,
         transactionService = transactionService,
-        timeProvider = timeProvider,
     )
 
     private val amount: BigDecimal = BigDecimal.TEN
@@ -263,12 +259,8 @@ class RealPrepareCoinageTransferUseCaseTest {
         verify(handoffCommit, never()).release()
     }
 
-    /**
-     * Low latency is the merchant flow's whole point, so nothing about it may wait hours on a rebuild: it is
-     * built once, and only waits a moment for its inputs to be seen.
-     */
     @Test
-    fun `a merchant send is never retried`() = runBlocking<Unit> {
+    fun `a merchant send is retried until its window`() = runBlocking<Unit> {
         withSplitScheduling()
         withSchedulingAccepted()
         withGroupReports(listOf(stateOf(PENDING)))
@@ -277,7 +269,7 @@ class RealPrepareCoinageTransferUseCaseTest {
 
         val verified = verify(splitStrategy)
         with(eq(StalenessReportCollector.NoOp)) {
-            verified.schedule(eq(TransferSubmissionParams(buildUntil = NOW + 1.minutes, retryFailures = false)))
+            verified.schedule(eq(TransferSubmissionParams(buildUntil = RETRY_UNTIL, retryFailures = true)))
         }
     }
 
@@ -297,7 +289,7 @@ class RealPrepareCoinageTransferUseCaseTest {
         with(StalenessReportCollector.NoOp) { useCase.prepareScheduledMemo(chatPlan, RETRY_UNTIL) }
 
     private suspend fun prepareMerchantSend() =
-        with(StalenessReportCollector.NoOp) { useCase.prepareMemo(splitPlan) }
+        with(StalenessReportCollector.NoOp) { useCase.prepareMemo(splitPlan, RETRY_UNTIL) }
 
     private suspend fun withSplitScheduling() {
         whenever(splitStrategyFactory.create(any())).thenReturn(splitStrategy)
@@ -373,7 +365,6 @@ class RealPrepareCoinageTransferUseCaseTest {
 
     private companion object {
         val RETRY_UNTIL: Instant = Instant.fromEpochSeconds(1_000)
-        val NOW: Instant = Instant.fromEpochSeconds(500)
     }
 
     private fun coinOf(derivationIndex: Int) = Coin(

@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
@@ -51,15 +50,8 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val memoBuilder: TransferMemoBuilder,
     private val transactionService: CoinageTransactionService,
-    private val timeProvider: TimeProvider,
 ) : PrepareCoinageTransferUseCase {
     private companion object {
-        /**
-         * How long a transfer sent right away may wait for its inputs to be seen. Its coins were selected as
-         * spendable a moment ago, so this only covers a presence read lagging behind that selection.
-         */
-        val IMMEDIATE_BUILD_WINDOW = 1.minutes
-
         /** How long the sender waits for the transactions to reach the wire before calling the send failed. */
         val SUBMISSION_TIMEOUT = 2.minutes
     }
@@ -93,15 +85,13 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     }
 
     /**
-     * The same scheduled path as [prepareScheduledMemo], registered at once and never retried, then held until
-     * every transaction is on the wire — so the memo only leaves once its coins are on their way.
+     * The same scheduled path as [prepareScheduledMemo], registered at once, then held until every transaction
+     * is on the wire — so the memo only leaves once its coins are on their way.
      */
     @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
-    override suspend fun prepareMemo(plan: TransferPlan): Result<PreparedTransferMemo> {
-        val params = TransferSubmissionParams(buildUntil = timeProvider.now() + IMMEDIATE_BUILD_WINDOW, retryFailures = false)
-
-        return createStrategy(plan).schedule(params)
+    override suspend fun prepareMemo(plan: TransferPlan, retryUntil: Instant): Result<PreparedTransferMemo> {
+        return createStrategy(plan).schedule(TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true))
             .flatMap { scheduled ->
                 // The memo never leaves when its transactions do not, so its coins need not wait for a relaunch.
                 submitNow(scheduled)

@@ -60,7 +60,7 @@ import java.util.UUID
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 import io.paritytech.polkadotapp.common.R as RCommon
 
 interface SendEnterAmountInteractor {
@@ -103,7 +103,10 @@ class RealSendEnterAmountInteractor @Inject constructor(
 ) : SendEnterAmountInteractor {
     companion object {
         private const val WALLET_PAYMENT_ORIGIN = "native-payment"
-        private val SETTLEMENT_TIMEOUT = 30.seconds
+
+        /** A merchant payment's transactions keep being rebuilt within this window, so the screen waits as long. */
+        private val MERCHANT_PAYMENT_RETRY_WINDOW = 5.minutes
+        private val SETTLEMENT_TIMEOUT = MERCHANT_PAYMENT_RETRY_WINDOW
 
         /**
          * How long a chat payment's transactions keep being rebuilt while their inputs are gone from the chain.
@@ -212,7 +215,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
         }
 
         diagnostics.markRegion(RCommon.string.wallet_stall_sending) {
-            prepareCoinageTransferUseCase.prepareMemo(value)
+            prepareCoinageTransferUseCase.prepareMemo(value, retryUntil = timeProvider.now() + MERCHANT_PAYMENT_RETRY_WINDOW)
                 .flatMap { prepared -> handOverToSubmitter(submitter, prepared, value, method) }
                 .logFailure("Coins submission via '${method.submitterId}' failed")
                 .onSuccess { memo -> emitAll(settlementStates(memo)) }
@@ -248,7 +251,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
             withTimeoutOrNull(SETTLEMENT_TIMEOUT) {
                 coinagePaymentStatusUseCase.subscribeStatuses(accountIds)
                     .transformWhile { states ->
-                        val state = states.toSendState()
+                        val state = states.toSendState(accountIds)
                         emit(state)
                         !state.isTerminal
                     }
@@ -287,7 +290,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
 }
 
 private fun Result<*>.toTerminalState(): SendState = fold(
-    onSuccess = { SendState.Complete },
+    onSuccess = { SendState.Complete(unfinalizedCoins = null) },
     onFailure = { SendState.Failed(it) }
 )
 
@@ -296,13 +299,13 @@ private fun Result<*>.toTerminalState(): SendState = fold(
  * one not on chain yet means we have not. An empty map is not agreement that nothing is left — it is not
  * knowing yet.
  */
-private fun Map<AccountId, CoinagePaymentState>.toSendState(): SendState = when {
+private fun Map<AccountId, CoinagePaymentState>.toSendState(coins: List<AccountId>): SendState = when {
     isEmpty() -> SendState.Detecting
 
     values.any { it.status == CoinagePaymentStatus.AwaitingClaim } -> SendState.Detected
 
     // A best-block claim is enough, although a fork can still undo it: finality is too long to keep the payer waiting.
-    values.all { it.status is CoinagePaymentStatus.Claimed } -> SendState.Complete
+    values.all { it.status is CoinagePaymentStatus.Claimed } -> SendState.Complete(unfinalizedCoins = coins)
 
     values.any { it.status == CoinagePaymentStatus.Failed } ->
         SendState.Failed(IllegalStateException("Coins to settle were never minted on chain"))

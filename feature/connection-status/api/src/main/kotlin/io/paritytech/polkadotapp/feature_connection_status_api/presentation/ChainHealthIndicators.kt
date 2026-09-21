@@ -47,6 +47,10 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.AssetHub
 import io.paritytech.polkadotapp.design.components.icon.vectors.Bulletin
 import io.paritytech.polkadotapp.design.components.icon.vectors.People
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
+import io.paritytech.polkadotapp.design.components.tooltip.NonFocusablePopupProperties
+import io.paritytech.polkadotapp.design.components.tooltip.PolkadotTooltip
+import io.paritytech.polkadotapp.design.components.tooltip.PolkadotTooltipContent
+import io.paritytech.polkadotapp.design.components.tooltip.TooltipAlignment
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainGlyph
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
@@ -115,7 +119,11 @@ object ChainHealthBarDefaults {
 
 /** Always-on, transparent, overlaid at the very top like the system status indicators. */
 @Composable
-fun ChainHealthBar(model: ChainHealthIndicatorsModel) {
+fun ChainHealthBar(
+    model: ChainHealthIndicatorsModel,
+    tooltipVisible: Boolean,
+    onTooltipDismiss: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -125,7 +133,24 @@ fun ChainHealthBar(model: ChainHealthIndicatorsModel) {
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChainHealthIndicators(model = model)
+        Box {
+            ChainHealthIndicators(model = model)
+
+            PolkadotTooltip(
+                expanded = tooltipVisible,
+                onDismiss = onTooltipDismiss,
+                arrowVisible = true,
+                alignment = TooltipAlignment.Bottom,
+                shape = PolkadotTheme.shapes.tiny,
+                properties = NonFocusablePopupProperties,
+            ) {
+                PolkadotTooltipContent(
+                    title = stringResource(RCommon.string.chain_health_tooltip_title),
+                    message = stringResource(RCommon.string.chain_health_tooltip_message),
+                    onDismiss = onTooltipDismiss,
+                )
+            }
+        }
     }
 }
 
