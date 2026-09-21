@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.productBotManagement
 
+import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBotStateController
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
@@ -14,6 +15,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.product.Integratio
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.UninstallProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,7 +26,7 @@ interface ProductBotManagementInteractor {
 
     suspend fun getUserWorkerUrl(productId: ProductId): String?
 
-    fun getDebugCard(productId: ProductId): DebugPocketCard?
+    suspend fun getDebugCard(productId: ProductId): DebugPocketCard?
 
     suspend fun upsertProduct(
         productId: ProductId,
@@ -57,6 +59,7 @@ class RealProductBotManagementInteractor @Inject constructor(
     private val uninstallProductUseCase: UninstallProductUseCase,
     private val dotNsTldProvider: DotNsTldProvider,
     private val debugPocketCards: DebugPocketCards,
+    private val dispatchers: CoroutineDispatchers,
 ) : ProductBotManagementInteractor {
     override fun observeProducts(): Flow<List<Product>> {
         return productRepository.observeProducts()
@@ -70,7 +73,10 @@ class RealProductBotManagementInteractor @Inject constructor(
         return productRepository.getUserWorkerUrl(productId)
     }
 
-    override fun getDebugCard(productId: ProductId): DebugPocketCard? = debugPocketCards.get(productId)
+    // The first read loads the preferences file from disk, and the edit dialog asks on the main thread.
+    override suspend fun getDebugCard(productId: ProductId): DebugPocketCard? = withContext(dispatchers.io) {
+        debugPocketCards.get(productId)
+    }
 
     override suspend fun upsertProduct(
         productId: ProductId,

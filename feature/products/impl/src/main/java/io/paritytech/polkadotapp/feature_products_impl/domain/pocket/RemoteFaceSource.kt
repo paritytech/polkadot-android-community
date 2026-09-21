@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.pocket
 
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.readNBytesCompat
 import io.paritytech.polkadotapp.feature_products_api.model.JsWidget
 import kotlinx.coroutines.withContext
 import okhttp3.Call
@@ -16,7 +17,7 @@ internal const val MAX_FACE_BYTES = 256L * 1024
  * rather than read to exhaustion.
  */
 internal fun InputStream.readFaceWithinBound(): String {
-    val bytes = readNBytes((MAX_FACE_BYTES + 1).toInt())
+    val bytes = readNBytesCompat((MAX_FACE_BYTES + 1).toInt())
     require(bytes.size <= MAX_FACE_BYTES) { "face is larger than $MAX_FACE_BYTES bytes" }
 
     return bytes.decodeToString()
