@@ -91,19 +91,9 @@ private fun EnterAmountBalancePreview() {
 }
 
 @Preview
-@Composable
-private fun EnterAmountBalanceNothingExposedPreview() {
-    PolkadotTheme {
-        EnterAmountBalance(
-            amount = "999,999.99",
-            gainingPrivacy = null
-        )
-    }
-}
-
 @Preview(widthDp = 320, fontScale = 2f)
 @Composable
-private fun EnterAmountBalanceNarrowLargeFontPreview() {
+private fun EnterAmountBalanceNothingExposedPreview() {
     PolkadotTheme {
         EnterAmountBalance(
             amount = "999,999.99",
