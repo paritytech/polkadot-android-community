@@ -85,31 +85,69 @@ If the face is rejected, the message under the frame is the decoder's own, namin
 
 ## Loop B — the whole card, live
 
-Runs your real worker and streams a live face into a real card, with actions coming back.
+Runs your real worker and streams a live face into a real card, redrawing in place.
 
-1. Serve your worker bundle and your face from the same directory.
-2. Debug menu → **Product bots**, then add or edit a product. Fill in:
-   - the dotNS name, for example `humanity.paseo`
-   - **Script URL** — `http://127.0.0.1:5173/worker.js`
-   - **Pocket card id** — for example `loyalty`
-   - **Pocket card title** — what the approval sheet calls it
-   - **Pocket card face URL** — `http://127.0.0.1:5173/faces/loyalty.json`
-3. Confirm. The card fields are optional; leaving the id or the face URL blank gives a worker with no
-   card, exactly as before.
-4. Follow the add link: `polkadotapp://<your product>.<tld>/-/pocket/add?card=loyalty`. `adb` can
-   send it for you:
+**1. Build and serve the worker.** The bundle and the static faces come out of the same `dist`:
 
-   ```sh
-   adb shell am start -a android.intent.action.VIEW \
-     -d "polkadotapp://humanity.paseo/-/pocket/add?card=loyalty"
-   ```
+```sh
+npm run build:worker
+npx serve -l 5173 packages/chat-worker/dist
+adb reverse tcp:5173 tcp:5173
+```
 
-5. The approval sheet shows the face from your URL. Approve it, and the card joins the Pocket tab.
-6. From then on the face comes from your worker's `renderer.onRender` on the `PocketCard` context,
-   not from the URL — the URL is only what the approval sheet draws.
+Check the tunnel with Loop A before going further: draw
+`http://127.0.0.1:5173/pocket/devicehood.json` in the face preview. If that works, the server, the
+tunnel and the face are all good, and anything that fails after this is the card path.
 
-What it proves: the manifest shape, the add flow, the live render stream, redraws in place, and
-button presses arriving back in the worker.
+**2. Point a product at it.** Debug menu → **Product bots** → add or edit, on a dotNS name with **no
+published worker**:
+
+| Field | Value |
+| :-- | :-- |
+| dotNS name | a name on your current TLD with no worker record |
+| Script URL | `http://127.0.0.1:5173/index.js` |
+| Pocket card id | the id your worker answers `onRender` for, e.g. `loyalty` |
+| Pocket card title | what the approval sheet calls the card |
+| Pocket card face URL | `http://127.0.0.1:5173/faces/loyalty.json` |
+
+Two traps in this form:
+
+- **The TLD is appended, not validated.** A name that does not already end with the current TLD
+  suffix gets it added, so `myproduct.testnet` on a `.test` host silently becomes
+  `myproduct.testnet.test`. The product row in the list shows the id it actually used — read it there
+  before building a deeplink.
+- **Re-confirming the form is what applies a change.** The card rides on the resolved worker, and
+  saving is what invalidates that resolution.
+
+**3. Open the add link.** "Following the link" means getting Android to open that URL:
+
+```sh
+adb shell am start -n io.parity.polkadotapp.debug/io.paritytech.polkadotapp.app.root.presentation.root.RootActivity \
+  -a android.intent.action.VIEW \
+  -d "'polkadotapp://myproduct.paseo/-/pocket/add?card=loyalty'"
+```
+
+Use the id the **Product bots list** shows on the row, not what you typed into the form.
+
+The URL is quoted twice on purpose. The command crosses two shells — yours, and the device's — and
+the device's reads `?` as a glob and `<`/`>` as redirects. Wrapping this in a one-line script in
+your own repo is worth it if you run it often.
+
+Naming the activity with `-n` makes this independent of the manifest's intent filters, so it works
+even on a TLD the app registers no filter for. Without `-n` the host must match one of `*.dot`,
+`*.paseo`, `*.test`, `*.testnet`, and `Error: Activity not started, unable to resolve Intent` means
+none did.
+
+**4. Approve the sheet.** It draws the *static* face from your face URL, because no worker runs until
+a card exists. Approving adds the card to the Pocket tab.
+
+**5. Watch it redraw.** From here the face comes from the worker's `renderer.onRender`, not the URL.
+The host holds that subscription open for as long as the card is on screen, so the worker can send a
+new tree whenever it likes. A worker that redraws on a short timer — a counter, a clock — makes a
+live card obvious at a glance while you are working on one.
+
+What this proves: the manifest shape, the add flow, the live render stream, redraws in place, and
+the host releasing the render when the card leaves the screen.
 
 ### Things worth knowing
 
@@ -147,8 +185,12 @@ URL, by design. Publish with `bulletin-deploy`, which writes this as the `execut
 Note that `bulletin-deploy` does not yet validate `pocket.cards`. A malformed card publishes cleanly
 and is then dropped by the app with only a log line, so check the card appears after publishing.
 
-### The pinned Humanity card
+### Pinned cards
 
-It is bound to `peopl.<tld>` and draws a face bundled in the APK until that product publishes a
-worker card with the id `humanity`. Publish that record and the host boots the worker and streams its
-face in place of the bundled one. Get the id wrong and the card silently keeps the bundled face.
+A pinned card is one the host places in the Pocket itself, backed by a reserved product id and drawn
+from a face bundled in the APK. It hands over to the product as soon as that product publishes a
+worker card with the matching id: the host then boots the worker and streams its face in place of the
+bundled one.
+
+Until that record exists the card keeps the bundled face, and nothing on the device says why — so if
+a pinned card does not pick up your worker, check the card id in the manifest first.
