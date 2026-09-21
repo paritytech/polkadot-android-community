@@ -50,7 +50,6 @@ internal fun EnterAmountBalance(
 
             HorizontalSpacer { extraSmall }
 
-            // The label yields the width so the icon beside it keeps its size on a narrow screen.
             NovaText(
                 modifier = Modifier.weight(1f, fill = false),
                 text = stringResource(RCommon.string.send_enter_amount_ready_to_send),
