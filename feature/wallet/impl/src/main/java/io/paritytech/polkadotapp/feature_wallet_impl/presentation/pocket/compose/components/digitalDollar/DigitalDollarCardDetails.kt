@@ -15,10 +15,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
@@ -50,6 +50,8 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
+
+private val ActionRowMinHeight = 48.dp
 
 @Composable
 fun DigitalDollarCardDetails(
@@ -191,13 +193,16 @@ private fun SendCashActions(
     onWithdrawClick: () -> Unit
 ) {
     Row(
-        modifier = modifier.height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier
+            .height(IntrinsicSize.Min)
+            .then(modifier),
+        horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
     ) {
         PolkadotTextButton(
             text = stringResource(RCommon.string.common_send),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = ActionRowMinHeight),
             size = PolkadotButtonSize.large(),
             shape = PolkadotButtonShape.pill,
             onClick = onSendClick
@@ -215,7 +220,9 @@ private fun SendCashActions(
 
         PolkadotTextButton(
             text = stringResource(RCommon.string.common_withdraw),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .defaultMinSize(minHeight = ActionRowMinHeight),
             size = PolkadotButtonSize.large(),
             shape = PolkadotButtonShape.pill,
             onClick = onWithdrawClick
