@@ -8,6 +8,8 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CheckpointBlock
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
@@ -15,10 +17,11 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isTerminal
+import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReader
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
-import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FAILURE
@@ -53,6 +56,10 @@ class RealCoinagePaymentStatusUseCaseTest {
     private val stateReaderFactory: CoinageStateReaderFactory = mockk()
     private val stateReader: CoinageStateReader = mockk()
 
+    private val installationRepository: CoinageInstallationRepository = mockk<CoinageInstallationRepository>().also {
+        coEvery { it.getOrCreateCurrent() } returns TEST_INSTALLATION
+    }
+
     private val chainAssetProvider: ChainAssetProvider = mockk<ChainAssetProvider>().also {
         every { it.chainId() } returns "test-chain"
     }
@@ -61,6 +68,7 @@ class RealCoinagePaymentStatusUseCaseTest {
         coinageAssetsUseCase,
         chainViewFactory,
         stateReaderFactory,
+        installationRepository,
         chainAssetProvider,
     )
 
@@ -194,6 +202,29 @@ class RealCoinagePaymentStatusUseCaseTest {
         assertEquals(listOf(CoinagePaymentStatus.Claimed(finalized = false), CoinagePaymentStatus.Claimed(finalized = true)), statuses)
     }
 
+    /**
+     * A coin recovered from a previous installation's backup: the mint was another installation's transaction,
+     * so no local ledger row records it, and the recovery scan only ever saves coins the finalized chain holds.
+     * Read as an unfinished mint it would sit at Detecting for good, and its payment would never close.
+     */
+    @Test
+    fun `a coin recovered from a previous installation is proven claimed once it is gone`() = runTest {
+        givenCoin(onChain = false, everSeen = true, minter = null, atFinalized = ABSENT, installation = PREVIOUS_INSTALLATION)
+
+        assertEquals(CoinagePaymentStatus.Claimed(finalized = true), statusOfCoin())
+    }
+
+    /**
+     * A coin this installation minted has a ledger row by construction, so a missing minter status means the
+     * mint has not been recorded yet rather than that it finalized long ago.
+     */
+    @Test
+    fun `a coin of this installation with no minter is still detecting`() = runTest {
+        givenCoin(onChain = false, everSeen = true, minter = null, atFinalized = ABSENT)
+
+        assertEquals(CoinagePaymentStatus.Detecting, statusOfCoin())
+    }
+
     /** A finalized read that cannot be taken proves nothing, and must not be read as the coin being gone. */
     @Test
     fun `a coin whose finalized read fails is not proven claimed`() = runTest {
@@ -210,9 +241,10 @@ class RealCoinagePaymentStatusUseCaseTest {
         everSeen: Boolean,
         minter: DurableTxStatus?,
         atFinalized: FinalizedRead,
+        installation: CoinageInstallationId = TEST_INSTALLATION,
     ) {
         val coin = Coin(
-            derivationIndex = testKey(0),
+            derivationIndex = CoinageKeyIndex(installation, 0),
             valueExponent = ValueExponent(3),
             // An age is kept once the chain has been seen to hold the coin, and never cleared after.
             age = if (everSeen) Coin.Age.Known(0) else Coin.Age.Unknown,
@@ -248,5 +280,7 @@ class RealCoinagePaymentStatusUseCaseTest {
         val UNREADABLE = FinalizedRead.UNREADABLE
 
         val ACCOUNT: AccountId = byteArrayOf(7).toDataByteArray()
+
+        val PREVIOUS_INSTALLATION = CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES) { 0x01 }.toDataByteArray())
     }
 }
