@@ -83,11 +83,20 @@ class RealCoinageAssetLedger @Inject constructor(
         // One transaction, so nothing can claim these between the check and the mark. Unlike registration,
         // no engine transaction is open around this call: a handoff writes coinage rows only.
         dao.withTransaction {
+            val scope = DaoValidationScope(dao)
+
             // The mirror of Blocked handoff: an asset a transaction of ours still has a claim on cannot
             // also leave the device, or the peer and that transaction would both be spending it.
-            val claimed = DaoValidationScope(dao).filterClaimed(keys)
+            val claimed = scope.filterClaimed(keys)
             assets.firstOrNull { it.publicKey in claimed }?.asset?.let {
                 throw CoinageRegistrationError.HandoffOfClaimedAsset(it)
+            }
+
+            // Single handoff: a key that already left the device cannot leave it again, or two peers would
+            // hold the same private key. The insert alone would not say so — it ignores the conflict.
+            val handedOff = scope.filterHandedOff(keys)
+            assets.firstOrNull { it.publicKey in handedOff }?.asset?.let {
+                throw CoinageRegistrationError.HandoffOfHandedOffAsset(it)
             }
 
             dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal() })

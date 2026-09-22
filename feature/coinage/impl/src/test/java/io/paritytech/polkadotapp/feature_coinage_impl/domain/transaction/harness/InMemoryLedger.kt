@@ -347,6 +347,11 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
                 .CoinageRegistrationError.HandoffOfClaimedAsset(it)
         }
 
+        assets.firstOrNull { it.publicKey in store.handoffs }?.asset?.let {
+            throw io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model
+                .CoinageRegistrationError.HandoffOfHandedOffAsset(it)
+        }
+
         assets.forEach { asset ->
             val owned = asset.asset ?: return@forEach
             if (asset.publicKey !in store.handoffs) {
