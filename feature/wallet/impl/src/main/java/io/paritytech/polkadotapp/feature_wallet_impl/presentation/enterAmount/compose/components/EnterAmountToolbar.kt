@@ -20,7 +20,7 @@ internal fun EnterAmountToolbar(onBackClick: () -> Unit) {
             action = onBackClick,
             icon = NovaIcons.Close
         ),
-        title = stringResource(id = RCommon.string.send_enter_amount_title),
+        title = stringResource(id = RCommon.string.send_payment_toolbar_title),
         titleAlignment = TopBarTitleAlignment.Center,
         titleSize = TopBarTitleSize.Medium,
     )

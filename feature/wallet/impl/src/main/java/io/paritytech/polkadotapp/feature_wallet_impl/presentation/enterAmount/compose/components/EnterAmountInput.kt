@@ -141,7 +141,6 @@ internal fun EnterAmountInput(
                         singleLine = true,
                         enabled = enabled,
                         modifier = Modifier
-                            .alignByBaseline()
                             .conditionalNotNull(focusRequester) { focusRequester(it) },
                         cursorBrush = SolidColor(PolkadotTheme.colors.fg.primary),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

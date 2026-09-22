@@ -313,6 +313,13 @@ private fun PolkadotTopBarPreview() {
                 actions = persistentListOf(rememberTopBarAction(action = {}, icon = NovaIcons.More)),
             )
 
+            PolkadotTopBar(
+                navigationAction = rememberTopBarAction(action = {}, icon = NovaIcons.ArrowLeft),
+                title = "Label",
+                titleAlignment = TopBarTitleAlignment.Center,
+                titleSize = TopBarTitleSize.Medium,
+            )
+
             // Back, centered title + subtitle + action
             PolkadotTopBar(
                 navigationAction = rememberTopBarAction(action = {}, icon = NovaIcons.ArrowLeft),
