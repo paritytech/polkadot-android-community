@@ -14,13 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
@@ -60,34 +57,16 @@ fun DigitalDollarCard(
 ) {
     val tiltState = LocalCardTilt.current
 
-    val borderBrush = remember {
-        Brush.radialGradient(
-            colorStops = arrayOf(
-                0f to PocketCardColors.Primary,
-                1f to PocketCardColors.Transparent
-            ),
-            center = Offset.Zero,
-            radius = 900f
-        )
-    }
+    val highlightBrush = remember { digitalDollarHighlightBrush() }
 
-    val highlightBrush = remember {
-        Brush.radialGradient(
-            colorStops = arrayOf(
-                0f to PocketCardColors.Primary.copy(alpha = 0.35f),
-                0.5f to PocketCardColors.Primary.copy(alpha = 0.1f),
-                1f to PocketCardColors.Transparent
-            ),
-            center = Offset.Zero,
-            radius = 700f
-        )
-    }
+    val litBorderColor = PolkadotTheme.colors.fg.staticWhite
+    val borderBrush = remember(litBorderColor) { digitalDollarBorderBrush(litBorderColor) }
 
     PolkadotSurface(
         modifier = modifier,
         shape = PolkadotTheme.shapes.large,
         color = PocketCardColors.DigitalDollarCardBackground,
-        border = BorderStroke(Dp.Hairline, borderBrush),
+        border = BorderStroke(BORDER_WIDTH, borderBrush),
         onClick = { onSelected?.invoke(card) },
         enabled = onSelected != null
     ) {
@@ -95,24 +74,6 @@ fun DigitalDollarCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(CardSizes.HEIGHT)
-        ) {
-            Image(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .align(Alignment.CenterEnd)
-                    .maskedMotionShine(
-                        tiltState = tiltState,
-                        parameters = MotionShineParameters.DigitalDollarCard,
-                        contentAlpha = if (isExpanded) 1f else COLLAPSED_ILLUSTRATION_ALPHA
-                    ),
-                painter = painterResource(R.drawable.img_digital_dollar_card),
-                contentDescription = null,
-                contentScale = ContentScale.FillHeight
-            )
-        }
-        Box(
-            modifier = Modifier
-                .matchParentSize()
                 .background(highlightBrush)
         )
 
@@ -120,8 +81,25 @@ fun DigitalDollarCard(
             modifier = Modifier.matchParentSize(),
             painter = painterResource(R.drawable.img_texture_grain_dark),
             contentDescription = null,
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            alpha = TEXTURE_ALPHA
         )
+
+        Box(modifier = Modifier.matchParentSize()) {
+            Image(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .align(Alignment.CenterEnd)
+                    .maskedMotionShine(
+                        tiltState = tiltState,
+                        parameters = MotionShineParameters.DigitalDollarCard,
+                        contentAlpha = ILLUSTRATION_ALPHA
+                    ),
+                painter = painterResource(R.drawable.img_digital_dollar_card),
+                contentDescription = null,
+                contentScale = ContentScale.FillHeight
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -298,7 +276,11 @@ private fun AccountBackupPending() {
     }
 }
 
-private const val COLLAPSED_ILLUSTRATION_ALPHA = 0.2f
+private val BORDER_WIDTH = 0.5.dp
+
+private const val ILLUSTRATION_ALPHA = 0.2f
+
+private const val TEXTURE_ALPHA = 0.3f
 
 private object AmountShimmerSizes {
     val WIDTH = 100.dp
