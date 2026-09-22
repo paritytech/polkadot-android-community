@@ -74,7 +74,7 @@ class RootViewModel @Inject constructor(
     override val chainsHealth = chainHealthMixinFactory.create(this).model
 
     private val networkStatusTooltipDismissed = MutableStateFlow(!rootInteractor.shouldShowNetworkStatusTooltip())
-    private val chainRingsOnScreen = chainsHealth.map { it.chains.isNotEmpty() }
+    private val chainRingsOnScreen = chainsHealth.map { it.rows.isNotEmpty() }
 
     override val isNetworkStatusTooltipVisible = combine(
         networkStatusTooltipDismissed,
