@@ -3,14 +3,12 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 import io.paritytech.polkadotapp.chains.network.binding.BlockNumber
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.reevaluate
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.hasEverBeenOnChain
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
-import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
@@ -39,22 +37,15 @@ class RealCoinagePaymentStatusUseCase @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val chainViewFactory: PinnedChainViewFactory,
     private val stateReaderFactory: CoinageStateReaderFactory,
-    private val installationRepository: CoinageInstallationRepository,
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
 ) : CoinagePaymentStatusUseCase {
     override fun subscribeStatuses(coins: List<AccountId>): Flow<Map<AccountId, CoinagePaymentState>> {
         return coinageAssetsUseCase.subscribeCoinsBy(coins)
             .reevaluate(finalizedHeads())
             .map { tracked ->
-                val current = installationRepository.getOrCreateCurrent()
-                val minterStatuses = tracked.associate { it.coin.accountId to it.effectiveMinterStatus(current) }
-                val atFinalized = tracked.presenceAtFinalized(minterStatuses)
+                val atFinalized = tracked.presenceAtFinalized()
 
-                tracked.associate {
-                    val status = it.paymentStatus(minterStatuses[it.coin.accountId], atFinalized)
-
-                    it.coin.accountId to CoinagePaymentState(it.coin, status)
-                }
+                tracked.associate { it.coin.accountId to CoinagePaymentState(it.coin, it.paymentStatus(atFinalized)) }
             }
             .distinctUntilChanged()
     }
@@ -74,9 +65,9 @@ class RealCoinagePaymentStatusUseCase @Inject constructor(
      * can mean the peer took it. A read that cannot be taken leaves them unknown, which costs a later look
      * and never a wrong verdict.
      */
-    private suspend fun List<TrackedCoin>.presenceAtFinalized(minterStatuses: Map<AccountId, DurableTxStatus?>): Map<AccountId, Boolean> {
-        val minted = map { it.coin.accountId }
-            .filter { minterStatuses[it] == FINALIZED_SUCCESS }
+    private suspend fun List<TrackedCoin>.presenceAtFinalized(): Map<AccountId, Boolean> {
+        val minted = filter { it.state.minterStatus == FINALIZED_SUCCESS }
+            .map { it.coin.accountId }
 
         if (minted.isEmpty()) return emptyMap()
 
@@ -88,33 +79,19 @@ class RealCoinagePaymentStatusUseCase @Inject constructor(
     }
 }
 
-/**
- * What the ledger says minted the coin, with one substitution.
- *
- * A coin recovered from a previous installation's backup has no local row for its mint — the transaction was
- * another installation's — yet the recovery scan only ever saves coins the finalized chain already held, so
- * the mint is as final as a recorded one. Reading the missing row as an unfinished mint would leave every
- * such coin at [CoinagePaymentStatus.Detecting] for good.
- */
-private fun TrackedCoin.effectiveMinterStatus(currentInstallation: CoinageInstallationId): DurableTxStatus? = when {
-    state.minterStatus != null -> state.minterStatus
-    coin.derivationIndex.installation != currentInstallation -> FINALIZED_SUCCESS
-    else -> null
-}
-
-private fun TrackedCoin.paymentStatus(minterStatus: DurableTxStatus?, atFinalized: Map<AccountId, Boolean>): CoinagePaymentStatus = when {
+private fun TrackedCoin.paymentStatus(atFinalized: Map<AccountId, Boolean>): CoinagePaymentStatus = when {
     // Finalized minter and absence at finalized is guaranteed finalized claim
-    minterStatus == FINALIZED_SUCCESS && atFinalized[coin.accountId] == false
+    state.minterStatus == FINALIZED_SUCCESS && atFinalized[coin.accountId] == false
     -> CoinagePaymentStatus.Claimed(finalized = true)
 
     // Never minted: the key the peer holds controls nothing, and nothing will change that.
-    minterStatus == DurableTxStatus.FAILURE -> CoinagePaymentStatus.Failed
+    state.minterStatus == DurableTxStatus.FAILURE -> CoinagePaymentStatus.Failed
 
     coin.isOnChain -> CoinagePaymentStatus.AwaitingClaim
 
     // We have previously seen coin on-chain and now its gone, but its minter has arrived
     // This wont fire if we never seen a coin: worst case we will be stuck at Detecting until finality decides
-    coin.hasEverBeenOnChain && minterStatus?.isArrived == true ->
+    coin.hasEverBeenOnChain && state.minterStatus?.isArrived == true ->
         CoinagePaymentStatus.Claimed(finalized = false)
 
     // We have not seen a coin unchain on best, but we can see it at finalized

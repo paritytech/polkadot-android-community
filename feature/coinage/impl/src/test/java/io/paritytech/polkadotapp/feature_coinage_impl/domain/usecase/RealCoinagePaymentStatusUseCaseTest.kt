@@ -18,7 +18,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePayme
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isTerminal
 import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
-import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReader
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
@@ -56,10 +55,6 @@ class RealCoinagePaymentStatusUseCaseTest {
     private val stateReaderFactory: CoinageStateReaderFactory = mockk()
     private val stateReader: CoinageStateReader = mockk()
 
-    private val installationRepository: CoinageInstallationRepository = mockk<CoinageInstallationRepository>().also {
-        coEvery { it.getOrCreateCurrent() } returns TEST_INSTALLATION
-    }
-
     private val chainAssetProvider: ChainAssetProvider = mockk<ChainAssetProvider>().also {
         every { it.chainId() } returns "test-chain"
     }
@@ -68,7 +63,6 @@ class RealCoinagePaymentStatusUseCaseTest {
         coinageAssetsUseCase,
         chainViewFactory,
         stateReaderFactory,
-        installationRepository,
         chainAssetProvider,
     )
 
@@ -203,23 +197,26 @@ class RealCoinagePaymentStatusUseCaseTest {
     }
 
     /**
-     * A coin recovered from a previous installation's backup: the mint was another installation's transaction,
-     * so no local ledger row records it, and the recovery scan only ever saves coins the finalized chain holds.
-     * Read as an unfinished mint it would sit at Detecting for good, and its payment would never close.
+     * A coin recovered from a previous installation's backup, once the peer has taken it.
+     *
+     * No entry of ours minted it, so the ledger is what decides its minter status: it hands back
+     * FINALIZED_SUCCESS, since recovery only ever saves what the finalized chain already held. That is all
+     * this use case needs to settle the payment — read as an unfinished mint it would sit at Detecting for
+     * good, and its payment would never close.
      */
     @Test
     fun `a coin recovered from a previous installation is proven claimed once it is gone`() = runTest {
-        givenCoin(onChain = false, everSeen = true, minter = null, atFinalized = ABSENT, installation = PREVIOUS_INSTALLATION)
+        givenCoin(onChain = false, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = ABSENT, installation = PREVIOUS_INSTALLATION)
 
         assertEquals(CoinagePaymentStatus.Claimed(finalized = true), statusOfCoin())
     }
 
     /**
-     * A coin this installation minted has a ledger row by construction, so a missing minter status means the
-     * mint has not been recorded yet rather than that it finalized long ago.
+     * Nothing is guessed from a minter the ledger reports as unknown: which mints count as settled is the
+     * ledger's rule, and a status invented here would apply it a second time and differently.
      */
     @Test
-    fun `a coin of this installation with no minter is still detecting`() = runTest {
+    fun `a coin the ledger reports no minter for is still detecting`() = runTest {
         givenCoin(onChain = false, everSeen = true, minter = null, atFinalized = ABSENT)
 
         assertEquals(CoinagePaymentStatus.Detecting, statusOfCoin())

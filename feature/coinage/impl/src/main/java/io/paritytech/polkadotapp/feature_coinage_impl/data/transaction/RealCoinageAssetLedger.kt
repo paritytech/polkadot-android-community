@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
 import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
 import io.paritytech.polkadotapp.database.model.DurableTxLocal
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
@@ -17,7 +18,9 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.queryPerInstallation
+import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.toCoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.toCoinageKeyIndex
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
@@ -27,6 +30,7 @@ import javax.inject.Inject
 
 class RealCoinageAssetLedger @Inject constructor(
     private val dao: CoinageEntryDao,
+    private val installationRepository: CoinageInstallationRepository,
 ) : CoinageAssetLedger {
     context(_: RegistrationScope)
     override suspend fun registerAssets(registrations: List<Pair<CoinageTransactionId, AssetRegistration>>) {
@@ -139,13 +143,13 @@ class RealCoinageAssetLedger @Inject constructor(
         dao.subscribeGroupEntries(groupId.value).map { it.toTransactionStates() }
 
     override fun subscribeAssetStates(): Flow<Map<OwnAsset, CoinageAssetState>> =
-        dao.subscribeAssetStates().map { projections -> projections.associate { it.toDomain() } }
+        dao.subscribeAssetStates().map { projections -> projections.toDomain(currentInstallation()) }
 
     override suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState> = runCatching {
         val index = asset.index()
+        val projection = dao.getAssetState(asset.kind().toLocal(), index.installation.value.value, index.item)
 
-        dao.getAssetState(asset.kind().toLocal(), index.installation.value.value, index.item)?.toDomain()?.second
-            ?: CoinageAssetState.UNTRACKED
+        projection?.toDomain(currentInstallation())?.second ?: CoinageAssetState.UNTRACKED
     }
 
     override suspend fun getAssetStates(
@@ -157,10 +161,12 @@ class RealCoinageAssetLedger @Inject constructor(
                     dao.getAssetStates(kind.toLocal(), installationId, items)
                 }
             }
-            .associate { it.toDomain() }
+            .toDomain(currentInstallation())
 
         assets.associateWith { tracked[it] ?: CoinageAssetState.UNTRACKED }
     }
+
+    private suspend fun currentInstallation(): CoinageInstallationId = installationRepository.getOrCreateCurrent()
 }
 
 private class DaoValidationScope(private val dao: CoinageEntryDao) : RegistrationValidationScope {
@@ -238,12 +244,29 @@ private fun LedgerAsset.toCoinageInput(): CoinageInput = when (val ownAsset = as
     null -> CoinageInput.Coin.Received(publicKey)
 }
 
-private fun CoinageAssetStateProjection.toDomain(): Pair<OwnAsset, CoinageAssetState> =
+private fun List<CoinageAssetStateProjection>.toDomain(currentInstallation: CoinageInstallationId) =
+    associate { it.toDomain(currentInstallation) }
+
+private fun CoinageAssetStateProjection.toDomain(currentInstallation: CoinageInstallationId): Pair<OwnAsset, CoinageAssetState> =
     assetKind.toOwnAsset(installationId.toCoinageKeyIndex(derivationIndex)) to CoinageAssetState(
         handedOff = handedOff,
-        minterStatus = minterStatus?.toDomain(),
+        minterStatus = effectiveMinterStatus(currentInstallation),
         consumerStatus = consumerStatus?.toDomain(),
     )
+
+/**
+ * What minted the asset, with one substitution.
+ *
+ * An asset recovered from a previous installation's backup has no entry of ours to have minted it — the
+ * transaction was another installation's — yet the recovery scan only saves what the finalized chain already
+ * held, so the mint is as settled as a recorded one. Left null it would read as a mint still in flight, and
+ * a payment made of such a coin could never reach a terminal status.
+ */
+private fun CoinageAssetStateProjection.effectiveMinterStatus(currentInstallation: CoinageInstallationId): DurableTxStatus? {
+    val recovered = installationId.toCoinageInstallationId() != currentInstallation
+
+    return minterStatus?.toDomain() ?: DurableTxStatus.FINALIZED_SUCCESS.takeIf { recovered }
+}
 
 private fun CoinageAssetKindLocal.toOwnAsset(derivationIndex: CoinageKeyIndex): OwnAsset = when (this) {
     CoinageAssetKindLocal.COIN -> OwnAsset.Coin(derivationIndex)
