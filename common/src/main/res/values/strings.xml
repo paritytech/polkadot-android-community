@@ -1510,6 +1510,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_coinage_balance_title">Balance</string>
     <string name="pocket_coinage_ready">Ready</string>
     <string name="pocket_coinage_clearing">Clearing</string>
+    <string name="pocket_coinage_total_balance">Total Balance</string>
     <string name="pocket_coinage_share_logs">Share Coinage Logs</string>
     <string name="pocket_debug_features_title">Debug features</string>
     <string name="pocket_debug_features_subtitle">Not visible in production</string>

@@ -13,7 +13,6 @@ import io.paritytech.polkadotapp.common.utils.stateInBackground
 import io.paritytech.polkadotapp.common.utils.withLoading
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
-import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.formatFiat
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_videogame_api.domain.collectibles.CollectiblesUrlResolver
@@ -120,7 +119,7 @@ class PocketViewModel @Inject constructor(
                 amounts?.let {
                     tokenAmountFormatter.formatTokenAmount(it.balance, RoundPrecision.FIAT, withSymbol = false)
                 },
-                amounts?.let { tokenAmountFormatter.formatFiat(it.ready) },
+                amounts?.let { tokenAmountFormatter.formatTokenAmount(it.ready, RoundPrecision.FIAT, withSymbol = false) },
                 card.syncInProgress,
                 card.accountBackupPending,
                 amounts?.notFullyReady
