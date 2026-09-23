@@ -270,13 +270,16 @@ private fun BalanceTermContent(
 @Composable
 private fun SheetTitle(title: String, subtitle: String?) {
     Column(
-        modifier = Modifier.padding(
-            horizontal = PolkadotTheme.spacings.large,
-            vertical = PolkadotTheme.spacings.mediumIncreased
-        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal = PolkadotTheme.spacings.large,
+                vertical = PolkadotTheme.spacings.mediumIncreased
+            ),
         verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
     ) {
         NovaText(
+            modifier = Modifier.fillMaxWidth(),
             text = title,
             style = PolkadotTheme.typography.headline.small,
             color = PolkadotTheme.colors.fg.primary
@@ -284,9 +287,10 @@ private fun SheetTitle(title: String, subtitle: String?) {
 
         if (subtitle != null) {
             NovaText(
+                modifier = Modifier.fillMaxWidth(),
                 text = subtitle,
                 style = PolkadotTheme.typography.paragraph.large,
-                color = PolkadotTheme.colors.fg.secondary
+                color = PolkadotTheme.colors.fg.primary
             )
         }
     }
