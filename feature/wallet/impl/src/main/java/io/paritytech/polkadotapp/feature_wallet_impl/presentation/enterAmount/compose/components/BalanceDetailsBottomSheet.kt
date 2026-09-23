@@ -41,6 +41,8 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import io.paritytech.polkadotapp.common.R as RCommon
 
+private const val RowCaptionWidthFraction = 0.75f
+
 internal sealed interface BalanceDetailsPage {
     data object Details : BalanceDetailsPage
 
@@ -219,6 +221,7 @@ private fun BalanceRow(
         }
 
         NovaText(
+            modifier = Modifier.fillMaxWidth(RowCaptionWidthFraction),
             text = caption,
             style = PolkadotTheme.typography.body.medium,
             color = PolkadotTheme.colors.fg.secondary
