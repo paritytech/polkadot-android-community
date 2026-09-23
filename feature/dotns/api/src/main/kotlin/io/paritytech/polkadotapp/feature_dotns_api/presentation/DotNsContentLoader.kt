@@ -21,16 +21,31 @@ import kotlinx.coroutines.flow.flowOf
 class DotNsContentLoader(
     private val delegate: DotNsResolver
 ) : DotNsResolver by delegate {
-    private val lastRequestedDomain = MutableStateFlow<String?>(null)
+    private val lastRequested = MutableStateFlow<Requested?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val loadProgress: Flow<DotNsLoadProgress> = lastRequestedDomain
-        .flatMapLatest { domain ->
-            if (domain == null) flowOf(DotNsLoadProgress.Idle) else delegate.getProgressByDomain(domain)
+    val loadProgress: Flow<DotNsLoadProgress> = lastRequested
+        .flatMapLatest { requested ->
+            when {
+                requested == null -> flowOf(DotNsLoadProgress.Idle)
+                requested.servedFromDevOrigin -> flowOf(DotNsLoadProgress.Completed)
+                else -> delegate.getProgressByDomain(requested.domain)
+            }
         }
 
     override suspend fun resolveToLocalUri(dotNsName: String): Result<Uri> {
-        lastRequestedDomain.value = dotNsName
+        lastRequested.value = Requested(dotNsName, servedFromDevOrigin = false)
         return delegate.resolveToLocalUri(dotNsName)
     }
+
+    /**
+     * A domain the client proxied to a developer's machine never touches the resolver, so nothing
+     * would ever mark it loaded and a host waiting for [DotNsLoadProgress.Completed] before showing
+     * the WebView would spin forever. The bytes are there the moment the document is answered.
+     */
+    fun markServedFromDevOrigin(dotNsName: String) {
+        lastRequested.value = Requested(dotNsName, servedFromDevOrigin = true)
+    }
+
+    private data class Requested(val domain: String, val servedFromDevOrigin: Boolean)
 }

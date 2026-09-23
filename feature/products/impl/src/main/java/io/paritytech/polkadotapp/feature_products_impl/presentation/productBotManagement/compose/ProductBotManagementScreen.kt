@@ -63,6 +63,7 @@ fun ProductBotManagementScreen(contract: ProductBotManagementContract) {
         onCardIdChanged = contract::onCardIdChanged,
         onCardTitleChanged = contract::onCardTitleChanged,
         onPreviewUrlChanged = contract::onPreviewUrlChanged,
+        onAppOriginChanged = contract::onAppOriginChanged,
         onDialogConfirm = contract::onDialogConfirm,
     )
 }
@@ -82,6 +83,7 @@ private fun ProductBotManagementScreenInternal(
     onCardIdChanged: (String) -> Unit,
     onCardTitleChanged: (String) -> Unit,
     onPreviewUrlChanged: (String) -> Unit,
+    onAppOriginChanged: (String) -> Unit,
     onDialogConfirm: () -> Unit,
 ) {
     PolkadotSurface {
@@ -150,6 +152,7 @@ private fun ProductBotManagementScreenInternal(
             onCardIdChanged = onCardIdChanged,
             onCardTitleChanged = onCardTitleChanged,
             onPreviewUrlChanged = onPreviewUrlChanged,
+            onAppOriginChanged = onAppOriginChanged,
             onConfirm = onDialogConfirm,
         )
     }
@@ -212,6 +215,7 @@ private fun ProductFormDialog(
     onCardIdChanged: (String) -> Unit,
     onCardTitleChanged: (String) -> Unit,
     onPreviewUrlChanged: (String) -> Unit,
+    onAppOriginChanged: (String) -> Unit,
     onConfirm: () -> Unit,
 ) {
     val isEditing = state.productId != null
@@ -292,15 +296,21 @@ private fun ProductFormDialog(
                     hint = RCommon.string.product_bot_management_preview_url_hint,
                 )
 
+                VerticalSpacer { extraMedium }
+
+                DebugFormField(
+                    value = state.appOrigin,
+                    onValueChange = onAppOriginChanged,
+                    hint = RCommon.string.product_bot_management_app_origin_hint,
+                )
+
                 VerticalSpacer { large }
 
                 PolkadotTextButton(
                     modifier = Modifier.align(Alignment.End),
                     text = stringResource(RCommon.string.product_bot_management_confirm),
                     onClick = onConfirm,
-                    enabled = state.workerUrl.isNotBlank() &&
-                        state.dotNsName.isNotBlank() &&
-                        !state.isSubmitting,
+                    enabled = state.dotNsName.isNotBlank() && !state.isSubmitting,
                     loading = state.isSubmitting
                 )
             }
@@ -350,6 +360,7 @@ private fun ProductBotManagementScreenPreview() {
             onCardIdChanged = {},
             onCardTitleChanged = {},
             onPreviewUrlChanged = {},
+            onAppOriginChanged = {},
             onDialogConfirm = {},
         )
     }

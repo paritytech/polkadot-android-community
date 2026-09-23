@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.DebugPocket
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.IntegrationType
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.UninstallProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
+import io.paritytech.polkadotapp.feature_products_impl.domain.webView.DebugAppOrigins
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -28,11 +29,14 @@ interface ProductBotManagementInteractor {
 
     suspend fun getDebugCard(productId: ProductId): DebugPocketCard?
 
+    suspend fun getDebugAppOrigin(productId: ProductId): String?
+
     suspend fun upsertProduct(
         productId: ProductId,
         workerUrl: String,
         name: String,
         card: DebugPocketCard?,
+        appOrigin: String?,
     ): Result<ProductId>
 
     suspend fun updateProduct(
@@ -40,6 +44,7 @@ interface ProductBotManagementInteractor {
         workerUrl: String,
         name: String,
         card: DebugPocketCard?,
+        appOrigin: String?,
     ): Result<Unit>
 
     suspend fun deleteProduct(productId: ProductId): Result<Unit>
@@ -59,6 +64,7 @@ class RealProductBotManagementInteractor @Inject constructor(
     private val uninstallProductUseCase: UninstallProductUseCase,
     private val dotNsTldProvider: DotNsTldProvider,
     private val debugPocketCards: DebugPocketCards,
+    private val debugAppOrigins: DebugAppOrigins,
     private val dispatchers: CoroutineDispatchers,
 ) : ProductBotManagementInteractor {
     override fun observeProducts(): Flow<List<Product>> {
@@ -78,15 +84,21 @@ class RealProductBotManagementInteractor @Inject constructor(
         debugPocketCards.get(productId)
     }
 
+    override suspend fun getDebugAppOrigin(productId: ProductId): String? = withContext(dispatchers.io) {
+        debugAppOrigins.get(productId)
+    }
+
     override suspend fun upsertProduct(
         productId: ProductId,
         workerUrl: String,
         name: String,
         card: DebugPocketCard?,
+        appOrigin: String?,
     ): Result<ProductId> {
         return runCatching {
-            productRepository.upsertManualProduct(productId, name, workerUrl)
+            productRepository.upsertManualProduct(productId, name, workerUrl.takeIf { it.isNotBlank() })
             debugPocketCards.set(productId, card)
+            debugAppOrigins.set(productId, appOrigin)
             resolveProductUseCase.invalidate(productId) // force next resolve to read the new URL
             integrationRepository.install(productId, IntegrationType.Chat)
             botStateController.setActive(productId.toChatExtensionId())
@@ -99,10 +111,12 @@ class RealProductBotManagementInteractor @Inject constructor(
         workerUrl: String,
         name: String,
         card: DebugPocketCard?,
+        appOrigin: String?,
     ): Result<Unit> {
         return runCatching {
-            productRepository.upsertManualProduct(productId, name, workerUrl)
+            productRepository.upsertManualProduct(productId, name, workerUrl.takeIf { it.isNotBlank() })
             debugPocketCards.set(productId, card)
+            debugAppOrigins.set(productId, appOrigin)
             // The card rides on the resolved worker, so a changed one is only seen after this.
             resolveProductUseCase.invalidate(productId)
         }

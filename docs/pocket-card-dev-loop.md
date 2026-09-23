@@ -166,6 +166,44 @@ the host releasing the render when the card leaves the screen.
   `adb shell am force-stop <package>` before retesting, or you will be reading results from the code
   you replaced.
 
+## Loop C — the product's app, from your machine
+
+The other half of a product is its SPA. It runs at `https://<name>.<tld>` inside the app, and the
+bytes come from the archive the app fetched over dotNS — so a change to it normally means publishing.
+In a debug build, the same form can point that origin at a dev server instead:
+
+| Field | Value |
+| :-- | :-- |
+| dotNS name | the product whose app you are working on, published or not |
+| App origin (dev server) | `http://127.0.0.1:5183` |
+
+Every other field can stay empty: a product saved with only an app origin gets no debug worker, so a
+published one keeps running its own.
+
+```sh
+npx serve -l 5183 dist        # a production build; `vite build --watch` keeps it fresh
+adb reverse tcp:5183 tcp:5183
+```
+
+Then open the product as you normally would. The WebView is still on `https://<name>.<tld>` — only the
+content is proxied from your machine — so product identity, permissions and the TrUAPI bridge are
+exactly what a release build would derive. That is also why this is done per request in interception
+rather than by loading a different URL: a `127.0.0.1` origin names no product, and the permission
+client would refuse its sub-resources.
+
+What the proxy does and does not do:
+
+- **Only the base host is overridden.** `app.<name>` and `worker.<name>` name executables of their own
+  and keep their archives, so a local SPA runs against the published worker unless you also point the
+  worker at a debug URL.
+- **Serve a build, not `vite dev`.** The page's origin is `https://`, so the dev server's HMR
+  websocket is mixed content and never connects. Watch-build into `dist` and serve that.
+- **Unknown main-frame paths fall back to `/index.html`**, as the archive path does for client-side
+  routes. Sub-resource 404s are forwarded so a missing asset still reads as missing.
+- **Nothing from the laptop is cached**: responses carry `Cache-Control: no-store`, so a rebuild is one
+  reload away. A `502` page with the target URL in it means the tunnel or the server is down.
+- **Clear the field and save to go back to the archive.**
+
 ## When you are ready to publish
 
 Declare the card in the worker's manifest instead, and the debug fields stop being involved:

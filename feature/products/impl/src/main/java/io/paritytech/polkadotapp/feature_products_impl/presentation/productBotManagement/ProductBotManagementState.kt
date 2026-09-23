@@ -29,6 +29,8 @@ sealed interface ProductDialogState {
         val cardId: String = "",
         val cardTitle: String = "",
         val previewUrl: String = "",
+        // The laptop origin the product's app is fetched from instead of its archive. Optional.
+        val appOrigin: String = "",
         val isSubmitting: Boolean = false,
     ) : ProductDialogState
 }

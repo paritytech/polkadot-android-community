@@ -19,8 +19,13 @@ interface ProductRepository {
 
     suspend fun addProduct(id: ProductId, name: String): ProductId
 
-    /** Separate from [upsertResolvedProduct], which must not clobber a set `userWorkerUrl`. */
-    suspend fun upsertManualProduct(id: ProductId, name: String, userWorkerUrl: String)
+    /**
+     * Separate from [upsertResolvedProduct], which must not clobber a set `userWorkerUrl`.
+     *
+     * A null [userWorkerUrl] clears it: a product configured only with a dev app origin has no
+     * worker, and a blank one stored as an empty string would read as a worker at no URL.
+     */
+    suspend fun upsertManualProduct(id: ProductId, name: String, userWorkerUrl: String?)
 
     /** Writes name + icon without clobbering integrations, permissions or `userWorkerUrl`. */
     suspend fun upsertResolvedProduct(product: Product)
@@ -58,7 +63,7 @@ class RealProductRepository @Inject constructor(
         return id
     }
 
-    override suspend fun upsertManualProduct(id: ProductId, name: String, userWorkerUrl: String) {
+    override suspend fun upsertManualProduct(id: ProductId, name: String, userWorkerUrl: String?) {
         productDao.upsertManual(
             ProductLocal(
                 id = id.value,

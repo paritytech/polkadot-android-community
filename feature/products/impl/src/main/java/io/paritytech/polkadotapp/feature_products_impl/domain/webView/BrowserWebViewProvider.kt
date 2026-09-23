@@ -43,6 +43,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
     private val dotNsResolver: DotNsResolver,
     private val dotNsTldProvider: DotNsTldProvider,
     private val servingHostResolver: DotNsServingHostResolver,
+    private val devOriginResolver: ProductDevOriginResolver,
     dispatchers: CoroutineDispatchers,
     @Assisted private val initialUrl: String,
     @Assisted private val navigationPolicy: NavigationPolicy,
@@ -107,6 +108,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
                     servingHostResolver,
                     navigationPolicy,
                     frameEmbeddingResponseHeaders(allowIframes),
+                    devOriginResolver,
                 )
             webViewClient = InternalWebViewClient(innerClient)
             webChromeClient = chromeClient
