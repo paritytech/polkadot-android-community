@@ -77,11 +77,41 @@ class RealCoinageAssetLedgerTest {
 
         val states = ledger.getAssetStates(listOf(asset)).getOrThrow()
 
-        assertEquals(FINALIZED_SUCCESS, states.getValue(asset).minterStatus)
+        assertEquals(FINALIZED_SUCCESS, states.getAssetStateOf(asset).minterStatus)
+    }
+
+    /** Right after a restore nothing of ours has touched the recovered assets yet, so the ledger holds no rows at all. */
+    @Test
+    fun `a recovered asset the ledger holds no row for counts as minted`() = runTest {
+        givenProjections()
+
+        assertEquals(FINALIZED_SUCCESS, subscribedStateOf(PREVIOUS_INSTALLATION).minterStatus)
+    }
+
+    @Test
+    fun `a single asset read of a recovered asset with no row counts as minted`() = runTest {
+        coEvery { dao.getAssetState(any(), any(), any()) } returns null
+
+        assertEquals(FINALIZED_SUCCESS, ledger.getAssetState(coinOf(PREVIOUS_INSTALLATION)).getOrThrow().minterStatus)
+    }
+
+    @Test
+    fun `a batched asset read of a recovered asset with no row counts as minted`() = runTest {
+        val asset = coinOf(PREVIOUS_INSTALLATION)
+        coEvery { dao.getAssetStates(any(), any(), any()) } returns emptyList()
+
+        assertEquals(FINALIZED_SUCCESS, ledger.getAssetStates(listOf(asset)).getOrThrow().getAssetStateOf(asset).minterStatus)
+    }
+
+    @Test
+    fun `an asset of this installation with no row is untracked`() = runTest {
+        givenProjections()
+
+        assertEquals(CoinageAssetState.UNTRACKED, subscribedStateOf(TEST_INSTALLATION))
     }
 
     private suspend fun subscribedStateOf(installation: CoinageInstallationId): CoinageAssetState =
-        ledger.subscribeAssetStates().first().getValue(coinOf(installation))
+        ledger.subscribeAssetStates().first().getAssetStateOf(coinOf(installation))
 
     private fun givenProjections(vararg projections: CoinageAssetStateProjection) {
         every { dao.subscribeAssetStates() } returns flowOf(projections.toList())

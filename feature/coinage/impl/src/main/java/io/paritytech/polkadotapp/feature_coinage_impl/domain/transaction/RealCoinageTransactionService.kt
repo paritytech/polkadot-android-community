@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction
 
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetStates
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
@@ -141,10 +142,10 @@ class RealCoinageTransactionService @Inject constructor(
     override suspend fun getAssetState(asset: OwnAsset): Result<CoinageAssetState> =
         assetLedger.getAssetState(asset)
 
-    override suspend fun getAssetStates(assets: List<OwnAsset>): Result<Map<OwnAsset, CoinageAssetState>> =
+    override suspend fun getAssetStates(assets: List<OwnAsset>): Result<CoinageAssetStates> =
         assetLedger.getAssetStates(assets)
 
-    override fun subscribeAssetStates(): Flow<Map<OwnAsset, CoinageAssetState>> =
+    override fun subscribeAssetStates(): Flow<CoinageAssetStates> =
         assetLedger.subscribeAssetStates()
 
     private suspend fun assetRegistration(
