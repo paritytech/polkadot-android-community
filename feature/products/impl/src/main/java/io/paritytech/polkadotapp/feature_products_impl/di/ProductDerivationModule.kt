@@ -5,7 +5,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoMap
-import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.feature_account_api.di.AccountPurposeKey
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.AccountDerivationProvider
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
@@ -26,13 +25,7 @@ internal object ProductDerivationModule {
     @IntoMap
     @AccountPurposeKey(MetaAccount.Purpose.WALLET)
     fun provideWalletAccountDerivation(dotNsTldProvider: DotNsTldProvider): AccountDerivationProvider {
-        // CHAT_PRODUCT_IDENTITY_DEMO moves the whole wallet identity (registration, username, statement signer, SSO).
-        val walletProduct = if (BuildConfig.CHAT_PRODUCT_IDENTITY_DEMO) {
-            ReservedProductIds::chat
-        } else {
-            ReservedProductIds::lightPersonIdentity
-        }
-        return ReservedProductAccountDerivationProvider(dotNsTldProvider, walletProduct)
+        return ReservedProductAccountDerivationProvider(dotNsTldProvider, ReservedProductIds::chat)
     }
 
     @Provides

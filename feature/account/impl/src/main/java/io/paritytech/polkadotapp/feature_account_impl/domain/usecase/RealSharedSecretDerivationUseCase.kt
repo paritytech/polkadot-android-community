@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_account_impl.domain.usecase
 
-import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.common.domain.model.X25519KeyPair
 import io.paritytech.polkadotapp.common.domain.model.X25519PrivateKey
 import io.paritytech.polkadotapp.common.utils.X25519KeyGenerator
@@ -34,7 +33,7 @@ class RealSharedSecretDerivationUseCase @Inject constructor(
     // RFC-0022: the ECDH tree hangs off the account entropy directly, not off an sr25519 derivation.
     // RFC-0004 keeps that derivation and only swaps the curve the material is interpreted under.
     override suspend fun deriveForDomain(domain: SharedSecretDerivationDomain): X25519KeyPair {
-        if (BuildConfig.CHAT_PRODUCT_IDENTITY_DEMO && domain == SharedSecretDerivationDomain.CHAT) {
+        if (domain == SharedSecretDerivationDomain.CHAT) {
             return keyGenerator.createKeyPair(X25519PrivateKey.fromDerivedBytes(deriveChatProductKey()))
         }
 
@@ -53,9 +52,9 @@ class RealSharedSecretDerivationUseCase @Inject constructor(
     }
 
     /**
-     * CHAT_PRODUCT_IDENTITY_DEMO: `chat.<tld>` product entropy under key `ecdh`, the same bytes a Chat product gets
-     * from `deriveEntropy("ecdh")`. A wallet created before the demo is still the `uid.<tld>` account with the old
-     * key registered, so it fails here instead of silently using a key that disagrees with its registration.
+     * `chat.<tld>` product entropy under key `ecdh`, the same bytes a Chat product gets from `deriveEntropy("ecdh")`.
+     * A wallet created before this change is still the `uid.<tld>` account with the old key registered, so it fails
+     * here instead of silently using a key that disagrees with its registration.
      */
     private suspend fun deriveChatProductKey(): ByteArray {
         val chatProductId = ReservedProductIds.chat(dotNsTldProvider.getTldRetrying())
@@ -63,11 +62,11 @@ class RealSharedSecretDerivationUseCase @Inject constructor(
         return accountDerivationUseCase.deriveAccount(productAccountPath(chatProductId, DerivationIndex32.default()))
             .mapCatching { chatAccount ->
                 check(accountRepository.getWalletAccount().defaultPubKey() == chatAccount) {
-                    "Wallet is not the $chatProductId account; the demo needs a wallet created by the demo build"
+                    "Wallet is not the $chatProductId account; chat needs a wallet created with the chat.<tld> identity"
                 }
             }
             .flatMap { deriveEntropyUseCase.deriveEntropy(chatProductId, ECDH_ROOT_KEY) }
-            // deriveForDomain is a throwing contract, and a failed demo key must not fall back to the ecdh tree.
+            // deriveForDomain is a throwing contract, and a failed chat key must not fall back to the ecdh tree.
             .getOrThrow()
     }
 

@@ -26,17 +26,9 @@ android {
         buildConfigField("boolean", "SAMPLE_BOT", "true")
         buildConfigField("boolean", "SAFETY_MODE", "false")
         buildConfigField("boolean", "TAB_BAR_CONNECTIVITY_INDICATOR", "false")
-        buildConfigField("boolean", "CHAT_PRODUCT_IDENTITY_DEMO", "false")
     }
 
     buildTypes {
-        getByName("debug") {
-            // Debug only: the wallet account becomes chat.<tld> and the chat key comes from chat.<tld> product
-            // entropy. The whole wallet identity changes, so use a fresh test wallet.
-            if (localProperties.readSecretOrNull("CHAT_PRODUCT_IDENTITY_DEMO").toBoolean()) {
-                buildConfigField("boolean", "CHAT_PRODUCT_IDENTITY_DEMO", "true")
-            }
-        }
         getByName("release") {
             initWith(getByName("release"))
             buildConfigField("boolean", "SAFETY_MODE", "true")

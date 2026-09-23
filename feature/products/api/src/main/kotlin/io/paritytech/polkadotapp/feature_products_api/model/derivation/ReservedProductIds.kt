@@ -21,7 +21,6 @@ object ReservedProductIds {
 
     fun personhood(tld: DotNsTld): ProductId = reserved("peopl", tld)
 
-    // Governance-reserved; used only by the CHAT_PRODUCT_IDENTITY_DEMO build.
     fun chat(tld: DotNsTld): ProductId = reserved("chat", tld)
 
     private fun reserved(label: String, tld: DotNsTld): ProductId {

@@ -48,7 +48,7 @@ class DeriveEntropyUseCaseTest {
     }
 
     /**
-     * The chat key of the CHAT_PRODUCT_IDENTITY_DEMO build, pinned to the vector the Chat SPA checks against.
+     * The chat key (chat.<tld> product entropy under `ecdh`), pinned to the vector the Chat SPA checks against.
      * The mnemonic is the public Substrate dev phrase.
      */
     @Test
