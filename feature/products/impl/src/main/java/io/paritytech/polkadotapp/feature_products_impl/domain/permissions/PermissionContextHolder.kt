@@ -14,7 +14,10 @@ class PermissionContextHolder @Inject constructor() {
 
     fun get(): ProductPermissionContext? = context
 
-    fun clear() {
-        context = null
+    // Owner-guarded: a sheet is cleared after its dismiss animation, when the holder may carry the next prompt
+    fun clear(owner: ProductPermissionContext) {
+        if (context === owner) {
+            context = null
+        }
     }
 }

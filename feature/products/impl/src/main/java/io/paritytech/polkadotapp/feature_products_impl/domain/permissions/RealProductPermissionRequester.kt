@@ -35,12 +35,8 @@ class RealProductPermissionRequester @Inject constructor(
         permissions: List<ProductPermission>,
     ): PermissionDecision = mutex.withLock {
         val context = ProductPermissionContext(productId, permissions)
-        try {
-            permissionContextHolder.set(context)
-            productsRouter.openPermissionPrompt()
-            context.awaitDecision()
-        } finally {
-            permissionContextHolder.clear()
-        }
+        // Cleared by its sheet, which may be created only after a withdrawal and then closes itself
+        permissionContextHolder.set(context)
+        context.awaitDecision(productsRouter::openPermissionPrompt)
     }
 }
