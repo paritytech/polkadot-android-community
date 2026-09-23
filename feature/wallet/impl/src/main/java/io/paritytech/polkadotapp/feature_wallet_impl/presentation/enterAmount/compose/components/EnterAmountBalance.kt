@@ -24,8 +24,11 @@ import io.paritytech.polkadotapp.common.R as RCommon
 internal fun EnterAmountBalance(
     modifier: Modifier = Modifier,
     amount: String,
-    gainingPrivacy: String?
+    gainingPrivacy: String?,
+    onInfoClick: () -> Unit
 ) {
+    val infoDescription = stringResource(RCommon.string.send_enter_amount_balance_info_action)
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -48,6 +51,8 @@ internal fun EnterAmountBalance(
                 style = PolkadotTheme.typography.body.large,
                 color = PolkadotTheme.colors.fg.secondary
             )
+
+            BalanceInfoButton(description = infoDescription, onClick = onInfoClick)
         }
 
         if (gainingPrivacy != null) {
@@ -69,7 +74,8 @@ private fun EnterAmountBalancePreview() {
     PolkadotTheme {
         EnterAmountBalance(
             amount = "300",
-            gainingPrivacy = "150"
+            gainingPrivacy = "150",
+            onInfoClick = {}
         )
     }
 }
@@ -81,7 +87,8 @@ private fun EnterAmountBalanceNothingExposedPreview() {
     PolkadotTheme {
         EnterAmountBalance(
             amount = "999,999.99",
-            gainingPrivacy = null
+            gainingPrivacy = null,
+            onInfoClick = {}
         )
     }
 }

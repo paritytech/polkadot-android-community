@@ -9,9 +9,9 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 data class SendEnterAmountUiState(
     val input: String,
     val available: TokenAmountModel,
-    val spendable: TokenAmountModel,
     /** Null when the strategy is holding nothing back, or will not part with it. */
     val gainingPrivacy: TokenAmountModel?,
+    val balanceBreakdown: BalanceBreakdownUiModel,
     val showBalanceError: Boolean,
     val isAmountPositive: Boolean,
     val recipient: String?,
@@ -35,6 +35,13 @@ data class SendEnterAmountUiState(
         }
     }
 }
+
+@Immutable
+data class BalanceBreakdownUiModel(
+    val total: TokenAmountModel,
+    val ready: TokenAmountModel,
+    val clearing: TokenAmountModel,
+)
 
 sealed interface SendPlanDebugInfo {
     val strategyName: String

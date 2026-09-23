@@ -739,6 +739,24 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_enter_amount_send_button">Send %1$s %2$s</string>
     <string name="send_enter_amount_submitting">Sending…</string>
     <string name="send_enter_amount_settling">Waiting for seller confirmation…</string>
+
+    <string name="send_enter_amount_balance_info_action">About your balance</string>
+    <string name="send_enter_amount_balance_term_info_action">What does %1$s mean?</string>
+    <string name="send_enter_amount_balance_details_title">Balance details</string>
+    <string name="send_enter_amount_balance_details_subtitle">See what makes up your balance</string>
+    <string name="send_enter_amount_balance_total_title">Total Balance</string>
+    <string name="send_enter_amount_balance_total_caption">Everything in your balance</string>
+    <string name="send_enter_amount_balance_ready_title">Ready</string>
+    <string name="send_enter_amount_balance_ready_caption">Funds you can use for payments right away</string>
+    <string name="send_enter_amount_balance_clearing_title">Clearing</string>
+    <string name="send_enter_amount_balance_clearing_caption">Funds being prepared by private payment system. Processing usually takes around 1-5 minutes</string>
+    <string name="send_enter_amount_balance_ready_explainer_title">What does \u201CReady\u201D mean?</string>
+    <string name="send_enter_amount_balance_ready_explainer_first">This is the amount you can use for a payment right away.</string>
+    <string name="send_enter_amount_balance_ready_explainer_second">It may include funds that are already ready for private sending, funds that can be prepared instantly for a payment, and funds that can be sent now with slightly less privacy.</string>
+    <string name="send_enter_amount_balance_clearing_explainer_title">What does \u201CClearing\u201D mean?</string>
+    <string name="send_enter_amount_balance_clearing_explainer_first">These funds are still being prepared by the private payment system and cannot be sent yet.</string>
+    <string name="send_enter_amount_balance_clearing_explainer_second">They may include funds from recent payments that are still settling, or change that is being made ready for future private sends.</string>
+    <string name="send_enter_amount_balance_clearing_explainer_third">They will become available automatically once processing is complete. Usually takes around 1-5 minutes</string>
     <string name="send_error_settlement_timeout">The recipient didn\'t confirm the payment in time. Your money is still yours \u2014 try again later.</string>
     <string name="send_error_not_enough_funds">Amount exceeds your available balance. Enter a smaller amount.</string>
     <string name="send_error_balance_unavailable">Couldn\'t check your balance. Try again.</string>

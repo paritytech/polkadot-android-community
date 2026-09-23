@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
+import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.chains.util.amountFromPlanks
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
@@ -28,6 +29,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.amountinput.Amo
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.amountinput.create
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
+import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.AmountPreset
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.SendEnterAmountPayload
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.TransferMethodPayload
@@ -110,10 +112,16 @@ class SendEnterAmountViewModel @Inject constructor(
 
     private val balanceSplit = tokenBalance
         .map { balance ->
-            val spendable = tokenAmountMapper.mapFrom(balance.chainAsset.withAmount(balance.spendable))
-            val offerable = balance.offerable?.let { tokenAmountMapper.mapFrom(balance.chainAsset.withAmount(it)) }
+            fun amount(value: Balance) = tokenAmountMapper.mapFrom(balance.chainAsset.withAmount(value))
 
-            spendable to offerable
+            BalanceSplit(
+                offerable = balance.offerable?.let(::amount),
+                breakdown = BalanceBreakdownUiModel(
+                    total = amount(balance.total),
+                    ready = amount(balance.spendable),
+                    clearing = amount(balance.clearing),
+                )
+            )
         }
         .shareInBackground()
 
@@ -123,7 +131,7 @@ class SendEnterAmountViewModel @Inject constructor(
         sendProgress,
         debugPlanFlow,
         balanceSplit,
-    ) { inputMixinValue, availableBalance, progress, debugPlan, (spendable, gainingPrivacy) ->
+    ) { inputMixinValue, availableBalance, progress, debugPlan, balance ->
         val inputNum = inputMixinValue.input.input.toBigDecimalOrNull()
 
         val isPositiveAmount = inputNum?.let { it > BigDecimal.ZERO } ?: false
@@ -135,8 +143,8 @@ class SendEnterAmountViewModel @Inject constructor(
                 input = inputMixinValue.input.input,
                 sendProgress = progress,
                 available = availableBalance,
-                spendable = spendable,
-                gainingPrivacy = gainingPrivacy,
+                gainingPrivacy = balance.offerable,
+                balanceBreakdown = balance.breakdown,
                 recipient = recipientInfo.display,
                 recipientType = recipientInfo.type,
                 recipientAvatarColor = recipientInfo.avatarColor,
@@ -218,6 +226,11 @@ class SendEnterAmountViewModel @Inject constructor(
         }
     }
 }
+
+private data class BalanceSplit(
+    val offerable: TokenAmountModel?,
+    val breakdown: BalanceBreakdownUiModel,
+)
 
 private data class RecipientInfo(
     val display: String?,

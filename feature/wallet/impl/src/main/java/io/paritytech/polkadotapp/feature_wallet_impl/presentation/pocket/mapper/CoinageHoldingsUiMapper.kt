@@ -37,13 +37,6 @@ fun List<CoinageHolding>.toUiModels(
     }
 }.toImmutableList()
 
-/**
- * What is not ready yet, for any reason. Gaining privacy and pending are one bucket on screen: to the user
- * both are simply not usable yet, and the distinction between them only matters to the recycler.
- */
-val CoinageBalance.clearing: Balance
-    get() = gainingPrivacy.amount + pending
-
 fun CoinageBalance.toCompositionUiModel(): CoinageCompositionUiModel {
     val total = total.value.toDouble()
     if (total <= 0.0) return CoinageCompositionUiModel.EMPTY

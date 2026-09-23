@@ -124,6 +124,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
                     spendable = it.availablePrivate,
                     gainingPrivacy = it.gainingPrivacy.amount,
                     canSpendGainingPrivacy = it.gainingPrivacy.canSpendWithConfirmation,
+                    clearing = it.clearing,
                     chainAsset = asset(),
                 )
             }

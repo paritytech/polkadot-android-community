@@ -44,5 +44,11 @@ data class CoinageBalance(
         availablePrivate
     }
 
-    val total: Balance = availablePrivate + gainingPrivacy.amount + pending
+    /**
+     * What is not ready yet, for any reason. Gaining privacy and pending are one bucket on screen: to the
+     * user both are simply not usable yet, and the distinction only matters to the recycler.
+     */
+    val clearing: Balance = gainingPrivacy.amount + pending
+
+    val total: Balance = availablePrivate + clearing
 }

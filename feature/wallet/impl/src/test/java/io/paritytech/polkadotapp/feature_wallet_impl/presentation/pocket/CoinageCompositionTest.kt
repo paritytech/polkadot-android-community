@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.clearing
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.toCompositionUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageCompositionUiModel
 import org.junit.Assert.assertEquals
