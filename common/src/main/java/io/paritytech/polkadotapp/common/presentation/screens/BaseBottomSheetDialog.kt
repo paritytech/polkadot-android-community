@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.common.presentation.screens
 
 import android.content.Context
 import android.view.View
-import android.widget.FrameLayout
 import androidx.activity.ComponentDialog
 import androidx.activity.setViewTreeOnBackPressedDispatcherOwner
 import androidx.annotation.StyleRes
@@ -24,8 +23,7 @@ abstract class BaseBottomSheetDialog(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         window?.let { it.decorView.systemUiVisibility = (it.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION) }
-        val containerView = findViewById<FrameLayout>(RMaterial.id.container)
-        containerView?.apply { fitsSystemWindows = false }
+        findViewById<View>(RMaterial.id.container)?.fitsSystemWindows = false
         findViewById<View>(RMaterial.id.coordinator)?.fitsSystemWindows = false
     }
 
