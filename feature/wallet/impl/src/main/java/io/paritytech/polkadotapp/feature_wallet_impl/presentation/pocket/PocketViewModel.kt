@@ -15,6 +15,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_products_api.domain.pocket.PocketCard
 import io.paritytech.polkadotapp.feature_products_api.model.JsImageSource
 import io.paritytech.polkadotapp.feature_products_api.model.JsUiEvent
+import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.presentation.spaHost.SpaHost
 import io.paritytech.polkadotapp.feature_products_api.presentation.widget.JsImageResolver
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
@@ -95,11 +96,14 @@ class PocketViewModel @Inject constructor(
         PocketCardUiModel.IdCard(username = username, address = address, rank = rank)
     }.onStart { emit(null) }
 
+    private val warmedPrivilegedProducts = ConcurrentHashMap.newKeySet<ProductId>()
+
     // Native cards keep their place; the product-backed collection follows, pinned cards first.
     // A collection the host cannot read costs the user their product cards, never the balance and
     // identity cards standing beside them.
     private val productCards = interactor.observeProductCards()
         .map { cards -> cards.map { it.toUiModel() } }
+        .onEach(::warmUpPrivilegedProducts)
         .catch { failure ->
             Timber.e(failure, "PocketViewModel: the product card collection is unavailable")
             emit(emptyList())
@@ -224,6 +228,16 @@ class PocketViewModel @Inject constructor(
      */
     private fun warmUpProduct(card: PocketCardUiModel.ProductCard) = launchUnit {
         interactor.warmUpProduct(card.key).logFailure("PocketViewModel: failed to warm up ${card.id}")
+    }
+
+    /**
+     * Only the host places a privileged card, so this set cannot grow with use. Fetching its pages
+     * when the collection arrives spends the time the user spends looking at the cards, rather than
+     * the half second [selectCard] has to offer.
+     */
+    private fun warmUpPrivilegedProducts(cards: List<PocketCardUiModel.ProductCard>) {
+        cards.filter { it.pinned && warmedPrivilegedProducts.add(it.key.productId) }
+            .forEach(::warmUpProduct)
     }
 
     fun dismissCard() {
