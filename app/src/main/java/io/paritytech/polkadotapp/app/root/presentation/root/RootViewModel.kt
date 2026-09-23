@@ -88,6 +88,11 @@ class RootViewModel @Inject constructor(
 
     init {
         with(servicesScope) {
+            // Durability must not hang off the remote config fetch: a failed sync would otherwise skip
+            // handoff release and transaction recovery for the whole session.
+            coinageServiceStarter.start()
+            externalPaymentWorkerStarter.start()
+
             launch {
                 remoteConfigService.sync()
                     .onSuccess { launchServicesBasedOnRemoteConfig() }
@@ -109,8 +114,6 @@ class RootViewModel @Inject constructor(
             launch { syncPriceCurrencyChange.startObserving() }
             launch { statementStoreSlotAllocator.scheduleSlotRenewals() }
 
-            coinageServiceStarter.start()
-            externalPaymentWorkerStarter.start()
             rootInteractor.startUpdateSystems().shareInBackground()
         }
         warmUpWebProducts(servicesScope)
