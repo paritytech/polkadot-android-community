@@ -1,6 +1,9 @@
 package io.paritytech.polkadotapp.feature_products_impl.domain.deriveEntropy
 
+import io.novasama.substrate_sdk_android.encrypt.mnemonic.MnemonicCreator
 import io.novasama.substrate_sdk_android.extensions.fromHex
+import io.paritytech.polkadotapp.common.domain.model.X25519PrivateKey
+import io.paritytech.polkadotapp.common.utils.X25519KeyGenerator
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.data.storage.accountSecrets.AccountSecretsStorage
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
@@ -42,6 +45,22 @@ class DeriveEntropyUseCaseTest {
 
         val expected = "479d5b9ecce19615397c9f160ee95e2f00c579837a5afb111132dd0da5fd472a".fromHex()
         assertArrayEquals(expected, result)
+    }
+
+    /**
+     * The chat key of the CHAT_PRODUCT_IDENTITY_DEMO build, pinned to the vector the Chat SPA checks against.
+     * The mnemonic is the public Substrate dev phrase.
+     */
+    @Test
+    fun `chat product entropy under ecdh matches the shared Chat SPA vector`() = runBlocking {
+        val devMnemonic = MnemonicCreator.fromWords("bottom drive obey lake curtain smoke basket hold race lonely fit walk")
+        whenever(accountSecretsStorage.getMetaAccountPassphrase(testMetaId)).thenReturn(devMnemonic)
+
+        val entropy = useCase.deriveEntropy(ProductId.fromStoredValue("chat.paseo"), "ecdh".toByteArray()).getOrThrow()
+        val publicKey = X25519KeyGenerator().createKeyPair(X25519PrivateKey.fromDerivedBytes(entropy)).publicKey
+
+        assertArrayEquals("1a74c2a4206f629ee938b0dea1a42a102a8d410edbb0527f7aa5c19cddaf9554".fromHex(), entropy)
+        assertArrayEquals("261089f9ef6cd5e07da99dcb3a2914f1524f35050882f5fc519110f3365a6c0f".fromHex(), publicKey.bytes.value)
     }
 
     @Test

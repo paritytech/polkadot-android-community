@@ -7,40 +7,27 @@ import org.junit.Test
 
 class ChatProductIdentityDemoTest {
     private val tld = DotNsTld.parse("paseo")!!
+    private val chat = ProductId.fromStoredValue("chat.paseo")
 
     @Test
-    fun `the source product calls the host as chat of the active tld`() {
-        val demo = ChatProductIdentityDemo(sourceProductId = "chat-spa-demo.paseo")
-
-        assertEquals(ProductId.fromStoredValue("chat.paseo"), demo.callingProductId(productId("chat-spa-demo.paseo"), tld))
-    }
-
-    @Test
-    fun `the app executable of the source product is mapped too`() {
-        val demo = ChatProductIdentityDemo(sourceProductId = "chat-spa-demo.paseo")
-
-        assertEquals(ProductId.fromStoredValue("chat.paseo"), demo.callingProductId(productId("app.chat-spa-demo.paseo"), tld))
+    fun `the source product and its app executable call the host as chat of the active tld`() {
+        assertEquals(chat, productId("chat-spa-demo.paseo").withChatIdentityDemo(tld, source = "chat-spa-demo.paseo"))
+        assertEquals(chat, productId("app.chat-spa-demo.paseo").withChatIdentityDemo(tld, source = "chat-spa-demo.paseo"))
     }
 
     @Test
     fun `other products keep their own id`() {
-        val demo = ChatProductIdentityDemo(sourceProductId = "chat-spa-demo.paseo")
+        val browse = productId("browse.paseo")
 
-        assertEquals(productId("browse.paseo"), demo.callingProductId(productId("browse.paseo"), tld))
+        assertEquals(browse, browse.withChatIdentityDemo(tld, source = "chat-spa-demo.paseo"))
     }
 
     @Test
-    fun `disabled demo maps nothing`() {
-        val demo = ChatProductIdentityDemo(sourceProductId = null)
+    fun `no source or a source outside the active tld maps nothing`() {
+        val demo = productId("chat-spa-demo.paseo")
 
-        assertEquals(productId("chat-spa-demo.paseo"), demo.callingProductId(productId("chat-spa-demo.paseo"), tld))
-    }
-
-    @Test
-    fun `a source outside the active tld maps nothing`() {
-        val demo = ChatProductIdentityDemo(sourceProductId = "chat-spa-demo.dot")
-
-        assertEquals(productId("chat-spa-demo.paseo"), demo.callingProductId(productId("chat-spa-demo.paseo"), tld))
+        assertEquals(demo, demo.withChatIdentityDemo(tld, source = ""))
+        assertEquals(demo, demo.withChatIdentityDemo(tld, source = "chat-spa-demo.dot"))
     }
 
     private fun productId(value: String): ProductId = ProductId.fromString(value, tld).getOrThrow()

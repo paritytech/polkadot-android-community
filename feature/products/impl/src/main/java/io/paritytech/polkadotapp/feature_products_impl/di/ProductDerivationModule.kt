@@ -4,19 +4,15 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import dagger.multibindings.ElementsIntoSet
 import dagger.multibindings.IntoMap
-import io.paritytech.polkadotapp.common.utils.FeatureOption
-import io.paritytech.polkadotapp.common.utils.isEnabled
+import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.feature_account_api.di.AccountPurposeKey
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.AccountDerivationProvider
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.RingVrfDerivationProvider
-import io.paritytech.polkadotapp.feature_account_api.domain.derivation.SharedSecretKeyMaterialProvider
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_products_api.model.derivation.ReservedProductIds
-import io.paritytech.polkadotapp.feature_products_impl.domain.derivation.ChatProductKeyMaterialProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.derivation.ReservedProductAccountDerivationProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.derivation.ReservedRingVrfDerivationProvider
 
@@ -30,19 +26,13 @@ internal object ProductDerivationModule {
     @IntoMap
     @AccountPurposeKey(MetaAccount.Purpose.WALLET)
     fun provideWalletAccountDerivation(dotNsTldProvider: DotNsTldProvider): AccountDerivationProvider {
-        // The demo moves the whole wallet identity (registration, username, statement signer, SSO), not only Chat.
-        val walletProduct = if (FeatureOption.CHAT_PRODUCT_IDENTITY_DEMO.isEnabled) {
+        // CHAT_PRODUCT_IDENTITY_DEMO moves the whole wallet identity (registration, username, statement signer, SSO).
+        val walletProduct = if (BuildConfig.CHAT_PRODUCT_IDENTITY_DEMO) {
             ReservedProductIds::chat
         } else {
             ReservedProductIds::lightPersonIdentity
         }
         return ReservedProductAccountDerivationProvider(dotNsTldProvider, walletProduct)
-    }
-
-    @Provides
-    @ElementsIntoSet
-    fun provideChatKeyMaterial(chatProduct: ChatProductKeyMaterialProvider): Set<SharedSecretKeyMaterialProvider> {
-        return if (FeatureOption.CHAT_PRODUCT_IDENTITY_DEMO.isEnabled) setOf(chatProduct) else emptySet()
     }
 
     @Provides

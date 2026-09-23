@@ -12,8 +12,8 @@ import io.paritytech.polkadotapp.common.utils.notFoundResponse
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.ChatProductIdentityDemo
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.getProductIdOrNull
+import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.withChatIdentityDemo
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.ProductPermissionGuard
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.handlers.NetworkAccessPermissionHandler
 import io.paritytech.polkadotapp.feature_products_impl.domain.permissions.models.ProductPermission
@@ -29,13 +29,7 @@ class WebViewPermissionClientFactory @Inject constructor(
         callingProductIdProvider: CallingProductIdProvider,
         firstPartyOrigin: String?,
     ): WebViewPermissionClient {
-        return WebViewPermissionClient(
-            callingProductIdProvider,
-            firstPartyOrigin,
-            permissionGuard,
-            dotNsTldProvider,
-            ChatProductIdentityDemo.fromBuildConfig(),
-        )
+        return WebViewPermissionClient(callingProductIdProvider, firstPartyOrigin, permissionGuard, dotNsTldProvider)
     }
 }
 
@@ -46,9 +40,7 @@ class WebViewPermissionClient(
     // debug-menu worker is served from an arbitrary host that is nonetheless first-party.
     private val firstPartyOrigin: String?,
     private val permissionGuard: ProductPermissionGuard,
-    private val dotNsTldProvider: DotNsTldProvider,
-    // The calling id can be the demo's mapped chat.<tld>; the product's own sub-resources must still match it.
-    private val chatIdentityDemo: ChatProductIdentityDemo,
+    private val dotNsTldProvider: DotNsTldProvider
 ) : WebViewClient() {
     /**
      * Last two entries from back-forward history, captured on [onPageStarted].
@@ -87,8 +79,9 @@ class WebViewPermissionClient(
             return notFoundResponse()
         }
 
+        // The calling id can be the demo's mapped chat.<tld>; the product's own sub-resources must still match it.
         val requestProductId = dotNsTldProvider.currentTldOrNull()?.let { tld ->
-            ProductId.fromUrl(url, tld).getOrNull()?.let { chatIdentityDemo.callingProductId(it, tld) }
+            ProductId.fromUrl(url, tld).getOrNull()?.withChatIdentityDemo(tld)
         }
         if (requestProductId == callingProductId || requestProductId in recentProductIds || url.isFirstParty()) {
             return super.shouldInterceptRequest(view, request)

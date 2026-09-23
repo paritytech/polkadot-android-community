@@ -20,7 +20,6 @@ import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsContentLoader
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.CallingProductIdProvider
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.ChatProductIdentityDemo
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.PageLifecycleSource
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.UrlDerivedProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.navigation.NavigationPolicy
@@ -59,10 +58,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
         ): BrowserWebViewProvider
     }
 
-    override val callingProductIdProvider: CallingProductIdProvider = UrlDerivedProductId(
-        dotNsTldProvider = dotNsTldProvider,
-        chatIdentityDemo = ChatProductIdentityDemo.fromBuildConfig(),
-    ) {
+    override val callingProductIdProvider: CallingProductIdProvider = UrlDerivedProductId(dotNsTldProvider) {
         accessWebView(WebView::getUrl)
     }
 

@@ -13,6 +13,7 @@ dependencies {
     ksp(libs.hilt.android.compiler)
 
     implementation(project(":database"))
+    implementation(project(":feature:products:api"))
 
     testImplementation(project(":test-shared"))
 }
