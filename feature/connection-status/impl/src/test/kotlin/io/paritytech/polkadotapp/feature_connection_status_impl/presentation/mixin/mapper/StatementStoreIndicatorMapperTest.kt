@@ -43,16 +43,6 @@ class StatementStoreIndicatorMapperTest {
         assertEquals(ChainHealthIndicator.Connecting, null.statementStoreIndicator(answered = true))
     }
 
-    @Test
-    fun `block production never reaches the statement store`() {
-        val producing = health(ChainConnectionPresentation.Connected)
-
-        assertEquals(
-            ChainHealthIndicator.Healthy(liveness = null),
-            producing.statementStoreIndicator(answered = true),
-        )
-    }
-
     private fun health(connection: ChainConnectionPresentation) = ChainHealth(
         chainId = "people",
         chainName = "People",

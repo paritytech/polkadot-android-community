@@ -172,13 +172,13 @@ fun ChainHealthIndicators(
             horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.tiny),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            model.rows.forEach { item -> ChainIndicator(item = item, indicatorSize = indicatorSize) }
+            model.rows.forEach { item -> RowIndicator(item = item, indicatorSize = indicatorSize) }
         }
     }
 }
 
 @Composable
-internal fun ChainIndicator(
+internal fun RowIndicator(
     modifier: Modifier = Modifier,
     item: ChainHealthItemModel,
     indicatorSize: ChainIndicatorSize,

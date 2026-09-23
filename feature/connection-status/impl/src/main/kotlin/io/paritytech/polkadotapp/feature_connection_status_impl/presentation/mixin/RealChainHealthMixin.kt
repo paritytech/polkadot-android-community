@@ -7,7 +7,6 @@ import io.paritytech.polkadotapp.common.presentation.AppLifecycleObserver
 import io.paritytech.polkadotapp.common.presentation.subscribeIsForeground
 import io.paritytech.polkadotapp.common.utils.stateInBackground
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.ChainHealthMonitor
-import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainConnectionPresentation
 import io.paritytech.polkadotapp.feature_connection_status_api.domain.model.ChainHealth
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicator
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
@@ -49,19 +48,12 @@ internal class RealChainHealthMixin(
 
     private fun Reading.toModel(previous: ChainHealthIndicatorsModel): ChainHealthIndicatorsModel {
         val chains = healths.map { health -> toItem(health, previous) }
-        val store = ChainHealthItemModel(row = IndicatorRow.StatementStore, indicator = storeIndicator(previous))
+        val store = ChainHealthItemModel(
+            row = IndicatorRow.StatementStore,
+            indicator = healths.firstOrNull { it.chainId == peer.chainId }.statementStoreIndicator(answered),
+        )
 
         return ChainHealthIndicatorsModel((chains + store).toImmutableList())
-    }
-
-    private fun Reading.storeIndicator(previous: ChainHealthIndicatorsModel): ChainHealthIndicator {
-        val health = healths.firstOrNull { it.chainId == peer.chainId }
-        val stillConnected = health?.connection == ChainConnectionPresentation.Connected
-        val wasAnswering = previous.rows.firstOrNull { it.row == IndicatorRow.StatementStore }?.indicator == UNMEASURED
-
-        // One subscription handing over to its replacement leaves nothing answered for a moment; that gap
-        // is not the peer going away, and only losing the chain underneath it is.
-        return if (stillConnected && wasAnswering) UNMEASURED else health.statementStoreIndicator(answered)
     }
 
     private fun toItem(health: ChainHealth, previous: ChainHealthIndicatorsModel): ChainHealthItemModel {

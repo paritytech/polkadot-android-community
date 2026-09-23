@@ -31,10 +31,9 @@ import io.paritytech.polkadotapp.common.R as RCommon
 private const val PERCENT = 100
 
 /**
- * The "Network Status" breakdown behind the tab bar's connectivity item: one row per monitored chain and one
- * for the statement store, each with its indicator at panel size, its name, and what the indicator is
- * saying. While a chain is connected and producing, its row also carries the share of expected blocks it
- * produced and the block interval that share implies; the statement store measures neither.
+ * The "Network Status" breakdown behind the tab bar's connectivity item. A connected, producing chain also
+ * shows the share of expected blocks it produced and the interval that implies; the statement store,
+ * which produces none, shows neither.
  */
 @Composable
 fun ChainHealthPanel(
@@ -53,19 +52,19 @@ fun ChainHealthPanel(
                 style = PolkadotTheme.typography.title.large,
                 color = PolkadotTheme.colors.fg.primary,
             )
-            model.rows.forEach { item -> ChainRow(item = item) }
+            model.rows.forEach { item -> HealthRow(item = item) }
         }
     }
 }
 
 @Composable
-private fun ChainRow(item: ChainHealthItemModel) {
+private fun HealthRow(item: ChainHealthItemModel) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChainIndicator(modifier = Modifier.clearAndSetSemantics { }, item = item, indicatorSize = ChainIndicatorSize.Panel)
+        RowIndicator(modifier = Modifier.clearAndSetSemantics { }, item = item, indicatorSize = ChainIndicatorSize.Panel)
         Column {
             NovaText(
                 text = stringResource(item.row.nameRes()),

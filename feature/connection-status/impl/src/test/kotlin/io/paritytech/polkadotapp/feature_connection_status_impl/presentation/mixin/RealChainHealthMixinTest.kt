@@ -142,8 +142,8 @@ class RealChainHealthMixinTest {
     @Test
     fun `the statement store follows the chain whose socket it shares, not the others`() = runBlocking<Unit> {
         withMonitorEmitting(
-            health(PEOPLE, connection = ChainConnectionPresentation.Disconnected),
             health(HUB, blockProduction(produced = 10)),
+            health(PEOPLE, connection = ChainConnectionPresentation.Disconnected),
         )
         val mixin = createMixin()
 
@@ -176,42 +176,6 @@ class RealChainHealthMixinTest {
     }
 
     @Test
-    fun `a subscription handing over does not drop the statement store`() = runBlocking<Unit> {
-        val healths = withMonitorSequence()
-        val mixin = createMixin()
-
-        healths.emit(listOf(health(PEOPLE)))
-        withTimeout(TIMEOUT) { mixin.model.first { it.statementStoreIndicatorOrNull() == CONNECTED } }
-
-        answered.value = false
-        healths.emit(listOf(health(PEOPLE, blockProduction(produced = 10))))
-
-        val model = withTimeout(TIMEOUT) { mixin.model.first { it.chainRows().single().indicator != CONNECTED } }
-
-        assertEquals(CONNECTED, model.statementStoreRow().indicator)
-    }
-
-    @Test
-    fun `losing the chain underneath ends the hold`() = runBlocking<Unit> {
-        val healths = withMonitorSequence()
-        val mixin = createMixin()
-
-        healths.emit(listOf(health(PEOPLE)))
-        withTimeout(TIMEOUT) { mixin.model.first { it.statementStoreIndicatorOrNull() == CONNECTED } }
-
-        answered.value = false
-        healths.emit(listOf(health(PEOPLE, connection = ChainConnectionPresentation.Offline)))
-
-        val offline = withTimeout(TIMEOUT) { mixin.model.first { it.statementStoreIndicatorOrNull() == ChainHealthIndicator.Offline } }
-        assertEquals(ChainHealthIndicator.Offline, offline.statementStoreRow().indicator)
-
-        healths.emit(listOf(health(PEOPLE)))
-
-        val back = withTimeout(TIMEOUT) { mixin.model.first { it.statementStoreIndicatorOrNull() != null && it.statementStoreIndicatorOrNull() != ChainHealthIndicator.Offline } }
-        assertEquals(ChainHealthIndicator.Connecting, back.statementStoreRow().indicator)
-    }
-
-    @Test
     fun `the monitor is observed only while the app is in the foreground`() = runBlocking<Unit> {
         withMonitorEmitting(health(PEOPLE))
         val mixin = createMixin()
@@ -239,9 +203,6 @@ class RealChainHealthMixinTest {
 
     private fun ChainHealthIndicatorsModel.statementStoreRow(): ChainHealthItemModel =
         rows.single { it.row == IndicatorRow.StatementStore }
-
-    private fun ChainHealthIndicatorsModel.statementStoreIndicatorOrNull(): ChainHealthIndicator? =
-        rows.firstOrNull { it.row == IndicatorRow.StatementStore }?.indicator
 
     private fun withMonitorSequence(): MutableSharedFlow<List<ChainHealth>> {
         val healths = MutableSharedFlow<List<ChainHealth>>(replay = 1)
@@ -298,7 +259,6 @@ class RealChainHealthMixinTest {
     }
 
     private companion object {
-        val CONNECTED = ChainHealthIndicator.Healthy(liveness = null)
         const val PEOPLE = "people"
         const val HUB = "hub"
         const val BULLETIN = "bulletin"
