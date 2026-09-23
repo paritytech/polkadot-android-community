@@ -429,7 +429,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="manual_backup_confirm_description">Tap on the words below</string>
     <string name="manual_backup_confirm_reveal_action_title">Tap to reveal</string>
     <string name="manual_backup_confirm_reveal_action_description">Make sure no one can see your screen and do not take a screenshot</string>
-    <string name="manual_backup_confirm_warning">Keep your recovery phrase stored in a safe place and never ahare it with anyone</string>
+    <string name="manual_backup_confirm_warning">Keep your recovery phrase stored in a safe place and never share it with anyone</string>
 
     <string name="recover_mnemonic_title">Restore your account</string>
     <string name="recover_mnemonic_description">Enter your 12 or 24-word recovery phrase</string>
@@ -622,7 +622,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="settings_backup_override_title">Remove the existing backup and create a new one?</string>
     <string name="settings_backup_override_description">If you haven\'t written down the recovery phrase for the account being replaced, you will no longer be able to access it.</string>
     <string name="settings_backup_override_confirmation">I fully understand the risk</string>
-    <string name="settings_backup_override_continue_action">Create a new nackup</string>
+    <string name="settings_backup_override_continue_action">Create a new backup</string>
 
     <string name="settings_backup_not_backed_up">Not backed up.\nSet up a backup to stay protected</string>
 
