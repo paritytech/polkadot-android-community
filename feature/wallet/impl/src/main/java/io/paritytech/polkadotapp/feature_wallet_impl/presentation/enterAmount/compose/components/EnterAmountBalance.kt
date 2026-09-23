@@ -39,6 +39,7 @@ internal fun EnterAmountBalance(
             verticalAlignment = Alignment.CenterVertically
         ) {
             NovaText(
+                modifier = Modifier.weight(1f, fill = false),
                 text = amount,
                 style = PolkadotTheme.typography.body.large,
                 color = PolkadotTheme.colors.fg.primary
@@ -47,6 +48,7 @@ internal fun EnterAmountBalance(
             HorizontalSpacer { extraSmall }
 
             NovaText(
+                modifier = Modifier.weight(1f, fill = false),
                 text = stringResource(RCommon.string.send_enter_amount_ready_to_send),
                 style = PolkadotTheme.typography.body.large,
                 color = PolkadotTheme.colors.fg.secondary

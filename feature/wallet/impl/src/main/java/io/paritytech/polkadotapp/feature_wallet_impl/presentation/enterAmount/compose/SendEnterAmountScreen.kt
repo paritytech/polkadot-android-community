@@ -90,12 +90,14 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
         }
     }
 
-    BalanceDetailsBottomSheet(
-        state = balanceSheet,
-        breakdown = loaded?.balanceBreakdown,
-        onPageChange = { balanceSheet = balanceSheet.copy(page = it) },
-        onDismissRequest = { balanceSheet = balanceSheet.copy(isVisible = false) }
-    )
+    if (loaded != null) {
+        BalanceDetailsBottomSheet(
+            state = balanceSheet,
+            breakdown = loaded.balanceBreakdown,
+            onPageChange = { balanceSheet = balanceSheet.copy(page = it) },
+            onDismissRequest = { balanceSheet = balanceSheet.copy(isVisible = false) }
+        )
+    }
 
     GainingPrivacyConfirmationHost(contract)
 }

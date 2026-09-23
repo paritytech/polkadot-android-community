@@ -17,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import io.paritytech.polkadotapp.design.components.bottomsheet.NovaBottomSheetDefaults
 import io.paritytech.polkadotapp.design.components.bottomsheet.NovaBottomSheetSurface
@@ -64,7 +63,7 @@ internal data class BalanceDetailsSheetState(
 @Composable
 internal fun BalanceDetailsBottomSheet(
     state: BalanceDetailsSheetState,
-    breakdown: BalanceBreakdownUiModel?,
+    breakdown: BalanceBreakdownUiModel,
     onPageChange: (BalanceDetailsPage) -> Unit,
     onDismissRequest: () -> Unit
 ) {
@@ -77,13 +76,11 @@ internal fun BalanceDetailsBottomSheet(
             transitionSpec = { NovaBottomSheetDefaults.PAGE_TRANSITION_SPEC }
         ) { page ->
             when (page) {
-                BalanceDetailsPage.Details -> if (breakdown != null) {
-                    BalanceDetailsContent(
-                        breakdown = breakdown,
-                        onTermClick = onPageChange,
-                        onDoneClick = onDismissRequest
-                    )
-                }
+                BalanceDetailsPage.Details -> BalanceDetailsContent(
+                    breakdown = breakdown,
+                    onTermClick = onPageChange,
+                    onDoneClick = onDismissRequest
+                )
 
                 BalanceDetailsPage.Ready -> BalanceTermContent(
                     title = stringResource(RCommon.string.send_enter_amount_balance_ready_explainer_title),
@@ -122,9 +119,9 @@ private fun BalanceDetailsContent(
     onDoneClick: () -> Unit
 ) {
     val formatter = LocalTokenAmountFormatter.current
-    val total = remember(breakdown) { formatter.formatTokenAmount(breakdown.total, RoundPrecision.FIAT) }
-    val ready = remember(breakdown) { formatter.formatTokenAmount(breakdown.ready, RoundPrecision.FIAT) }
-    val clearing = remember(breakdown) { formatter.formatTokenAmount(breakdown.clearing, RoundPrecision.FIAT) }
+    val total = remember(breakdown, formatter) { formatter.formatTokenAmount(breakdown.total, RoundPrecision.FIAT) }
+    val ready = remember(breakdown, formatter) { formatter.formatTokenAmount(breakdown.ready, RoundPrecision.FIAT) }
+    val clearing = remember(breakdown, formatter) { formatter.formatTokenAmount(breakdown.clearing, RoundPrecision.FIAT) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         SheetTitle(
@@ -188,31 +185,36 @@ private fun BalanceRow(
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NovaText(
-                text = title,
-                style = PolkadotTheme.typography.title.medium,
-                color = PolkadotTheme.colors.fg.primary
-            )
-
-            if (onInfoClick != null) {
-                BalanceInfoButton(
-                    description = stringResource(
-                        RCommon.string.send_enter_amount_balance_term_info_action,
-                        title
-                    ),
-                    onClick = onInfoClick
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NovaText(
+                    modifier = Modifier.weight(1f, fill = false),
+                    text = title,
+                    style = PolkadotTheme.typography.title.medium,
+                    color = PolkadotTheme.colors.fg.primary
                 )
+
+                if (onInfoClick != null) {
+                    BalanceInfoButton(
+                        description = stringResource(
+                            RCommon.string.send_enter_amount_balance_term_info_action,
+                            title
+                        ),
+                        onClick = onInfoClick
+                    )
+                }
             }
 
             NovaText(
-                modifier = Modifier.weight(1f),
                 text = amount,
                 style = PolkadotTheme.typography.title.medium,
-                color = PolkadotTheme.colors.fg.primary,
-                textAlign = TextAlign.End
+                color = PolkadotTheme.colors.fg.primary
             )
         }
 
@@ -291,6 +293,7 @@ private fun SheetTitle(title: String, subtitle: String?) {
 }
 
 @Preview
+@Preview(widthDp = 320, fontScale = 2f)
 @Composable
 private fun BalanceDetailsContentPreview() {
     CompositionLocalProvider(LocalTokenAmountFormatter provides TokenAmountFormatter.mocked) {
