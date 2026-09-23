@@ -16,7 +16,12 @@ import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLConnection
+import java.util.Locale
 
 open class DotNsWebViewClient(
     private val dotNsResolver: DotNsResolver,
@@ -25,6 +30,11 @@ open class DotNsWebViewClient(
     // Stamped onto the main-frame document response so the caller can enforce document-level policy
     // (e.g. a Content-Security-Policy that forbids iframes) engine-side rather than by heuristics.
     private val mainDocumentResponseHeaders: Map<String, String> = emptyMap(),
+    // Debug builds only: when a dev origin is configured for the requested host, the bytes come from
+    // the developer's machine instead of the archive. It is applied here, in interception, and never
+    // to the loaded URL: the WebView keeps the product's real origin (`https://<productId>`), so
+    // product identity, permissions and the TrUAPI bridge are derived exactly as in a release build.
+    private val devOriginResolver: DotNsDevOriginResolver = DotNsDevOriginResolver.None,
 ) : WebViewClient() {
     override fun shouldInterceptRequest(
         view: WebView,
@@ -39,6 +49,16 @@ open class DotNsWebViewClient(
             Timber.d("Not dotNs domain: $url")
 
             return null
+        }
+
+        val devOrigin = runBlocking { devOriginResolver.devOriginFor(url.host.orEmpty()) }
+        if (devOrigin != null) {
+            // The resolver is never asked for this domain, so the host's load progress has to be
+            // told by hand that there is a document to show.
+            if (request.isForMainFrame) {
+                (dotNsResolver as? DotNsContentLoader)?.markServedFromDevOrigin(url.host.orEmpty())
+            }
+            return proxyToDevOrigin(devOrigin, url, request)
         }
 
         val requestPath = (url.path ?: "/").removePrefix("/")
@@ -127,6 +147,108 @@ open class DotNsWebViewClient(
     private fun guessMimeFromContent(file: File): String? =
         file.inputStream().buffered().use { URLConnection.guessContentTypeFromStream(it) }
 
+    /**
+     * Serves the request from a developer's local server instead of the archive. Only the bytes move:
+     * the response is handed back through interception, so the document keeps the archive's origin and
+     * everything keyed off it (identity, permissions, storage) is unchanged.
+     */
+    private fun proxyToDevOrigin(
+        origin: String,
+        url: Uri,
+        request: WebResourceRequest,
+    ): WebResourceResponse {
+        val method = (request.method ?: "GET").uppercase(Locale.ROOT)
+        if (method != "GET" && method != "HEAD") {
+            Timber.w("Dev origin: refusing to proxy $method $url, only GET/HEAD are supported")
+            return notFoundResponse()
+        }
+
+        val base = origin.trimEnd('/')
+        val target = base + (url.encodedPath ?: "/") + (url.encodedQuery?.let { "?$it" } ?: "")
+
+        return try {
+            var connection = openDevOrigin(target, method, request)
+            var status = connection.responseCode
+            if (status == HttpURLConnection.HTTP_NOT_FOUND && request.isForMainFrame) {
+                // Same rationale as [spaFallbackFile]: a client-side route is no more a file on the dev
+                // server than in the archive, so boot the SPA from its root document and let it route.
+                connection.disconnect()
+                connection = openDevOrigin("$base/index.html", method, request)
+                status = connection.responseCode
+            }
+            devOriginResponse(connection, url, status, request)
+        } catch (e: IOException) {
+            Timber.w(e, "dev origin unreachable for $url")
+            WebResourceResponse(
+                "text/plain",
+                "UTF-8",
+                ByteArrayInputStream("dev origin unreachable: $target".toByteArray())
+            ).apply {
+                setStatusCodeAndReasonPhrase(502, "Bad Gateway")
+            }
+        }
+    }
+
+    private fun openDevOrigin(
+        target: String,
+        method: String,
+        request: WebResourceRequest,
+    ): HttpURLConnection {
+        Timber.d("Dev origin: $method $target")
+
+        return (URL(target).openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            connectTimeout = DEV_ORIGIN_CONNECT_TIMEOUT_MS
+            readTimeout = DEV_ORIGIN_READ_TIMEOUT_MS
+            instanceFollowRedirects = true
+            // The stream is passed to the WebView verbatim and Content-Encoding is dropped, so ask for
+            // unencoded bytes rather than unwrapping gzip here.
+            setRequestProperty("Accept-Encoding", "identity")
+            request.requestHeaders?.get("Accept")?.let { setRequestProperty("Accept", it) }
+        }
+    }
+
+    private fun devOriginResponse(
+        connection: HttpURLConnection,
+        url: Uri,
+        status: Int,
+        request: WebResourceRequest,
+    ): WebResourceResponse {
+        val contentType = connection.contentType
+        val mimeType = contentType?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }
+            ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(devOriginExtension(url))
+            ?: "application/octet-stream"
+        val encoding = contentType?.let { charsetOf(it) } ?: "UTF-8"
+        val headers = buildMap {
+            // The next edit must be one reload away, so nothing from the laptop is ever cached.
+            put("Cache-Control", "no-store")
+            if (request.isForMainFrame) putAll(mainDocumentResponseHeaders)
+        }
+        // An upstream error is forwarded as-is so a genuinely missing asset still reads as missing.
+        val stream = connection.devOriginStream(status)
+        val reasonPhrase = (connection.responseMessage ?: "").ifBlank { "OK" }
+
+        Timber.d("Dev origin: $status $url mimeType=$mimeType")
+
+        return WebResourceResponse(mimeType, encoding, status, reasonPhrase, headers, stream)
+    }
+
+    private fun HttpURLConnection.devOriginStream(status: Int): InputStream =
+        runCatching {
+            if (status >= HttpURLConnection.HTTP_BAD_REQUEST) errorStream ?: inputStream else inputStream
+        }.getOrElse { ByteArrayInputStream(ByteArray(0)) }
+
+    private fun devOriginExtension(url: Uri): String =
+        url.encodedPath?.substringAfterLast('/')?.substringAfterLast('.', "").orEmpty()
+
+    private fun charsetOf(contentType: String): String? =
+        contentType.split(';')
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("charset=", ignoreCase = true) }
+            ?.substringAfter('=')
+            ?.trim('"', ' ')
+            ?.takeIf { it.isNotEmpty() }
+
     private fun notFoundResponse(): WebResourceResponse {
         return WebResourceResponse(
             "text/plain",
@@ -135,5 +257,10 @@ open class DotNsWebViewClient(
         ).apply {
             setStatusCodeAndReasonPhrase(404, "Not Found")
         }
+    }
+
+    private companion object {
+        const val DEV_ORIGIN_CONNECT_TIMEOUT_MS = 5_000
+        const val DEV_ORIGIN_READ_TIMEOUT_MS = 15_000
     }
 }

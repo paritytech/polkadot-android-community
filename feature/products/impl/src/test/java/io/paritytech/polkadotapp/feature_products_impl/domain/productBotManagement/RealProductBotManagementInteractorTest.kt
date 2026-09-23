@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.feature_products_api.domain.pocket.PocketCardId
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.DebugPocketCard
 import io.paritytech.polkadotapp.feature_products_impl.domain.pocket.DebugPocketCards
+import io.paritytech.polkadotapp.feature_products_impl.domain.webView.DebugAppOrigins
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -39,6 +40,16 @@ class RealProductBotManagementInteractorTest {
         override fun set(productId: ProductId, card: DebugPocketCard?) = Unit
     }
 
+    private val debugAppOrigins = object : DebugAppOrigins {
+        private val origins = mutableMapOf<ProductId, String>()
+
+        override fun get(productId: ProductId): String? = origins[productId]
+
+        override fun set(productId: ProductId, origin: String?) {
+            if (origin == null) origins.remove(productId) else origins[productId] = origin
+        }
+    }
+
     private val interactor = RealProductBotManagementInteractor(
         productRepository = mock(),
         integrationRepository = mock(),
@@ -47,6 +58,7 @@ class RealProductBotManagementInteractorTest {
         uninstallProductUseCase = mock(),
         dotNsTldProvider = mock(),
         debugPocketCards = debugPocketCards,
+        debugAppOrigins = debugAppOrigins,
         dispatchers = dispatchers,
     )
 

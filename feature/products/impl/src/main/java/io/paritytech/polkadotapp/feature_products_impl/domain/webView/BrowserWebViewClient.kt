@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsNavigationType
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsUtils
+import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsDevOriginResolver
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsWebViewClient
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.navigation.NavigationPolicy
@@ -24,7 +25,14 @@ class BrowserWebViewClient(
     servingHostResolver: DotNsServingHostResolver,
     private val navigationPolicy: NavigationPolicy,
     mainDocumentResponseHeaders: Map<String, String>,
-) : DotNsWebViewClient(dotNsResolver, dotNsTldProvider, servingHostResolver, mainDocumentResponseHeaders) {
+    devOriginResolver: DotNsDevOriginResolver,
+) : DotNsWebViewClient(
+    dotNsResolver,
+    dotNsTldProvider,
+    servingHostResolver,
+    mainDocumentResponseHeaders,
+    devOriginResolver,
+) {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val origin = view.url?.toUri()
         val destination = request.url

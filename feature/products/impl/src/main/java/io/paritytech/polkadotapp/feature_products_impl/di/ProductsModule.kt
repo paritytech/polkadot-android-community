@@ -133,6 +133,8 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.topUpRequest.TopUp
 import io.paritytech.polkadotapp.feature_products_impl.domain.truapi.worker.TrUAPIPocketFaceStreams
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.RealResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
+import io.paritytech.polkadotapp.feature_products_impl.domain.webView.DebugAppOrigins
+import io.paritytech.polkadotapp.feature_products_impl.domain.webView.PrefsDebugAppOrigins
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.ProductServingHostResolver
 import io.paritytech.polkadotapp.feature_products_impl.domain.worker.ProductWorkerRefCounter
 import io.paritytech.polkadotapp.feature_products_impl.domain.worker.RealProductWorkerRefCounter
@@ -412,6 +414,14 @@ internal interface ProductsModule {
         fun provideDebugPocketCards(@ApplicationContext context: Context): DebugPocketCards =
             PrefsDebugPocketCards(
                 prefs = context.getSharedPreferences("debug_pocket_cards", Context.MODE_PRIVATE),
+                isDebugBuild = BuildConfig.DEBUG,
+            )
+
+        @Provides
+        @Singleton
+        fun provideDebugAppOrigins(@ApplicationContext context: Context): DebugAppOrigins =
+            PrefsDebugAppOrigins(
+                prefs = context.getSharedPreferences("debug_app_origins", Context.MODE_PRIVATE),
                 isDebugBuild = BuildConfig.DEBUG,
             )
 

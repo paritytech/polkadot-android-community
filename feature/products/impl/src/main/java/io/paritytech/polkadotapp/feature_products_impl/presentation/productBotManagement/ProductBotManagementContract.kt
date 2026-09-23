@@ -28,5 +28,7 @@ interface ProductBotManagementContract {
 
     fun onPreviewUrlChanged(url: String)
 
+    fun onAppOriginChanged(origin: String)
+
     fun onDialogConfirm()
 }

@@ -60,6 +60,7 @@ class ProductBotManagementViewModel @Inject constructor(
         launch {
             val workerUrl = interactor.getUserWorkerUrl(product.id).orEmpty()
             val card = interactor.getDebugCard(product.id)
+            val appOrigin = interactor.getDebugAppOrigin(product.id).orEmpty()
             state.update {
                 it.copy(
                     dialogState = ProductDialogState.Form(
@@ -69,6 +70,7 @@ class ProductBotManagementViewModel @Inject constructor(
                         cardId = card?.cardId?.value.orEmpty(),
                         cardTitle = card?.title.orEmpty(),
                         previewUrl = card?.previewUrl.orEmpty(),
+                        appOrigin = appOrigin,
                     )
                 )
             }
@@ -119,18 +121,33 @@ class ProductBotManagementViewModel @Inject constructor(
         }
     }
 
+    override fun onAppOriginChanged(origin: String) {
+        state.update {
+            val form = it.dialogState as? ProductDialogState.Form ?: return@update it
+            it.copy(dialogState = form.copy(appOrigin = origin))
+        }
+    }
+
     override fun onDialogConfirm() = launchUnit {
         val form = state.value.dialogState as? ProductDialogState.Form ?: return@launchUnit
-        if (form.workerUrl.isBlank() || form.dotNsName.isBlank()) return@launchUnit
+        // A product can be worth adding for its app origin alone, so only the name is required.
+        if (form.dotNsName.isBlank()) return@launchUnit
 
         state.update {
             it.copy(dialogState = form.copy(isSubmitting = true))
         }
 
         val card = form.toDebugCard()
+        val appOrigin = form.appOrigin.trim().ifBlank { null }
 
         val result = if (form.productId != null) {
-            interactor.updateProduct(ProductId.fromStoredValue(form.productId), form.workerUrl, form.dotNsName, card)
+            interactor.updateProduct(
+                ProductId.fromStoredValue(form.productId),
+                form.workerUrl,
+                form.dotNsName,
+                card,
+                appOrigin,
+            )
         } else {
             runCatching { requireNotNull(interactor.currentTld()) { "Network TLD is not known yet" } }
                 .flatMap { tld ->
@@ -140,7 +157,7 @@ class ProductBotManagementViewModel @Inject constructor(
                     ProductId.fromString(dotNs, tld)
                 }
                 .flatMap { productId ->
-                    interactor.upsertProduct(productId, form.workerUrl, form.dotNsName, card)
+                    interactor.upsertProduct(productId, form.workerUrl, form.dotNsName, card, appOrigin)
                 }
         }
 
