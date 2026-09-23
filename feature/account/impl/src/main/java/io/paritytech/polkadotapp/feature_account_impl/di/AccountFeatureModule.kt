@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_account_api.data.storage.newaccount.New
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.AccountDerivationProvider
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.RingVrfDerivationProvider
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.RingVrfEntropyDeriver
+import io.paritytech.polkadotapp.feature_account_api.domain.derivation.SharedSecretKeyMaterialProvider
 import io.paritytech.polkadotapp.feature_account_api.domain.model.AliasAccountDerivationOverride
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.AccountDerivationUseCase
@@ -97,4 +98,7 @@ interface AccountFeatureApiModule {
 
     @Multibinds
     fun ringVrfDerivationProviders(): Map<MetaAccount.Purpose, RingVrfDerivationProvider>
+
+    @Multibinds
+    fun sharedSecretKeyMaterialProviders(): Set<SharedSecretKeyMaterialProvider>
 }

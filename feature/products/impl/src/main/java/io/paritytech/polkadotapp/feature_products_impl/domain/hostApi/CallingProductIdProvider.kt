@@ -29,11 +29,14 @@ class FixedProductId(private val productId: ProductId) : CallingProductIdProvide
  */
 class UrlDerivedProductId(
     private val dotNsTldProvider: DotNsTldProvider,
+    private val chatIdentityDemo: ChatProductIdentityDemo,
     private val urlProvider: suspend () -> String?
 ) : CallingProductIdProvider {
     override suspend fun getProductId(): Result<ProductId> {
         val url = urlProvider()
             ?: return Result.failure(IllegalStateException("No current URL available"))
-        return dotNsTldProvider.getTld().flatMap { tld -> ProductId.fromUrl(url.toUri(), tld) }
+        return dotNsTldProvider.getTld().flatMap { tld ->
+            ProductId.fromUrl(url.toUri(), tld).map { chatIdentityDemo.callingProductId(it, tld) }
+        }
     }
 }

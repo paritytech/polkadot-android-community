@@ -26,9 +26,22 @@ android {
         buildConfigField("boolean", "SAMPLE_BOT", "true")
         buildConfigField("boolean", "SAFETY_MODE", "false")
         buildConfigField("boolean", "TAB_BAR_CONNECTIVITY_INDICATOR", "false")
+        buildConfigField("boolean", "CHAT_PRODUCT_IDENTITY_DEMO", "false")
+        buildConfigString("CHAT_PRODUCT_IDENTITY_DEMO_SOURCE", "")
     }
 
     buildTypes {
+        getByName("debug") {
+            // Demo only, debug only: native Chat runs as chat.<tld> and one development product is
+            // treated as chat.<tld>. The wallet identity changes, so use a fresh test wallet.
+            if (localProperties.readSecretOrNull("CHAT_PRODUCT_IDENTITY_DEMO").toBoolean()) {
+                buildConfigField("boolean", "CHAT_PRODUCT_IDENTITY_DEMO", "true")
+                buildConfigString(
+                    "CHAT_PRODUCT_IDENTITY_DEMO_SOURCE",
+                    localProperties.readSecretOrThrow("CHAT_PRODUCT_IDENTITY_DEMO_SOURCE")
+                )
+            }
+        }
         getByName("release") {
             initWith(getByName("release"))
             buildConfigField("boolean", "SAFETY_MODE", "true")

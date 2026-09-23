@@ -30,6 +30,7 @@ object FeatureFlags {
             FeatureOption.DIM1_BOT_BY_DEFAULT -> BuildConfig.DIM1_BOT_BY_DEFAULT
             FeatureOption.DIM2_BOT_BY_DEFAULT -> BuildConfig.DIM2_BOT_BY_DEFAULT
             FeatureOption.PEER_BOT_BY_DEFAULT -> BuildConfig.PEER_BOT_BY_DEFAULT
+            FeatureOption.CHAT_PRODUCT_IDENTITY_DEMO -> BuildConfig.CHAT_PRODUCT_IDENTITY_DEMO
         }
     }
 }
@@ -68,7 +69,12 @@ enum class FeatureOption {
     PRODUCT_SETTINGS,
     PERSONHOOD,
     COLLECTIBLES,
-    ARBITRARY_PRODUCTS
+    ARBITRARY_PRODUCTS,
+
+    // Demo of a product-scoped Chat identity: the wallet account becomes chat.<tld>, the chat key comes
+    // from chat.<tld> product entropy, and one development product runs as chat.<tld>. Debug builds with
+    // CHAT_PRODUCT_IDENTITY_DEMO in local.properties only; it needs a fresh test wallet.
+    CHAT_PRODUCT_IDENTITY_DEMO
 }
 
 val FeatureOption.isEnabled
