@@ -83,6 +83,7 @@ class ChatRoomDaoTest {
                 chatId = chatId,
                 timestamp = timestamp,
                 updatedAt = 0,
+                sortOrder = ChatMessageLocal.UNORDERED,
                 origin = ChatMessageLocal.Origin(type = ChatMessageLocal.OriginType.CONTACT, key = byteArrayOf(0x02)),
                 status = ChatMessageLocal.Status.NEW,
                 type = type,
@@ -91,6 +92,7 @@ class ChatRoomDaoTest {
                 replyToMessageId = null,
                 isInternal = false
             ),
+            placement = ChatMessageDao.Placement.Latest,
             onSaved = {},
         )
     }

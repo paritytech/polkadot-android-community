@@ -71,7 +71,7 @@ class ChatPushNotificationHandlerTest {
     fun setUp() {
         every { appLifecycleObserver.getCurrentState() } returns AppLifecycleState.BACKGROUND
         every { chatActiveTracker.getActive() } returns null
-        coEvery { chatEngine.saveMessage(any(), any(), any()) } returns true
+        coEvery { chatEngine.saveMessage(any(), any(), any(), any()) } returns true
     }
 
     @Test
@@ -149,11 +149,11 @@ class ChatPushNotificationHandlerTest {
     }
 
     private fun verifyMessageSaved() {
-        coVerify(exactly = 1) { chatEngine.saveMessage(match { it.id == MESSAGE_ID }, any(), any()) }
+        coVerify(exactly = 1) { chatEngine.saveMessage(match { it.id == MESSAGE_ID }, any(), any(), any()) }
     }
 
     private fun verifyNothingSaved() {
-        coVerify(exactly = 0) { chatEngine.saveMessage(any(), any(), any()) }
+        coVerify(exactly = 0) { chatEngine.saveMessage(any(), any(), any(), any()) }
     }
 
     private fun verifyNotificationPublished(text: String) {

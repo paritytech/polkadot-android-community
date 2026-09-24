@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.database.dao.ChatMessageReactionDao
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.RoomMetadata
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.*
+import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatMessageSearchHit
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastMessageSummary
@@ -29,6 +30,7 @@ interface ChatMessageRepository {
         chatMessage: ChatMessage,
         customContentDecoder: CustomContentDecoder,
         onConflict: ChatMessageSaveConflictStrategy = ChatMessageSaveConflictStrategy.REPLACE,
+        placement: ChatMessagePlacement,
         onSaved: suspend () -> Unit = {},
     ): Boolean
 
@@ -41,6 +43,7 @@ interface ChatMessageRepository {
         chatMessages: List<ChatMessage>,
         customContentDecoder: CustomContentDecoder,
         onConflict: ChatMessageSaveConflictStrategy = ChatMessageSaveConflictStrategy.REPLACE,
+        placement: ChatMessagePlacement,
     ): List<ChatMessage>
 
     suspend fun updateMessageStatus(messageId: ChatMessageId, status: ChatMessage.Status)
@@ -144,18 +147,19 @@ class RealChatMessageRepository @Inject constructor(
         chatMessage: ChatMessage,
         customContentDecoder: CustomContentDecoder,
         onConflict: ChatMessageSaveConflictStrategy,
+        placement: ChatMessagePlacement,
         onSaved: suspend () -> Unit,
     ): Boolean {
         val local = chatMessage.toLocal(customContentDecoder)
 
         return when (onConflict) {
             ChatMessageSaveConflictStrategy.REPLACE -> {
-                chatMessageDao.saveMessage(local, onSaved)
+                chatMessageDao.saveMessage(local, placement.toLocal(), onSaved)
                 true
             }
 
             ChatMessageSaveConflictStrategy.IGNORE -> {
-                chatMessageDao.saveMessageIfNotExists(local).also { if (it >= 0) onSaved() } >= 0
+                chatMessageDao.saveMessageIfNotExists(local, placement.toLocal()).also { if (it >= 0) onSaved() } >= 0
             }
         }
     }
@@ -164,6 +168,7 @@ class RealChatMessageRepository @Inject constructor(
         chatMessages: List<ChatMessage>,
         customContentDecoder: CustomContentDecoder,
         onConflict: ChatMessageSaveConflictStrategy,
+        placement: ChatMessagePlacement,
     ): List<ChatMessage> {
         if (chatMessages.isEmpty()) return emptyList()
 
@@ -171,12 +176,12 @@ class RealChatMessageRepository @Inject constructor(
 
         return when (onConflict) {
             ChatMessageSaveConflictStrategy.REPLACE -> {
-                chatMessageDao.saveMessages(locals)
+                chatMessageDao.saveMessages(locals, placement.toLocal())
                 chatMessages
             }
 
             ChatMessageSaveConflictStrategy.IGNORE -> {
-                val rowIds = chatMessageDao.saveMessagesIfNotExist(locals)
+                val rowIds = chatMessageDao.saveMessagesIfNotExist(locals, placement.toLocal())
                 chatMessages.filterIndexed { index, _ -> rowIds[index] >= 0 }
             }
         }
@@ -443,3 +448,11 @@ private fun String.escapeLikeWildcards(): String {
 }
 
 private const val MESSAGE_SEARCH_LIMIT = 50
+
+private fun ChatMessagePlacement.toLocal(): ChatMessageDao.Placement {
+    return when (this) {
+        ChatMessagePlacement.Latest -> ChatMessageDao.Placement.Latest
+        ChatMessagePlacement.ByTimestamp -> ChatMessageDao.Placement.ByTimestamp
+        is ChatMessagePlacement.SameAs -> ChatMessageDao.Placement.SameAs(messageId)
+    }
+}

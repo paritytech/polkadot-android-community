@@ -25,39 +25,102 @@ abstract class ChatMessageDao {
      * when the message is — neither can be rolled back without the other.
      */
     @Transaction
-    open suspend fun saveMessage(local: ChatMessageLocal, onSaved: suspend () -> Unit) {
-        saveMessages(listOf(local))
+    open suspend fun saveMessage(local: ChatMessageLocal, placement: Placement, onSaved: suspend () -> Unit) {
+        saveMessages(listOf(local), placement)
         onSaved()
     }
 
     @Transaction
-    open suspend fun saveMessageIfNotExists(local: ChatMessageLocal): Long {
-        return saveMessagesIfNotExist(listOf(local)).single()
+    open suspend fun saveMessageIfNotExists(local: ChatMessageLocal, placement: Placement): Long {
+        return saveMessagesIfNotExist(listOf(local), placement).single()
     }
 
     @Transaction
-    open suspend fun saveMessages(locals: List<ChatMessageLocal>) {
-        insert(locals)
+    open suspend fun saveMessages(locals: List<ChatMessageLocal>, placement: Placement) {
+        insert(locals.withSortOrders(placement))
         insertPendingExpansions(locals.pendingExpansions())
     }
 
     @Transaction
-    open suspend fun saveMessagesIfNotExist(locals: List<ChatMessageLocal>): List<Long> {
-        val rowIds = insertIfNotExists(locals)
+    open suspend fun saveMessagesIfNotExist(locals: List<ChatMessageLocal>, placement: Placement): List<Long> {
+        val rowIds = insertIfNotExists(locals.withSortOrders(placement))
         val inserted = locals.filterIndexed { index, _ -> rowIds[index] >= 0 }
         insertPendingExpansions(inserted.pendingExpansions())
         return rowIds
     }
+
+    private suspend fun List<ChatMessageLocal>.withSortOrders(placement: Placement): List<ChatMessageLocal> {
+        val stored = mapNotNull { local -> getSortOrder(local.id)?.let { local.id to it } }.toMap()
+        val allocated = filterNot { it.id in stored }
+            .sortedBy { it.timestamp }
+            .allocateSortOrders(placement)
+
+        return map { it.withSortOrder(stored[it.id] ?: allocated.getValue(it.id)) }
+    }
+
+    private suspend fun List<ChatMessageLocal>.allocateSortOrders(placement: Placement): Map<String, Long> {
+        return when (placement) {
+            Placement.Latest -> allocateLatest()
+            Placement.ByTimestamp -> allocateByTimestamp()
+            is Placement.SameAs -> {
+                val sortOrder = getSortOrder(placement.messageId) ?: return allocateLatest()
+                associate { it.id to sortOrder }
+            }
+        }
+    }
+
+    private suspend fun List<ChatMessageLocal>.allocateLatest(): Map<String, Long> {
+        if (isEmpty()) return emptyMap()
+
+        val highest = getHighestSortOrder() ?: ChatMessageLocal.UNORDERED
+        return mapIndexed { index, local -> local.id to highest + index + 1 }.toMap()
+    }
+
+    private suspend fun List<ChatMessageLocal>.allocateByTimestamp(): Map<String, Long> {
+        val (history, live) = partition { local ->
+            val latestTimestamp = getLatestTimestamp(local.chatId)
+            latestTimestamp != null && local.timestamp < latestTimestamp
+        }
+        val historyOrders = history.associate { local ->
+            local.id to (getHighestSortOrderUpTo(local.chatId, local.timestamp) ?: ChatMessageLocal.UNORDERED)
+        }
+
+        return historyOrders + live.allocateLatest()
+    }
+
+    private fun ChatMessageLocal.withSortOrder(sortOrder: Long) = ChatMessageLocal(
+        id = id,
+        chatId = chatId,
+        timestamp = timestamp,
+        updatedAt = updatedAt,
+        sortOrder = sortOrder,
+        origin = origin,
+        status = status,
+        type = type,
+        searchableContent = searchableContent,
+        content = content,
+        replyToMessageId = replyToMessageId,
+        isInternal = isInternal
+    )
+
+    @Query("SELECT sortOrder FROM chat_messages WHERE id = :messageId")
+    protected abstract suspend fun getSortOrder(messageId: String): Long?
+
+    @Query("SELECT MAX(sortOrder) FROM chat_messages")
+    protected abstract suspend fun getHighestSortOrder(): Long?
+
+    @Query("SELECT MAX(sortOrder) FROM chat_messages WHERE chatId = :chatId AND timestamp <= :timestamp")
+    protected abstract suspend fun getHighestSortOrderUpTo(chatId: ByteArray, timestamp: Long): Long?
 
     private fun List<ChatMessageLocal>.pendingExpansions(): List<ChatMessagePendingExpansionLocal> {
         return filter { it.type == ChatMessageLocal.Type.COMPACTION_COMMIT && it.origin.type != ChatMessageLocal.OriginType.USER }
             .map { ChatMessagePendingExpansionLocal(commitId = it.id, retryState = TransferRetryStateLocal.None) }
     }
 
-    @Query("SELECT * FROM chat_messages WHERE chatId = :chatId ORDER BY timestamp DESC")
+    @Query("SELECT * FROM chat_messages WHERE chatId = :chatId ORDER BY sortOrder DESC, timestamp DESC")
     abstract fun subscribeMessages(chatId: ByteArray): Flow<List<ChatMessageLocal>>
 
-    @Query("SELECT * FROM chat_messages WHERE chatId = :chatId ORDER BY timestamp ASC")
+    @Query("SELECT * FROM chat_messages WHERE chatId = :chatId ORDER BY sortOrder ASC, timestamp ASC")
     abstract suspend fun getMessages(chatId: ByteArray): List<ChatMessageLocal>
 
     @Query("SELECT * FROM chat_messages WHERE updatedAt > :after ORDER BY updatedAt ASC")
@@ -200,6 +263,14 @@ abstract class ChatMessageDao {
 
     @Query("SELECT id, status FROM chat_messages WHERE id IN (:messageIds)")
     abstract suspend fun getMessageStatuses(messageIds: List<String>): List<MessageStatusProjection>
+
+    sealed interface Placement {
+        data object Latest : Placement
+
+        data object ByTimestamp : Placement
+
+        data class SameAs(val messageId: String) : Placement
+    }
 
     data class MessageStatusProjection(
         val id: String,

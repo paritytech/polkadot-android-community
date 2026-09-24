@@ -500,10 +500,11 @@ class ChatEngine @Inject constructor(
     suspend fun saveMessage(
         chatMessage: ChatMessage,
         onConflict: ChatMessageSaveConflictStrategy = ChatMessageSaveConflictStrategy.REPLACE,
+        placement: ChatMessagePlacement = ChatMessagePlacement.Latest,
         onSaved: suspend () -> Unit = {},
     ): Boolean {
         val customContentDecoder = getCustomContentDecoder(chatMessage.chatId)
-        return chatMessageRepository.saveMessage(chatMessage, customContentDecoder, onConflict, onSaved)
+        return chatMessageRepository.saveMessage(chatMessage, customContentDecoder, onConflict, placement, onSaved)
             .also { saved ->
                 if (saved) {
                     messageSaveProcessors.forEach { it.onMessageSaved(chatMessage) }
@@ -516,11 +517,12 @@ class ChatEngine @Inject constructor(
     suspend fun saveMessages(
         chatMessages: List<ChatMessage>,
         onConflict: ChatMessageSaveConflictStrategy = ChatMessageSaveConflictStrategy.REPLACE,
+        placement: ChatMessagePlacement,
     ): List<ChatMessage> {
         if (chatMessages.isEmpty()) return emptyList()
 
         val customContentDecoder = getGlobalContentDecoder()
-        val savedMessages = chatMessageRepository.saveMessages(chatMessages, customContentDecoder, onConflict)
+        val savedMessages = chatMessageRepository.saveMessages(chatMessages, customContentDecoder, onConflict, placement)
 
         savedMessages.forEach { saved ->
             messageSaveProcessors.forEach { it.onMessageSaved(saved) }
