@@ -1052,7 +1052,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="chat_search_error_message">Search failed. Please try again</string>
 
     <string name="add_contact_search_placeholder">Type username</string>
-    <string name="add_contact_search_prompt">Start a conversation with someone \nby typing their username</string>
+    <string name="add_contact_recents_header">RECENTS</string>
+    <string name="add_contact_no_recent_searches">No recent searches</string>
+    <string name="add_contact_users_header">USERS</string>
     <string name="add_contact_bottom_sheet_message">Add a contact\nand start a chat with\n%1$s</string>
     <string name="add_contact_bottom_sheet_description">After you enter the chat, make sure <b>%1$s</b> starts one with you as well, or your message may not be seen.</string>
     <string name="add_contact_bottom_sheet_button_text">Add to Contacts</string>

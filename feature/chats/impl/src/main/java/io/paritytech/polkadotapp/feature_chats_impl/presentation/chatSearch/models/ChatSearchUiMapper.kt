@@ -148,7 +148,7 @@ private fun String.toFallbackAvatarModel(): AvatarUiModel {
 
 private fun ChatId.uniqueKey(): String = value.value.toHexString()
 
-private val NoRowStatus = ChatSearchRowStatus(
+internal val NoRowStatus = ChatSearchRowStatus(
     isMuted = false,
     hasReaction = false,
     badge = ChatListUiState.Badge.None,
