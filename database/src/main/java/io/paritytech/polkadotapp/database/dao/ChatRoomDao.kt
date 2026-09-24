@@ -61,7 +61,7 @@ abstract class ChatRoomDao {
         LEFT JOIN message_revisions rev ON rev.messageId = m.id AND rev.timestamp = (
             SELECT MAX(r2.timestamp) FROM message_revisions r2 WHERE r2.messageId = m.id
         )
-        ORDER BY COALESCE(m.timestamp, r.createdAt) DESC
+        ORDER BY m.sortOrder DESC, COALESCE(m.timestamp, r.createdAt) DESC
         """
     )
     abstract fun subscribeChatSummaries(): Flow<List<ChatRoomSummaryLocal>>

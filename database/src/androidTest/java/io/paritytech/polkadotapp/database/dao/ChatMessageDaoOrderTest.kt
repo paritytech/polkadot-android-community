@@ -111,6 +111,16 @@ class ChatMessageDaoOrderTest {
     }
 
     @Test
+    fun syncedBacklogComparesWithTheChatsNewestMessageEvenWhenItIsInternal() = runBlocking<Unit> {
+        insertLegacy(received(id = "displayed", timestamp = 1_000))
+        insertLegacy(received(id = "internal", timestamp = 5_000, type = ChatMessageLocal.Type.DEVICE_ADDED, isInternal = true))
+
+        saveIgnoring(sent(id = "synced", timestamp = 2_000), Placement.ByTimestamp)
+
+        assertEquals(listOf("displayed", "synced", "internal"), feed())
+    }
+
+    @Test
     fun syncedBacklogMessageInterleavesOrderedHistoryByTimestamp() = runBlocking<Unit> {
         saveIgnoring(received(id = "older", timestamp = now))
         saveReplacing(sent(id = "newer", timestamp = now + 2_000))
@@ -195,9 +205,19 @@ class ChatMessageDaoOrderTest {
         database.openHelper.writableDatabase.execSQL(
             """
             INSERT INTO chat_messages (id, chatId, timestamp, updatedAt, origintype, originkey, status, type, searchableContent, content, isInternal)
-            VALUES (?, ?, ?, 0, ?, ?, ?, ?, '', ?, 0)
+            VALUES (?, ?, ?, 0, ?, ?, ?, ?, '', ?, ?)
             """,
-            arrayOf(message.id, message.chatId, message.timestamp, message.origin.type.name, message.origin.key, message.status.name, message.type.name, message.content)
+            arrayOf(
+                message.id,
+                message.chatId,
+                message.timestamp,
+                message.origin.type.name,
+                message.origin.key,
+                message.status.name,
+                message.type.name,
+                message.content,
+                if (message.isInternal) 1 else 0,
+            )
         )
     }
 
@@ -209,11 +229,16 @@ class ChatMessageDaoOrderTest {
         return database.chatRoomDao().subscribeChatSummaries().first().single { it.chatId.contentEquals(chatId) }.lastMessage?.id
     }
 
-    private fun received(id: String, timestamp: Long, chatId: ByteArray = this.chatId) =
-        message(id, timestamp, chatId, ChatMessageLocal.OriginType.CONTACT, ChatMessageLocal.Status.NEW)
+    private fun received(
+        id: String,
+        timestamp: Long,
+        chatId: ByteArray = this.chatId,
+        type: ChatMessageLocal.Type = ChatMessageLocal.Type.TEXT,
+        isInternal: Boolean = false,
+    ) = message(id, timestamp, chatId, ChatMessageLocal.OriginType.CONTACT, ChatMessageLocal.Status.NEW, type, isInternal)
 
     private fun sent(id: String, timestamp: Long, status: ChatMessageLocal.Status = ChatMessageLocal.Status.IS_SENT) =
-        message(id, timestamp, chatId, ChatMessageLocal.OriginType.USER, status)
+        message(id, timestamp, chatId, ChatMessageLocal.OriginType.USER, status, ChatMessageLocal.Type.TEXT, isInternal = false)
 
     private fun message(
         id: String,
@@ -221,6 +246,8 @@ class ChatMessageDaoOrderTest {
         chatId: ByteArray,
         originType: ChatMessageLocal.OriginType,
         status: ChatMessageLocal.Status,
+        type: ChatMessageLocal.Type,
+        isInternal: Boolean,
     ) = ChatMessageLocal(
         id = id,
         chatId = chatId,
@@ -229,10 +256,10 @@ class ChatMessageDaoOrderTest {
         sortOrder = ChatMessageLocal.UNORDERED,
         origin = ChatMessageLocal.Origin(type = originType, key = byteArrayOf(0x02).takeIf { originType != ChatMessageLocal.OriginType.USER }),
         status = status,
-        type = ChatMessageLocal.Type.TEXT,
+        type = type,
         searchableContent = "",
         content = id.encodeToByteArray(),
         replyToMessageId = null,
-        isInternal = false
+        isInternal = isInternal
     )
 }

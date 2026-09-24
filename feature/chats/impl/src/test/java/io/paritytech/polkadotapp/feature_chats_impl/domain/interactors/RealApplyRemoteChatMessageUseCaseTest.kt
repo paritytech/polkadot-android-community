@@ -26,12 +26,11 @@ import org.mockito.Mockito.verify
 class RealApplyRemoteChatMessageUseCaseTest {
     private val peerAccountId: AccountId = ByteArray(32) { 7 }.toDataByteArray()
 
-    private val chatMessageRepository: ChatMessageRepository = mock(ChatMessageRepository::class.java)
     private val chatEngine: ChatEngine = mock(ChatEngine::class.java)
     private val processedChatMessageRepository: ProcessedChatMessageRepository = mock(ProcessedChatMessageRepository::class.java)
 
     private val useCase = RealApplyRemoteChatMessageUseCase(
-        chatMessageRepository = chatMessageRepository,
+        chatMessageRepository = mock(ChatMessageRepository::class.java),
         contactsRepository = mock(ContactsRepository::class.java),
         chatEngine = chatEngine,
         accountRepository = mock(AccountRepository::class.java),

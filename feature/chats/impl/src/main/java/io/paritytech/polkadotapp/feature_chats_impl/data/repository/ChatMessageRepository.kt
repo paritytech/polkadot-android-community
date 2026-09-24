@@ -278,6 +278,7 @@ class RealChatMessageRepository @Inject constructor(
                 LastMessageSummary(
                     chatId = ChatId.fromRawValue(roomSummary.chatId),
                     lastMessage = roomSummary.lastMessage?.toDomain(customContentDecoder),
+                    lastMessageSortOrder = roomSummary.lastMessage?.sortOrder,
                     unseenCount = roomSummary.unseenCount,
                     hasUnseenReaction = roomSummary.hasUnseenReaction,
                     chatCreatedAt = roomSummary.createdAt,

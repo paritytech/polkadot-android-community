@@ -71,11 +71,26 @@ class ChatRoomDaoTest {
         assertArrayEquals("edited text".encodeToByteArray(), preview.content)
     }
 
+    @Test
+    fun chatWithTheLaterStoredMessageComesFirstEvenWhenTheSenderClockRanAhead() = runBlocking<Unit> {
+        val otherChatId = byteArrayOf(0x03)
+        val emptyChatId = byteArrayOf(0x04)
+        database.chatRoomDao().insert(ChatRoomLocal(id = otherChatId, createdAt = 0, name = null, icon = null))
+        database.chatRoomDao().insert(ChatRoomLocal(id = emptyChatId, createdAt = 10_000, name = null, icon = null))
+        withMessage(id = "received", timestamp = 5_000, content = "received", chatId = chatId)
+        withMessage(id = "sent", timestamp = 1_000, content = "sent", chatId = otherChatId)
+
+        val order = database.chatRoomDao().subscribeChatSummaries().first().map { it.chatId.toList() }
+
+        assertEquals(listOf(otherChatId, chatId, emptyChatId).map { it.toList() }, order)
+    }
+
     private suspend fun withMessage(
         id: String,
         timestamp: Long,
         content: String,
         type: ChatMessageLocal.Type = ChatMessageLocal.Type.TEXT,
+        chatId: ByteArray = this.chatId,
     ) {
         database.chatMessageDao().saveMessage(
             ChatMessageLocal(

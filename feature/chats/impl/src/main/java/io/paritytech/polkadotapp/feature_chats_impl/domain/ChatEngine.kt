@@ -70,6 +70,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatSummaryBad
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatUserInputState
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastMessageSummary
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.MessageEditHistoryItem
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.chatSummaryOrder
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toDomain
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.DmChatMessageOriginDisplayResolver
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.MessageOriginDisplayResolver
@@ -263,10 +264,7 @@ class ChatEngine @Inject constructor(
             combine(allChatSummaries, customPreviews) { summaries, previews ->
                 summaries
                     .map { createChatSummary(it, previews[it.chatId]) }
-                    .sortedWith(
-                        compareBy<ChatSummary> { it.preview.order }
-                            .thenByDescending { it.timestamp }
-                    )
+                    .sortedWith(chatSummaryOrder)
             }
         }
             .inBackground()
@@ -304,6 +302,7 @@ class ChatEngine @Inject constructor(
 
         return ChatSummary(
             timestamp = timestamp,
+            lastMessageSortOrder = messageSummary.lastMessageSortOrder,
             chatId = messageSummary.chatId,
             badge = createBadge(messageSummary, customChatPreview),
             preview = preview,
