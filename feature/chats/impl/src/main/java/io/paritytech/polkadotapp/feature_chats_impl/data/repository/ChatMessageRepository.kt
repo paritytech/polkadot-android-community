@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.database.dao.ChatMessageReactionDao
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.RoomMetadata
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.*
+import io.paritytech.polkadotapp.feature_chats_impl.data.mappers.toLocal
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatMessageSearchHit
@@ -448,11 +449,3 @@ private fun String.escapeLikeWildcards(): String {
 }
 
 private const val MESSAGE_SEARCH_LIMIT = 50
-
-private fun ChatMessagePlacement.toLocal(): ChatMessageDao.Placement {
-    return when (this) {
-        ChatMessagePlacement.Latest -> ChatMessageDao.Placement.Latest
-        ChatMessagePlacement.ByTimestamp -> ChatMessageDao.Placement.ByTimestamp
-        is ChatMessagePlacement.SameAs -> ChatMessageDao.Placement.SameAs(messageId)
-    }
-}
