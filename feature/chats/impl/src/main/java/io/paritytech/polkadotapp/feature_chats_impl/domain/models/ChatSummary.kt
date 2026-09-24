@@ -6,10 +6,12 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatPre
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatPreviewRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.Order
 
 data class ChatSummary(
     val chatId: ChatId,
     val preview: ChatPreview,
+    val order: Order,
     val badge: ChatSummaryBadge,
     val timestamp: Timestamp,
     val lastMessageSortOrder: Long?,
@@ -33,6 +35,6 @@ data class LastMessageSummary(
     val roomMetadata: RoomMetadata,
 )
 
-internal val chatSummaryOrder: Comparator<ChatSummary> = compareBy<ChatSummary> { it.preview.order }
+internal val chatSummaryOrder: Comparator<ChatSummary> = compareBy<ChatSummary> { it.order }
     .thenByDescending { it.lastMessageSortOrder }
     .thenByDescending { it.timestamp }

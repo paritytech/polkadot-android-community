@@ -30,6 +30,14 @@ class ChatSummaryOrderTest {
     }
 
     @Test
+    fun `pinned chat without a visible message stays on top`() {
+        val pinnedEmpty = emptyChat(seed = 1, createdAt = now, order = Order.PinToTop)
+        val latest = chatWithMessage(seed = 2, sortOrder = 5, timestamp = now + 1_000)
+
+        assertEquals(listOf(pinnedEmpty, latest), listOf(latest, pinnedEmpty).sortedWith(chatSummaryOrder))
+    }
+
+    @Test
     fun `chat without messages goes below chats with messages`() {
         val empty = emptyChat(seed = 1, createdAt = now + 60_000)
         val withMessage = chatWithMessage(seed = 2, sortOrder = 0, timestamp = now)
@@ -59,16 +67,23 @@ class ChatSummaryOrderTest {
             content = ChatMessage.Content.Text("hi"),
             status = ChatMessage.Status.IS_SENT,
         )
-        return summary(chatId, ChatPreview.Message(message, order), timestamp, sortOrder)
+        return summary(chatId, ChatPreview.Message(message, order), order, timestamp, sortOrder)
     }
 
-    private fun emptyChat(seed: Byte, createdAt: Long): ChatSummary {
-        return summary(chatId(seed), ChatPreview.EmptyChat, createdAt, lastMessageSortOrder = null)
+    private fun emptyChat(seed: Byte, createdAt: Long, order: Order = Order.ByTimestamp): ChatSummary {
+        return summary(chatId(seed), ChatPreview.EmptyChat, order, createdAt, lastMessageSortOrder = null)
     }
 
-    private fun summary(chatId: ChatId, preview: ChatPreview, timestamp: Long, lastMessageSortOrder: Long?) = ChatSummary(
+    private fun summary(
+        chatId: ChatId,
+        preview: ChatPreview,
+        order: Order,
+        timestamp: Long,
+        lastMessageSortOrder: Long?,
+    ) = ChatSummary(
         chatId = chatId,
         preview = preview,
+        order = order,
         badge = ChatSummaryBadge.None,
         timestamp = timestamp,
         lastMessageSortOrder = lastMessageSortOrder,

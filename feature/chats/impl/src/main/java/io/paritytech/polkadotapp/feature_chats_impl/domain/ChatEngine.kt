@@ -306,6 +306,7 @@ class ChatEngine @Inject constructor(
             chatId = messageSummary.chatId,
             badge = createBadge(messageSummary, customChatPreview),
             preview = preview,
+            order = customChatPreview?.order ?: Order.ByTimestamp,
             roomMetadata = messageSummary.roomMetadata,
             hasUnseenReaction = messageSummary.hasUnseenReaction,
             customPreviewRenderer = customPreviewRenderer,
