@@ -63,15 +63,15 @@ private fun MutableList<ChatSearchSectionUiModel>.addSectionIfNotEmpty(
 internal fun RecentChat.toUi(
     isMenuOpen: Boolean,
     chatsById: Map<ChatId, Chat>,
-): RecentChatUiModel? {
-    val chat = chatsById[chatId] ?: return null
+): RecentChatUiModel? = chatsById[chatId]?.toRecentUi(isMenuOpen)
 
+internal fun Chat.toRecentUi(isMenuOpen: Boolean): RecentChatUiModel {
     return RecentChatUiModel(
-        chatId = chatId,
-        key = chatId.uniqueKey(),
-        title = chat.display.name,
-        avatarModel = chat.avatarModel(),
-        status = chat.toRowStatus(),
+        chatId = id,
+        key = id.uniqueKey(),
+        title = display.name,
+        avatarModel = avatarModel(),
+        status = toRowStatus(),
         isMenuOpen = isMenuOpen,
     )
 }

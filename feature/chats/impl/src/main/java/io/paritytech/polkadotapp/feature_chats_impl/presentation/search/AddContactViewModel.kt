@@ -6,10 +6,10 @@ import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.search.SearchState
 import io.paritytech.polkadotapp.common.presentation.search.withQuerySearching
 import io.paritytech.polkadotapp.common.utils.SizedList
+import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.mapList
 import io.paritytech.polkadotapp.common.utils.shareInBackground
-import io.paritytech.polkadotapp.common.utils.stateInBackground
 import io.paritytech.polkadotapp.feature_chats_api.domain.error.asStartChatError
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatVariant
@@ -17,11 +17,10 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.error.toPresenta
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.ChatFeedPayload
 import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.AddContactInteractor
-import io.paritytech.polkadotapp.feature_chats_impl.domain.models.Chat
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatAvatar
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ContactSearchResult
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.StartChatData
-import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatSearch.models.toUi
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatSearch.models.toRecentUi
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.toUi
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.search.models.UserSearchResultUiModel
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.search.models.toChatFeedPayload
@@ -33,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -54,19 +54,9 @@ internal class AddContactViewModel @Inject constructor(
 
     private val loadingContactId = MutableStateFlow<AccountId?>(null)
 
-    private val chats: StateFlow<List<Chat>> = interactor.subscribeChats()
-        .stateInBackground(initialValue = emptyList())
-
-    private val recents = combine(
-        interactor.observeRecents(),
-        chats
-    ) { recentChats, currentChats ->
-        val chatsById = currentChats.associateBy { it.id }
-
-        recentChats.mapNotNull { recent ->
-            recent.toUi(isMenuOpen = false, chatsById = chatsById)
-        }.toImmutableList()
-    }
+    private val recents = interactor.observeRecentChats()
+        .map { chats -> chats.map { it.toRecentUi(isMenuOpen = false) }.toImmutableList() }
+        .inBackground()
 
     override val state: StateFlow<AddContactUiState> = combine(
         searchQuery,

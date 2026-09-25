@@ -11,12 +11,12 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSearchRecentsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.Chat
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ContactSearchResult
-import io.paritytech.polkadotapp.feature_chats_impl.domain.models.RecentChat
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.StartChatData
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.StartChatDataUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SubscribeActiveChatsUseCase
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.SearchUsernamesUseCase
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
 interface AddContactInteractor {
@@ -24,9 +24,8 @@ interface AddContactInteractor {
     suspend fun getStartChatData(contactAccountId: AccountId): Result<StartChatData>
 
     context(scope: ComputationalScope)
-    fun subscribeChats(): Flow<List<Chat>>
+    fun observeRecentChats(): Flow<List<Chat>>
 
-    fun observeRecents(): Flow<List<RecentChat>>
     suspend fun addRecent(chatId: ChatId)
 }
 
@@ -58,11 +57,16 @@ class RealAddContactInteractor @Inject constructor(
         return startChatDataUseCase(contactAccountId)
     }
 
+    // Recents keep only chat ids: resolved against the live chat list, so a recent shows the chat as it is now, and one
+    // whose chat is no longer active is dropped.
     context(scope: ComputationalScope)
-    override fun subscribeChats(): Flow<List<Chat>> = subscribeActiveChats()
+    override fun observeRecentChats(): Flow<List<Chat>> = combine(
+        chatSearchRecentsRepository.observeRecents(),
+        subscribeActiveChats()
+    ) { recents, chats ->
+        val chatsById = chats.associateBy { it.id }
 
-    override fun observeRecents(): Flow<List<RecentChat>> {
-        return chatSearchRecentsRepository.observeRecents()
+        recents.mapNotNull { chatsById[it.chatId] }
     }
 
     override suspend fun addRecent(chatId: ChatId) {
