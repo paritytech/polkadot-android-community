@@ -69,6 +69,18 @@ class RealStatementStorePeerTest {
     }
 
     @Test
+    fun `a second page does not answer the subscription again`() = runBlocking<Unit> {
+        val subscription = Subscription()
+
+        subscription.open {
+            subscription.sendPage()
+            subscription.sendPage()
+        }
+
+        assertFalse(answered())
+    }
+
+    @Test
     fun `one answered subscription is enough while another is still waiting`() = runBlocking<Unit> {
         val answering = Subscription()
         val quiet = Subscription()

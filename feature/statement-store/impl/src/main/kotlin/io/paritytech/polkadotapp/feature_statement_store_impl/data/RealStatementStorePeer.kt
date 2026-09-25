@@ -52,18 +52,16 @@ class RealStatementStorePeer internal constructor(
         )
     }
 
-    fun <T> track(pages: Flow<Result<T>>): Flow<Result<T>> = flow {
+    fun <T> track(pages: Flow<Result<T>>): Flow<Result<T>> {
         var counted = false
 
-        emitAll(
-            pages
-                .onEach { page ->
-                    if (!counted && page.isSuccess) {
-                        counted = true
-                        answering.update { it + 1 }
-                    }
+        return pages
+            .onEach { page ->
+                if (!counted && page.isSuccess) {
+                    counted = true
+                    answering.update { it + 1 }
                 }
-                .onCompletion { if (counted) answering.update { it - 1 } },
-        )
+            }
+            .onCompletion { if (counted) answering.update { it - 1 } }
     }
 }
