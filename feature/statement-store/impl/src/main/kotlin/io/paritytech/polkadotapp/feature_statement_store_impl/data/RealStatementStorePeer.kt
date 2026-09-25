@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
@@ -53,17 +55,15 @@ class RealStatementStorePeer internal constructor(
     fun <T> track(pages: Flow<Result<T>>): Flow<Result<T>> = flow {
         var counted = false
 
-        try {
-            pages.collect { page ->
-                if (!counted && page.isSuccess) {
-                    counted = true
-                    answering.update { it + 1 }
+        emitAll(
+            pages
+                .onEach { page ->
+                    if (!counted && page.isSuccess) {
+                        counted = true
+                        answering.update { it + 1 }
+                    }
                 }
-
-                emit(page)
-            }
-        } finally {
-            if (counted) answering.update { it - 1 }
-        }
+                .onCompletion { if (counted) answering.update { it - 1 } },
+        )
     }
 }
