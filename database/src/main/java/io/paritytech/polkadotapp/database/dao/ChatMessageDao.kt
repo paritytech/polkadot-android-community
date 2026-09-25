@@ -50,7 +50,7 @@ abstract class ChatMessageDao {
     }
 
     private suspend fun List<ChatMessageLocal>.withSortOrders(placement: Placement): List<ChatMessageLocal> {
-        val stored = mapNotNull { local -> getSortOrder(local.id)?.let { local.id to it } }.toMap()
+        val stored = getSortOrders(map { it.id })
         val allocated = filterNot { it.id in stored }
             .sortedBy { it.timestamp }
             .allocateSortOrders(placement)
@@ -77,8 +77,10 @@ abstract class ChatMessageDao {
     }
 
     private suspend fun List<ChatMessageLocal>.allocateByTimestamp(): Map<String, Long> {
+        val latestTimestamps = distinctBy { it.chatId.contentToString() }
+            .associate { it.chatId.contentToString() to getLatestTimestamp(it.chatId) }
         val (history, live) = partition { local ->
-            val latestTimestamp = getLatestTimestamp(local.chatId)
+            val latestTimestamp = latestTimestamps.getValue(local.chatId.contentToString())
             latestTimestamp != null && local.timestamp < latestTimestamp
         }
         val historyOrders = history.associate { local ->
@@ -103,8 +105,17 @@ abstract class ChatMessageDao {
         isInternal = isInternal
     )
 
+    private suspend fun getSortOrders(messageIds: List<String>): Map<String, Long> {
+        return messageIds.chunked(SQLITE_VARIABLE_LIMIT)
+            .flatMap { getSortOrderRows(it) }
+            .associate { it.id to it.sortOrder }
+    }
+
     @Query("SELECT sortOrder FROM chat_messages WHERE id = :messageId")
     protected abstract suspend fun getSortOrder(messageId: String): Long?
+
+    @Query("SELECT id, sortOrder FROM chat_messages WHERE id IN (:messageIds)")
+    protected abstract suspend fun getSortOrderRows(messageIds: List<String>): List<SortOrderProjection>
 
     @Query("SELECT MAX(sortOrder) FROM chat_messages")
     protected abstract suspend fun getHighestSortOrder(): Long?
@@ -277,10 +288,20 @@ abstract class ChatMessageDao {
         val status: ChatMessageLocal.Status
     )
 
+    data class SortOrderProjection(
+        val id: String,
+        val sortOrder: Long
+    )
+
     class MessageContentUpdateLocal(
         val id: String,
         val content: ByteArray?,
         val type: ChatMessageLocal.Type,
         val updatedAt: Long
     )
+
+    companion object {
+        // SQLITE_MAX_VARIABLE_NUMBER of the SQLite shipped with API 29 and 30
+        private const val SQLITE_VARIABLE_LIMIT = 999
+    }
 }

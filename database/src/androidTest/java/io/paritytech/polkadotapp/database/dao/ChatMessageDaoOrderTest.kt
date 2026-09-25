@@ -193,6 +193,49 @@ class ChatMessageDaoOrderTest {
         assertEquals("compacted-1500", feed().first())
     }
 
+    @Test
+    fun storedBatchLargerThanTheSqliteVariableLimitKeepsItsPlaces() = runBlocking<Unit> {
+        val batch = (1..1_500).map { index -> received(id = "received-$index", timestamp = now + index) }
+        dao.saveMessagesIfNotExist(batch, Placement.Latest)
+        saveReplacing(sent(id = "sent", timestamp = now))
+        val before = feed()
+
+        dao.saveMessages(batch, Placement.Latest)
+
+        assertEquals(before, feed())
+    }
+
+    @Test
+    fun batchKeepsStoredPlacesAndAppendsNewMessages() = runBlocking<Unit> {
+        saveIgnoring(received(id = "first", timestamp = now))
+        saveReplacing(sent(id = "second", timestamp = now + 1_000))
+
+        dao.saveMessages(
+            listOf(received(id = "third", timestamp = now + 2_000), received(id = "first", timestamp = now)),
+            Placement.Latest
+        )
+
+        assertEquals(listOf("first", "second", "third"), feed())
+    }
+
+    @Test
+    fun syncedBatchIsPlacedAgainstEachMessagesOwnChat() = runBlocking<Unit> {
+        database.chatRoomDao().insert(ChatRoomLocal(id = otherChatId, createdAt = 0, name = null, icon = null))
+        saveIgnoring(received(id = "received", timestamp = now))
+        saveIgnoring(received(id = "other-received", timestamp = senderClockAhead, chatId = otherChatId))
+
+        dao.saveMessagesIfNotExist(
+            listOf(
+                received(id = "synced-live", timestamp = now + 1_000),
+                received(id = "synced-backlog", timestamp = now + 1_000, chatId = otherChatId),
+            ),
+            Placement.ByTimestamp
+        )
+
+        assertEquals(listOf("received", "synced-live"), feed())
+        assertEquals(listOf("synced-backlog", "other-received"), feed(otherChatId))
+    }
+
     private suspend fun saveReplacing(message: ChatMessageLocal) {
         dao.saveMessage(message, Placement.Latest, onSaved = {})
     }
@@ -221,7 +264,7 @@ class ChatMessageDaoOrderTest {
         )
     }
 
-    private suspend fun feed(): List<String> {
+    private suspend fun feed(chatId: ByteArray = this.chatId): List<String> {
         return dao.subscribeMessages(chatId).first().map { it.id }.reversed()
     }
 
