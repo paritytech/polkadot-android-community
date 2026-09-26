@@ -12,6 +12,7 @@ data class AvailableToSendAmount(
     val spendable: Balance,
     val gainingPrivacy: Balance,
     val canSpendGainingPrivacy: Boolean,
+    val clearing: Balance,
     val chainAsset: Chain.Asset
 ) {
     /** Everything a send could draw on, so the input is not capped below what the confirmation allows. */
@@ -19,6 +20,8 @@ data class AvailableToSendAmount(
 
     /** Null when there is nothing extra to offer, so the caller can leave the hint out entirely. */
     val offerable: Balance? = gainingPrivacy.takeIf { canSpendGainingPrivacy && !it.isZero() }
+
+    val total: Balance = spendable + clearing
 }
 
 fun AvailableToSendAmount.spendablePlanks() = chainAsset.amountFromPlanks(spendable)

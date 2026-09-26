@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -44,10 +47,14 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Local
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.BalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountContract
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendEnterAmountUiState.SendProgress
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.SendPlanDebugInfo
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.BalanceDetailsBottomSheet
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.BalanceDetailsPage
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.BalanceDetailsSheetState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountBalance
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountInput
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.compose.components.EnterAmountRecipient
@@ -59,6 +66,8 @@ import io.paritytech.polkadotapp.common.R as RCommon
 @Composable
 internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
     val state = contract.state.collectAsStateWithLifecycle().value
+    val loaded = (state as? LoadingState.Loaded)?.data
+    var balanceSheet by remember { mutableStateOf(BalanceDetailsSheetState.CLOSED) }
 
     PolkadotSurface {
         when (state) {
@@ -68,11 +77,26 @@ internal fun SendEnterAmountScreen(contract: SendEnterAmountContract) {
                 stallReport = {},
                 onAmountChange = contract::onNewInput,
                 onConfirmClick = contract::onConfirmClick,
-                onBackClick = contract::onBackClick
+                onBackClick = contract::onBackClick,
+                onBalanceInfoClick = {
+                    balanceSheet = BalanceDetailsSheetState(
+                        isVisible = true,
+                        page = BalanceDetailsPage.Details
+                    )
+                }
             )
 
             else -> LoadingScreenState()
         }
+    }
+
+    if (loaded != null) {
+        BalanceDetailsBottomSheet(
+            state = balanceSheet,
+            breakdown = loaded.balanceBreakdown,
+            onPageChange = { balanceSheet = balanceSheet.copy(page = it) },
+            onDismissRequest = { balanceSheet = balanceSheet.copy(isVisible = false) }
+        )
     }
 
     GainingPrivacyConfirmationHost(contract)
@@ -102,6 +126,7 @@ private fun SendEnterAmountScreenInternal(
     onAmountChange: (String) -> Unit,
     onConfirmClick: () -> Unit,
     onBackClick: () -> Unit,
+    onBalanceInfoClick: () -> Unit,
 ) {
     val formatter = LocalTokenAmountFormatter.current
     val focusRequester = remember { FocusRequester() }
@@ -115,8 +140,8 @@ private fun SendEnterAmountScreenInternal(
     val symbol = remember(state.available) {
         formatter.formatToSymbol(state.available)
     }
-    val amount = remember(state.spendable) {
-        formatter.formatTokenAmount(state.spendable, RoundPrecision.FIAT, withSymbol = false)
+    val amount = remember(state.balanceBreakdown.ready) {
+        formatter.formatTokenAmount(state.balanceBreakdown.ready, RoundPrecision.FIAT, withSymbol = false)
     }
     val gainingPrivacy = remember(state.gainingPrivacy) {
         state.gainingPrivacy?.let { formatter.formatTokenAmount(it, RoundPrecision.FIAT, withSymbol = false) }
@@ -150,7 +175,8 @@ private fun SendEnterAmountScreenInternal(
             EnterAmountBalance(
                 modifier = Modifier.padding(horizontal = PolkadotTheme.spacings.large),
                 amount = amount,
-                gainingPrivacy = gainingPrivacy
+                gainingPrivacy = gainingPrivacy,
+                onInfoClick = onBalanceInfoClick
             )
 
             VerticalSpacer { small }
@@ -256,9 +282,13 @@ private fun SendEnterAmountScreenAllWidgetPreview() {
                     recipient = "2o4ytihgkgrjbsk4kjb45lnqlkn35lk3ny73l54jnu45lkjulk5u4lu4lubhv",
                     recipientType = ExtractedAddress.DisplayType.ADDRESS,
                     available = TokenAmountModel.mock,
-                    spendable = TokenAmountModel.mock(300),
                     gainingPrivacy = TokenAmountModel.mock(150),
                     sendProgress = SendProgress.Idle,
+                    balanceBreakdown = BalanceBreakdownUiModel(
+                        total = TokenAmountModel.mock(450),
+                        ready = TokenAmountModel.mock(300),
+                        clearing = TokenAmountModel.mock(150)
+                    ),
                     showBalanceError = true,
                     isAmountPositive = true,
                     isSendEnabled = false,
@@ -268,7 +298,8 @@ private fun SendEnterAmountScreenAllWidgetPreview() {
                 stallReport = { PreviewStallReport() },
                 onAmountChange = {},
                 onConfirmClick = {},
-                onBackClick = {}
+                onBackClick = {},
+                onBalanceInfoClick = {}
             )
         }
     }
