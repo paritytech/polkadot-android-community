@@ -21,6 +21,7 @@ import io.paritytech.polkadotapp.feature_videogame_api.domain.state.VideoGamesPr
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.DigitalDollarBalance
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.PocketRank
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.toPocketRank
+import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
@@ -38,7 +39,8 @@ class PocketInteractor @Inject constructor(
     private val coinageAccountBackupObserver: CoinageAccountBackupObserver,
     private val accountRepository: AccountRepository,
     private val chainRegistry: ChainRegistry,
-    private val knownChains: KnownChains
+    private val knownChains: KnownChains,
+    private val remoteConfigService: RemoteConfigService
 ) {
     fun observeBackupProgress(): Flow<BackupProgress> = coinageBackupService.subscribeProgress()
 
@@ -77,5 +79,16 @@ class PocketInteractor @Inject constructor(
         gamesProgressUseCase.videoGamesProgressFlow().map { it.toPocketRank() }
     } else {
         flowOf(PocketRank.Basic)
+    }
+
+    suspend fun getAppSharingUrl(): Result<String> {
+        return remoteConfigService.getSyncedString(APP_SHARING_URL_KEY).mapCatching { url ->
+            require(url.isNotBlank()) { "Remote Config $APP_SHARING_URL_KEY is empty" }
+            url
+        }
+    }
+
+    private companion object {
+        const val APP_SHARING_URL_KEY = "app_sharing_url"
     }
 }

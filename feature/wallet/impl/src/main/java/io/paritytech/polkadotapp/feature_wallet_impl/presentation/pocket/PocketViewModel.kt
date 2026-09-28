@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket
 
+import android.content.Context
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.sharing.SharingManager
@@ -31,16 +33,18 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import io.paritytech.polkadotapp.common.R as RCommon
 
 @HiltViewModel
 class PocketViewModel @Inject constructor(
-    interactor: PocketInteractor,
+    private val interactor: PocketInteractor,
     private val tokenAmountMapper: TokenAmountMapper,
     private val tokenAmountFormatter: TokenAmountFormatter,
     private val router: PocketRouter,
     private val collectiblesUrlResolver: CollectiblesUrlResolver,
     private val idShareImageRenderer: IdShareImageRenderer,
-    private val sharingManager: SharingManager
+    private val sharingManager: SharingManager,
+    @param:ApplicationContext private val context: Context
 ) : BaseViewModel() {
     private val selectedCardId = MutableStateFlow<String?>(null)
     private val collectiblesShown = MutableStateFlow(false)
@@ -151,9 +155,16 @@ class PocketViewModel @Inject constructor(
 
     fun onShareId() = launchUnit {
         val idCard = cards.value.filterIsInstance<PocketCardUiModel.IdCard>().firstOrNull() ?: return@launchUnit
-        val text = "${idCard.username}\n${idCard.address}"
 
-        idShareImageRenderer.render(idCard.username, idCard.address)
+        interactor.getAppSharingUrl()
+            .onSuccess { url -> shareId(idCard, url) }
+            .onFailure { showPresentationError(ShareIdFailedPresentationError(it)) }
+    }
+
+    private suspend fun shareId(idCard: PocketCardUiModel.IdCard, appSharingUrl: String) {
+        val text = context.getString(RCommon.string.pocket_id_share_message, appSharingUrl, idCard.username)
+
+        idShareImageRenderer.render(idCard.address)
             .logFailure("PocketViewModel: failed to render ID share image")
             .onSuccess { uri ->
                 sharingManager.shareContent(
