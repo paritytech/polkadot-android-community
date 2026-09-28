@@ -4,7 +4,6 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.types.BSResult
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.DerivationIndex32
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingCollectionId
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.ProductProofContext
 import io.paritytech.polkadotapp.feature_products_api.domain.accountsProtocol.RingLocation
@@ -21,7 +20,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 private val SESSION_ID = SsoSessionId("session")
-private val TLD = requireNotNull(DotNsTld.parse("dot"))
 private const val REQUEST_ID = "request"
 
 private val CALLER = ProductId.fromStoredValue("game.dot")
@@ -50,7 +48,7 @@ class SsoRingVrfKeyMessageTest {
             )
         )
 
-        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
+        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID).getOrThrow()
 
         val content = decoded.content as SsoSessionRequest.Content.RegisterRingVrfKeyRequest
         assertEquals(CALLER, content.callingProduct)
@@ -68,7 +66,7 @@ class SsoRingVrfKeyMessageTest {
             )
         )
 
-        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
+        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID).getOrThrow()
 
         val content = decoded.content as SsoSessionRequest.Content.ListRingVrfKeysRequest
         assertEquals("peopl.dot", content.owner.value)
@@ -86,7 +84,7 @@ class SsoRingVrfKeyMessageTest {
             )
         )
 
-        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
+        val decoded = request.toEncodedMessage().toSsoSessionRequest(SESSION_ID).getOrThrow()
 
         val content = decoded.content as SsoSessionRequest.Content.RingVrfSignRequest
         assertEquals(KEY_HANDLE, content.keyHandle)
@@ -99,12 +97,12 @@ class SsoRingVrfKeyMessageTest {
 
         val alias = requestWith(
             SsoSessionRequest.Content.AliasRequest(CALLER, KEY_HANDLE, context, RING)
-        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
+        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID).getOrThrow()
         assertEquals(KEY_HANDLE, (alias.content as SsoSessionRequest.Content.AliasRequest).keyHandle)
 
         val proof = requestWith(
             SsoSessionRequest.Content.CreateProofRequest(CALLER, KEY_HANDLE, context, RING, ByteArray(4))
-        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID, TLD).getOrThrow()
+        ).toEncodedMessage().toSsoSessionRequest(SESSION_ID).getOrThrow()
         assertEquals(KEY_HANDLE, (proof.content as SsoSessionRequest.Content.CreateProofRequest).keyHandle)
     }
 

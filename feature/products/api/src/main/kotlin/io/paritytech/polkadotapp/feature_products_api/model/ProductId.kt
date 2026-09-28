@@ -51,6 +51,15 @@ data class ProductId private constructor(val value: String) {
         fun fromStoredValue(value: String): ProductId = ProductId(value)
 
         /**
+         * Reconstruct ProductId from a value a paired peer sent over the wire.
+         *
+         * Normalizes exactly as [fromString] does, but does not require the id to carry this
+         * device's TLD. A product id names the same product on every network, so a peer may
+         * legitimately send one minted under a different suffix.
+         */
+        fun fromWireValue(value: String): ProductId = ProductId(value.lowercase().dropExecutableLabel())
+
+        /**
          * `app.coinflip.dot` names an executable of `coinflip.dot`, not a product of its own, so
          * the label is dropped — unless dropping it would leave the bare TLD, since `app.dot` is a
          * legitimate product.
