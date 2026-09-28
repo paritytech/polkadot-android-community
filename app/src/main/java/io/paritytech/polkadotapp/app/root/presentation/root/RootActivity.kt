@@ -33,6 +33,8 @@ import io.paritytech.polkadotapp.common.presentation.formatters.time.TimeFormatt
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotificationHost
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotifier
 import io.paritytech.polkadotapp.common.presentation.notification.error
+import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
+import io.paritytech.polkadotapp.common.presentation.paymentAsset.PaymentAssetBrandProvider
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.ObserveViewModelEvents
 import io.paritytech.polkadotapp.common.utils.observe
@@ -55,6 +57,9 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
 
     @Inject
     lateinit var appNotifier: AppNotifier
+
+    @Inject
+    lateinit var paymentAssetBrandProvider: PaymentAssetBrandProvider
 
     private val viewModel by viewModels<RootViewModel>()
 
@@ -136,10 +141,14 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         val composeView = ComposeView(this).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                PolkadotTheme {
-                    ObserveViewModelEvents(viewModel, appNotifier)
+                val paymentAssetBrand by paymentAssetBrandProvider.brand.collectAsStateWithLifecycle()
 
-                    AppNotificationHost(notifier = appNotifier)
+                CompositionLocalProvider(LocalPaymentAssetBrand provides paymentAssetBrand) {
+                    PolkadotTheme {
+                        ObserveViewModelEvents(viewModel, appNotifier)
+
+                        AppNotificationHost(notifier = appNotifier)
+                    }
                 }
             }
         }
