@@ -11,11 +11,16 @@ import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.UsernameOf
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.VideoGamesProgressUseCase
 import io.paritytech.polkadotapp.test_shared.whenever
 import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
+import org.mockito.invocation.Invocation
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.startCoroutine
 
 private const val APP_SHARING_URL_KEY = "app_sharing_url"
 private const val APP_SHARING_URL = "https://example.com/app"
@@ -37,33 +42,50 @@ class PocketInteractorTest {
     )
 
     @Test
-    fun `the configured url is returned as is`() = runBlocking<Unit> {
-        withConfiguredUrl(APP_SHARING_URL)
+    fun `returns the synced url when it is set`() = runBlocking<Unit> {
+        withSyncedUrl(APP_SHARING_URL)
 
         assertEquals(Result.success(APP_SHARING_URL), interactor.getAppSharingUrl())
     }
 
     @Test
-    fun `an unset key fails instead of yielding an empty link`() = runBlocking<Unit> {
-        withConfiguredUrl("")
+    fun `fails when the key is unset`() = runBlocking<Unit> {
+        withSyncedUrl("")
 
         assertFailure(interactor.getAppSharingUrl())
     }
 
     @Test
-    fun `a failed config read fails`() = runBlocking<Unit> {
-        withConfigReadFailing()
+    fun `fails when the session never syncs`() = runBlocking<Unit> {
+        withSyncNeverCompleting()
 
         assertFailure(interactor.getAppSharingUrl())
     }
 
-    private suspend fun withConfiguredUrl(url: String) {
+    @Test
+    fun `fails when the synced read fails`() = runBlocking<Unit> {
+        withSyncedReadFailing()
+
+        assertFailure(interactor.getAppSharingUrl())
+    }
+
+    private suspend fun withSyncedUrl(url: String) {
         whenever(remoteConfigService.getSyncedString(APP_SHARING_URL_KEY)).thenReturn(Result.success(url))
     }
 
-    private suspend fun withConfigReadFailing() {
+    private suspend fun withSyncedReadFailing() {
         whenever(remoteConfigService.getSyncedString(APP_SHARING_URL_KEY))
             .thenReturn(Result.failure(IllegalStateException("not synced")))
+    }
+
+    private suspend fun withSyncNeverCompleting() {
+        whenever(remoteConfigService.getSyncedString(APP_SHARING_URL_KEY)).thenAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val continuation = (invocation as Invocation).rawArguments.last() as Continuation<Result<String>>
+            val waitForever: suspend () -> Result<String> = { awaitCancellation() }
+            waitForever.startCoroutine(continuation)
+            COROUTINE_SUSPENDED
+        }
     }
 
     private fun assertFailure(result: Result<String>) {
