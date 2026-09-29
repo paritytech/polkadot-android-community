@@ -18,19 +18,17 @@ import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetPr
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.UsernameOfAccountUseCase
 import io.paritytech.polkadotapp.feature_videogame_api.domain.state.VideoGamesProgressUseCase
+import io.paritytech.polkadotapp.feature_wallet_impl.data.config.AppSharingConfigRepository
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.DigitalDollarBalance
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.PocketRank
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.toPocketRank
-import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.seconds
 
 class PocketInteractor @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
@@ -42,7 +40,7 @@ class PocketInteractor @Inject constructor(
     private val accountRepository: AccountRepository,
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
-    private val remoteConfigService: RemoteConfigService
+    private val appSharingConfigRepository: AppSharingConfigRepository
 ) {
     fun observeBackupProgress(): Flow<BackupProgress> = coinageBackupService.subscribeProgress()
 
@@ -83,19 +81,5 @@ class PocketInteractor @Inject constructor(
         flowOf(PocketRank.Basic)
     }
 
-    suspend fun getAppSharingUrl(): Result<String> {
-        val synced = withTimeoutOrNull(APP_SHARING_URL_SYNC_WAIT) {
-            remoteConfigService.getSyncedString(APP_SHARING_URL_KEY)
-        } ?: Result.failure(IllegalStateException("Remote Config did not sync within $APP_SHARING_URL_SYNC_WAIT"))
-
-        return synced.mapCatching { url ->
-            require(url.isNotBlank()) { "Remote Config $APP_SHARING_URL_KEY is empty" }
-            url
-        }
-    }
-
-    private companion object {
-        const val APP_SHARING_URL_KEY = "app_sharing_url"
-        val APP_SHARING_URL_SYNC_WAIT = 3.seconds
-    }
+    suspend fun getAppSharingUrl(): Result<String> = appSharingConfigRepository.getAppSharingUrl()
 }
