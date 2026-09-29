@@ -17,6 +17,8 @@ import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDo
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.CoinageHoldingsInfo
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.CoinageBreakdownFactory
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.clearing
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.debug.CoinageTestDataMode
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.debug.generateHoldingsInfo
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageBalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
@@ -45,24 +47,33 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
      */
     private val detailsVisible = MutableStateFlow(false)
 
+    // TODO: remove with the debug test-data switch — see CoinageTestDataMode.
+    private val testDataMode = MutableStateFlow(CoinageTestDataMode.NONE)
+
     private val holdingsFlow: Flow<Result<CoinageHoldingsInfo>> = interactor.observeHoldings()
 
     val coinageState: StateFlow<LoadingState<CoinageUiState>> = combine(
         holdingsFlow,
         fundInProgress,
         interactor.observeActionsEnabled(),
-        detailsVisible
-    ) { holdingsResult, inProgress, actionsEnabled, expanded ->
+        detailsVisible,
+        testDataMode
+    ) { holdingsResult, inProgress, actionsEnabled, expanded, testMode ->
         val asset = interactor.asset()
 
-        holdingsResult.map { holdings ->
+        // TODO: remove with the debug test-data switch. Substituted here rather than downstream so that the
+        //  real ordering, wear ladder and balance partition still run over the generated holdings.
+        val shownHoldings = testMode.generatedHoldings() ?: holdingsResult
+
+        shownHoldings.map { holdings ->
             CoinageUiState(
                 tokensState = holdings.toTokensState(asset),
                 autoFundAvailable = interactor.autoFundAvailable(),
                 fundInProgress = inProgress,
                 actionsEnabled = actionsEnabled,
                 shareLogsEnabled = BuildConfig.TESTNET_FUND_ENABLED,
-                detailsVisible = expanded
+                detailsVisible = expanded,
+                testDataMode = testMode
             )
         }
     }
@@ -119,9 +130,23 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         detailsVisible.value = !detailsVisible.value
     }
 
+    // TODO: remove with the debug test-data switch — see CoinageTestDataMode.
+    fun onTestDataModeSelected(mode: CoinageTestDataMode) {
+        testDataMode.value = mode
+    }
+
     fun onShareLogsClick() = launchUnit {
         interactor.shareCoinageLogs()
             .onFailure { showPresentationError(ShareCoinageLogsFailedPresentationError(it)) }
+    }
+
+    // TODO: remove with the debug test-data switch — see CoinageTestDataMode.
+    private suspend fun CoinageTestDataMode.generatedHoldings(): Result<CoinageHoldingsInfo>? {
+        if (this == CoinageTestDataMode.NONE) return null
+
+        return interactor.coinageConversion().mapCatching { conversion ->
+            with(conversion) { generateHoldingsInfo() } ?: error("a mode past NONE always generates")
+        }
     }
 
     private fun CoinageHoldingsInfo.toTokensState(asset: Chain.Asset) = CoinageUiState.TokensState(

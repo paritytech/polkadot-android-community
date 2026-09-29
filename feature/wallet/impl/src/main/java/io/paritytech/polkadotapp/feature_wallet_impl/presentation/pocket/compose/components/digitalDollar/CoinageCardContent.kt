@@ -15,6 +15,8 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.debug.CoinageTestDataMode
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.debug.CoinageTestDataSwitch
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageBalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -24,9 +26,19 @@ fun CoinageCardContent(
     state: CoinageUiState,
     onAutoFundClick: () -> Unit,
     onDetailsToggled: () -> Unit,
-    onShareLogsClick: () -> Unit
+    onShareLogsClick: () -> Unit,
+    onTestDataModeSelected: (CoinageTestDataMode) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.mediumIncreased)) {
+        // TODO: remove with the debug test-data switch — see CoinageTestDataMode.
+        if (FeatureOption.COINAGE_DEBUG_FEATURES.isEnabled) {
+            CoinageTestDataSwitch(
+                modifier = Modifier.fillMaxWidth(),
+                selected = state.testDataMode,
+                onSelected = onTestDataModeSelected
+            )
+        }
+
         CoinageStateCard(
             modifier = Modifier.fillMaxWidth(),
             state = state.tokensState,
