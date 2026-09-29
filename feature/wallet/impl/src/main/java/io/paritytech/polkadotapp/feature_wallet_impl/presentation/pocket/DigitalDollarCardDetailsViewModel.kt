@@ -15,13 +15,13 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmo
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDollarCardDetailsInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.CoinageHoldingsInfo
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.clearing
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.toCompositionUiModel
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.mapper.toUiModels
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.CoinageBreakdownFactory
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.clearing
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageBalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.DigitalDollarCardDetailsUiState
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,31 +40,29 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     private val fundInProgress = MutableStateFlow(false)
 
     /**
-     * Owned here rather than remembered in the card, so an expanded key or details list outlives the
-     * holdings updating underneath it.
+     * Owned here rather than remembered in the card, so the spread grid outlives the holdings updating
+     * underneath it.
      */
     private val detailsVisible = MutableStateFlow(false)
-    private val keyVisible = MutableStateFlow(false)
 
     private val holdingsFlow: Flow<Result<CoinageHoldingsInfo>> = interactor.observeHoldings()
-
-    private val cardToggles = combine(detailsVisible, keyVisible, ::Pair)
 
     val coinageState: StateFlow<LoadingState<CoinageUiState>> = combine(
         holdingsFlow,
         fundInProgress,
         interactor.observeActionsEnabled(),
-        cardToggles
-    ) { holdingsResult, inProgress, actionsEnabled, toggles ->
+        detailsVisible
+    ) { holdingsResult, inProgress, actionsEnabled, expanded ->
+        val asset = interactor.asset()
+
         holdingsResult.map { holdings ->
             CoinageUiState(
-                tokensState = holdings.toTokensState(interactor.asset()),
+                tokensState = holdings.toTokensState(asset),
                 autoFundAvailable = interactor.autoFundAvailable(),
                 fundInProgress = inProgress,
                 actionsEnabled = actionsEnabled,
                 shareLogsEnabled = BuildConfig.TESTNET_FUND_ENABLED,
-                detailsVisible = toggles.first,
-                keyVisible = toggles.second
+                detailsVisible = expanded
             )
         }
     }
@@ -121,10 +119,6 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         detailsVisible.value = !detailsVisible.value
     }
 
-    fun onKeyToggled() {
-        keyVisible.value = !keyVisible.value
-    }
-
     fun onShareLogsClick() = launchUnit {
         interactor.shareCoinageLogs()
             .onFailure { showPresentationError(ShareCoinageLogsFailedPresentationError(it)) }
@@ -134,8 +128,7 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
         totalBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.total)),
         readyBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.availablePrivate)),
         clearingBalance = tokenAmountMapper.mapFrom(asset.withAmount(balance.clearing)),
-        composition = balance.toCompositionUiModel(),
-        holdings = holdings.toUiModels(asset, tokenAmountMapper),
+        coins = CoinageBreakdownFactory.coins(holdings).toImmutableList(),
         breakdown = CoinageBalanceBreakdownUiModel(
             availablePrivate = tokenAmountMapper.mapFrom(asset.withAmount(balance.availablePrivate)),
             gainingPrivacy = tokenAmountMapper.mapFrom(asset.withAmount(balance.gainingPrivacy.amount)),
