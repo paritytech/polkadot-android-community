@@ -6,11 +6,13 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.common.BuildConfig
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.PresentationThrowable
 import io.paritytech.polkadotapp.common.utils.disable
 import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.withLoading
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
+import io.paritytech.polkadotapp.feature_products_api.domain.FundingConfig
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDollarCardDetailsInteractor
@@ -38,6 +40,7 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     private val tokenAmountMapper: TokenAmountMapper
 ) : BaseViewModel() {
     private val fundInProgress = MutableStateFlow(false)
+    private val fundingSheetInProgress = MutableStateFlow(false)
 
     /**
      * Owned here rather than remembered in the card, so an expanded key or details list outlives the
@@ -85,17 +88,9 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
             )
         )
 
-    fun onGetCashClick() = launchUnit {
-        interactor.getFundingConfig()
-            .onSuccess { router.openSpaSheet(it.onrampUrl) }
-            .onFailure { showPresentationError(GetCashUnavailablePresentationError(it)) }
-    }
+    fun onGetCashClick() = openFundingSheet(FundingConfig::onrampUrl, ::GetCashUnavailablePresentationError)
 
-    fun onWithdrawClick() = launchUnit {
-        interactor.getFundingConfig()
-            .onSuccess { router.openSpaSheet(it.offrampUrl) }
-            .onFailure { showPresentationError(WithdrawUnavailablePresentationError(it)) }
-    }
+    fun onWithdrawClick() = openFundingSheet(FundingConfig::offrampUrl, ::WithdrawUnavailablePresentationError)
 
     fun onSendClick() {
         router.openSendPayment()
@@ -128,6 +123,18 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     fun onShareLogsClick() = launchUnit {
         interactor.shareCoinageLogs()
             .onFailure { showPresentationError(ShareCoinageLogsFailedPresentationError(it)) }
+    }
+
+    private fun openFundingSheet(
+        urlOf: (FundingConfig) -> String,
+        error: (Throwable) -> PresentationThrowable
+    ) = launchUnit {
+        if (fundingSheetInProgress.value) return@launchUnit
+        fundingSheetInProgress.enable()
+        interactor.getFundingConfig()
+            .onSuccess { router.openSpaSheet(urlOf(it)) }
+            .onFailure { showPresentationError(error(it)) }
+        fundingSheetInProgress.disable()
     }
 
     private fun CoinageHoldingsInfo.toTokensState(asset: Chain.Asset) = CoinageUiState.TokensState(
