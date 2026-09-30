@@ -4,7 +4,6 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.data.network.TestnetEnvironment
 import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinageBalanceConversionContext
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBackupService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -40,16 +39,6 @@ class DigitalDollarCardDetailsInteractor @Inject constructor(
     suspend fun getFundingConfig(): Result<FundingConfig> = fundingDomainProvider.getFundingConfig()
 
     suspend fun asset(): Chain.Asset = chainAssetProvider.asset()
-
-    /**
-     * TODO: remove with the debug test-data switch.
-     *
-     * Generated holdings need the same exponent-to-balance conversion the real ones get. How many plancks a
-     * denomination is worth is read off the coinage instance on chain, so it cannot be worked out from the
-     * asset alone.
-     */
-    suspend fun coinageConversion(): Result<CoinageBalanceConversionContext> =
-        coinageBalanceConverterUseCase.create()
 
     /**
      * The four figures and the rows beneath them, off one classification.

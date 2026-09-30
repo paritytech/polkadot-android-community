@@ -45,7 +45,6 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.DigitalDollarCardDetailsViewModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketCardSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketContentSlide
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.debug.CoinageTestDataMode
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageBalanceBreakdownUiModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.CoinageUiState
@@ -81,9 +80,7 @@ fun DigitalDollarCardDetails(
         onDetailsToggled = viewModel::onDetailsToggled,
         onShareLogsClick = viewModel::onShareLogsClick,
         onBackupUpdateClick = viewModel::onBackupUpdateClick,
-        onBackupCloseClick = viewModel::onBackupCloseClick,
-        // TODO: remove with the debug test-data switch — see CoinageTestDataMode.
-        onTestDataModeSelected = viewModel::onTestDataModeSelected
+        onBackupCloseClick = viewModel::onBackupCloseClick
     )
 }
 
@@ -101,8 +98,7 @@ private fun DigitalDollarCardDetailsContent(
     onDetailsToggled: () -> Unit,
     onShareLogsClick: () -> Unit,
     onBackupUpdateClick: () -> Unit,
-    onBackupCloseClick: () -> Unit,
-    onTestDataModeSelected: (CoinageTestDataMode) -> Unit
+    onBackupCloseClick: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize()
@@ -180,8 +176,7 @@ private fun DigitalDollarCardDetailsContent(
                         state = coinageState,
                         onAutoFundClick = onAutoFundClick,
                         onDetailsToggled = onDetailsToggled,
-                        onShareLogsClick = onShareLogsClick,
-                        onTestDataModeSelected = onTestDataModeSelected
+                        onShareLogsClick = onShareLogsClick
                     )
                 }
             }
@@ -266,8 +261,7 @@ private fun DigitalDollarCardDetailsPreview() {
                         fundInProgress = false,
                         actionsEnabled = true,
                         shareLogsEnabled = true,
-                        detailsVisible = false,
-                        testDataMode = CoinageTestDataMode.NONE
+                        detailsVisible = false
                     )
                 ),
                 state = DigitalDollarCardDetailsUiState(
@@ -280,8 +274,7 @@ private fun DigitalDollarCardDetailsPreview() {
                 onDetailsToggled = {},
                 onShareLogsClick = {},
                 onBackupUpdateClick = {},
-                onBackupCloseClick = {},
-                onTestDataModeSelected = {}
+                onBackupCloseClick = {}
             )
         }
     }
