@@ -29,6 +29,7 @@ class CoinageRenderThread(
     private val lock = Object()
     private var running = true
     private var awake = true
+    private var isVisible = true
 
     private var pixelWidth = 0
     private var pixelHeight = 0
@@ -85,6 +86,29 @@ class CoinageRenderThread(
         wake()
     }
 
+    /**
+     * Follows the card on and off the screen.
+     *
+     * Nothing here is driven by a system-owned display link, so nothing pauses it for us: backgrounding the
+     * app leaves the view attached, which used to leave the sensor registered and the loop free to draw into
+     * a surface no one was looking at. iOS gets this for free from `CADisplayLink`; a hand-rolled loop has
+     * to be told.
+     */
+    fun setVisible(visible: Boolean) = synchronized(lock) {
+        if (visible == isVisible) return@synchronized
+
+        isVisible = visible
+
+        if (visible) {
+            tilt.start()
+            lastFrame = 0L
+            wake()
+        } else {
+            tilt.stop()
+            lock.notifyAll()
+        }
+    }
+
     fun shutdown() {
         synchronized(lock) {
             running = false
@@ -111,6 +135,7 @@ class CoinageRenderThread(
             Timber.e(error, "CoinageRenderThread: the frame loop stopped")
         } finally {
             tilt.stop()
+            tilt.onMove = null
             renderer?.release()
             releaseEgl()
         }
@@ -119,7 +144,7 @@ class CoinageRenderThread(
     private fun loop() {
         while (true) {
             synchronized(lock) {
-                while (running && !awake) lock.wait()
+                while (running && (!awake || !isVisible)) lock.wait()
 
                 if (!running) return
             }

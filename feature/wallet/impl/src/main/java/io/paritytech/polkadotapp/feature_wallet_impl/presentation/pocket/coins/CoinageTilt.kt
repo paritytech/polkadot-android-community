@@ -139,13 +139,19 @@ class CoinageTilt(context: Context) : SensorEventListener {
         sensors?.registerListener(this, sensor, INTERVAL_MICROSECONDS)
     }
 
+    /**
+     * Lets go of the sensor. A pause rather than a teardown: [onMove] is the caller's and survives, so the
+     * same instance can be started again when the card comes back on screen.
+     *
+     * Neutral does not survive. A phone that was put somewhere else while nobody was looking should come
+     * back square, and the first reading after starting is taken as neutral outright.
+     */
     fun stop() {
         sensors?.unregisterListener(this)
         neutral = null
         previous = null
         stillFor = 0.0
         lastReading = 0L
-        onMove = null
     }
 
     /**
@@ -207,11 +213,26 @@ class CoinageTilt(context: Context) : SensorEventListener {
         this.previous = pose
         target = settled.turnTo(pose)
 
-        if (!isSettled) onMove?.invoke()
+        if (isWorthWaking) onMove?.invoke()
     }
 
-    private val isSettled: Boolean
-        get() = maxOf(abs(target.x - turn.x), abs(target.y - turn.y), abs(target.z - turn.z)) <= EPSILON
+    /** Where the studio is against where it is heading, on whichever axis is furthest off. */
+    private val offset: Double
+        get() = maxOf(abs(target.x - turn.x), abs(target.y - turn.y), abs(target.z - turn.z))
+
+    /** Arrived: close enough that another frame would move nothing. */
+    private val isSettled: Boolean get() = offset <= REST_BAND
+
+    /**
+     * Far enough out to be worth a frame.
+     *
+     * Deliberately much coarser than [isSettled]. Waking on the resting threshold meant waking on anything
+     * at all: it works out to four hundredths of a degree of tilt, which is under the sensor's own noise
+     * floor, so a phone merely held in a hand woke the renderer sixty times a second and redrew every coin
+     * for as long as the card was open. This is only the lighting — a degree of it is not visible — and
+     * once awake the studio still eases the whole way in, so a real movement is as smooth as it ever was.
+     */
+    private val isWorthWaking: Boolean get() = offset > WAKE_BAND
 
     companion object {
         /**
@@ -256,7 +277,17 @@ class CoinageTilt(context: Context) : SensorEventListener {
          */
         const val SMOOTHING = 8.0
 
-        private const val EPSILON = 0.0008
+        /** Arrived. Fine, because it only decides when to stop easing, not when to start. */
+        private const val REST_BAND = 0.0008
+
+        /**
+         * A degree of the phone's own tilt, converted into the studio's turn.
+         *
+         * An order of magnitude above hand tremor and sensor noise, and an order below a deliberate
+         * movement, which is the whole width of the gap this has to sit in.
+         */
+        private val WAKE_BAND = TRAVEL / RANGE * (PI / 180)
+
         private const val INTERVAL_MICROSECONDS = 16_667
         private const val INTERVAL_SECONDS = 1.0 / 60
         private const val MIN_INTERVAL = 1.0 / 240

@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins
 
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -72,6 +73,33 @@ class CoinageTiltTest {
         }
     }
 
+    /**
+     * The renderer is woken only when the light has somewhere to go, and hand tremor is not somewhere to go.
+     *
+     * This cannot be caught on an emulator: its gravity sensor is synthetic and returns the same reading to
+     * the last digit, so the loop parks there however tight the threshold is. On a phone the old threshold
+     * sat under the sensor's own noise floor, and every reading redrew every coin.
+     */
+    @Test
+    fun `tremor does not wake the renderer, a real tilt does`() {
+        assertEquals("tremor woke the renderer", 0, wakeCount(List(TREMOR_READINGS) { TREMOR * if (it % 2 == 0) 1 else -1 }))
+        assertEquals("a deliberate tilt did not wake it", 1, wakeCount(listOf(DELIBERATE)))
+    }
+
+    /** How many of [rolls], fed one reading at a time from square, asked for a frame. */
+    private fun wakeCount(rolls: List<Double>): Int {
+        val tilt = CoinageTilt(mockk(relaxed = true))
+        var woken = 0
+
+        tilt.onMove = { woken++ }
+        // The first reading becomes neutral outright, so the light has nowhere to go from it.
+        tilt.absorb(pose(roll = 0.0, lean = 0.0), FRAME)
+
+        rolls.forEach { tilt.absorb(pose(roll = it, lean = 0.0), FRAME) }
+
+        return woken
+    }
+
     /** Gravity in the phone's frame for a device rolled and leaned by the given angles. */
     private fun pose(roll: Double, lean: Double): CoinageTilt.Pose {
         // Down, in the device frame: upright portrait is -y, leaning back tips it toward -z, rolling right
@@ -85,6 +113,12 @@ class CoinageTiltTest {
     private fun hypot(a: Double, b: Double) = sqrt(a * a + b * b)
 
     private companion object {
+        /** Well above a gravity sensor's noise floor, well below anything anyone means to do. */
+        const val TREMOR = 0.3 * PI / 180
+        const val DELIBERATE = 5.0 * PI / 180
+        const val TREMOR_READINGS = 40
+        const val FRAME = 1.0 / 60
+
         const val TOLERANCE = 1e-9
         const val EIGHTH_TURN = PI / 4
         const val FIVE_DEGREES = 5 * PI / 180

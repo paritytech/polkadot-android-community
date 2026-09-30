@@ -91,4 +91,15 @@ class CoinageCoinsView(context: Context) : FrameLayout(context), TextureView.Sur
     }
 
     override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
+
+    /**
+     * Covers the window going away as well as this view being hidden, which is what makes it the right hook
+     * for the app being backgrounded — the view stays attached through that, so the surface callbacks say
+     * nothing about it.
+     */
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+
+        thread?.setVisible(isVisible)
+    }
 }
