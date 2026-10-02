@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -58,6 +59,12 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
          * pass holds out for a complete set — never how long claiming goes on, which is the caller's window.
          */
         val DETECTION_TIMEOUT = 30.seconds
+
+        /**
+         * The longest a submitted claim is rebuilt for after failing. Its deadline is persisted with the
+         * transaction, so it must stay finite even when the caller's window has no end.
+         */
+        val MAX_REBUILD_WINDOW = 6.hours
     }
 
     override fun claim(
@@ -180,7 +187,9 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     ) {
         coinageLogI("Claim submitting group=${groupId.value} claims=${claimable.size}")
 
-        submissionUseCase(claimable.keys.mapNotNull(keys::get), claimable, groupId, retryUntil)
+        val rebuildUntil = minOf(retryUntil, timeProvider.now() + MAX_REBUILD_WINDOW)
+
+        submissionUseCase(claimable.keys.mapNotNull(keys::get), claimable, groupId, rebuildUntil)
             .onFailure { coinageLogE("Claim submission failed group=${groupId.value}", it) }
     }
 
