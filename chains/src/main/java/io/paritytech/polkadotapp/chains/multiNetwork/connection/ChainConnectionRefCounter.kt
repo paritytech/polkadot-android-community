@@ -5,6 +5,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,6 +44,15 @@ suspend fun <R> ChainConnectionRefCounter.withConnectionEnabled(
     block: suspend () -> R
 ): R {
     return withConnectionEnabled(setOf(chainId), label, block)
+}
+
+/** Keeps [chainId] connected for as long as the returned flow is collected. */
+fun <T> Flow<T>.holdingConnection(
+    refCounter: ChainConnectionRefCounter,
+    chainId: ChainId,
+    label: String,
+): Flow<T> = flow {
+    refCounter.withConnectionEnabled(chainId, label) { emitAll(this@holdingConnection) }
 }
 
 interface EnabledChainConnectionReference {
