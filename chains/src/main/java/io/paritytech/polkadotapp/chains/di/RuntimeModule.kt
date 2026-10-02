@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.chains.call.RealMultiChainViewFunctionsApi
 import io.paritytech.polkadotapp.chains.extrinsic.visitor.call.api.CallTraversal
 import io.paritytech.polkadotapp.chains.extrinsic.visitor.call.impl.RealCallTraversal
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
+import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.requests.StorageSharedRequestsBuilderFactory
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.ChainEventsRepositoryFactory
 import io.paritytech.polkadotapp.chains.multiNetwork.runtime.repository.DbRuntimeVersionsRepository
@@ -84,8 +85,9 @@ internal class RuntimeModule {
         chainRegistry: ChainRegistry,
         bulkRetriever: BulkRetriever,
         sharedRequestsBuilderFactory: StorageSharedRequestsBuilderFactory,
+        chainConnectionRefCounter: ChainConnectionRefCounter,
     ): RemoteStorageQueryContextFactory {
-        return RemoteStorageQueryContextFactory(chainRegistry, bulkRetriever, sharedRequestsBuilderFactory)
+        return RemoteStorageQueryContextFactory(chainRegistry, bulkRetriever, sharedRequestsBuilderFactory, chainConnectionRefCounter)
     }
 
     @Provides

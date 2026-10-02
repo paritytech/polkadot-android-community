@@ -374,6 +374,20 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     /**
+     * The window closed without the chain ever answering — a socket that stayed paused in the background
+     * looks exactly like this. Silence is not evidence that the coins never arrived, so it settles nothing.
+     */
+    @Test
+    fun `the window closing does not end a claim the chain never answered`() = runTest {
+        val coin = key(1)
+        every { timeProvider.now() } returns WINDOW_CLOSED
+        givenChainSees()
+        givenGroupReports(noEntries())
+
+        assertDoesNotComplete(coin)
+    }
+
+    /**
      * A payment received long ago whose coin only now shows on chain. It is still the peer's money waiting to
      * be collected, and the window has nothing to say about it.
      *

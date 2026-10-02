@@ -7,6 +7,8 @@ import io.novasama.substrate_sdk_android.wsrpc.request.runtime.storage.storageCh
 import io.novasama.substrate_sdk_android.wsrpc.subscriptionFlow
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
+import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
+import io.paritytech.polkadotapp.chains.multiNetwork.connection.holdingConnection
 import io.paritytech.polkadotapp.chains.multiNetwork.getRuntime
 import io.paritytech.polkadotapp.chains.multiNetwork.getSocket
 import io.paritytech.polkadotapp.chains.multiNetwork.requests.StorageSharedRequestsBuilderFactory
@@ -20,10 +22,14 @@ import io.paritytech.polkadotapp.common.utils.withFlowScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+// A subscription collected in the background is otherwise left on a paused socket that never answers
+private const val CONNECTION_LABEL = "RemoteStorageSubscription"
+
 class RemoteStorageQueryContextFactory(
     private val chainRegistry: ChainRegistry,
     private val bulkRetriever: BulkRetriever,
     private val storageSharedRequestsBuilderFactory: StorageSharedRequestsBuilderFactory,
+    private val chainConnectionRefCounter: ChainConnectionRefCounter,
 ) {
     suspend fun create(
         chainId: ChainId,
@@ -37,6 +43,7 @@ class RemoteStorageQueryContextFactory(
             socketService = socketService,
             subscriptionBuilder = subscriptionBuilder,
             storageSharedRequestsBuilderFactory = storageSharedRequestsBuilderFactory,
+            chainConnectionRefCounter = chainConnectionRefCounter,
             chainId = chainId,
             at = at,
             runtime = runtime
@@ -49,6 +56,7 @@ private class RemoteStorageQueryContext(
     private val socketService: SocketService,
     private val subscriptionBuilder: SubstrateSubscriptionBuilder?,
     private val storageSharedRequestsBuilderFactory: StorageSharedRequestsBuilderFactory,
+    private val chainConnectionRefCounter: ChainConnectionRefCounter,
     chainId: ChainId,
     at: BlockHash?,
     runtime: RuntimeSnapshot,
@@ -82,7 +90,7 @@ private class RemoteStorageQueryContext(
     }
 
     override fun observeKey(key: String): Flow<StorageUpdate> {
-        return subscriptionBuilder?.subscribe(key)?.map {
+        val updates = subscriptionBuilder?.subscribe(key)?.map {
             StorageUpdate(
                 value = it.value,
                 at = it.block
@@ -96,16 +104,20 @@ private class RemoteStorageQueryContext(
                     at = storageChange.block
                 )
             }
+
+        return updates.holdingConnection(chainConnectionRefCounter, chainId, CONNECTION_LABEL)
     }
 
     // TODO To this is not quite efficient implementation as we are de-multiplexing arrived keys into multiple flows (in sdk) and them merging them back
     // Instead, we should allow batch subscriptions on sdk level
     override suspend fun observeKeys(keys: List<String>): Flow<Map<String, String?>> {
-        return if (subscriptionBuilder != null) {
+        val updates = if (subscriptionBuilder != null) {
             subscribeViaExternalBuilder(keys, subscriptionBuilder)
         } else {
             subscribeViaOwnBuilder(keys)
         }
+
+        return updates.holdingConnection(chainConnectionRefCounter, chainId, CONNECTION_LABEL)
     }
 
     private fun subscribeViaExternalBuilder(
