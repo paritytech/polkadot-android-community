@@ -111,6 +111,8 @@ class CoinagePaymentProcessingExtension @Inject constructor(
         coinKeys: List<CoinPrivateKey>,
     ): Flow<Status> {
         val groupId = claimGroupOf(message.id)
+        // TODO: this deadline is persisted in every durable claim's submission params. If it is ever changed,
+        //  add a migration that updates the stored deadlines too
         val retryUntil = Instant.DISTANT_FUTURE
 
         Timber.tag(COINAGE_LOG_TAG)

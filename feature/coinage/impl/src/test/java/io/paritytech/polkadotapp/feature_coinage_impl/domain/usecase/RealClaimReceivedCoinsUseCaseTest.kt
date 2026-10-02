@@ -47,7 +47,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.math.BigInteger
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -389,21 +388,6 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     /**
-     * The submission's rebuild deadline is persisted with the transaction, so a caller window with no end is
-     * capped from when the claim was submitted: otherwise it would store a deadline nothing could ever change.
-     */
-    @Test
-    fun `an endless window still bounds a claim's rebuilds`() = runTest {
-        val coin = key(1)
-        givenChainSees(listOf(coin.accountId))
-        givenGroupReports(noEntries())
-
-        withTimeoutOrNull(IDLE) { claimOf(coin, retryUntil = Instant.DISTANT_FUTURE).collect { } }
-
-        coVerify(exactly = 1) { submissionUseCase(any(), any(), groupId, WINDOW_OPEN + MAX_REBUILD_WINDOW) }
-    }
-
-    /**
      * A payment received long ago whose coin only now shows on chain. It is still the peer's money waiting to
      * be collected, and the window has nothing to say about it.
      *
@@ -639,8 +623,8 @@ class RealClaimReceivedCoinsUseCaseTest {
         coVerify(exactly = 1) { submissionUseCase(keys, any(), groupId, RETRY_UNTIL) }
     }
 
-    private fun claimOf(vararg coins: PeerCoin, retryUntil: Instant = RETRY_UNTIL): Flow<CoinageTransferDetection> =
-        useCase.claim(coins.map { it.privateKey }, groupId, retryUntil)
+    private fun claimOf(vararg coins: PeerCoin): Flow<CoinageTransferDetection> =
+        useCase.claim(coins.map { it.privateKey }, groupId, RETRY_UNTIL)
 
     /**
      * Everything the claim says before it either finishes or runs out of anything to react to.
@@ -802,7 +786,6 @@ class RealClaimReceivedCoinsUseCaseTest {
         val IDLE = 60.seconds
 
         val RETRY_UNTIL = Instant.fromEpochSeconds(1_000)
-        val MAX_REBUILD_WINDOW = 6.hours
         val WINDOW_OPEN = Instant.fromEpochSeconds(500)
         val WINDOW_CLOSED = Instant.fromEpochSeconds(1_500)
 
