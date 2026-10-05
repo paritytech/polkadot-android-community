@@ -79,7 +79,7 @@ class DenominationTest {
     }
 
     @Test
-    fun `remainder after breakdown should be what the greedy pass leaves below the smallest coin`() {
+    fun `remainder after breakdown should be the uncovered planks when the amount is not a multiple of the smallest coin`() {
         assertEquals(Balance(BigInteger("500000000000000")), coinAmountBreakdown.remainderAfterBreakdown(BigDecimal("0.163")))
         assertEquals(Balance(BigInteger("1000000000000000")), coinAmountBreakdown.remainderAfterBreakdown(BigDecimal("0.001")))
     }

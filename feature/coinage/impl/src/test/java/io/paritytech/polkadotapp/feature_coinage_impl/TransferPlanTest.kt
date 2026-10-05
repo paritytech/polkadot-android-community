@@ -20,7 +20,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPla
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
 import io.paritytech.polkadotapp.test_shared.any
-import io.paritytech.polkadotapp.test_shared.argThat
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -233,14 +232,14 @@ class TransferPlannerTest {
     }
 
     @Test(timeout = PLAN_TIMEOUT_MS)
-    fun `should never break down the full amount when planning it`() = runBlocking<Unit> {
+    fun `should not break down the amount when it is far above the wallet`() = runBlocking<Unit> {
         val breakdown = withEveryBreakdownEmpty()
-        val recordingPlanner = TransferPlanner(testConversionContext, breakdown, 16)
+        val plannerWithSpiedBreakdown = TransferPlanner(testConversionContext, breakdown, 16)
 
-        val result = recordingPlanner.plan(THIRTY_DIGIT_AMOUNT, listOf(createCoin(exponent = 0), createCoin(exponent = 2)), emptyList())
+        val result = plannerWithSpiedBreakdown.plan(THIRTY_DIGIT_AMOUNT, listOf(createCoin(exponent = 0), createCoin(exponent = 2)), emptyList())
 
         assertFailsWith<InsufficientBalanceException>(result)
-        verifyNeverBrokenDown(breakdown, THIRTY_DIGIT_AMOUNT)
+        verifyNeverBrokenDown(breakdown)
     }
 
     @Test(timeout = PLAN_TIMEOUT_MS)
@@ -263,8 +262,8 @@ class TransferPlannerTest {
         return breakdown
     }
 
-    private fun verifyNeverBrokenDown(breakdown: CoinAmountBreakdown, amount: BigDecimal) {
-        verify(breakdown, never()).breakdown(argThat { it?.compareTo(amount) == 0 })
+    private fun verifyNeverBrokenDown(breakdown: CoinAmountBreakdown) {
+        verify(breakdown, never()).breakdown(any())
     }
 
     private fun assertCoinExponents(expected: List<Int>, coins: List<Coin>) =
