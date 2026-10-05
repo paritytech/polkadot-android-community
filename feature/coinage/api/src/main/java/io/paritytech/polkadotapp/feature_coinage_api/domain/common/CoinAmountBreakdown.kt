@@ -9,7 +9,7 @@ interface CoinAmountBreakdown {
 
     fun roundDownAmount(amount: BigDecimal): BigDecimal
 
-    /** What [breakdown] would leave unassigned, without building the list. */
+    /** The part of [amount], in planks, that is not a multiple of the smallest coin. */
     fun remainderAfterBreakdown(amount: BigDecimal): Balance
 }
 
