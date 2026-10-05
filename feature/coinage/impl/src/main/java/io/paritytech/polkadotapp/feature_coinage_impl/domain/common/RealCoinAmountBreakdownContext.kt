@@ -42,6 +42,15 @@ class RealCoinAmountBreakdownContext(
         return roundedPlanks.intoBalance().amountFromPlanks(precision)
     }
 
+    override fun remainderAfterBreakdown(amount: BigDecimal): Balance {
+        return allowedExponents.sortedDescending()
+            .fold(amount.planksFromAmount(precision).value) { remaining, exponent ->
+                val coinValue = exponent.valueInPlanks().value
+                if (remaining >= coinValue) remaining % coinValue else remaining
+            }
+            .intoBalance()
+    }
+
     private fun ValueExponent.valueInPlanks(): Balance {
         return coinageBalanceConvertionContext.formatExponentToBalance(this)
     }
