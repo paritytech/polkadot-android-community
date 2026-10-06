@@ -149,7 +149,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 67,
+    version = 68,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -287,6 +287,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 64, to = 65),
         // Add chat_messages.sortOrder (local storage order) and its indices
         AutoMigration(from = 66, to = 67),
+        // Add chat_requests delivery state (deliveryStatus, deliveredVia, lastDeliveredPeriod)
+        AutoMigration(from = 67, to = 68),
     ]
 )
 @TypeConverters(

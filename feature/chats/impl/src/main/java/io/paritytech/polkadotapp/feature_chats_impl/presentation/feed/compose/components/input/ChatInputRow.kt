@@ -59,6 +59,9 @@ import io.paritytech.polkadotapp.common.R as RCommon
 
 private val ChatInputMinHeight = 48.dp
 
+// Keeps a chat request inside the single 10 KiB statement a notification slot allows.
+private const val MAX_WELCOME_MESSAGE_LENGTH = 1000
+
 @Composable
 internal fun ChatInputRow(
     inputState: ChatInputUiState,
@@ -101,7 +104,11 @@ internal fun ChatInputRow(
                             showAttachmentButton = inputState.showAttachButton,
                             onClearReply = onClearReply,
                             onClearEdit = onClearEdit,
-                            onMessageChange = onMessageChange,
+                            onMessageChange = if (inputState.isChatRequest) {
+                                { text -> onMessageChange(text.take(MAX_WELCOME_MESSAGE_LENGTH)) }
+                            } else {
+                                onMessageChange
+                            },
                             onSendMessageClick = onSendMessageClick,
                             onPayClick = onPayClick,
                             onAttachClick = onAttachClick

@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.ChatRequestCrypto
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.ChatRequestProver
@@ -45,12 +44,21 @@ interface ChatRequestTransport {
         derivationDomain: SharedSecretDerivationDomain,
     ): Flow<Result<List<ChatRequestDecrypted>>>
 
-    suspend fun submitChatRequest(
+    suspend fun prepareChatRequestStatement(
         topics: OutgoingChatRequestTopics,
         request: ChatRequestDecrypted,
         derivationDomain: SharedSecretDerivationDomain,
-        statementSigner: MetaAccount,
-    ): Result<Unit>
+        statementProver: StatementStoreMessageProver,
+    ): Result<Statement>
+
+    suspend fun submitChatRequestStatement(statement: Statement): Result<Unit>
+
+    /** Whether a request signed by [signer] is still stored under [session]. */
+    suspend fun isChatRequestStored(
+        session: ChatRequestTopic.Session,
+        derivationDomain: SharedSecretDerivationDomain,
+        signer: AccountId,
+    ): Result<Boolean>
 }
 
 class RealChatRequestTransport @Inject constructor(
@@ -59,7 +67,6 @@ class RealChatRequestTransport @Inject constructor(
     private val chatRequestCrypto: ChatRequestCrypto,
     private val chatRequestProver: ChatRequestProver,
     private val encryptionFactory: CommunicationEncryption.Factory,
-    private val statementProverFactory: StatementStoreMessageProver.Factory
 ) : ChatRequestTransport {
     override suspend fun fetchChatRequests(
         topic: ChatRequestTopic,
@@ -96,16 +103,31 @@ class RealChatRequestTransport @Inject constructor(
         }.flowOn(coroutineDispatchers.io)
     }
 
-    override suspend fun submitChatRequest(
+    override suspend fun prepareChatRequestStatement(
         topics: OutgoingChatRequestTopics,
         request: ChatRequestDecrypted,
         derivationDomain: SharedSecretDerivationDomain,
-        statementSigner: MetaAccount,
-    ): Result<Unit> {
+        statementProver: StatementStoreMessageProver,
+    ): Result<Statement> {
         return encryptAndEncodeStatementData(request, peerPublicKey = topics.session.peerChatKey)
             .mapCatching { createChatRequestStatementBody(it, topics, derivationDomain) }
-            .mapCatching { createChatRequestStatement(it, statementSigner) }
-            .flatMap { statementStoreService.submitStatement(it) }
+            .mapCatching { statementProver.prepareSignedStatement(it) }
+    }
+
+    override suspend fun submitChatRequestStatement(statement: Statement): Result<Unit> {
+        return statementStoreService.submitStatement(statement)
+    }
+
+    override suspend fun isChatRequestStored(
+        session: ChatRequestTopic.Session,
+        derivationDomain: SharedSecretDerivationDomain,
+        signer: AccountId,
+    ): Result<Boolean> = withContext(coroutineDispatchers.io) {
+        val sessionTopic = session.toStatementTopic(derivationDomain)
+
+        statementStoreService.fetchStatements(TopicFilter.MatchAll(listOf(sessionTopic))).map { statements ->
+            statements.any { it.proof.publicKey.contentEquals(signer.value) }
+        }
     }
 
     private suspend fun createChatRequestStatementBody(
@@ -121,14 +143,6 @@ class RealChatRequestTransport @Inject constructor(
             data = statementData
         )
         return statementBody
-    }
-
-    private suspend fun createChatRequestStatement(
-        statementBody: Statement.Body,
-        statementSigner: MetaAccount,
-    ): Statement {
-        return statementProverFactory.createKeyPairProver(statementSigner)
-            .prepareSignedStatement(statementBody)
     }
 
     private suspend fun ChatRequestTopic.toStatementTopic(
