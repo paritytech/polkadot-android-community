@@ -20,11 +20,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyLogoTicker
+import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.PaymentAssetBrand
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
@@ -110,7 +108,6 @@ internal fun CoinageStateCard(
 @Composable
 private fun Headline(total: TokenAmountModel) {
     val formatter = LocalTokenAmountFormatter.current
-    val ticker = LocalPaymentAssetBrand.current.symbol
 
     Row(horizontalArrangement = Arrangement.spacedBy(HoldingGeometry.headlineSpacing)) {
         NovaText(
@@ -121,10 +118,8 @@ private fun Headline(total: TokenAmountModel) {
             color = PolkadotTheme.colors.fg.primary
         )
         NovaText(
-            modifier = Modifier
-                .alignByBaseline()
-                .semantics { contentDescription = ticker },
-            text = ticker.withCurrencyLogoTicker(),
+            modifier = Modifier.alignByBaseline(),
+            text = LocalPaymentAssetBrand.current.symbol.withCurrencyTickerStyle(PolkadotTheme.typography.headline.large),
             style = PolkadotTheme.typography.headline.large,
             color = PolkadotTheme.colors.fg.secondary
         )
