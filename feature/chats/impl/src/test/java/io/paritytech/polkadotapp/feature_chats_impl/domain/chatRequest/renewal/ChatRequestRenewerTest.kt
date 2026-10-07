@@ -43,7 +43,6 @@ class ChatRequestRenewerTest {
     @Before
     fun setUp() {
         every { allocator.currentPeriod() } returns period
-        coEvery { allocator.isSupported() } returns Result.success(true)
         coEvery { payloadLoader.load(contact, any()) } returns Result.success(payload)
         coEvery { publisher.republish(any(), payload, any()) } returns Result.success(Unit)
     }
@@ -110,7 +109,7 @@ class ChatRequestRenewerTest {
 
     private fun withClaimed(vararg accounts: ChatRequestDeliveryAccount) {
         val claimed = accounts.map { it.accountId }
-        coEvery { allocator.allocateAll(any()) } returns Result.success(claimed)
+        coEvery { allocator.initiateAllocations(any()) } returns Result.success(claimed)
     }
 
     private fun withStored(account: ChatRequestDeliveryAccount, stored: Boolean) {

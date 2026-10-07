@@ -38,17 +38,8 @@ class ChatRequestDeliveryAccountResolverTest {
     }
 
     @Test
-    fun `signs with our own account when the runtime has no notification slots`() = runBlocking<Unit> {
-        withNotificationSlotsSupported(false)
-
-        assertSame(usernameSigner, resolver.resolveFirstDelivery(contact, request).getOrThrow())
-    }
-
-    @Test
     fun `signs with the period account once its slot is claimed`() = runBlocking<Unit> {
-        withNotificationSlotsSupported(true)
         withAllocation(Result.success(Unit))
-        withAllocationLanding()
 
         val signer = resolver.resolveFirstDelivery(contact, request).getOrThrow()
 
@@ -57,7 +48,6 @@ class ChatRequestDeliveryAccountResolverTest {
 
     @Test
     fun `falls back to our own account when no slot is free`() = runBlocking<Unit> {
-        withNotificationSlotsSupported(true)
         withAllocation(Result.failure(NotificationAllocationError.NoFreeSlotInPeriod(accountId)))
 
         assertSame(usernameSigner, resolver.resolveFirstDelivery(contact, request).getOrThrow())
@@ -65,25 +55,14 @@ class ChatRequestDeliveryAccountResolverTest {
 
     @Test
     fun `fails instead of falling back when the claim did not land in time`() = runBlocking<Unit> {
-        withNotificationSlotsSupported(true)
-        withAllocation(Result.success(Unit))
-        coEvery { allocator.awaitAllocated(accountId, any()) } returns
-            Result.failure(NotificationAllocationError.Timeout(accountId, kotlin.time.Duration.ZERO))
+        withAllocation(Result.failure(NotificationAllocationError.Timeout(accountId, kotlin.time.Duration.ZERO)))
 
         val error = resolver.resolveFirstDelivery(contact, request).exceptionOrNull()
 
         assertTrue(error is NotificationAllocationError.Timeout)
     }
 
-    private fun withNotificationSlotsSupported(supported: Boolean) {
-        coEvery { allocator.isSupported() } returns Result.success(supported)
-    }
-
     private fun withAllocation(result: Result<Unit>) {
-        coEvery { allocator.allocate(accountId) } returns result
-    }
-
-    private fun withAllocationLanding() {
-        coEvery { allocator.awaitAllocated(accountId, any()) } returns Result.success(Unit)
+        coEvery { allocator.allocate(accountId, any()) } returns result
     }
 }

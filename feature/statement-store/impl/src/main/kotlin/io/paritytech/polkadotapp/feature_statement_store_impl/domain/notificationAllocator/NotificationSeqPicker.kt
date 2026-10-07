@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.domain.notificati
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchAlias
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
+import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
@@ -13,30 +14,33 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.data.repository.No
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAllocator.AllocateContext
 import javax.inject.Inject
 
-/** Free notification slots of the current period: People before LitePeople, ascending seq within each. */
+/**
+ * Free notification slots of the current period: People before LitePeople, ascending seq within each. A slot
+ * reserved for [forTarget] counts as free for it; slots reserved for anyone else never do.
+ */
 class NotificationSeqPicker @Inject constructor(
     private val notificationSlotRepository: NotificationSlotRepository,
     private val bandersnatchKeyResolver: BandersnatchKeyResolver,
     private val dotNsTldProvider: DotNsTldProvider,
     private val reservations: NotificationSeqReservations,
 ) {
-    suspend fun freeSlots(context: AllocateContext): Result<List<NotificationSlot>> {
-        return context.availableCollections
-            .sortedBy { if (it == PeopleCollection.People) 0 else 1 }
-            .map { collection -> freeSlotsIn(context, collection) }
+    suspend fun freeSlots(context: AllocateContext, forTarget: AccountId?): Result<List<NotificationSlot>> {
+        val reserved = reservations.reservedIn(context.period, exceptFor = forTarget)
+        val collections = context.availableCollections.sortedBy { if (it == PeopleCollection.People) 0 else 1 }
+
+        return collections
+            .map { collection -> unregisteredSlotsIn(context, collection) }
             .flattenResult()
-            .map { it.flatten() }
+            .map { slots -> slots.flatten().filterNot { it in reserved } }
     }
 
-    private suspend fun freeSlotsIn(context: AllocateContext, collection: PeopleCollection): Result<List<NotificationSlot>> {
+    private suspend fun unregisteredSlotsIn(context: AllocateContext, collection: PeopleCollection): Result<List<NotificationSlot>> {
         return notificationSlotRepository.highestSeqPerPeriod(collection).flatMap { highestSeq ->
             val aliasBySeq = aliasesBySeq(collection, context.period, highestSeq)
 
             notificationSlotRepository.registeredAliases(context.chain.id, aliasBySeq.values).map { registered ->
-                val reserved = reservations.reservedIn(context.period)
-                aliasBySeq.filterValues { it !in registered }.keys
-                    .map { seq -> NotificationSlot(collection, context.period, seq) }
-                    .filterNot { it in reserved }
+                val unregisteredSeqs = aliasBySeq.filterValues { it !in registered }.keys
+                unregisteredSeqs.map { seq -> NotificationSlot(collection, context.period, seq) }
             }
         }
     }

@@ -1,17 +1,11 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.notificationAllocator
 
-import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
-import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
-import io.paritytech.polkadotapp.chains.multiNetwork.getRuntime
-import io.paritytech.polkadotapp.chains.util.hasCall
-import io.paritytech.polkadotapp.chains.util.resources
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.common.utils.mapErrorNotInstance
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
-import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.SET_NOTIFICATION_STATEMENT_ACCOUNT_CALL
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationAllocationError
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationStatementAccountAllocator
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAllocator.AllocateContext
@@ -29,28 +23,29 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
     private val durableTransactionService: DurableTransactionService,
     private val contextResolver: AllocateContextResolver,
     private val seqPicker: NotificationSeqPicker,
+    private val reservations: NotificationSeqReservations,
     private val allocationLock: NotificationSlotAllocationLock,
     private val currentPeriodProvider: CurrentPeriodProvider,
-    private val chainRegistry: ChainRegistry,
-    private val knownChains: KnownChains,
 ) : NotificationStatementAccountAllocator {
     override fun currentPeriod(): UInt = currentPeriodProvider.current()
 
-    override suspend fun isSupported(): Result<Boolean> = runCancellableCatching {
-        chainRegistry.getRuntime(knownChains.people).metadata.resources().hasCall(SET_NOTIFICATION_STATEMENT_ACCOUNT_CALL)
-    }
+    override suspend fun initiateAllocation(target: AccountId): Result<Unit> {
+        return initiateAllocations(listOf(target)).flatMap { initiated ->
+            if (target in initiated) return@flatMap Result.success(Unit)
 
-    override suspend fun allocate(target: AccountId): Result<Unit> {
-        return allocateAll(listOf(target)).flatMap { allocated ->
-            if (target in allocated) Result.success(Unit) else Result.failure(NotificationAllocationError.NoFreeSlotInPeriod(target))
+            Result.failure(NotificationAllocationError.NoFreeSlotInPeriod(target))
         }
     }
 
-    override suspend fun allocateAll(targets: List<AccountId>): Result<List<AccountId>> {
+    override suspend fun initiateAllocations(targets: List<AccountId>): Result<List<AccountId>> {
         return contextResolver.resolve()
             .flatMap { context -> allocationLock.withLock { scheduleWithinCapacity(context, targets) } }
             .onFailure { Timber.e(it, "Notification slot allocation failed for ${targets.size} targets") }
-            .mapErrorNotInstance<_, NotificationAllocationError> { NotificationAllocationError.Unknown(it) }
+            .mapErrorNotInstance<_, NotificationAllocationError> { NotificationAllocationError.Unknown(targets, it) }
+    }
+
+    override suspend fun allocate(target: AccountId, timeout: Duration): Result<Unit> {
+        return initiateAllocation(target).flatMap { awaitAllocated(target, timeout) }
     }
 
     override suspend fun awaitAllocated(target: AccountId, timeout: Duration): Result<Unit> = runCancellableCatching {
@@ -61,15 +56,24 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
     }.flatMap { states -> awaitOutcome(target, timeout, states) }
 
     private suspend fun scheduleWithinCapacity(context: AllocateContext, targets: List<AccountId>): Result<List<AccountId>> {
-        return claimedAmong(targets).flatMap { claimed ->
-            seqPicker.freeSlots(context).flatMap { free ->
-                val toSchedule = targets.filterNot { it in claimed }.take(free.size)
-                scheduleClaims(toSchedule).map { targets.filter { it in claimed || it in toSchedule } }
-            }
+        return filterClaimed(targets).flatMap { claimed -> scheduleUnclaimed(context, targets, claimed) }
+    }
+
+    private suspend fun scheduleUnclaimed(
+        context: AllocateContext,
+        targets: List<AccountId>,
+        claimed: Set<AccountId>,
+    ): Result<List<AccountId>> {
+        val unclaimed = targets.filterNot { it in claimed }
+
+        return seqPicker.freeSlots(context, forTarget = null).flatMap { free ->
+            val assignments = unclaimed.zip(free)
+            val scheduled = assignments.mapTo(mutableSetOf()) { (target, _) -> target }
+            scheduleClaims(assignments).map { targets.filter { it in claimed || it in scheduled } }
         }
     }
 
-    private suspend fun claimedAmong(targets: List<AccountId>): Result<Set<AccountId>> {
+    private suspend fun filterClaimed(targets: List<AccountId>): Result<Set<AccountId>> {
         return targets
             .map { target -> hasClaim(target).map { claimed -> target.takeIf { claimed } } }
             .flattenResult()
@@ -81,15 +85,25 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
             .map { states -> states.any { it.status.canArrive } }
     }
 
-    private suspend fun scheduleClaims(targets: List<AccountId>): Result<Unit> {
-        return targets.map { target ->
+    private suspend fun scheduleClaims(assignments: List<Pair<AccountId, NotificationSlot>>): Result<Unit> {
+        return assignments
+            .map { (target, slot) -> scheduleClaim(target, slot) }
+            .flattenResult()
+            .coerceToUnit()
+    }
+
+    // Reserved before the claim is recorded: the claim is built later, and until then the slot is only ours here.
+    private suspend fun scheduleClaim(target: AccountId, slot: NotificationSlot): Result<Unit> {
+        return reservations.reserve(target, slot).flatMap {
             durableTransactionService.schedule(
                 domain = NOTIFICATION_SLOT_DOMAIN,
                 groupId = target.notificationSlotGroup(),
                 policies = listOf(target.notificationSlotPolicy()),
                 onRegister = {},
-            ).coerceToUnit()
-        }.flattenResult().coerceToUnit()
+            )
+                .onFailure { reservations.release(target) }
+                .coerceToUnit()
+        }
     }
 
     private fun awaitOutcome(target: AccountId, timeout: Duration, states: List<DurableTxState>?): Result<Unit> = when {

@@ -23,10 +23,20 @@ class NotificationAllowanceOracle @Inject constructor(
         get() = knownChains.people
 
     override suspend fun effectsAt(transactions: List<DurableTxEntry>, at: CheckpointBlock): Map<DurableTxId, Boolean> {
-        val targetByClaim = transactions.mapNotNull { tx -> tx.groupId?.notificationSlotTargetOrNull()?.let { tx.id to it } }
-        val granted = allowancesAt(targetByClaim.map { it.second }.distinct(), at) ?: return emptyMap()
+        val targetByClaim = targetsOf(transactions)
+        val targets = targetByClaim.values.distinct()
+        val granted = allowancesAt(targets, at) ?: return emptyMap()
 
-        return targetByClaim.mapNotNull { (claim, target) -> granted[target]?.let { claim to it } }.toMap()
+        return targetByClaim
+            .mapNotNull { (claim, target) -> granted[target]?.let { claim to it } }
+            .toMap()
+    }
+
+    private fun targetsOf(transactions: List<DurableTxEntry>): Map<DurableTxId, AccountId> {
+        return transactions.mapNotNull { tx ->
+            val target = tx.groupId?.notificationSlotTargetOrNull() ?: return@mapNotNull null
+            tx.id to target
+        }.toMap()
     }
 
     private suspend fun allowancesAt(targets: List<AccountId>, at: CheckpointBlock): Map<AccountId, Boolean>? {

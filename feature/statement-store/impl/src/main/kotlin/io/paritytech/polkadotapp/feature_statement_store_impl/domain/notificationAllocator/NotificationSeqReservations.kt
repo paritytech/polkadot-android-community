@@ -1,27 +1,45 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.notificationAllocator
 
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
-import java.util.concurrent.ConcurrentHashMap
+import io.paritytech.polkadotapp.common.domain.model.AccountId
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Seqs handed to claims built in this process but possibly not yet visible on chain, so that two claims built in
- * parallel never race for the same slot. A claim's reservation is replaced whenever it is built again.
+ * Slots promised to target accounts in this process from the moment their claim is scheduled until it is visible
+ * on chain, so that neither a later allocation nor a parallel build hands the same slot to another account.
  */
 @Singleton
 class NotificationSeqReservations @Inject constructor() {
-    private val slotByClaim = ConcurrentHashMap<DurableTxId, NotificationSlot>()
+    private val slotByTarget = mutableMapOf<AccountId, NotificationSlot>()
 
-    fun reserve(claim: DurableTxId, slot: NotificationSlot) {
-        slotByClaim.values.removeIf { it.period < slot.period }
-        slotByClaim[claim] = slot
+    @Synchronized
+    fun reserve(target: AccountId, slot: NotificationSlot): Result<Unit> {
+        slotByTarget.values.removeIf { it.period < slot.period }
+
+        val holder = slotByTarget.entries.firstOrNull { (account, reserved) -> reserved == slot && account != target }?.key
+        if (holder != null) return Result.failure(NotificationSlotAlreadyReservedError(slot, holder, target))
+
+        slotByTarget[target] = slot
+        return Result.success(Unit)
     }
 
-    fun release(claim: DurableTxId) {
-        slotByClaim.remove(claim)
+    @Synchronized
+    fun release(target: AccountId) {
+        slotByTarget.remove(target)
     }
 
-    fun reservedIn(period: UInt): Set<NotificationSlot> =
-        slotByClaim.values.filterTo(mutableSetOf()) { it.period == period }
+    @Synchronized
+    fun reservedFor(target: AccountId): NotificationSlot? = slotByTarget[target]
+
+    /** Slots of [period] reserved for any account other than [exceptFor]. */
+    @Synchronized
+    fun reservedIn(period: UInt, exceptFor: AccountId?): Set<NotificationSlot> {
+        return slotByTarget
+            .filter { (account, slot) -> slot.period == period && account != exceptFor }
+            .values
+            .toSet()
+    }
 }
+
+class NotificationSlotAlreadyReservedError(slot: NotificationSlot, holder: AccountId, requester: AccountId) :
+    IllegalStateException("Notification slot $slot is already reserved for $holder, cannot reserve it for $requester")

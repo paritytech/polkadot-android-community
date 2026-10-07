@@ -5,13 +5,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchAlias
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_people_api.domain.BandersnatchKeyResolver
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.repository.NotificationSlotRepository
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAllocator.AllocateContext
-import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -19,6 +19,8 @@ import org.junit.Test
 
 class NotificationSeqPickerTest {
     private val period = 20_000u
+    private val target = byteArrayOf(0x01).toDataByteArray()
+    private val otherTarget = byteArrayOf(0x02).toDataByteArray()
     private val chain: Chain = mockk { every { id } returns "people" }
 
     private val repository: NotificationSlotRepository = mockk()
@@ -38,19 +40,29 @@ class NotificationSeqPickerTest {
         withSlots(PeopleCollection.People, highestSeq = 1u)
         withSlots(PeopleCollection.LitePeople, highestSeq = 0u)
 
-        val free = picker.freeSlots(contextOf(PeopleCollection.LitePeople, PeopleCollection.People)).getOrThrow()
+        val free = picker.freeSlots(contextOf(PeopleCollection.LitePeople, PeopleCollection.People), forTarget = null).getOrThrow()
 
         assertEquals(listOf(people(0u), people(1u), lite(0u)), free)
     }
 
     @Test
-    fun `excludes seqs registered on chain or reserved in process`() = runBlocking<Unit> {
+    fun `excludes seqs registered on chain or reserved for another account`() = runBlocking<Unit> {
         withSlots(PeopleCollection.People, highestSeq = 2u, registeredSeqs = setOf(1u))
-        reservations.reserve(DurableTxId(7), people(2u))
+        reservations.reserve(otherTarget, people(2u)).getOrThrow()
 
-        val free = picker.freeSlots(contextOf(PeopleCollection.People)).getOrThrow()
+        val free = picker.freeSlots(contextOf(PeopleCollection.People), forTarget = target).getOrThrow()
 
         assertEquals(listOf(people(0u)), free)
+    }
+
+    @Test
+    fun `keeps a seq reserved for the asking account free for it`() = runBlocking<Unit> {
+        withSlots(PeopleCollection.People, highestSeq = 1u)
+        reservations.reserve(target, people(1u)).getOrThrow()
+
+        val free = picker.freeSlots(contextOf(PeopleCollection.People), forTarget = target).getOrThrow()
+
+        assertEquals(listOf(people(0u), people(1u)), free)
     }
 
     private fun withSlots(collection: PeopleCollection, highestSeq: UByte, registeredSeqs: Set<UByte> = emptySet()) {

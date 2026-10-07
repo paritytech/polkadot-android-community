@@ -61,11 +61,16 @@ private fun ChatRequestLocal.toDeliveryDomain(): ChatRequest.Delivery = when (de
     ChatRequestLocal.DeliveryStatus.DELIVERED -> deliveredDomain()
 }
 
-private fun ChatRequestLocal.deliveredDomain(): ChatRequest.Delivery {
-    val period = lastDeliveredPeriod
-    if (deliveredVia != ChatRequestLocal.DeliveredVia.NOTIFICATION || period == null) return ChatRequest.Delivery.Delivered
-
-    return ChatRequest.Delivery.DeliveredAnonymously(period.toUInt())
+// A null via is a row delivered before delivery was tracked: an incoming request or one signed by our username.
+private fun ChatRequestLocal.deliveredDomain(): ChatRequest.Delivery = when (deliveredVia) {
+    null,
+    ChatRequestLocal.DeliveredVia.USERNAME -> ChatRequest.Delivery.Delivered
+    ChatRequestLocal.DeliveredVia.NOTIFICATION -> {
+        val period = requireNotNull(lastDeliveredPeriod) {
+            "Chat request $id delivered via NOTIFICATION must record its period, but lastDeliveredPeriod is null"
+        }
+        ChatRequest.Delivery.DeliveredAnonymously(period.toUInt())
+    }
 }
 
 fun ChatRequest.Delivery.toLocalStatus(): ChatRequestLocal.DeliveryStatus = when (this) {

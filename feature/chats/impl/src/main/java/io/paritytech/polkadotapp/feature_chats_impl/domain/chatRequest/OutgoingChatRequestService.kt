@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.scale.toScale
+import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
@@ -22,7 +23,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.OutgoingChatRequestTopics
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
-import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.StatementStoreMessageProver
 import java.util.UUID
@@ -54,16 +54,20 @@ interface OutgoingChatRequestService {
     suspend fun sendChatRequest(payload: OutgoingChatRequestPayload): Result<ChatRequest>
 
     /**
-     * Builds the statement for the already recorded [request]. Its inner proof stays with the contact's meta account;
-     * only the outer statement is signed by [statementProver], which is what the statement store shows publicly.
+     * Submits the already recorded [request]. Its inner proof stays with the contact's meta account; only the
+     * outer statement is signed by [statementProver], which is what the statement store shows publicly.
      */
-    suspend fun prepareStatement(
+    suspend fun deliverChatRequest(
         request: ChatRequest,
         payload: OutgoingChatRequestPayload,
         statementProver: StatementStoreMessageProver,
-    ): Result<Statement>
+    ): Result<Unit>
 
-    suspend fun submitStatement(statement: Statement): Result<Unit>
+    suspend fun fitsStatementSize(
+        request: ChatRequest,
+        payload: OutgoingChatRequestPayload,
+        limit: InformationSize,
+    ): Result<Boolean>
 
     suspend fun isStoredBy(contact: Contact, signer: AccountId): Result<Boolean>
 }
@@ -81,36 +85,47 @@ class RealOutgoingChatRequestService @Inject constructor(
         val request = newOutgoingChatRequest(ChatRequest.Delivery.Delivered)
 
         return identityAccountOf(payload.contact)
-            .flatMap { identity -> prepareStatement(request, payload, statementProverFactory.createKeyPairProver(identity)) }
-            .flatMap { statement -> submitStatement(statement) }
+            .flatMap { identity -> deliverChatRequest(request, payload, statementProverFactory.createKeyPairProver(identity)) }
             .map { request }
     }
 
-    override suspend fun prepareStatement(
+    override suspend fun deliverChatRequest(
         request: ChatRequest,
         payload: OutgoingChatRequestPayload,
         statementProver: StatementStoreMessageProver,
-    ): Result<Statement> {
-        return identityAccountOf(payload.contact).flatMap { identityAccount ->
-            constructDecryptedChatRequest(identityAccount, request, payload).flatMap { decrypted ->
-                chatRequestTransport.prepareChatRequestStatement(
-                    topics = constructChatRequestTopics(payload.contact, identityAccount.defaultAccountId()),
-                    request = decrypted,
-                    derivationDomain = payload.contact.sharedSecretDerivationDomain,
-                    statementProver = statementProver,
-                )
-            }
+    ): Result<Unit> {
+        return composeRequest(request, payload).flatMap { composed ->
+            chatRequestTransport.submitChatRequest(
+                topics = composed.topics,
+                request = composed.decrypted,
+                derivationDomain = payload.contact.sharedSecretDerivationDomain,
+                statementProver = statementProver,
+            )
         }
     }
 
-    override suspend fun submitStatement(statement: Statement): Result<Unit> {
-        return chatRequestTransport.submitChatRequestStatement(statement)
+    override suspend fun fitsStatementSize(
+        request: ChatRequest,
+        payload: OutgoingChatRequestPayload,
+        limit: InformationSize,
+    ): Result<Boolean> {
+        return composeRequest(request, payload)
+            .flatMap { composed -> chatRequestTransport.estimateStatementSize(composed.topics, composed.decrypted) }
+            .map { size -> size <= limit }
     }
 
     override suspend fun isStoredBy(contact: Contact, signer: AccountId): Result<Boolean> {
         return identityAccountOf(contact).flatMap { identityAccount ->
             val session = constructChatRequestTopics(contact, identityAccount.defaultAccountId()).session
             chatRequestTransport.isChatRequestStored(session, contact.sharedSecretDerivationDomain, signer)
+        }
+    }
+
+    private suspend fun composeRequest(request: ChatRequest, payload: OutgoingChatRequestPayload): Result<ComposedChatRequest> {
+        return identityAccountOf(payload.contact).flatMap { identityAccount ->
+            val topics = constructChatRequestTopics(payload.contact, identityAccount.defaultAccountId())
+            constructDecryptedChatRequest(identityAccount, request, payload)
+                .map { decrypted -> ComposedChatRequest(topics, decrypted) }
         }
     }
 
@@ -187,3 +202,8 @@ class RealOutgoingChatRequestService @Inject constructor(
         )
     }
 }
+
+private class ComposedChatRequest(
+    val topics: OutgoingChatRequestTopics,
+    val decrypted: ChatRequestDecrypted,
+)

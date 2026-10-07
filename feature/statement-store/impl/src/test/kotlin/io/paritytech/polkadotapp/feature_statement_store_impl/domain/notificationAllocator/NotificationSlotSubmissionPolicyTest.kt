@@ -69,26 +69,37 @@ class NotificationSlotSubmissionPolicyTest {
     }
 
     @Test
-    fun `builds the claim on the first free slot and reserves it`() = runBlocking<Unit> {
+    fun `builds the claim on the slot reserved when it was scheduled`() = runBlocking<Unit> {
+        reservations.reserve(target, slot(4u)).getOrThrow()
         withFreeSlots(slot(3u), slot(4u))
         withBuildableClaims()
 
         val preparation = policy.prepareSubmission(listOf(scheduledClaim())).getOrThrow()
 
         assertTrue(preparation[claim] is SubmissionPreparation.Ready)
-        assertEquals(setOf(slot(3u)), reservations.reservedIn(period))
-        coVerify { origins.asResourcesNotificationSlot(period, 3u, PeopleCollection.People) }
+        coVerify { origins.asResourcesNotificationSlot(period, 4u, PeopleCollection.People) }
     }
 
     @Test
-    fun `a rebuild drops the previous attempt's reservation`() = runBlocking<Unit> {
-        reservations.reserve(claim, slot(0u))
+    fun `moves the claim to a free slot once its reserved slot is taken on chain`() = runBlocking<Unit> {
+        reservations.reserve(target, slot(0u)).getOrThrow()
         withFreeSlots(slot(5u))
         withBuildableClaims()
 
         policy.prepareSubmission(listOf(scheduledClaim())).getOrThrow()
 
-        assertEquals(setOf(slot(5u)), reservations.reservedIn(period))
+        assertEquals(slot(5u), reservations.reservedFor(target))
+        coVerify { origins.asResourcesNotificationSlot(period, 5u, PeopleCollection.People) }
+    }
+
+    @Test
+    fun `giving up releases the target's reservation`() = runBlocking<Unit> {
+        reservations.reserve(target, slot(0u)).getOrThrow()
+        withFreeSlots()
+
+        policy.prepareSubmission(listOf(scheduledClaim())).getOrThrow()
+
+        assertEquals(null, reservations.reservedFor(target))
     }
 
     @Test
@@ -99,7 +110,7 @@ class NotificationSlotSubmissionPolicyTest {
     }
 
     private fun withFreeSlots(vararg slots: NotificationSlot) {
-        coEvery { seqPicker.freeSlots(context) } answers { Result.success(slots.toList() - reservations.reservedIn(period)) }
+        coEvery { seqPicker.freeSlots(context, forTarget = target) } returns Result.success(slots.toList())
     }
 
     private fun withBuildableClaims() {

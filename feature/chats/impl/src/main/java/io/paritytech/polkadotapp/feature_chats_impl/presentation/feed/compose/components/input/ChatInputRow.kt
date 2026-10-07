@@ -100,6 +100,7 @@ internal fun ChatInputRow(
 
                         SendMessageInput(
                             messageState = inputState.messageState,
+                            characterLimit = MAX_WELCOME_MESSAGE_LENGTH.takeIf { inputState.isChatRequest },
                             showPayButton = inputState.showPayButton,
                             showAttachmentButton = inputState.showAttachButton,
                             onClearReply = onClearReply,
@@ -168,6 +169,7 @@ private fun footerBackgroundBrush(state: ChatInputUiState): Brush = when (state)
 @Composable
 private fun SendMessageInput(
     messageState: ChatSendMessageInputState,
+    characterLimit: Int?,
     showPayButton: Boolean,
     showAttachmentButton: Boolean,
     onClearReply: () -> Unit,
@@ -219,6 +221,7 @@ private fun SendMessageInput(
                         .fillMaxWidth()
                         .animateContentSize(),
                     text = messageState.inputMessage,
+                    characterLimit = characterLimit,
                     onTextChanged = onMessageChange,
                     onSendAction = onSendMessageClick
                 )

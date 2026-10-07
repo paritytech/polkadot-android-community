@@ -22,20 +22,14 @@ class ChatRequestDeliveryAccountResolver @Inject constructor(
     private val signers: ChatRequestDeliverySigners,
 ) {
     suspend fun resolveFirstDelivery(contact: Contact, request: ChatRequest): Result<ChatRequestDeliverySigner> {
-        return allocator.isSupported().flatMap { supported ->
-            if (!supported) return@flatMap signers.usernameSigner(contact)
-
-            anonymousSigner(request).flatRecover { error -> fallBackIfNoSlot(contact, error) }
-        }
+        return anonymousSigner(request).flatRecover { error -> fallBackIfNoSlot(contact, error) }
     }
 
     private suspend fun anonymousSigner(request: ChatRequest): Result<ChatRequestDeliverySigner> {
         val period = allocator.currentPeriod()
 
         return keypairDerivation.deliveryAccount(request.id, period).flatMap { account ->
-            allocator.allocate(account.accountId)
-                .flatMap { allocator.awaitAllocated(account.accountId, ALLOCATION_WAIT_TIMEOUT) }
-                .map { signers.anonymousSigner(account) }
+            allocator.allocate(account.accountId, ALLOCATION_WAIT_TIMEOUT).map { signers.anonymousSigner(account) }
         }
     }
 

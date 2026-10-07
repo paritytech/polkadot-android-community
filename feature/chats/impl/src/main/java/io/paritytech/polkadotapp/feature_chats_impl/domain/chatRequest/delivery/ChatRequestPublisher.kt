@@ -9,13 +9,9 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepo
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingChatRequestPayload
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingChatRequestService
-import io.paritytech.polkadotapp.feature_statement_store_api.data.Statement
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NOTIFICATION_STATEMENT_MAX_SIZE_BYTES
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NOTIFICATION_STATEMENT_MAX_SIZE
 import timber.log.Timber
 import javax.inject.Inject
-
-// Generous upper bound on what a chat request statement adds around its data: proof, expiry, topics, length prefixes.
-private const val STATEMENT_ENVELOPE_BYTES = 512
 
 /** Puts a recorded outgoing chat request on the statement store and records how it got there. */
 class ChatRequestPublisher @Inject constructor(
@@ -23,13 +19,9 @@ class ChatRequestPublisher @Inject constructor(
     private val chatRequestRepository: ChatRequestRepository,
     private val contactsRepository: ContactsRepository,
     private val chatEngine: ChatEngine,
-    private val signers: ChatRequestDeliverySigners,
 ) {
-    /** Signs with our own account: identical in size to the anonymously signed statement, and never submitted. */
     suspend fun fitsNotificationStatement(request: ChatRequest, payload: OutgoingChatRequestPayload): Result<Boolean> {
-        return signers.usernameSigner(payload.contact)
-            .flatMap { signer -> outgoingChatRequestService.prepareStatement(request, payload, signer.prover) }
-            .map { statement -> statement.encodedSizeUpperBound() <= NOTIFICATION_STATEMENT_MAX_SIZE_BYTES }
+        return outgoingChatRequestService.fitsStatementSize(request, payload, NOTIFICATION_STATEMENT_MAX_SIZE)
     }
 
     suspend fun publishFirstDelivery(
@@ -58,7 +50,7 @@ class ChatRequestPublisher @Inject constructor(
     }
 
     suspend fun markUndeliverable(request: ChatRequest): Result<Unit> = runCancellableCatching {
-        Timber.w("Chat request ${request.id} exceeds $NOTIFICATION_STATEMENT_MAX_SIZE_BYTES bytes; marking undeliverable")
+        Timber.w("Chat request ${request.id} exceeds $NOTIFICATION_STATEMENT_MAX_SIZE; marking undeliverable")
         contactsRepository.withTransaction {
             chatRequestRepository.updateDelivery(request.id, ChatRequest.Delivery.Failed)
             chatEngine.updateMessageStatus(request.id, ChatMessage.Status.DELIVERY_FAILED)
@@ -70,9 +62,6 @@ class ChatRequestPublisher @Inject constructor(
         payload: OutgoingChatRequestPayload,
         signer: ChatRequestDeliverySigner,
     ): Result<Unit> {
-        return outgoingChatRequestService.prepareStatement(request, payload, signer.prover)
-            .flatMap { statement -> outgoingChatRequestService.submitStatement(statement) }
+        return outgoingChatRequestService.deliverChatRequest(request, payload, signer.prover)
     }
-
-    private fun Statement.encodedSizeUpperBound(): Int = body.data.size + STATEMENT_ENVELOPE_BYTES
 }

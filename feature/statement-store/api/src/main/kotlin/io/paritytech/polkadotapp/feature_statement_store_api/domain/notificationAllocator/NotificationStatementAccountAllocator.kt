@@ -1,32 +1,36 @@
 package io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.utils.InformationSize
+import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.kilobytes
 import kotlin.time.Duration
+
+/** Allowance one notification binding grants: a single statement of at most this encoded size. */
+val NOTIFICATION_STATEMENT_MAX_SIZE: InformationSize = 10.kilobytes
 
 /**
  * Funds statement accounts from anonymous notification slots: each binding lets its account keep one statement of
- * up to 10 KiB until the current period ends plus the runtime's grace window. An account can hold one live binding,
- * so callers pass a fresh account per period.
+ * up to [NOTIFICATION_STATEMENT_MAX_SIZE] until the current period ends plus the runtime's grace window. An account
+ * can hold one live binding, so callers pass a fresh account per period.
  */
 interface NotificationStatementAccountAllocator {
     /** The period slots are claimed in right now; a binding made now lives until this period ends plus grace. */
     fun currentPeriod(): UInt
 
-    /** Whether the connected runtime offers notification slots at all. */
-    suspend fun isSupported(): Result<Boolean>
-
     /**
-     * Schedules a durable claim of a notification slot for [target] in the current period. A no-op when a claim
+     * Reserves a free slot of the current period for [target] and schedules its durable claim. A no-op when a claim
      * for [target] is already in flight or has landed. Returns once the claim is recorded, not when it lands.
      */
-    suspend fun allocate(target: AccountId): Result<Unit>
+    suspend fun initiateAllocation(target: AccountId): Result<Unit>
 
     /**
-     * Like [allocate] for each of [targets], in the given order of preference: when fewer slots are free than
-     * targets, only the leading ones are scheduled and the rest fail with
-     * [NotificationAllocationError.NoFreeSlotInPeriod]. Returns the targets that were scheduled or already claimed.
+     * Like [initiateAllocation] for each of [targets], in the given order of preference: when fewer slots are free
+     * than targets, only the leading ones are scheduled. Returns the targets that were scheduled or already claimed.
      */
-    suspend fun allocateAll(targets: List<AccountId>): Result<List<AccountId>>
+    suspend fun initiateAllocations(targets: List<AccountId>): Result<List<AccountId>>
+
+    /** [initiateAllocation] followed by [awaitAllocated]. */
+    suspend fun allocate(target: AccountId, timeout: Duration): Result<Unit>
 
     /**
      * Suspends until a claim for [target] has executed (pending finality is enough), up to [timeout].
@@ -37,9 +41,6 @@ interface NotificationStatementAccountAllocator {
     suspend fun awaitAllocated(target: AccountId, timeout: Duration): Result<Unit>
 }
 
-/** Allowance one notification binding grants: a single statement of at most this many encoded bytes. */
-const val NOTIFICATION_STATEMENT_MAX_SIZE_BYTES: Int = 10 * 1024
-
 sealed class NotificationAllocationError(message: String, cause: Throwable?) : Throwable(message, cause) {
     class NoFreeSlotInPeriod(target: AccountId) :
         NotificationAllocationError("No free notification slot in the current period for $target", null)
@@ -47,5 +48,6 @@ sealed class NotificationAllocationError(message: String, cause: Throwable?) : T
     class Timeout(target: AccountId, timeout: Duration) :
         NotificationAllocationError("Notification slot claim for $target did not land within $timeout", null)
 
-    class Unknown(cause: Throwable) : NotificationAllocationError("Notification slot allocation failed", cause)
+    class Unknown(targets: List<AccountId>, cause: Throwable) :
+        NotificationAllocationError("Notification slot allocation failed for $targets", cause)
 }

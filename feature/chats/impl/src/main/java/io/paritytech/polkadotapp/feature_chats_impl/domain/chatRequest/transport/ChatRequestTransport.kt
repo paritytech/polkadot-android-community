@@ -6,6 +6,8 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.enco
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.InformationSize
+import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
@@ -44,14 +46,18 @@ interface ChatRequestTransport {
         derivationDomain: SharedSecretDerivationDomain,
     ): Flow<Result<List<ChatRequestDecrypted>>>
 
-    suspend fun prepareChatRequestStatement(
+    suspend fun submitChatRequest(
         topics: OutgoingChatRequestTopics,
         request: ChatRequestDecrypted,
         derivationDomain: SharedSecretDerivationDomain,
         statementProver: StatementStoreMessageProver,
-    ): Result<Statement>
+    ): Result<Unit>
 
-    suspend fun submitChatRequestStatement(statement: Statement): Result<Unit>
+    /** Upper bound of the encoded statement [submitChatRequest] would submit for [request]. */
+    suspend fun estimateStatementSize(
+        topics: OutgoingChatRequestTopics,
+        request: ChatRequestDecrypted,
+    ): Result<InformationSize>
 
     /** Whether a request signed by [signer] is still stored under [session]. */
     suspend fun isChatRequestStored(
@@ -60,6 +66,9 @@ interface ChatRequestTransport {
         signer: AccountId,
     ): Result<Boolean>
 }
+
+// Generous upper bound on what a chat request statement adds around its data: proof, expiry, topics, length prefixes.
+private val STATEMENT_ENVELOPE_SIZE = 512.bytes
 
 class RealChatRequestTransport @Inject constructor(
     private val coroutineDispatchers: CoroutineDispatchers,
@@ -103,19 +112,24 @@ class RealChatRequestTransport @Inject constructor(
         }.flowOn(coroutineDispatchers.io)
     }
 
-    override suspend fun prepareChatRequestStatement(
+    override suspend fun submitChatRequest(
         topics: OutgoingChatRequestTopics,
         request: ChatRequestDecrypted,
         derivationDomain: SharedSecretDerivationDomain,
         statementProver: StatementStoreMessageProver,
-    ): Result<Statement> {
+    ): Result<Unit> {
         return encryptAndEncodeStatementData(request, peerPublicKey = topics.session.peerChatKey)
             .mapCatching { createChatRequestStatementBody(it, topics, derivationDomain) }
             .mapCatching { statementProver.prepareSignedStatement(it) }
+            .flatMap { statementStoreService.submitStatement(it) }
     }
 
-    override suspend fun submitChatRequestStatement(statement: Statement): Result<Unit> {
-        return statementStoreService.submitStatement(statement)
+    override suspend fun estimateStatementSize(
+        topics: OutgoingChatRequestTopics,
+        request: ChatRequestDecrypted,
+    ): Result<InformationSize> {
+        return encryptAndEncodeStatementData(request, peerPublicKey = topics.session.peerChatKey)
+            .map { statementData -> statementData.size.bytes + STATEMENT_ENVELOPE_SIZE }
     }
 
     override suspend fun isChatRequestStored(

@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.common.utils.forEachAsync
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapAsync
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactWithChatRequest
@@ -41,13 +42,9 @@ class ChatRequestRenewer @Inject constructor(
     private val publisher: ChatRequestPublisher,
     private val signers: ChatRequestDeliverySigners,
 ) {
-    suspend fun renew(): Result<Unit> {
-        return allocator.isSupported().flatMap { supported ->
-            if (!supported) return@flatMap Result.success(Unit)
-
-            renewCandidates(contactsRepository.getContactsWithAnonymouslyDeliveredPendingRequests().mapNotNull(::toCandidate))
-        }
-    }
+    suspend fun renew(): Result<Unit> = runCancellableCatching {
+        contactsRepository.getContactsWithAnonymouslyDeliveredPendingRequests().mapNotNull(::toCandidate)
+    }.flatMap { candidates -> renewCandidates(candidates) }
 
     private suspend fun renewCandidates(candidates: List<ChatRequestRenewalCandidate>): Result<Unit> {
         val period = allocator.currentPeriod()
@@ -60,17 +57,25 @@ class ChatRequestRenewer @Inject constructor(
     private suspend fun renewStale(stale: List<ChatRequestRenewalCandidate>, period: UInt): Result<Unit> {
         if (stale.isEmpty()) return Result.success(Unit)
 
-        return stale.map { keypairDerivation.deliveryAccount(it.request.id, period) }.flattenResult()
+        val freshAccounts = stale.map { keypairDerivation.deliveryAccount(it.request.id, period) }.flattenResult()
+
+        return freshAccounts
             .flatMap { accounts -> claimSlots(stale.zip(accounts)) }
-            .map { claimed -> claimed.forEachAsync { (candidate, account) -> publishOnceAllocated(candidate, account) } }
+            .map { claimed -> publishOnceAllocated(claimed) }
     }
 
     private suspend fun claimSlots(
         renewals: List<Pair<ChatRequestRenewalCandidate, ChatRequestDeliveryAccount>>,
     ): Result<List<Pair<ChatRequestRenewalCandidate, ChatRequestDeliveryAccount>>> {
-        return allocator.allocateAll(renewals.map { (_, account) -> account.accountId }).map { claimed ->
+        val targets = renewals.map { (_, account) -> account.accountId }
+
+        return allocator.initiateAllocations(targets).map { claimed ->
             renewals.filter { (_, account) -> account.accountId in claimed }
         }
+    }
+
+    private suspend fun publishOnceAllocated(claimed: List<Pair<ChatRequestRenewalCandidate, ChatRequestDeliveryAccount>>) {
+        claimed.forEachAsync { (candidate, account) -> publishOnceAllocated(candidate, account) }
     }
 
     private suspend fun publishOnceAllocated(candidate: ChatRequestRenewalCandidate, account: ChatRequestDeliveryAccount) {
@@ -84,17 +89,26 @@ class ChatRequestRenewer @Inject constructor(
     }
 
     private suspend fun resendIfMissing(candidate: ChatRequestRenewalCandidate): Result<Unit> {
-        return keypairDerivation.deliveryAccount(candidate.request.id, candidate.deliveredPeriod).flatMap { account ->
-            outgoingChatRequestService.isStoredBy(candidate.contact, account.accountId).flatMap { stored ->
-                if (stored) Result.success(Unit) else publishFrom(candidate, account)
-            }
-        }.logFailure("Chat request ${candidate.request.id}: presence check or re-send failed")
+        val currentAccount = keypairDerivation.deliveryAccount(candidate.request.id, candidate.deliveredPeriod)
+
+        return currentAccount
+            .flatMap { account -> resendIfMissingFrom(candidate, account) }
+            .logFailure("Chat request ${candidate.request.id}: presence check or re-send failed")
+    }
+
+    private suspend fun resendIfMissingFrom(candidate: ChatRequestRenewalCandidate, account: ChatRequestDeliveryAccount): Result<Unit> {
+        return outgoingChatRequestService.isStoredBy(candidate.contact, account.accountId).flatMap { stored ->
+            if (stored) return@flatMap Result.success(Unit)
+
+            publishFrom(candidate, account)
+        }
     }
 
     private suspend fun publishFrom(candidate: ChatRequestRenewalCandidate, account: ChatRequestDeliveryAccount): Result<Unit> {
-        return payloadLoader.load(candidate.contact, candidate.request).flatMap { payload ->
-            publisher.republish(candidate.request, payload, signers.anonymousSigner(account))
-        }
+        val signer = signers.anonymousSigner(account)
+
+        return payloadLoader.load(candidate.contact, candidate.request)
+            .flatMap { payload -> publisher.republish(candidate.request, payload, signer) }
     }
 
     private fun toCandidate(entry: ContactWithChatRequest): ChatRequestRenewalCandidate? {

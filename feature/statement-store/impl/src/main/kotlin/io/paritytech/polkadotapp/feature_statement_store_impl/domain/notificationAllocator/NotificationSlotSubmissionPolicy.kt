@@ -73,23 +73,31 @@ class NotificationSlotSubmissionPolicy @Inject constructor(
     }
 
     private suspend fun prepare(context: AllocateContext, tx: ScheduledDurableTx): Result<SubmissionPreparation> {
-        reservations.release(tx.id)
+        val target = tx.policy.params
 
-        return reserveFreeSlot(context, tx.id).flatMap { slot ->
-            if (slot == null) {
-                Timber.w("No free notification slot in period ${context.period}; giving up claim ${tx.id.value}")
-                return@flatMap Result.success(SubmissionPreparation.GiveUp)
-            }
-            build(context, slot, target = tx.policy.params)
+        return reserveSlot(context, target).flatMap { slot ->
+            if (slot == null) return@flatMap giveUp(context, tx, target)
+
+            build(context, slot, target)
         }
     }
 
-    private suspend fun reserveFreeSlot(context: AllocateContext, claim: DurableTxId): Result<NotificationSlot?> {
+    // Keeps the slot reserved at scheduling while it is still unregistered; otherwise moves the target to a free one.
+    private suspend fun reserveSlot(context: AllocateContext, target: AccountId): Result<NotificationSlot?> {
         return allocationLock.withLock {
-            seqPicker.freeSlots(context).map { free ->
-                free.firstOrNull()?.also { slot -> reservations.reserve(claim, slot) }
+            seqPicker.freeSlots(context, forTarget = target).flatMap { free ->
+                val slot = reservations.reservedFor(target)?.takeIf { it in free } ?: free.firstOrNull()
+                if (slot == null) return@flatMap Result.success(null)
+
+                reservations.reserve(target, slot).map { slot }
             }
         }
+    }
+
+    private fun giveUp(context: AllocateContext, tx: ScheduledDurableTx, target: AccountId): Result<SubmissionPreparation> {
+        Timber.w("No free notification slot in period ${context.period}; giving up claim ${tx.id.value}")
+        reservations.release(target)
+        return Result.success(SubmissionPreparation.GiveUp)
     }
 
     private suspend fun build(context: AllocateContext, slot: NotificationSlot, target: AccountId): Result<SubmissionPreparation> {
