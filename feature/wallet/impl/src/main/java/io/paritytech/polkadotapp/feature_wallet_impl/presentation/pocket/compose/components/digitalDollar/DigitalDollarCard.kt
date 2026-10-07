@@ -17,9 +17,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
+import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyLogoTicker
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.PaymentAssetBrand
@@ -173,14 +175,17 @@ private fun BalanceAmount(
     val sharedElement = if (isHidden) Modifier.alpha(0f) else Modifier.pocketBalanceSharedElement(cardId)
 
     when (amounts) {
-        is LoadingState.Loaded -> NovaText(
-            modifier = sharedElement,
-            text = LocalTokenAmountFormatter.current.formatFiatSigned(amounts.data.balance, withSymbol = true)
-                .withCurrencyTickerStyle(PolkadotTheme.typography.headline.medium),
-            maxLines = 1,
-            style = PolkadotTheme.typography.headline.medium,
-            color = PolkadotTheme.colors.fg.staticWhite
-        )
+        is LoadingState.Loaded -> {
+            val balance = LocalTokenAmountFormatter.current.formatFiatSigned(amounts.data.balance, withSymbol = true)
+
+            NovaText(
+                modifier = sharedElement.semantics { contentDescription = balance },
+                text = balance.withCurrencyLogoTicker(),
+                maxLines = 1,
+                style = PolkadotTheme.typography.headline.medium,
+                color = PolkadotTheme.colors.fg.staticWhite
+            )
+        }
 
         else -> Shimmer(
             modifier = sharedElement.size(width = AmountShimmerSizes.WIDTH, height = AmountShimmerSizes.HEIGHT),
@@ -199,9 +204,11 @@ private fun PartlyReadyBalance(amount: TokenAmountModel) {
             color = PocketCardColors.Secondary
         )
 
+        val readyAmount = LocalTokenAmountFormatter.current.formatFiatSigned(amount, withSymbol = true)
+
         NovaText(
-            text = LocalTokenAmountFormatter.current.formatFiatSigned(amount, withSymbol = true)
-                .withCurrencyTickerStyle(PolkadotTheme.typography.body.medium),
+            modifier = Modifier.semantics { contentDescription = readyAmount },
+            text = readyAmount.withCurrencyLogoTicker(),
             maxLines = 1,
             style = PolkadotTheme.typography.body.medium,
             color = PocketCardColors.Primary
