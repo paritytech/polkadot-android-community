@@ -30,6 +30,7 @@ class ChatRequestDeliveryAccountResolver @Inject constructor(
         val period = allocator.currentPeriod()
 
         return keypairDerivation.deliveryAccount(request.id, period).flatMap { account ->
+            Timber.i("chatRequestDelivery: request ${request.id} claiming notification slot for ${account.accountId} in period $period")
             allocator.allocate(account.accountId, ALLOCATION_WAIT_TIMEOUT).map { signers.anonymousSigner(account) }
         }
     }
@@ -37,7 +38,7 @@ class ChatRequestDeliveryAccountResolver @Inject constructor(
     private suspend fun fallBackIfNoSlot(contact: Contact, error: Throwable): Result<ChatRequestDeliverySigner> {
         if (error !is NotificationAllocationError.NoFreeSlotInPeriod) return Result.failure(error)
 
-        Timber.i("No notification slot for a chat request this period; signing with our own account")
+        Timber.i("chatRequestDelivery: no notification slot this period; falling back to our own account")
         return signers.usernameSigner(contact)
     }
 }

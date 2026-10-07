@@ -53,6 +53,8 @@ class NotificationSlotSubmissionPolicy @Inject constructor(
     override suspend fun prepareSubmission(
         transactions: List<ScheduledDurableTx>,
     ): Result<Map<DurableTxId, SubmissionPreparation>> = runCancellableCatching {
+        Timber.i("notificationSlotPolicy: preparing ${transactions.size} claims; awaiting ring inclusion")
+
         awaitRingInclusion()
             .flatMap { contextResolver.resolve() }
             .flatMap { context -> prepareEach(context, transactions) }
@@ -86,12 +88,19 @@ class NotificationSlotSubmissionPolicy @Inject constructor(
     private suspend fun reserveSlot(context: AllocateContext, target: AccountId): Result<NotificationSlot?> {
         return allocationLock.withLock {
             seqPicker.freeSlots(context, forTarget = target).flatMap { free ->
-                val slot = reservations.reservedFor(target)?.takeIf { it in free } ?: free.firstOrNull()
+                val reserved = reservations.reservedFor(target)
+                val slot = reserved?.takeIf { it in free } ?: free.firstOrNull()
+                logSlotChoice(target, reserved, slot, freeCount = free.size)
                 if (slot == null) return@flatMap Result.success(null)
 
                 reservations.reserve(target, slot).map { slot }
             }
         }
+    }
+
+    private fun logSlotChoice(target: AccountId, reserved: NotificationSlot?, chosen: NotificationSlot?, freeCount: Int) {
+        val reuse = if (reserved != null && reserved == chosen) "reusing reserved" else "moving from reserved=$reserved to"
+        Timber.i("notificationSlotPolicy: $target $reuse slot=$chosen ($freeCount free)")
     }
 
     private fun giveUp(context: AllocateContext, tx: ScheduledDurableTx, target: AccountId): Result<SubmissionPreparation> {

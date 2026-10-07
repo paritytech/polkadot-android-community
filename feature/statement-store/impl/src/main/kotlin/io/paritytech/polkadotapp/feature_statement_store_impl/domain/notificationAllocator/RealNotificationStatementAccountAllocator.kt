@@ -39,6 +39,8 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
     }
 
     override suspend fun initiateAllocations(targets: List<AccountId>): Result<List<AccountId>> {
+        Timber.i("notificationAllocator: initiating allocation for ${targets.size} targets")
+
         return contextResolver.resolve()
             .flatMap { context -> allocationLock.withLock { scheduleWithinCapacity(context, targets) } }
             .onFailure { Timber.e(it, "Notification slot allocation failed for ${targets.size} targets") }
@@ -65,6 +67,11 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
 
         return seqPicker.freeSlots(context, forTarget = null).flatMap { free ->
             val assignments = unclaimed.zip(free)
+            Timber.i(
+                "notificationAllocator: period=${context.period}, already claimed=${claimed.size}, " +
+                    "unclaimed=${unclaimed.size}, free slots=${free.size}; scheduling ${assignments.size}"
+            )
+
             val scheduled = assignments.mapToSet { (target, _) -> target }
             scheduleClaims(assignments).map { targets.filter { it in claimed || it in scheduled } }
         }
@@ -91,6 +98,8 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
 
     // Reserved before the claim is recorded: the claim is built later, and until then the slot is only ours here.
     private suspend fun scheduleClaim(target: AccountId, slot: NotificationSlot): Result<Unit> {
+        Timber.i("notificationAllocator: scheduling claim for $target on seq=${slot.seq} in ${slot.collection}")
+
         return reservations.reserve(target, slot).flatMap {
             durableTransactionService.schedule(
                 domain = NOTIFICATION_SLOT_DOMAIN,
@@ -104,9 +113,18 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
     }
 
     private fun awaitOutcome(target: AccountId, timeout: Duration, states: List<DurableTxState>?): Result<Unit> = when {
-        states == null -> Result.failure(NotificationAllocationError.Timeout(target, timeout))
-        states.anyArrived() -> Result.success(Unit)
-        else -> Result.failure(NotificationAllocationError.NoFreeSlotInPeriod(target))
+        states == null -> {
+            Timber.w("notificationAllocator: claim for $target did not land within $timeout")
+            Result.failure(NotificationAllocationError.Timeout(target, timeout))
+        }
+        states.anyArrived() -> {
+            Timber.i("notificationAllocator: claim for $target executed")
+            Result.success(Unit)
+        }
+        else -> {
+            Timber.w("notificationAllocator: claim for $target gave up, no free slot")
+            Result.failure(NotificationAllocationError.NoFreeSlotInPeriod(target))
+        }
     }
 
     private fun List<DurableTxState>.anyArrived(): Boolean = any { it.status.isArrived }

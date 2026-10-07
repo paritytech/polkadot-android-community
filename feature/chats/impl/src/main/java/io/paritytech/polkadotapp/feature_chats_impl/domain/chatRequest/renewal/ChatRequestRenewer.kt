@@ -49,7 +49,7 @@ class ChatRequestRenewer @Inject constructor(
     private suspend fun renewCandidates(candidates: List<ChatRequestRenewalCandidate>): Result<Unit> {
         val period = allocator.currentPeriod()
         val (stale, current) = candidates.partition { it.deliveredPeriod < period }
-        Timber.i("Chat request renewal: ${stale.size} from earlier periods, ${current.size} of period $period")
+        Timber.i("chatRequestRenewal: ${stale.size} pending from earlier periods, ${current.size} of period $period")
 
         return renewStale(stale, period).flatMap { resendMissing(current) }
     }
@@ -70,6 +70,7 @@ class ChatRequestRenewer @Inject constructor(
         val targets = renewals.map { (_, account) -> account.accountId }
 
         return allocator.initiateAllocations(targets).map { claimed ->
+            Timber.i("chatRequestRenewal: claimed slots for ${claimed.size}/${targets.size} stale requests; the rest keep their old copy")
             renewals.filter { (_, account) -> account.accountId in claimed }
         }
     }
@@ -81,6 +82,7 @@ class ChatRequestRenewer @Inject constructor(
     private suspend fun publishOnceAllocated(candidate: ChatRequestRenewalCandidate, account: ChatRequestDeliveryAccount) {
         allocator.awaitAllocated(account.accountId, ALLOCATION_WAIT_TIMEOUT)
             .flatMap { publishFrom(candidate, account) }
+            .onSuccess { Timber.i("chatRequestRenewal: request ${candidate.request.id} renewed into period ${account.period} from ${account.accountId}") }
             .logFailure("Chat request ${candidate.request.id}: renewal into period ${account.period} failed")
     }
 
@@ -98,8 +100,10 @@ class ChatRequestRenewer @Inject constructor(
 
     private suspend fun resendIfMissingFrom(candidate: ChatRequestRenewalCandidate, account: ChatRequestDeliveryAccount): Result<Unit> {
         return outgoingChatRequestService.isStoredBy(candidate.contact, account.accountId).flatMap { stored ->
+            Timber.d("chatRequestRenewal: request ${candidate.request.id} stored=$stored (signer ${account.accountId})")
             if (stored) return@flatMap Result.success(Unit)
 
+            Timber.i("chatRequestRenewal: request ${candidate.request.id} missing from the store; re-sending")
             publishFrom(candidate, account)
         }
     }

@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.extension.notificationSlot
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.repository.NotificationSlotRepository
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.slotAllocator.AllocateContext
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -32,6 +33,7 @@ class NotificationSeqPicker @Inject constructor(
             .map { collection -> unregisteredSlotsIn(context, collection) }
             .flattenResult()
             .map { slots -> slots.flatten().filterNot { it in reserved } }
+            .onSuccess { free -> Timber.d("notificationSeqPicker: period=${context.period}, ${free.size} free, ${reserved.size} reserved by others") }
     }
 
     private suspend fun unregisteredSlotsIn(context: AllocateContext, collection: PeopleCollection): Result<List<NotificationSlot>> {

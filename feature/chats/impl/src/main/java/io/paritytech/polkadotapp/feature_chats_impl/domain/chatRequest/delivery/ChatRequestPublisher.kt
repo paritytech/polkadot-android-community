@@ -22,6 +22,7 @@ class ChatRequestPublisher @Inject constructor(
 ) {
     suspend fun fitsNotificationStatement(request: ChatRequest, payload: OutgoingChatRequestPayload): Result<Boolean> {
         return outgoingChatRequestService.fitsStatementSize(request, payload, NOTIFICATION_STATEMENT_MAX_SIZE)
+            .onSuccess { fits -> Timber.d("chatRequestPublisher: request ${request.id} fits $NOTIFICATION_STATEMENT_MAX_SIZE: $fits") }
     }
 
     suspend fun publishFirstDelivery(
@@ -62,6 +63,8 @@ class ChatRequestPublisher @Inject constructor(
         payload: OutgoingChatRequestPayload,
         signer: ChatRequestDeliverySigner,
     ): Result<Unit> {
+        Timber.i("chatRequestPublisher: submitting request ${request.id} as ${signer.delivery}")
+
         return outgoingChatRequestService.deliverChatRequest(request, payload, signer.prover)
     }
 }

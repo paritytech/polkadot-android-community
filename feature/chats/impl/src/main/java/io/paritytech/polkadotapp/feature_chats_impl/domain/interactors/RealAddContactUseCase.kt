@@ -87,9 +87,11 @@ class RealAddContactUseCase @Inject constructor(
         welcomeMessage: ChatMessage.Content.RichText?,
     ): Result<Unit> {
         if (contact.ourMetaAccountId == accountRepository.getWalletAccount().id) {
+            Timber.i("addContact: recording chat request to ${contact.accountId} for background delivery")
             return recordForDelivery(contact, welcomeMessage)
         }
 
+        Timber.i("addContact: sending chat request to ${contact.accountId} now, signed by its own account")
         return sendNow(OutgoingChatRequestPayload(contact, pushToken?.toTokenContent(), welcomeMessage))
     }
 

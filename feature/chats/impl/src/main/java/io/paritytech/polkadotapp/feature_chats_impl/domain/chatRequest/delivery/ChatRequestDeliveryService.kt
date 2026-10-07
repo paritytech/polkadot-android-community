@@ -20,6 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -57,6 +58,7 @@ class ChatRequestDeliveryService @Inject constructor(
     private fun launchDelivery(pending: ContactWithChatRequest) {
         val request = pending.pendingChatRequest ?: return
         if (!inFlight.add(request.id)) return
+        Timber.i("chatRequestDelivery: starting first delivery of request ${request.id}")
 
         scope.launch(coroutineDispatchers.computation) {
             try {
@@ -74,8 +76,11 @@ class ChatRequestDeliveryService @Inject constructor(
 
         while (isStillAwaitingDelivery(contact, request) && deliver(contact, request).isFailure) {
             attempt++
-            delay(retryDelay(attempt))
+            val retryIn = retryDelay(attempt)
+            Timber.i("chatRequestDelivery: request ${request.id} attempt $attempt failed; retrying in $retryIn")
+            delay(retryIn)
         }
+        Timber.i("chatRequestDelivery: finished with request ${request.id} after ${attempt + 1} attempts")
     }
 
     // The peer's own request may have been auto-accepted, or the contact removed, while we were retrying.
@@ -83,9 +88,14 @@ class ChatRequestDeliveryService @Inject constructor(
         val current = chatRequestRepository.getById(request.id) ?: return false
         val linkedRequestId = contactsRepository.getContact(contact.accountId)?.pendingChatRequestId
 
-        return current.delivery == ChatRequest.Delivery.Undelivered &&
+        val awaiting = current.delivery == ChatRequest.Delivery.Undelivered &&
             current.status == ChatRequest.Status.PENDING &&
             linkedRequestId == request.id
+        if (!awaiting) {
+            Timber.i("chatRequestDelivery: request ${request.id} no longer awaits delivery (delivery=${current.delivery}, status=${current.status}, linked=${linkedRequestId == request.id})")
+        }
+
+        return awaiting
     }
 
     private suspend fun deliver(contact: Contact, request: ChatRequest): Result<Unit> {
@@ -104,6 +114,7 @@ class ChatRequestDeliveryService @Inject constructor(
 
             accountResolver.resolveFirstDelivery(contact, request)
                 .flatMap { signer -> publisher.publishFirstDelivery(request, payload, signer) }
+                .onSuccess { Timber.i("chatRequestDelivery: request ${request.id} delivered") }
         }
     }
 

@@ -26,6 +26,7 @@ class NotificationAllowanceOracle @Inject constructor(
         val targetByClaim = targetsOf(transactions)
         val targets = targetByClaim.values.distinct()
         val granted = allowancesAt(targets, at) ?: return emptyMap()
+        Timber.d("notificationAllowanceOracle: ${granted.count { it.value }}/${targets.size} targets hold an allowance at block ${at.blockNumber}")
 
         return targetByClaim
             .mapNotNull { (claim, target) -> granted[target]?.let { claim to it } }
