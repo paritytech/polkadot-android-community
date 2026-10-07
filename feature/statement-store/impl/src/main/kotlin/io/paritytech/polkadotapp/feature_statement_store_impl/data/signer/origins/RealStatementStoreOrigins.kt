@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.data.signer.origi
 
 import io.paritytech.polkadotapp.bandersnatch_crypto.BandersnatchContext
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.domain.getTldRetrying
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
@@ -24,7 +25,7 @@ class RealStatementStoreOrigins @Inject constructor(
         period: UInt,
         seq: UInt,
         collection: PeopleCollection,
-    ): Result<TransactionOrigin> = runCatching {
+    ): Result<TransactionOrigin> = runCancellableCatching {
         val context = BandersnatchContext.statementStoreSlot(dotNsTldProvider.getTldRetrying(), period, seq)
         unsignedResourcesOrigin(AsResourcesProofKind.STATEMENT_STORE_ALLOWANCE, context, collection)
     }
@@ -33,7 +34,7 @@ class RealStatementStoreOrigins @Inject constructor(
         period: UInt,
         seq: UByte,
         collection: PeopleCollection,
-    ): Result<TransactionOrigin> = runCatching {
+    ): Result<TransactionOrigin> = runCancellableCatching {
         val context = BandersnatchContext.notificationSlot(dotNsTldProvider.getTldRetrying(), period, seq)
         unsignedResourcesOrigin(AsResourcesProofKind.NOTIFICATION_FOR_COLLECTION, context, collection)
     }
