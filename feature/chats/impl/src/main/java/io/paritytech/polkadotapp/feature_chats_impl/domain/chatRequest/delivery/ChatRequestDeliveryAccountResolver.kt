@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationAllocationError
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationStatementAccountAllocator
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.allocate
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.minutes

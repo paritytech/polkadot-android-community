@@ -63,6 +63,7 @@ class ChatRequestDeliveryAccountResolverTest {
     }
 
     private fun withAllocation(result: Result<Unit>) {
-        coEvery { allocator.allocate(accountId, any()) } returns result
+        coEvery { allocator.initiateAllocation(accountId) } returns Result.success(Unit)
+        coEvery { allocator.awaitAllocated(accountId, any()) } returns result
     }
 }

@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.common.utils.mapErrorNotInstance
+import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationAllocationError
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationStatementAccountAllocator
@@ -44,10 +45,6 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
             .mapErrorNotInstance<_, NotificationAllocationError> { NotificationAllocationError.Unknown(targets, it) }
     }
 
-    override suspend fun allocate(target: AccountId, timeout: Duration): Result<Unit> {
-        return initiateAllocation(target).flatMap { awaitAllocated(target, timeout) }
-    }
-
     override suspend fun awaitAllocated(target: AccountId, timeout: Duration): Result<Unit> = runCancellableCatching {
         withTimeoutOrNull(timeout) {
             durableTransactionService.subscribeGroupStates(NOTIFICATION_SLOT_DOMAIN, target.notificationSlotGroup())
@@ -68,7 +65,7 @@ class RealNotificationStatementAccountAllocator @Inject constructor(
 
         return seqPicker.freeSlots(context, forTarget = null).flatMap { free ->
             val assignments = unclaimed.zip(free)
-            val scheduled = assignments.mapTo(mutableSetOf()) { (target, _) -> target }
+            val scheduled = assignments.mapToSet { (target, _) -> target }
             scheduleClaims(assignments).map { targets.filter { it in claimed || it in scheduled } }
         }
     }

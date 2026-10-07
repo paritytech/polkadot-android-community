@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_statement_store_api.domain.notificatio
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.kilobytes
+import io.paritytech.polkadotapp.common.utils.flatMap
 import kotlin.time.Duration
 
 /** Allowance one notification binding grants: a single statement of at most this encoded size. */
@@ -29,9 +30,6 @@ interface NotificationStatementAccountAllocator {
      */
     suspend fun initiateAllocations(targets: List<AccountId>): Result<List<AccountId>>
 
-    /** [initiateAllocation] followed by [awaitAllocated]. */
-    suspend fun allocate(target: AccountId, timeout: Duration): Result<Unit>
-
     /**
      * Suspends until a claim for [target] has executed (pending finality is enough), up to [timeout].
      *
@@ -39,6 +37,11 @@ interface NotificationStatementAccountAllocator {
      * and with [NotificationAllocationError.Timeout] when [timeout] elapses first.
      */
     suspend fun awaitAllocated(target: AccountId, timeout: Duration): Result<Unit>
+}
+
+/** [NotificationStatementAccountAllocator.initiateAllocation] followed by [NotificationStatementAccountAllocator.awaitAllocated]. */
+suspend fun NotificationStatementAccountAllocator.allocate(target: AccountId, timeout: Duration): Result<Unit> {
+    return initiateAllocation(target).flatMap { awaitAllocated(target, timeout) }
 }
 
 sealed class NotificationAllocationError(message: String, cause: Throwable?) : Throwable(message, cause) {
