@@ -35,6 +35,10 @@ class CommunicationSessionCreatorFactory @Inject constructor(
 ) : CommunicationSessionCreator.Factory {
     override fun create(account: MetaAccount): CommunicationSessionCreator {
         val prover = proverFactory.createKeyPairProver(account)
+        return create(prover)
+    }
+
+    override fun create(prover: StatementStoreMessageProver): CommunicationSessionCreator {
         return RealCommunicationSessionCreator(
             statementStoreService = statementStoreService,
             prover = prover,

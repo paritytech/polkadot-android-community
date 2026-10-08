@@ -50,6 +50,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.error.asChatRequestEr
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatFeedInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatUserInputState
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.InitiateCallResult
+import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ChatSignerKind
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.BusyInAnotherChatPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.draft.ChatDraftController
@@ -194,6 +195,10 @@ class ChatFeedViewModel @Inject constructor(
         val hasRenderer = renderer != null
         menuActionsProvider.getToolbarActions(openChatRequest, inputStateType, addMenuIconForcibly = hasRenderer)
     }.stateInBackground(initialValue = persistentListOf())
+
+    override val showPrivacyWarning = interactor.subscribeChatSignerKind(chatId)
+        .map { kind -> kind == ChatSignerKind.USERNAME }
+        .stateInBackground(initialValue = false)
 
     override val popupState = combine(
         messagePopupSection,
@@ -450,6 +455,10 @@ class ChatFeedViewModel @Inject constructor(
         }
 
         menuState.update { it.copy(isVisible = true, type = type) }
+    }
+
+    override fun onPrivacyWarningClick() {
+        menuState.update { it.copy(isVisible = true, type = ChatMenuType.PrivacyDisclaimer) }
     }
 
     override fun onCopyUsernameClick() = launchUnit {

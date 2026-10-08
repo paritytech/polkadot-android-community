@@ -32,10 +32,12 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.compaction.ChatMessageCompactor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.PushSubscriptionSynchronizer
+import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
 import io.paritytech.polkadotapp.feature_statement_store_api.data.encryption.CommunicationEncryption
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSessionCreator
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.StatementStoreMessageProver
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
 import io.paritytech.polkadotapp.tools_push_notifications_api.PushNotificationsHelper
 import kotlinx.coroutines.CoroutineScope
@@ -87,6 +89,8 @@ internal class RealContactChatSessionManager @Inject constructor(
     private val chatMessageCompactor: ChatMessageCompactor,
     private val incomingChatMessageProcessor: IncomingChatMessageProcessor,
     private val notificationPayloadEncoder: ChatNotificationPayloadEncoder,
+    private val proverFactory: StatementStoreMessageProver.Factory,
+    private val chatSigners: ContactChatSigners,
     dispatchers: CoroutineDispatchers
 ) : ContactChatSessionManager, CoroutineScope, ChatSessionCallbacks {
     companion object {
@@ -236,6 +240,8 @@ internal class RealContactChatSessionManager @Inject constructor(
         Timber.d("createSession: contact=${contact.username}, sessionType=$sessionType, hasPushToken=${contact.pushToken != null}, hasLastShared=${contact.lastSharedPushToken != null}")
 
         val sessionCreatorWithAccount = sessionCreatorsCache.getOrCompute(contact.ourMetaAccountId)
+        val chatSessionCreator = createChatSessionCreator(contact)
+        chatSigners.warmUp(contact.accountId)
 
         val scope = childScope(supervised = true)
 
@@ -243,6 +249,7 @@ internal class RealContactChatSessionManager @Inject constructor(
             contact = contact,
             sessionType = sessionType,
             sessionCreatorWithAccount = sessionCreatorWithAccount,
+            chatSessionCreator = chatSessionCreator,
             scope = scope,
         )
 
@@ -262,6 +269,11 @@ internal class RealContactChatSessionManager @Inject constructor(
 
         chatSession
     }.logFailure("ContactChatSessionManager: failed to create session for contact ${contact.username}")
+
+    private fun createChatSessionCreator(contact: Contact): CommunicationSessionCreator {
+        val chatProver = proverFactory.createLazyKeyPairProver { chatSigners.keypairFor(contact.accountId) }
+        return sessionCreatorFactory.create(prover = chatProver)
+    }
 
     // TODO: should be removed when fully migrated to push-notifications v2
     private suspend fun invalidateContact(
@@ -323,6 +335,7 @@ internal class RealContactChatSessionManager @Inject constructor(
         contact: Contact,
         sessionType: SessionType,
         sessionCreatorWithAccount: SessionCreatorWithAccount,
+        chatSessionCreator: CommunicationSessionCreator,
         scope: CoroutineScope,
     ): CommunicationSessions {
         val localAccount = sessionCreatorWithAccount.localSessionAccount
@@ -336,7 +349,7 @@ internal class RealContactChatSessionManager @Inject constructor(
             SessionType.MultiDevice -> {
                 val perDeviceEncryption = encryptionFactory.createWithDeviceKeypair(contact.chatKey)
 
-                val mainSession = sessionCreatorWithAccount.creator.createMultiDeviceSession(
+                val mainSession = chatSessionCreator.createMultiDeviceSession(
                     scope = scope,
                     localAccount = localAccount,
                     remoteAccount = remoteAccount,
@@ -359,7 +372,7 @@ internal class RealContactChatSessionManager @Inject constructor(
             }
 
             SessionType.Pairwise -> {
-                val session = sessionCreatorWithAccount.creator.createSession(
+                val session = chatSessionCreator.createSession(
                     scope = scope,
                     localAccount = localAccount,
                     remoteAccount = remoteAccount,

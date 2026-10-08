@@ -73,7 +73,15 @@ interface StatementStoreSlotAllocationRepository {
         currentPeriod: UInt,
     ): List<StatementStoreSlotAllocationRecord>
 
-    suspend fun hasStaleFor(
+    suspend fun hasAnyStale(
+        chainId: ChainId,
+        currentPeriod: UInt,
+    ): Boolean
+
+    /**
+     * Whether [accountId] has a local row already renewed into [currentPeriod] (or allocated in it).
+     */
+    suspend fun hasRenewedFor(
         chainId: ChainId,
         accountId: AccountId,
         currentPeriod: UInt,

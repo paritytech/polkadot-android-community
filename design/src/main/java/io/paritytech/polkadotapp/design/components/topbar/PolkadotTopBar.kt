@@ -59,6 +59,7 @@ fun PolkadotTopBar(
     titleSize: TopBarTitleSize = TopBarTitleSize.Standard,
     actions: ImmutableList<TopBarAction> = persistentListOf(),
     leadingContent: (@Composable () -> Unit)? = null,
+    titleTrailingContent: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null,
 ) {
     require(actions.size <= MAX_TOP_BAR_ACTIONS) { "Top bar supports at most $MAX_TOP_BAR_ACTIONS actions" }
@@ -90,6 +91,7 @@ fun PolkadotTopBar(
                 title = title,
                 subtitle = subtitle,
                 titleStyle = titleStyle,
+                titleTrailingContent = titleTrailingContent,
                 actions = actions,
             )
         } else {
@@ -100,6 +102,7 @@ fun PolkadotTopBar(
                 title = title,
                 subtitle = subtitle,
                 titleStyle = titleStyle,
+                titleTrailingContent = titleTrailingContent,
                 actions = actions,
                 content = content,
             )
@@ -114,6 +117,7 @@ private fun CenteredTopBar(
     title: String?,
     subtitle: String?,
     titleStyle: TextStyle,
+    titleTrailingContent: (@Composable () -> Unit)?,
     actions: ImmutableList<TopBarAction>,
     modifier: Modifier = Modifier,
 ) {
@@ -128,6 +132,7 @@ private fun CenteredTopBar(
                     title = title,
                     subtitle = subtitle,
                     titleStyle = titleStyle,
+                    titleTrailingContent = titleTrailingContent,
                     textAlign = TextAlign.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 )
@@ -172,6 +177,7 @@ private fun StartTopBar(
     title: String?,
     subtitle: String?,
     titleStyle: TextStyle,
+    titleTrailingContent: (@Composable () -> Unit)?,
     actions: ImmutableList<TopBarAction>,
     content: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
@@ -197,6 +203,7 @@ private fun StartTopBar(
                 title = title,
                 subtitle = subtitle,
                 titleStyle = titleStyle,
+                titleTrailingContent = titleTrailingContent,
                 textAlign = TextAlign.Start,
                 horizontalAlignment = Alignment.Start,
             )
@@ -236,10 +243,35 @@ private fun LeadingGroup(
 }
 
 @Composable
+private fun TitleRow(
+    title: String,
+    titleStyle: TextStyle,
+    textAlign: TextAlign,
+    trailingContent: (@Composable () -> Unit)?,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.tiny),
+    ) {
+        NovaText(
+            modifier = Modifier.weight(1f, fill = false),
+            text = title,
+            style = titleStyle,
+            color = PolkadotTheme.colors.fg.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = textAlign,
+        )
+        trailingContent?.invoke()
+    }
+}
+
+@Composable
 private fun TitleColumn(
     title: String?,
     subtitle: String?,
     titleStyle: TextStyle,
+    titleTrailingContent: (@Composable () -> Unit)?,
     textAlign: TextAlign,
     horizontalAlignment: Alignment.Horizontal,
     modifier: Modifier = Modifier,
@@ -249,14 +281,7 @@ private fun TitleColumn(
         horizontalAlignment = horizontalAlignment,
     ) {
         if (title != null) {
-            NovaText(
-                text = title,
-                style = titleStyle,
-                color = PolkadotTheme.colors.fg.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = textAlign,
-            )
+            TitleRow(title, titleStyle, textAlign, titleTrailingContent)
         }
         if (subtitle != null) {
             NovaText(

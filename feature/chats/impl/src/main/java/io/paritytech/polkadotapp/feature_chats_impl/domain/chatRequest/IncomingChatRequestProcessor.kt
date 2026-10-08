@@ -31,6 +31,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRoomRepo
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
+import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenPlatform
@@ -120,6 +121,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val chatEngine: dagger.Lazy<ChatEngine>,
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
+    private val chatSigners: ContactChatSigners,
 ) : IncomingChatRequestProcessor {
     private companion object {
         const val ACCEPTED_MESSAGE_ID_PREFIX = "req-accepted:"
@@ -209,7 +211,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         incomingData: IncomingChatRequestData
     ): IncomingRequestProcessingResult.AutoAccepted {
         // Clear pendingChatRequestId before status — see markOutgoingRequestAccepted.
-        contactsRepository.markChatRequestAccepted(contact.accountId, CurrentTimeContext.currentTime())
+        markChatAccepted(contact.accountId)
 
         chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
 
@@ -231,7 +233,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private suspend fun acceptIncomingRequestInternal(contact: Contact) {
         val chatRequestId = contact.pendingChatRequestIdOrThrow()
 
-        contactsRepository.markChatRequestAccepted(contact.accountId, CurrentTimeContext.currentTime())
+        markChatAccepted(contact.accountId)
 
         chatRequestRepository.updateStatus(chatRequestId, ChatRequest.Status.ACCEPTED)
 
@@ -253,12 +255,17 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         // session manager briefly sees "pending request with non-PENDING status" and tears
         // the session down mid-handshake → "Wait for peer to accept" sticks forever.
         // TODO: replace with a single Room transaction across both DAOs.
-        contactsRepository.markChatRequestAccepted(contact.accountId, CurrentTimeContext.currentTime())
+        markChatAccepted(contact.accountId)
         chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
     }.also {
         // Welcome row lives on the receiver, not here — swallow the miss.
         runCatching { markOurWelcomeMessageAsRead(ourRequest.id) }
             .onFailure { Timber.w(it, "markOurWelcomeMessageAsRead failed (non-critical)") }
+    }
+
+    private suspend fun markChatAccepted(contactAccountId: AccountId) {
+        contactsRepository.markChatRequestAccepted(contactAccountId, CurrentTimeContext.currentTime())
+        chatSigners.warmUp(contactAccountId)
     }
 
     private suspend fun updateIfNewer(

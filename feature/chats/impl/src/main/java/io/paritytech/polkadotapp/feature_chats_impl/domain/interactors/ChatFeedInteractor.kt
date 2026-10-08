@@ -64,6 +64,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.models.InitiateCallRe
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.MessageEditHistoryItem
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.DmChatMessageOriginDisplayResolver
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.MessageOriginDisplayResolver
+import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ChatSignerKind
+import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -97,6 +99,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private val attachmentMetaBuilder: AttachmentMetaBuilder,
     private val attachmentFileStorage: AttachmentFileStorage,
     private val hopNodeUrlProvider: HopNodeUrlProvider,
+    private val chatSigners: ContactChatSigners,
 ) {
     fun initiateCall(chatId: ChatId, callerName: String, withVideo: Boolean): InitiateCallResult {
         val activeCall = callStateTracker.getActiveCall()
@@ -306,6 +309,7 @@ class ChatFeedInteractor @Inject internal constructor(
     suspend fun blockUser(chatId: ChatId): Result<Unit> = runCatching {
         chatId.onContact { contactChat ->
             contactsRepository.setBlocked(contactChat.contactAccountId, true)
+            releaseChatSigner(contactChat.contactAccountId)
         }
     }
 
@@ -316,9 +320,21 @@ class ChatFeedInteractor @Inject internal constructor(
     }
 
     suspend fun leaveChat(chatId: ChatId): Result<Unit> {
+        // LeftChat is signed by the chat signer, so the slot is released only after it was sent.
         tryNotifyPeerLeftChat(chatId)
+        chatId.onContact { contactChat -> releaseChatSigner(contactChat.contactAccountId) }
 
         return deleteContactChatLocalData(chatId)
+    }
+
+    fun subscribeChatSignerKind(chatId: ChatId): Flow<ChatSignerKind?> {
+        val contactChat = chatId.contactOrNull() ?: return flowOf { null }
+
+        return chatSigners.kindFlow(contactChat.contactAccountId)
+    }
+
+    private suspend fun releaseChatSigner(contactAccountId: AccountId) {
+        chatSigners.release(contactAccountId).logFailure("Failed to release chat signer slot")
     }
 
     fun subscribeRevisions(chatId: ChatId): Flow<Map<ChatMessageId, MessageRevision>> {

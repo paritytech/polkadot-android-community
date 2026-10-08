@@ -45,12 +45,25 @@ interface StatementStoreSlotAllocationDao {
         """
         SELECT EXISTS(
             SELECT 1 FROM statement_store_slot_allocations
-            WHERE chainId = :chainId AND accountId = :accountId
-              AND latestRenewedPeriod < :currentPeriod
+            WHERE chainId = :chainId AND latestRenewedPeriod < :currentPeriod
         )
         """
     )
-    suspend fun hasStaleFor(
+    suspend fun hasAnyStale(
+        chainId: String,
+        currentPeriod: Long,
+    ): Boolean
+
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM statement_store_slot_allocations
+            WHERE chainId = :chainId AND accountId = :accountId
+              AND latestRenewedPeriod >= :currentPeriod
+        )
+        """
+    )
+    suspend fun hasRenewedFor(
         chainId: String,
         accountId: ByteArray,
         currentPeriod: Long,

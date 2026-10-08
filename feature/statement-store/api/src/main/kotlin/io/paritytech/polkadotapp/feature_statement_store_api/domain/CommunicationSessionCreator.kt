@@ -18,6 +18,12 @@ import kotlinx.coroutines.CoroutineScope
 interface CommunicationSessionCreator {
     interface Factory {
         fun create(account: MetaAccount): CommunicationSessionCreator
+
+        /**
+         * Sessions sign outgoing statements with [prover] instead of the account's own key.
+         * Addressing (topics, envelopes) still comes from the `SessionAccount`s passed per session.
+         */
+        fun create(prover: StatementStoreMessageProver): CommunicationSessionCreator
     }
 
     /**

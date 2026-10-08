@@ -63,12 +63,19 @@ class RealStatementStoreSlotAllocationRepository @Inject constructor(
             .map { it.toRecord() }
     }
 
-    override suspend fun hasStaleFor(
+    override suspend fun hasAnyStale(
+        chainId: ChainId,
+        currentPeriod: UInt,
+    ): Boolean {
+        return dao.hasAnyStale(chainId, currentPeriod.toLong())
+    }
+
+    override suspend fun hasRenewedFor(
         chainId: ChainId,
         accountId: AccountId,
         currentPeriod: UInt,
     ): Boolean {
-        return dao.hasStaleFor(chainId, accountId.value, currentPeriod.toLong())
+        return dao.hasRenewedFor(chainId, accountId.value, currentPeriod.toLong())
     }
 
     override suspend fun maxPriorityLevelsFor(
