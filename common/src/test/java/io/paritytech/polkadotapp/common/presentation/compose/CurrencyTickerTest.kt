@@ -2,11 +2,13 @@ package io.paritytech.polkadotapp.common.presentation.compose
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import io.paritytech.polkadotapp.designsystem.typography.PolkadotCashLogo
@@ -16,6 +18,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private const val TICKER = "CASH"
+
+private val SMALL_CAPS = SpanStyle(fontFeatureSettings = "c2sc")
 
 class CurrencyTickerTest {
     @Test
@@ -102,6 +106,36 @@ class CurrencyTickerTest {
         assertEquals(FontWeight.Normal, logo.item.fontWeight)
         assertEquals(FontSynthesis.None, logo.item.fontSynthesis)
         assertTrue(styles.indexOf(logo) > styles.indexOfFirst { it.item.fontWeight == FontWeight.Bold && it.start <= logo.start && it.end > logo.start })
+    }
+
+    @Test
+    fun `should draw the wordmark only for the CASH brand`() {
+        val logoText = styleTicker(AnnotatedString("12.34 CASH"), TICKER, PolkadotCashLogo.SmallCaps, SMALL_CAPS)
+
+        assertEquals("12.34 cash", logoText.text)
+        assertEquals(listOf(TextRange(6, 7)), logoText.logoRanges())
+        assertTrue(logoText.spanStyles.none { it.item == SMALL_CAPS })
+    }
+
+    @Test
+    fun `should keep the small caps ticker for any other brand`() {
+        val tickerText = styleTicker(AnnotatedString("12.34 USDX"), "USDX", PolkadotCashLogo.SmallCaps, SMALL_CAPS)
+
+        assertEquals("12.34 USDX", tickerText.text)
+        assertEquals(emptyList<TextRange>(), tickerText.logoRanges())
+        assertEquals(listOf(TextRange(6, 10)), tickerText.spanStyles.filter { it.item == SMALL_CAPS }.map { TextRange(it.start, it.end) })
+    }
+
+    @Test
+    fun `should keep a paragraph style that spans the ticker in one piece`() {
+        val centered = ParagraphStyle(textAlign = TextAlign.Center)
+        val source = buildAnnotatedString {
+            withStyle(centered) { append("Pay 5 CASH now") }
+        }
+
+        val logoText = drawTickerAsLogo(source, PolkadotCashLogo.SmallCaps)
+
+        assertEquals(listOf(TextRange(0, 14)), logoText.paragraphStyles.map { TextRange(it.start, it.end) })
     }
 
     private fun assertRanges(source: String, expected: List<TextRange>) {

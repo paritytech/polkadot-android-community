@@ -30,15 +30,20 @@ fun AnnotatedString.withCurrencyTickerStyle(
     val ticker = LocalPaymentAssetBrand.current.symbol
     val spanStyle = rememberTickerSpanStyle()
 
-    return remember(this, ticker, spanStyle, logo) {
-        if (ticker == CASH_LOGO_TICKER) {
-            drawTickerAsLogo(this, logo)
-        } else {
-            buildAnnotatedString {
-                append(this@withCurrencyTickerStyle)
-                styleTickerOccurrences(this@withCurrencyTickerStyle.text, ticker, spanStyle)
-            }
-        }
+    return remember(this, ticker, spanStyle, logo) { styleTicker(this, ticker, logo, spanStyle) }
+}
+
+internal fun styleTicker(
+    source: AnnotatedString,
+    ticker: String,
+    logo: PolkadotCashLogo,
+    smallCaps: SpanStyle
+): AnnotatedString = if (ticker == CASH_LOGO_TICKER) {
+    drawTickerAsLogo(source, logo)
+} else {
+    buildAnnotatedString {
+        append(source)
+        styleTickerOccurrences(source.text, ticker, smallCaps)
     }
 }
 
@@ -78,22 +83,19 @@ private fun AnnotatedString.Builder.styleTickerOccurrences(source: String, ticke
 }
 
 // The ticker takes the glyph's case, which picks the wordmark; only its first letter is drawn, the rest stays for screen readers.
-internal fun drawTickerAsLogo(source: AnnotatedString, logo: PolkadotCashLogo): AnnotatedString = buildAnnotatedString {
-    var cursor = 0
+internal fun drawTickerAsLogo(source: AnnotatedString, logo: PolkadotCashLogo): AnnotatedString {
+    val ranges = tickerRanges(source.text, CASH_LOGO_TICKER)
+    val logoTicker = CASH_LOGO_TICKER.inCaseOf(logo.glyph)
+    val text = ranges.fold(source.text) { text, range -> text.replaceRange(range.start, range.end, logoTicker) }
 
-    tickerRanges(source.text, CASH_LOGO_TICKER).forEach { range ->
-        append(source.subSequence(cursor, range.start))
+    return buildAnnotatedString {
+        append(AnnotatedString(text, source.spanStyles, source.paragraphStyles))
 
-        val ticker = source.subSequence(range.start, range.end)
-        val logoStart = length
-        append(AnnotatedString(ticker.text.inCaseOf(logo.glyph), ticker.spanStyles))
-        addStyle(CashLogoSpanStyle, logoStart, logoStart + 1)
-        addStyle(CollapsedTickerSpanStyle, logoStart + 1, length)
-
-        cursor = range.end
+        ranges.forEach { range ->
+            addStyle(CashLogoSpanStyle, range.start, range.start + 1)
+            addStyle(CollapsedTickerSpanStyle, range.start + 1, range.end)
+        }
     }
-
-    append(source.subSequence(cursor, source.length))
 }
 
 private fun String.inCaseOf(glyph: String): String = if (glyph.first().isLowerCase()) lowercase() else uppercase()
