@@ -7,6 +7,7 @@ import kotlinx.coroutines.CompletableDeferred
 
 // Mockito cannot suspend a stubbed suspend call.
 internal class ParkedFundingDomainProvider : FundingDomainProvider {
+    private val fundingConfig = FundingConfig(onrampUrl = ONRAMP_URL, offrampUrl = OFFRAMP_URL)
     private val reads = ArrayDeque<CompletableDeferred<Result<FundingConfig>>>()
 
     override suspend fun getFundingConfig(): Result<FundingConfig> {
@@ -17,7 +18,11 @@ internal class ParkedFundingDomainProvider : FundingDomainProvider {
 
     override suspend fun getFundingProductIds(): Result<Set<ProductId>> = error("not reachable from the wallet screens")
 
-    fun completeReads(result: Result<FundingConfig>) {
+    fun completeReadsWithConfig() = completeReads(Result.success(fundingConfig))
+
+    fun failReads() = completeReads(Result.failure(IllegalStateException("no config")))
+
+    private fun completeReads(result: Result<FundingConfig>) {
         while (reads.isNotEmpty()) {
             reads.removeFirst().complete(result)
         }

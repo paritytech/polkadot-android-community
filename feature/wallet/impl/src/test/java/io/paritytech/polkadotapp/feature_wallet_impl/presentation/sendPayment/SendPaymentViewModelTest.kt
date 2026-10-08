@@ -12,15 +12,19 @@ import io.paritytech.polkadotapp.feature_account_api.presentation.address.model.
 import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.GetContactsUseCase
 import io.paritytech.polkadotapp.feature_chats_api.presentation.ChatStarter
 import io.paritytech.polkadotapp.feature_chats_api.presentation.address.ContactsAddressConverterFactory
-import io.paritytech.polkadotapp.feature_products_api.domain.FundingConfig
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transfers_api.presentation.PreviousPaymentsAddressConverterFactory
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.ParseAddressUsernameConverterFactory
 import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.UsernameAddressConverterFactory
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.OFFRAMP_URL
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.ONRAMP_URL
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.ParkedFundingDomainProvider
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.WithdrawUnavailablePresentationError
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.domain.RealSendPaymentInteractor
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.verifySheetNeverOpened
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.verifySheetOpenedOnce
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.verifySheetOpenedTwice
 import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.assertPresentationErrorShown
 import io.paritytech.polkadotapp.test_shared.whenever
@@ -41,21 +45,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
 import kotlin.time.Duration.Companion.seconds
 import io.paritytech.polkadotapp.common.R as RCommon
 
-private const val ONRAMP_URL = "onramp.example"
-private const val OFFRAMP_URL = "offramp.example"
 private const val CHAIN_ID = "chain"
 private val STATE_TIMEOUT = 1.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SendPaymentViewModelTest {
-    private val fundingConfig = FundingConfig(onrampUrl = ONRAMP_URL, offrampUrl = OFFRAMP_URL)
-
     private val router: PocketRouter = mock(PocketRouter::class.java)
     private val clipboardService: ClipboardService = mock(ClipboardService::class.java)
     private val getContactsUseCase: GetContactsUseCase = mock(GetContactsUseCase::class.java)
@@ -170,10 +167,10 @@ class SendPaymentViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onSendToYourselfClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
-        verifySheetOpenedOnce(OFFRAMP_URL)
-        verifySheetNeverOpened(ONRAMP_URL)
+        router.verifySheetOpenedOnce(OFFRAMP_URL)
+        router.verifySheetNeverOpened(ONRAMP_URL)
     }
 
     @Test
@@ -182,9 +179,9 @@ class SendPaymentViewModelTest {
 
         viewModel.onSendToYourselfClick()
         viewModel.onSendToYourselfClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
-        verifySheetOpenedOnce(OFFRAMP_URL)
+        router.verifySheetOpenedOnce(OFFRAMP_URL)
     }
 
     @Test
@@ -192,11 +189,11 @@ class SendPaymentViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onSendToYourselfClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
         viewModel.onSendToYourselfClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
-        verifySheetOpenedTwice(OFFRAMP_URL)
+        router.verifySheetOpenedTwice(OFFRAMP_URL)
     }
 
     @Test
@@ -204,12 +201,12 @@ class SendPaymentViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onSendToYourselfClick()
-        withFundingConfigFailing()
+        fundingDomainProvider.failReads()
         viewModel.onSendToYourselfClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
         assertPresentationErrorShown<WithdrawUnavailablePresentationError>(viewModel)
-        verifySheetOpenedOnce(OFFRAMP_URL)
+        router.verifySheetOpenedOnce(OFFRAMP_URL)
     }
 
     private fun withAddressConverters() {
@@ -239,26 +236,6 @@ class SendPaymentViewModelTest {
         addressCandidates.emit(
             AddressCandidates(query = "", local = emptyList(), remote = RemoteSearchPhase.Loaded(emptyList()))
         )
-    }
-
-    private fun withFundingConfigLoaded() {
-        fundingDomainProvider.completeReads(Result.success(fundingConfig))
-    }
-
-    private fun withFundingConfigFailing() {
-        fundingDomainProvider.completeReads(Result.failure(IllegalStateException("no config")))
-    }
-
-    private fun verifySheetOpenedOnce(url: String) {
-        verify(router).openSpaSheet(url)
-    }
-
-    private fun verifySheetOpenedTwice(url: String) {
-        verify(router, times(2)).openSpaSheet(url)
-    }
-
-    private fun verifySheetNeverOpened(url: String) {
-        verify(router, never()).openSpaSheet(url)
     }
 
     private suspend fun SendPaymentViewModel.awaitState(predicate: (SendPaymentUiState) -> Boolean): SendPaymentUiState {

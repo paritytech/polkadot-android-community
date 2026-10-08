@@ -7,12 +7,16 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageHoldingsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
-import io.paritytech.polkadotapp.feature_products_api.domain.FundingConfig
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.DigitalDollarCardDetailsInteractor
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.OFFRAMP_URL
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.ONRAMP_URL
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.ParkedFundingDomainProvider
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.verifySheetNeverOpened
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.verifySheetOpenedOnce
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.verifySheetOpenedTwice
 import io.paritytech.polkadotapp.test_shared.assertPresentationErrorShown
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.Dispatchers
@@ -27,17 +31,9 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
-
-private const val ONRAMP_URL = "onramp.example"
-private const val OFFRAMP_URL = "offramp.example"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DigitalDollarCardDetailsViewModelTest {
-    private val fundingConfig = FundingConfig(onrampUrl = ONRAMP_URL, offrampUrl = OFFRAMP_URL)
-
     private val chainAssetProvider: ChainAssetProvider = mock(ChainAssetProvider::class.java)
     private val coinageTestnetFundUseCase: CoinageTestnetFundUseCase = mock(CoinageTestnetFundUseCase::class.java)
     private val coinageBackupService: CoinageBackupService = mock(CoinageBackupService::class.java)
@@ -78,10 +74,10 @@ class DigitalDollarCardDetailsViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onGetCashClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
-        verifySheetOpenedOnce(ONRAMP_URL)
-        verifySheetNeverOpened(OFFRAMP_URL)
+        router.verifySheetOpenedOnce(ONRAMP_URL)
+        router.verifySheetNeverOpened(OFFRAMP_URL)
     }
 
     @Test
@@ -90,9 +86,9 @@ class DigitalDollarCardDetailsViewModelTest {
 
         viewModel.onGetCashClick()
         viewModel.onGetCashClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
-        verifySheetOpenedOnce(ONRAMP_URL)
+        router.verifySheetOpenedOnce(ONRAMP_URL)
     }
 
     @Test
@@ -100,11 +96,11 @@ class DigitalDollarCardDetailsViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onGetCashClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
         viewModel.onGetCashClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
-        verifySheetOpenedTwice(ONRAMP_URL)
+        router.verifySheetOpenedTwice(ONRAMP_URL)
     }
 
     @Test
@@ -112,32 +108,12 @@ class DigitalDollarCardDetailsViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onGetCashClick()
-        withFundingConfigFailing()
+        fundingDomainProvider.failReads()
         viewModel.onGetCashClick()
-        withFundingConfigLoaded()
+        fundingDomainProvider.completeReadsWithConfig()
 
         assertPresentationErrorShown<GetCashUnavailablePresentationError>(viewModel)
-        verifySheetOpenedOnce(ONRAMP_URL)
-    }
-
-    private fun withFundingConfigLoaded() {
-        fundingDomainProvider.completeReads(Result.success(fundingConfig))
-    }
-
-    private fun withFundingConfigFailing() {
-        fundingDomainProvider.completeReads(Result.failure(IllegalStateException("no config")))
-    }
-
-    private fun verifySheetOpenedOnce(url: String) {
-        verify(router).openSpaSheet(url)
-    }
-
-    private fun verifySheetOpenedTwice(url: String) {
-        verify(router, times(2)).openSpaSheet(url)
-    }
-
-    private fun verifySheetNeverOpened(url: String) {
-        verify(router, never()).openSpaSheet(url)
+        router.verifySheetOpenedOnce(ONRAMP_URL)
     }
 
     private fun createViewModel() = DigitalDollarCardDetailsViewModel(

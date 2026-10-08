@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -52,6 +53,12 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
+
+private val BalancedLineBreak = LineBreak(
+    strategy = LineBreak.Strategy.Balanced,
+    strictness = LineBreak.Strictness.Normal,
+    wordBreak = LineBreak.WordBreak.Default
+)
 
 @Composable
 fun DigitalDollarCardDetails(
@@ -243,7 +250,7 @@ private fun CashActionButton(
 
             NovaText(
                 text = description,
-                style = PolkadotTheme.typography.body.small,
+                style = PolkadotTheme.typography.body.small.copy(lineBreak = BalancedLineBreak),
                 color = PolkadotTheme.colors.fg.secondaryInverted,
                 textAlign = TextAlign.Center
             )

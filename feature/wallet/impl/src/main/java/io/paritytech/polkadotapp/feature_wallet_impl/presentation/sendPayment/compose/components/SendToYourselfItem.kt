@@ -17,11 +17,10 @@ import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonS
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotButton
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotButtonSize
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
-import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.UserRound
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.compose.components.icons.UserRound
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private val IconContainerSize = 40.dp
@@ -52,7 +51,7 @@ internal fun SendToYourselfItem(
             ) {
                 NovaIcon(
                     modifier = Modifier.requiredSize(IconSize),
-                    imageVector = NovaIcons.UserRound,
+                    imageVector = UserRound,
                     tint = PolkadotTheme.colors.fg.primary
                 )
             }

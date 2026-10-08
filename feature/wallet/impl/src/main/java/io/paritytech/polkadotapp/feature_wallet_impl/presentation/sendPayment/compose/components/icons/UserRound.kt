@@ -1,4 +1,4 @@
-package io.paritytech.polkadotapp.design.components.icon.vectors
+package io.paritytech.polkadotapp.feature_wallet_impl.presentation.sendPayment.compose.components.icons
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -7,9 +7,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
-import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 
-val NovaIcons.UserRound: ImageVector by lazy(LazyThreadSafetyMode.NONE) {
+val UserRound: ImageVector by lazy(LazyThreadSafetyMode.NONE) {
     ImageVector.Builder(
         name = "UserRound",
         defaultWidth = 20.dp,
