@@ -1524,7 +1524,7 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_debug_breakdown_can_spend_gaining">Can spend gaining privacy</string>
     <string name="pocket_coinage_show_details">Show Details</string>
 
-    <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
+    <string name="payment_privacy_mode_title">%1$s Privacy Mode</string>
     <string name="payment_privacy_mode_fastest_label">Fastest</string>
     <string name="payment_privacy_mode_fastest_description">Fastest payments, lower privacy</string>
     <string name="payment_privacy_mode_fastest_accessibility">Fastest. Fastest payments, lower privacy.</string>

@@ -10,24 +10,29 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.designsystem.typography.PolkadotCashLogo
 import io.paritytech.polkadotapp.designsystem.typography.PolkadotFontFamilies
 
 @Composable
-fun String.withCurrencyTickerStyle(style: TextStyle): AnnotatedString =
-    remember(this) { AnnotatedString(this) }.withCurrencyTickerStyle(style)
+fun String.withCurrencyTickerStyle(
+    style: TextStyle,
+    logo: PolkadotCashLogo = PolkadotCashLogo.SmallCaps
+): AnnotatedString = remember(this) { AnnotatedString(this) }.withCurrencyTickerStyle(style, logo)
 
 @Composable
-fun AnnotatedString.withCurrencyTickerStyle(style: TextStyle): AnnotatedString {
+fun AnnotatedString.withCurrencyTickerStyle(
+    style: TextStyle,
+    logo: PolkadotCashLogo = PolkadotCashLogo.SmallCaps
+): AnnotatedString {
     val ticker = LocalPaymentAssetBrand.current.symbol
     val spanStyle = rememberTickerSpanStyle()
 
-    return remember(this, ticker, spanStyle) {
+    return remember(this, ticker, spanStyle, logo) {
         if (ticker == CASH_LOGO_TICKER) {
-            drawTickerAsLogo(this)
+            drawTickerAsLogo(this, logo)
         } else {
             buildAnnotatedString {
                 append(this@withCurrencyTickerStyle)
@@ -72,23 +77,31 @@ private fun AnnotatedString.Builder.styleTickerOccurrences(source: String, ticke
     }
 }
 
-// One uppercase letter in the CashLogo font draws the whole wordmark; the rest stays in the text for screen readers.
-internal fun drawTickerAsLogo(source: AnnotatedString): AnnotatedString = buildAnnotatedString {
-    append(source)
+// The ticker takes the glyph's case, which picks the wordmark; only its first letter is drawn, the rest stays for screen readers.
+internal fun drawTickerAsLogo(source: AnnotatedString, logo: PolkadotCashLogo): AnnotatedString = buildAnnotatedString {
+    var cursor = 0
 
     tickerRanges(source.text, CASH_LOGO_TICKER).forEach { range ->
-        addStyle(CashLogoSpanStyle, range.start, range.start + 1)
-        addStyle(CollapsedTickerSpanStyle, range.start + 1, range.end)
+        append(source.subSequence(cursor, range.start))
+
+        val ticker = source.subSequence(range.start, range.end)
+        val logoStart = length
+        append(AnnotatedString(ticker.text.inCaseOf(logo.glyph), ticker.spanStyles))
+        addStyle(CashLogoSpanStyle, logoStart, logoStart + 1)
+        addStyle(CollapsedTickerSpanStyle, logoStart + 1, length)
+
+        cursor = range.end
     }
+
+    append(source.subSequence(cursor, source.length))
 }
+
+private fun String.inCaseOf(glyph: String): String = if (glyph.first().isLowerCase()) lowercase() else uppercase()
 
 private const val CASH_LOGO_TICKER = "CASH"
 
-private val CashLogoFontSize = 1.25.em
-
 private val CashLogoSpanStyle = SpanStyle(
     fontFamily = PolkadotFontFamilies.cashLogo,
-    fontSize = CashLogoFontSize,
     fontWeight = FontWeight.Normal,
     fontStyle = FontStyle.Normal,
     fontSynthesis = FontSynthesis.None

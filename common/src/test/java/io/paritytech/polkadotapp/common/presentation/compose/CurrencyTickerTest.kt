@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.common.presentation.compose
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
@@ -8,6 +9,7 @@ import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
+import io.paritytech.polkadotapp.designsystem.typography.PolkadotCashLogo
 import io.paritytech.polkadotapp.designsystem.typography.PolkadotFontFamilies
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -47,23 +49,45 @@ class CurrencyTickerTest {
     }
 
     @Test
-    fun `should draw a standalone ticker as one logo glyph and keep its text`() {
-        val logoText = drawTickerAsLogo(AnnotatedString("12.34 CASH"))
+    fun `should draw a standalone ticker as the small caps wordmark`() {
+        val logoText = drawTickerAsLogo(AnnotatedString("12.34 CASH"), PolkadotCashLogo.SmallCaps)
 
-        assertEquals("12.34 CASH", logoText.text)
+        assertEquals("12.34 cash", logoText.text)
         assertEquals(listOf(TextRange(6, 7)), logoText.logoRanges())
         assertEquals(listOf(TextRange(7, 10)), logoText.collapsedRanges())
     }
 
     @Test
+    fun `should draw a standalone ticker as the capital wordmark`() {
+        val logoText = drawTickerAsLogo(AnnotatedString("CASH Privacy Mode"), PolkadotCashLogo.Capital)
+
+        assertEquals("CASH Privacy Mode", logoText.text)
+        assertEquals(listOf(TextRange(0, 1)), logoText.logoRanges())
+        assertEquals(listOf(TextRange(1, 4)), logoText.collapsedRanges())
+    }
+
+    @Test
     fun `should draw every standalone ticker as a logo`() {
-        assertLogo(source = "1 CASH = 1 CASH", logo = listOf(TextRange(2, 3), TextRange(11, 12)))
-        assertLogo(source = "CASH", logo = listOf(TextRange(0, 1)))
+        assertLogo(source = "1 CASH = 1 CASH", text = "1 cash = 1 cash", logo = listOf(TextRange(2, 3), TextRange(11, 12)))
+        assertLogo(source = "CASH", text = "cash", logo = listOf(TextRange(0, 1)))
     }
 
     @Test
     fun `should leave a ticker inside a longer word untouched`() {
-        assertLogo(source = "Buy CASHBACK today", logo = emptyList())
+        assertLogo(source = "Buy CASHBACK today", text = "Buy CASHBACK today", logo = emptyList())
+    }
+
+    @Test
+    fun `should keep the styles the ticker already had on the logo glyph`() {
+        val secondary = SpanStyle(color = Color.Gray)
+        val source = buildAnnotatedString {
+            append("$20 ")
+            withStyle(secondary) { append("CASH") }
+        }
+
+        val logoText = drawTickerAsLogo(source, PolkadotCashLogo.SmallCaps)
+
+        assertEquals(listOf(TextRange(4, 8)), logoText.spanStyles.filter { it.item == secondary }.map { TextRange(it.start, it.end) })
     }
 
     @Test
@@ -72,22 +96,22 @@ class CurrencyTickerTest {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("2 CASH") }
         }
 
-        val styles = drawTickerAsLogo(source).spanStyles
+        val styles = drawTickerAsLogo(source, PolkadotCashLogo.SmallCaps).spanStyles
         val logo = styles.single { it.item.fontFamily == PolkadotFontFamilies.cashLogo }
 
         assertEquals(FontWeight.Normal, logo.item.fontWeight)
         assertEquals(FontSynthesis.None, logo.item.fontSynthesis)
-        assertTrue(styles.indexOf(logo) > styles.indexOfFirst { it.item.fontWeight == FontWeight.Bold })
+        assertTrue(styles.indexOf(logo) > styles.indexOfFirst { it.item.fontWeight == FontWeight.Bold && it.start <= logo.start && it.end > logo.start })
     }
 
     private fun assertRanges(source: String, expected: List<TextRange>) {
         assertEquals(expected, tickerRanges(source, TICKER))
     }
 
-    private fun assertLogo(source: String, logo: List<TextRange>) {
-        val logoText = drawTickerAsLogo(AnnotatedString(source))
+    private fun assertLogo(source: String, text: String, logo: List<TextRange>) {
+        val logoText = drawTickerAsLogo(AnnotatedString(source), PolkadotCashLogo.SmallCaps)
 
-        assertEquals(source, logoText.text)
+        assertEquals(text, logoText.text)
         assertEquals(logo, logoText.logoRanges())
     }
 
