@@ -96,7 +96,6 @@
     <string name="home_citizenship_registering_person">Registering as a person</string>
 
     <string name="common_send">Send</string>
-    <string name="common_withdraw">Withdraw</string>
     <string name="common_edit">Edit</string>
     <string name="common_reply">Reply</string>
 
@@ -731,6 +730,8 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="send_payment_search_placeholder">Type username or wallet address</string>
     <string name="send_payment_to">To:</string>
     <string name="send_payment_open_chat_message">You need to first establish a chat before sending a payment</string>
+    <string name="send_payment_send_to_yourself">Send to yourself</string>
+    <string name="send_payment_send_to_yourself_description">Bank account or crypto wallet</string>
 
     <string name="send_enter_amount_placeholder">Enter Amount</string>
     <string name="send_enter_amount_ready_to_send">Ready</string>
@@ -1504,6 +1505,9 @@ I’m attaching PDF with more information and details regarding the Tattoo Stenc
     <string name="pocket_digital_dollar_title">%1$s Card</string>
     <string name="pocket_digital_dollar_card_title">%1$s</string>
     <string name="pocket_digital_dollar_faucet_top_up">Faucet Top Up</string>
+    <string name="pocket_action_get">Get</string>
+    <string name="pocket_action_get_description">Add %1$s via bank, crypto or credit card</string>
+    <string name="pocket_action_send_description">Move %1$s to your bank, crypto wallet or contacts</string>
     <string name="pocket_collectibles_open_button">View collectibles</string>
     <string name="pocket_collectibles_title">Collectibles</string>
     <string name="pocket_error_get_cash_unavailable">Get %1$s isn\'t available right now. Try again later.</string>
