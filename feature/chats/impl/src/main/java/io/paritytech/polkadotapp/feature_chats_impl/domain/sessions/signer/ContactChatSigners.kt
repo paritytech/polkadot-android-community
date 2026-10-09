@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer
 
 import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519Keypair
-import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
@@ -9,7 +8,6 @@ import io.paritytech.polkadotapp.common.utils.exponentialRetryDelay
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.retryUntilSuccess
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
-import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementStoreSlotAllocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -21,7 +19,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -31,10 +28,10 @@ import kotlin.time.Duration.Companion.seconds
 
 // Resolved at most once per process so a chat never flips between private and username signer while the app runs.
 interface ContactChatSigners {
-    // Chats that are not established yet sign with the username account and never allocate a slot.
-    suspend fun keypairFor(contactAccountId: AccountId): Sr25519Keypair
+    // Pending and not yet accepted chats sign with the chat account too, so no statement links the chat to the username.
+    suspend fun keypairFor(contact: Contact): Sr25519Keypair
 
-    fun warmUp(contactAccountId: AccountId)
+    fun warmUp(contact: Contact)
 
     fun kindFlow(contactAccountId: AccountId): Flow<ChatSignerKind?>
 
@@ -46,7 +43,6 @@ class RealContactChatSigners @Inject constructor(
     private val resolver: ContactChatSignerResolver,
     private val accountDerivation: ChatSignerAccountDerivation,
     private val slotAllocator: StatementStoreSlotAllocator,
-    private val contactsRepository: ContactsRepository,
     dispatchers: CoroutineDispatchers,
 ) : ContactChatSigners, CoroutineScope {
     override val coroutineContext = dispatchers.io + SupervisorJob()
@@ -55,16 +51,13 @@ class RealContactChatSigners @Inject constructor(
     private val resolutions = ConcurrentHashMap<AccountId, Deferred<ContactChatSigner>>()
     private val resolvedKinds = MutableStateFlow<Map<AccountId, ChatSignerKind>>(emptyMap())
 
-    override suspend fun keypairFor(contactAccountId: AccountId): Sr25519Keypair {
-        val contactHex = contactAccountId.value.toHexString()
-        val contact = contactsRepository.getContact(contactAccountId)
-            ?: error("No contact $contactHex to sign chat statements for, expected an existing contact")
-        val signer = signerFor(contact)
+    override suspend fun keypairFor(contact: Contact): Sr25519Keypair {
+        val signer = resolutionFor(contact).await()
         return signer.keypair
     }
 
-    override fun warmUp(contactAccountId: AccountId) {
-        launch { warmUpIfEstablished(contactAccountId) }
+    override fun warmUp(contact: Contact) {
+        resolutionFor(contact)
     }
 
     override fun kindFlow(contactAccountId: AccountId): Flow<ChatSignerKind?> {
@@ -79,19 +72,6 @@ class RealContactChatSigners @Inject constructor(
             val chatAccountId = chatKeypair.publicKey.toDataByteArray()
             slotAllocator.deallocateAllSlots(chatAccountId)
         }
-    }
-
-    private suspend fun warmUpIfEstablished(contactAccountId: AccountId) {
-        val contact = contactsRepository.getContact(contactAccountId) ?: return
-        if (contact.establishedAt == null) return
-
-        resolutionFor(contact)
-    }
-
-    private suspend fun signerFor(contact: Contact): ContactChatSigner {
-        if (contact.establishedAt == null) return usernameSignerUntilResolved(contact)
-
-        return resolutionFor(contact).await()
     }
 
     // Cancelled before deallocating so an in-flight allocation cannot re-insert a slot row after release.
@@ -111,9 +91,5 @@ class RealContactChatSigners @Inject constructor(
         resolvedKinds.update { kinds -> kinds + (contact.accountId to signer.kind) }
         Timber.i("ContactChatSigners: chat with ${contact.username} resolved to ${signer.kind}")
         return signer
-    }
-
-    private suspend fun usernameSignerUntilResolved(contact: Contact): ContactChatSigner {
-        return retryUntilSuccess(retryDelay) { resolver.usernameSigner(contact) }
     }
 }

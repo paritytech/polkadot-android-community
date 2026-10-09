@@ -77,7 +77,7 @@ class ContactChatSignerResolverTest {
 
         val signer = resolver.resolve(contact).getOrNull()
 
-        assertTrue(signer is ContactChatSigner.Username)
+        assertEquals(ChatSignerKind.USERNAME, signer?.kind)
         assertSame(usernameKeypair, signer?.keypair)
     }
 
@@ -111,7 +111,7 @@ class ContactChatSignerResolverTest {
     }
 
     private fun assertPrivateWith(signer: ContactChatSigner?, keypair: Sr25519Keypair) {
-        assertTrue(signer is ContactChatSigner.Private)
+        assertEquals(ChatSignerKind.PRIVATE, signer?.kind)
         assertSame(keypair, signer?.keypair)
     }
 }

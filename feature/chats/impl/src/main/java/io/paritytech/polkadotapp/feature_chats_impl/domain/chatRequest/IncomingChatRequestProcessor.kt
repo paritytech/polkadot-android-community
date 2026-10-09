@@ -4,11 +4,11 @@ import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.data.os.OperatingSystem
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
 import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
-import io.paritytech.polkadotapp.common.utils.CurrentTimeContext
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
@@ -31,7 +31,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRoomRepo
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
-import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenPlatform
@@ -121,7 +120,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val chatEngine: dagger.Lazy<ChatEngine>,
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
-    private val chatSigners: ContactChatSigners,
+    private val currentTimeContext: CurrentTimeContext,
 ) : IncomingChatRequestProcessor {
     private companion object {
         const val ACCEPTED_MESSAGE_ID_PREFIX = "req-accepted:"
@@ -264,8 +263,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     }
 
     private suspend fun markChatAccepted(contactAccountId: AccountId) {
-        contactsRepository.markChatRequestAccepted(contactAccountId, CurrentTimeContext.currentTime())
-        chatSigners.warmUp(contactAccountId)
+        contactsRepository.markChatRequestAccepted(contactAccountId, currentTimeContext.currentTime())
     }
 
     private suspend fun updateIfNewer(
@@ -349,7 +347,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
             pendingChatRequestId = request.id,
             pushToken = content.pushToken?.token?.toDataByteArray(),
             operatingSystem = content.pushToken?.platform.toOperatingSystem(),
-            addedAt = CurrentTimeContext.currentTime(),
+            addedAt = currentTimeContext.currentTime(),
         )
         Timber.d("createNewIncomingRequestChat: contact=$peerUsername, hasPushToken=${contact.pushToken != null}, os=${contact.operatingSystem}")
         contactsRepository.saveContact(contact)

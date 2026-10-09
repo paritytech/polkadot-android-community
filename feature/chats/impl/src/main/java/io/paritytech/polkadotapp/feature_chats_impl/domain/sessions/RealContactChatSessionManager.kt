@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.common.utils.childScope
 import io.paritytech.polkadotapp.common.utils.diffed
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapToSet
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
@@ -68,6 +69,13 @@ private data class ContactWithSessionType(
     val sessionType: SessionType,
 ) : Identifiable {
     override val identifier: String = "${contact.identifier}:$sessionType"
+}
+
+private class EstablishedChatSession(
+    val contact: Contact,
+    val session: RealContactChatSession,
+) : Identifiable {
+    override val identifier: String = contact.identifier
 }
 
 @Singleton
@@ -130,6 +138,7 @@ internal class RealContactChatSessionManager @Inject constructor(
     fun startSubscriptions() {
         registerSubscriptionOnTokenChanges()
         subscribeToEnabledContacts()
+        subscribeToEstablishedChats()
         subscribeToTokenUpdates()
     }
 
@@ -241,7 +250,6 @@ internal class RealContactChatSessionManager @Inject constructor(
 
         val sessionCreatorWithAccount = sessionCreatorsCache.getOrCompute(contact.ourMetaAccountId)
         val chatSessionCreator = createChatSessionCreator(contact)
-        chatSigners.warmUp(contact.accountId)
 
         val scope = childScope(supervised = true)
 
@@ -265,42 +273,62 @@ internal class RealContactChatSessionManager @Inject constructor(
             notificationPayloadEncoder = notificationPayloadEncoder,
         )
 
-        invalidateContact(chatSession, contact)
+        syncIncomingPushId(chatSession, contact)
 
         chatSession
     }.logFailure("ContactChatSessionManager: failed to create session for contact ${contact.username}")
 
     private fun createChatSessionCreator(contact: Contact): CommunicationSessionCreator {
-        val chatProver = proverFactory.createLazyKeyPairProver { chatSigners.keypairFor(contact.accountId) }
+        val chatProver = proverFactory.createLazyKeyPairProver { chatSigners.keypairFor(contact) }
         return sessionCreatorFactory.create(prover = chatProver)
     }
 
+    // Pending chats sign nothing until accepted, so an unanswered request never claims a chat slot.
+    private fun subscribeToEstablishedChats() {
+        combine(sessionsFlow, contactsRepository.subscribeContactsWithChatRequests()) { sessions, contacts ->
+            contacts.mapNotNull { establishedChatSessionOrNull(it.contact, sessions) }
+        }
+            .diffed()
+            .onEach { diff -> diff.added.forEach { onChatEstablished(it) } }
+            .launchIn(this)
+    }
+
+    private fun establishedChatSessionOrNull(
+        contact: Contact,
+        sessions: Map<AccountId, RealContactChatSession>,
+    ): EstablishedChatSession? {
+        if (contact.establishedAt == null) return null
+        val session = sessions[contact.accountId] ?: return null
+
+        return EstablishedChatSession(contact, session)
+    }
+
+    private suspend fun onChatEstablished(chat: EstablishedChatSession) {
+        chatSigners.warmUp(chat.contact)
+        runCancellableCatching { shareOwnPushTokenIfChanged(chat.session, chat.contact) }
+            .logFailure("ContactChatSessionManager: failed to share push token with ${chat.contact.username}")
+    }
+
     // TODO: should be removed when fully migrated to push-notifications v2
-    private suspend fun invalidateContact(
-        chatSession: RealContactChatSession,
-        currentContact: Contact
-    ) {
-        val ownPushToken = pushNotificationsHelper.getCurrentToken()
+    private suspend fun shareOwnPushTokenIfChanged(chatSession: RealContactChatSession, contact: Contact) {
+        val ownPushToken = pushNotificationsHelper.getCurrentToken() ?: return
+        if (ownPushToken == contact.lastSharedPushToken) return
 
-        Timber.d("invalidateContact: contact=${currentContact.username}, ownToken=${if (ownPushToken != null) "present" else "null"}, lastShared=${currentContact.lastSharedPushToken != null}")
+        Timber.d("shareOwnPushTokenIfChanged: sending own token to ${contact.username}")
+        chatSession.sendToken(ownPushToken)
+        contactsRepository.updateLastSharedPushTokenFor(listOf(contact.accountId), ownPushToken)
+    }
 
-        if (ownPushToken != null && ownPushToken != currentContact.lastSharedPushToken) {
-            Timber.d("invalidateContact: sending own token to ${currentContact.username}")
-            chatSession.sendToken(ownPushToken)
-        }
+    private suspend fun syncIncomingPushId(chatSession: RealContactChatSession, contact: Contact) {
+        if (chatSession.incomingPushId == contact.pushId) return
 
-        if (chatSession.incomingPushId != currentContact.pushId) {
-            contactsRepository.updatePushId(currentContact.accountId, chatSession.incomingPushId)
-        }
-        if (ownPushToken != null && ownPushToken != currentContact.lastSharedPushToken) {
-            contactsRepository.updateLastSharedPushTokenFor(listOf(currentContact.accountId), ownPushToken)
-        }
+        contactsRepository.updatePushId(contact.accountId, chatSession.incomingPushId)
     }
 
     // TODO: should be removed when fully migrated to push-notifications v2
     private suspend fun invalidateOwnPushToken(newToken: String) {
         val contactsToUpdate = contactsRepository.getContacts()
-            .filter { it.lastSharedPushToken != newToken }
+            .filter { it.establishedAt != null && it.lastSharedPushToken != newToken }
         if (contactsToUpdate.isEmpty()) return
 
         val accountIds = contactsToUpdate.mapToSet { it.accountId }

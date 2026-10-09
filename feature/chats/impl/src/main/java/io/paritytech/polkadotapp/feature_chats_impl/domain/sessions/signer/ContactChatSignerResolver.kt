@@ -36,14 +36,14 @@ class ContactChatSignerResolver @Inject constructor(
             .logFailure("Failed to resolve chat signer for contact ${contact.username}")
     }
 
-    suspend fun usernameSigner(contact: Contact): Result<ContactChatSigner> = runCancellableCatching {
+    private suspend fun usernameSigner(contact: Contact): Result<ContactChatSigner> = runCancellableCatching {
         val keypair = accountSecretsStorage.getMetaAccountSr25519Keypair(contact.ourMetaAccountId)
-        ContactChatSigner.Username(keypair)
+        ContactChatSigner(keypair, ChatSignerKind.USERNAME)
     }
 
     private suspend fun resolveWithChatKeypair(contact: Contact, chatKeypair: Sr25519Keypair): Result<ContactChatSigner> {
         val chatAccountId = chatKeypair.publicKey.toDataByteArray()
-        val privateSigner: Result<ContactChatSigner> = ensureSlot(chatAccountId).map { ContactChatSigner.Private(chatKeypair) }
+        val privateSigner: Result<ContactChatSigner> = ensureSlot(chatAccountId).map { ContactChatSigner(chatKeypair, ChatSignerKind.PRIVATE) }
         return privateSigner.flatRecover { error -> usernameSignerIfNoSlot(contact, error) }
     }
 

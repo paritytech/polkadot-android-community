@@ -4,10 +4,10 @@ import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
 import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
-import io.paritytech.polkadotapp.common.utils.CurrentTimeContext
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
@@ -52,6 +52,7 @@ class RealAddContactUseCase @Inject constructor(
     private val accountRepository: AccountRepository,
     private val chainRegistry: ChainRegistry,
     private val knownChains: KnownChains,
+    private val currentTimeContext: CurrentTimeContext,
 ) : AddContactUseCase {
     override suspend fun addContactWithChatRequest(
         contactAccountId: AccountId,
@@ -74,7 +75,7 @@ class RealAddContactUseCase @Inject constructor(
             avatarUrl = avatar,
             origin = origin,
             lastSharedPushToken = token,
-            addedAt = CurrentTimeContext.currentTime(),
+            addedAt = currentTimeContext.currentTime(),
         )
 
         Timber.d("Adding contact ${contact.accountId} with chat request, has welcome message: ${welcomeMessage != null}")
@@ -114,7 +115,7 @@ class RealAddContactUseCase @Inject constructor(
         return resourcesRepository.resolveConsumers(peopleChain.id, accountIds).flatMap { consumerInfoByAccount ->
             runCatching {
                 val walletAccount = accountRepository.getWalletAccount()
-                val now = CurrentTimeContext.currentTime()
+                val now = currentTimeContext.currentTime()
 
                 accountIds.forEach { accountId ->
                     val consumerInfo = consumerInfoByAccount[accountId] ?: run {
