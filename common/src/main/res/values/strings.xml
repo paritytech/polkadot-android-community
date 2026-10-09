@@ -646,6 +646,7 @@
 
     <string name="chat_details_pay_button_text">Pay</string>
     <string name="chat_details_input_field_placeholder">Write a message…</string>
+    <string name="chat_input_character_counter" translatable="false">%1$d/%2$d</string>
     <string name="chat_details_message_status_pending">Pending</string>
     <string name="chat_details_message_status_sent">Message sent</string>
     <string name="chat_details_message_status_read">Message read</string>

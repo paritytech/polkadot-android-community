@@ -140,7 +140,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 68,
+    version = 69,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -275,6 +275,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 66, to = 67),
         // Drop the video game and privacy voucher tables
         AutoMigration(from = 67, to = 68, spec = Migration67To68Spec::class),
+        // Add chat_requests delivery state (deliveryStatus, deliveredVia, lastDeliveredPeriod)
+        AutoMigration(from = 68, to = 69),
     ]
 )
 @TypeConverters(
