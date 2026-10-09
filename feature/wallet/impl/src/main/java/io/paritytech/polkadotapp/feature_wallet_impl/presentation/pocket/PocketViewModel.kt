@@ -7,17 +7,14 @@ import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.sharing.SharingManager
 import io.paritytech.polkadotapp.common.utils.ContentSharing
-import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.common.utils.stateInBackground
 import io.paritytech.polkadotapp.common.utils.withLoading
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.BackupProgress
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.mapper.TokenAmountMapper
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.RoundPrecision
-import io.paritytech.polkadotapp.feature_videogame_api.domain.collectibles.CollectiblesUrlResolver
 import io.paritytech.polkadotapp.feature_wallet_impl.PocketRouter
 import io.paritytech.polkadotapp.feature_wallet_impl.domain.interactor.PocketInteractor
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
@@ -41,13 +38,11 @@ class PocketViewModel @Inject constructor(
     private val tokenAmountMapper: TokenAmountMapper,
     private val tokenAmountFormatter: TokenAmountFormatter,
     private val router: PocketRouter,
-    private val collectiblesUrlResolver: CollectiblesUrlResolver,
     private val idShareImageRenderer: IdShareImageRenderer,
     private val sharingManager: SharingManager,
     @param:ApplicationContext private val context: Context
 ) : BaseViewModel() {
     private val selectedCardId = MutableStateFlow<String?>(null)
-    private val collectiblesShown = MutableStateFlow(false)
 
     private val digitalDollarAmounts = interactor.observeDigitalDollarBalance()
         .map { balance ->
@@ -72,12 +67,11 @@ class PocketViewModel @Inject constructor(
         )
     }
 
-    private val addressCard = combine<_, _, _, PocketCardUiModel.IdCard?>(
+    private val addressCard = combine<_, _, PocketCardUiModel.IdCard?>(
         interactor.observeUsername(),
-        interactor.observeRank(),
         interactor.observeAddress()
-    ) { username, rank, address ->
-        PocketCardUiModel.IdCard(username = username, address = address, rank = rank)
+    ) { username, address ->
+        PocketCardUiModel.IdCard(username = username, address = address)
     }.onStart { emit(null) }
 
     val cards = combine(balanceCard, addressCard) { balance, address ->
@@ -91,28 +85,21 @@ class PocketViewModel @Inject constructor(
             initialValue = persistentListOf()
         )
 
-    val collectiblesAvailable = flowOf {
-        collectiblesUrlResolver.resolveUrl() != null
-    }
-        .stateInBackground(initialValue = false)
-
     val state: StateFlow<PocketScreenState> = combine(
         cards,
-        selectedCardId,
-        collectiblesShown,
-        collectiblesAvailable
-    ) { cards, selectedId, collectiblesShown, collectiblesAvailable ->
+        selectedCardId
+    ) { cards, selectedId ->
         val selectedCard = cards.firstOrNull { it.id == selectedId }
-        when {
-            selectedCard != null -> PocketScreenState.CardDetails(selectedCard = selectedCard)
-            collectiblesShown -> PocketScreenState.Collectibles
-            else -> PocketScreenState.List(collectiblesAvailable = collectiblesAvailable)
+        if (selectedCard != null) {
+            PocketScreenState.CardDetails(selectedCard = selectedCard)
+        } else {
+            PocketScreenState.List
         }
     }
         .stateIn(
             scope = this,
             started = SharingStarted.Eagerly,
-            initialValue = PocketScreenState.List(collectiblesAvailable = false)
+            initialValue = PocketScreenState.List
         )
 
     private fun cardDisplayKey(card: PocketCardUiModel): String = when (card) {
@@ -130,7 +117,7 @@ class PocketViewModel @Inject constructor(
             ).joinToString("|")
         }
 
-        is PocketCardUiModel.IdCard -> listOf(card.username, card.address, card.rank).joinToString("|")
+        is PocketCardUiModel.IdCard -> listOf(card.username, card.address).joinToString("|")
     }
 
     fun selectCard(card: PocketCardUiModel) {
@@ -139,18 +126,6 @@ class PocketViewModel @Inject constructor(
 
     fun dismissCard() {
         selectedCardId.value = null
-    }
-
-    fun showCollectiblesSketchbook() {
-        collectiblesShown.value = true
-    }
-
-    fun hideCollectiblesSketchbook() {
-        collectiblesShown.value = false
-    }
-
-    fun openCollectibles() {
-        router.openCollectibles()
     }
 
     fun onShareId() = launchUnit {
