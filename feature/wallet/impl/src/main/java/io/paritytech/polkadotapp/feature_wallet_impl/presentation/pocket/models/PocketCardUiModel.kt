@@ -3,7 +3,6 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
-import io.paritytech.polkadotapp.feature_wallet_impl.domain.model.PocketRank
 
 sealed interface PocketCardUiModel {
     val id: String
@@ -36,7 +35,6 @@ sealed interface PocketCardUiModel {
     data class IdCard(
         val username: String,
         val address: String,
-        val rank: PocketRank
     ) : PocketCardUiModel {
         override val id = "id_card"
     }
