@@ -3,7 +3,7 @@
 > **What this doc is:** rules and seams for off-chain peer messaging via the substrate statement-store pallet.
 > **What this doc is NOT:** an explainer of crypto primitives. Read `feature/statement-store/**` for that.
 
-Shared off-chain message bus used by SSO pairing, video-game WebRTC signaling, and chat. End-to-end encrypted, sender-authenticated, slot-allocated.
+Shared off-chain message bus used by SSO pairing and chat. End-to-end encrypted, sender-authenticated, slot-allocated.
 
 ---
 
@@ -65,7 +65,7 @@ Shared off-chain message bus used by SSO pairing, video-game WebRTC signaling, a
 ## Canonical examples
 
 - One-shot statement (no session): SSO `SsoHandshakeRepository.submitHandshakeAnswer`.
-- Bidirectional session: `VideoGamePeerChannelSignaling` driving a `CommunicationSession`.
+- Bidirectional session: `SyncPeerChannelSignaling` (`feature/device-sync`) driving a `CommunicationSession`.
 - Topic discovery + encrypted payload: `ChatRequestTransport.submitChatRequest` (three topics: day-keyed, full, session-specific).
 - Slot management: `RealStatementStoreSlotAllocator.allocate` with LRU eviction.
 - Unlinkable one-shot statement: chat requests — allocated lazily per request at first delivery (`ChatRequestDeliveryService`), renewed into each new period from a fresh account by `ChatRequestRenewalWorker`; falls back to the identity account only when no notification slot is free.

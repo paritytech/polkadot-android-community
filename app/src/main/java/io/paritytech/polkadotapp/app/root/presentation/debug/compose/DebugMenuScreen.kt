@@ -49,9 +49,7 @@ fun DebugMenuScreen(contract: DebugMenuContract) {
         onClearBackupClick = contract::onClearBackupClick,
         onShareLogsClick = contract::onShareLogsClick,
         onCopyWalletAccountClick = contract::onCopyWalletAccountClick,
-        onCopyCandidateAccountClick = contract::onCopyCandidateAccountClick,
         onCopyWalletMnemonicClick = contract::onCopyWalletMnemonicClick,
-        onOpenVideoGameClick = contract::onOpenVideoGameClick,
         onProductBotsClick = contract::onProductBotsClick,
         onRandomizeAccountClick = contract::onRandomizeAccountClick,
         onOpenSpaBrowserClick = contract::onOpenSpaBrowserClick,
@@ -59,7 +57,6 @@ fun DebugMenuScreen(contract: DebugMenuContract) {
         onSpaBrowserDialogDismissed = contract::onSpaBrowserDialogDismissed,
         onClearDotNsCacheClick = contract::onClearDotNsCacheClick,
         onClearJWTTokenClick = contract::onClearJWTTokenClick,
-        onSimulateGameResultsClick = contract::onSimulateGameResultsClick,
         onCoinageDebugWidgetsToggled = contract::onCoinageDebugWidgetsToggled,
     )
 }
@@ -71,10 +68,8 @@ private fun DebugMenuScreenInternal(
     onBackClick: () -> Unit,
     onClearBackupClick: () -> Unit,
     onCopyWalletAccountClick: () -> Unit,
-    onCopyCandidateAccountClick: () -> Unit,
     onCopyWalletMnemonicClick: () -> Unit,
     onShareLogsClick: () -> Unit,
-    onOpenVideoGameClick: () -> Unit,
     onProductBotsClick: () -> Unit,
     onRandomizeAccountClick: () -> Unit,
     onOpenSpaBrowserClick: () -> Unit,
@@ -82,7 +77,6 @@ private fun DebugMenuScreenInternal(
     onSpaBrowserDialogDismissed: () -> Unit,
     onClearDotNsCacheClick: () -> Unit,
     onClearJWTTokenClick: () -> Unit,
-    onSimulateGameResultsClick: () -> Unit,
     onCoinageDebugWidgetsToggled: (Boolean) -> Unit,
 ) {
     PolkadotSurface {
@@ -128,14 +122,6 @@ private fun DebugMenuScreenInternal(
             VerticalSpacer { mediumIncreased }
 
             DebugMenuItem(
-                title = stringResource(RCommon.string.debug_menu_copy_candidate_account),
-                enabled = true,
-                onClick = onCopyCandidateAccountClick
-            )
-
-            VerticalSpacer { mediumIncreased }
-
-            DebugMenuItem(
                 title = stringResource(RCommon.string.debug_menu_copy_deposit_mnemonic),
                 enabled = true,
                 onClick = onCopyWalletMnemonicClick
@@ -147,14 +133,6 @@ private fun DebugMenuScreenInternal(
                 title = stringResource(RCommon.string.debug_menu_share_logs),
                 enabled = !state.isSharingLogs,
                 onClick = onShareLogsClick
-            )
-
-            VerticalSpacer { mediumIncreased }
-
-            DebugMenuItem(
-                title = stringResource(RCommon.string.debug_menu_open_video_game),
-                enabled = !state.isSharingLogs,
-                onClick = onOpenVideoGameClick
             )
 
             VerticalSpacer { mediumIncreased }
@@ -200,14 +178,6 @@ private fun DebugMenuScreenInternal(
                 ),
                 enabled = state.hasJWTToken,
                 onClick = onClearJWTTokenClick
-            )
-
-            VerticalSpacer { large }
-
-            DebugMenuItem(
-                title = stringResource(RCommon.string.debug_menu_simulate_game_results),
-                enabled = true,
-                onClick = onSimulateGameResultsClick
             )
 
             VerticalSpacer { extraLargeIncreased }
@@ -327,16 +297,13 @@ private fun DebugMenuScreenPreview() {
             onCopyWalletAccountClick = {},
             onCopyWalletMnemonicClick = {},
             onShareLogsClick = {},
-            onOpenVideoGameClick = {},
             onProductBotsClick = {},
-            onCopyCandidateAccountClick = {},
             onRandomizeAccountClick = {},
             onOpenSpaBrowserClick = {},
             onSpaBrowserUrlEntered = {},
             onSpaBrowserDialogDismissed = {},
             onClearDotNsCacheClick = {},
             onClearJWTTokenClick = {},
-            onSimulateGameResultsClick = {},
             onCoinageDebugWidgetsToggled = {},
         )
     }

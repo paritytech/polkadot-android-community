@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 68,
-    "identityHash": "8d3af1ade7c1b4170d86b1825079093e",
+    "identityHash": "cde72e8b4c66e4f0172ca91bc86130c7",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -1272,91 +1272,6 @@
         }
       },
       {
-        "tableName": "video_game_votes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` BLOB NOT NULL, `roundIndex` INTEGER NOT NULL, `playerIndex` INTEGER NOT NULL, `vote` TEXT NOT NULL, `gameIndex` INTEGER NOT NULL, `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)",
-        "fields": [
-          {
-            "fieldPath": "accountId",
-            "columnName": "accountId",
-            "affinity": "BLOB",
-            "notNull": true
-          },
-          {
-            "fieldPath": "roundIndex",
-            "columnName": "roundIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "playerIndex",
-            "columnName": "playerIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "vote",
-            "columnName": "vote",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "gameIndex",
-            "columnName": "gameIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": true,
-          "columnNames": [
-            "id"
-          ]
-        }
-      },
-      {
-        "tableName": "vouchers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`state` TEXT NOT NULL, `type` TEXT NOT NULL, `voucherIndex` INTEGER NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`type`, `voucherIndex`))",
-        "fields": [
-          {
-            "fieldPath": "state",
-            "columnName": "state",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "type",
-            "columnName": "type",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "voucherIndex",
-            "columnName": "voucherIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "value",
-            "columnName": "value",
-            "affinity": "TEXT",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "type",
-            "voucherIndex"
-          ]
-        }
-      },
-      {
         "tableName": "sso_sessions",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sharedSecretPublicKey` BLOB NOT NULL, `statementStorePublicKey` BLOB NOT NULL, `addedAt` INTEGER NOT NULL DEFAULT 0, `status` TEXT NOT NULL DEFAULT 'ACTIVE', `lastUpdate` INTEGER NOT NULL DEFAULT 0, `outgoingUpdateTime` INTEGER DEFAULT NULL, `lastSyncOfferId` TEXT DEFAULT NULL, PRIMARY KEY(`sharedSecretPublicKey`))",
         "fields": [
@@ -1560,36 +1475,6 @@
         }
       },
       {
-        "tableName": "game_players",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`gameIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `gameTimestamp` INTEGER, PRIMARY KEY(`gameIndex`, `accountId`))",
-        "fields": [
-          {
-            "fieldPath": "gameIndex",
-            "columnName": "gameIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "accountId",
-            "columnName": "accountId",
-            "affinity": "BLOB",
-            "notNull": true
-          },
-          {
-            "fieldPath": "gameTimestamp",
-            "columnName": "gameTimestamp",
-            "affinity": "INTEGER"
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "gameIndex",
-            "accountId"
-          ]
-        }
-      },
-      {
         "tableName": "products",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `iconCid` TEXT, `iconFormat` TEXT, `userWorkerUrl` TEXT, PRIMARY KEY(`id`))",
         "fields": [
@@ -1630,7 +1515,7 @@
       },
       {
         "tableName": "chat_requests",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `direction` TEXT NOT NULL, `status` TEXT NOT NULL, `deliveryStatus` TEXT NOT NULL DEFAULT 'DELIVERED', `deliveredVia` TEXT, `lastDeliveredPeriod` INTEGER, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `direction` TEXT NOT NULL, `status` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -1655,23 +1540,6 @@
             "columnName": "status",
             "affinity": "TEXT",
             "notNull": true
-          },
-          {
-            "fieldPath": "deliveryStatus",
-            "columnName": "deliveryStatus",
-            "affinity": "TEXT",
-            "notNull": true,
-            "defaultValue": "'DELIVERED'"
-          },
-          {
-            "fieldPath": "deliveredVia",
-            "columnName": "deliveredVia",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "lastDeliveredPeriod",
-            "columnName": "lastDeliveredPeriod",
-            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -1909,24 +1777,6 @@
         }
       },
       {
-        "tableName": "video_game_banned_players",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` BLOB NOT NULL, PRIMARY KEY(`accountId`))",
-        "fields": [
-          {
-            "fieldPath": "accountId",
-            "columnName": "accountId",
-            "affinity": "BLOB",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "accountId"
-          ]
-        }
-      },
-      {
         "tableName": "product_integrations",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`productId` TEXT NOT NULL, `type` TEXT NOT NULL, `metadata` TEXT, PRIMARY KEY(`productId`, `type`), FOREIGN KEY(`productId`) REFERENCES `products`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
@@ -2113,37 +1963,6 @@
             ]
           }
         ]
-      },
-      {
-        "tableName": "video_game_connection_attempts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`gameIndex` INTEGER NOT NULL, `accountId` BLOB NOT NULL, `offerId` TEXT NOT NULL, PRIMARY KEY(`gameIndex`, `accountId`))",
-        "fields": [
-          {
-            "fieldPath": "gameIndex",
-            "columnName": "gameIndex",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "accountId",
-            "columnName": "accountId",
-            "affinity": "BLOB",
-            "notNull": true
-          },
-          {
-            "fieldPath": "offerId",
-            "columnName": "offerId",
-            "affinity": "TEXT",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "gameIndex",
-            "accountId"
-          ]
-        }
       },
       {
         "tableName": "file_downloads",
@@ -3172,7 +2991,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8d3af1ade7c1b4170d86b1825079093e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cde72e8b4c66e4f0172ca91bc86130c7')"
     ]
   }
 }

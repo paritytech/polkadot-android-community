@@ -6,7 +6,6 @@ import io.paritytech.polkadotapp.app.root.navigation.NavigationHolder
 import io.paritytech.polkadotapp.app.root.presentation.root.RootRouter
 import io.paritytech.polkadotapp.common.utils.toPayloadBundle
 import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
-import io.paritytech.polkadotapp.feature_videogame_impl.presentation.gameResults.GameResultsPayload
 import javax.inject.Inject
 
 class RootNavigator @Inject constructor(
@@ -27,17 +26,10 @@ class RootNavigator @Inject constructor(
 
     override fun openDebugMenu() = performNavigation(R.id.action_global_to_debug_menu)
 
-    override fun openVideoGame() = performNavigation(R.id.action_global_to_video_game_play_graph)
-
     override fun openProductBotsManagement() = performNavigation(R.id.action_global_to_product_bots_management)
 
     override fun openSpaBrowser(payload: SpaBrowserPayload) = performNavigation(
         R.id.action_global_to_spaBrowserFragment,
         args = payload.toPayloadBundle(SpaBrowserPayload::class.java.name),
-    )
-
-    override fun openSimulatedGameResults(payload: GameResultsPayload) = performNavigation(
-        actionId = R.id.action_global_to_gameResultsFragment,
-        args = payload.toPayloadBundle()
     )
 }
