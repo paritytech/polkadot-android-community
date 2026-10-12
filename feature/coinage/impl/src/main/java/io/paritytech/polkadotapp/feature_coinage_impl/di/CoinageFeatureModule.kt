@@ -6,11 +6,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoMap
-import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.chains.network.updaters.system.UpdateSystemFactory
 import io.paritytech.polkadotapp.common.data.storage.SingleValueStorageFactory
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
-import io.paritytech.polkadotapp.common.presentation.tabs.TabWarningProvider
 import io.paritytech.polkadotapp.feature_coinage_api.data.updaters.CoinageUpdateSystem
 import io.paritytech.polkadotapp.feature_coinage_api.domain.CoinsInteractor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.RecyclerVouchersInteractor
@@ -38,6 +36,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.OnboardingUs
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.presentation.mixin.CoinageSetupNoticeMixin
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.DataStoreAccountKeys
@@ -88,10 +87,11 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.rep
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.usecase.RealUnloadRecyclerIntoExternalAssetUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.usecase.UnloadRecyclerIntoExternalAssetUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.COINAGE_INSTALLATION_DOMAIN_ID
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.CoinageBackupTabWarningProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.CoinageInstallationGate
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.CoinageInstallationRegistrar
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.CoinageInstallationRegistrationOracle
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.InstallationRegistrationSubmitter
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.RealCoinageInstallationGate
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.RealInstallationRegistrationSubmitter
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransactionFactory
@@ -128,6 +128,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealOnboard
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealPrepareCoinageTransferUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealTotalBalanceUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.presentation.mixin.RealCoinageSetupNoticeMixinFactory
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.AsyncDurableSubmissionPolicy
@@ -241,13 +242,15 @@ interface CoinageFeatureModule {
     fun bindCoinageAccountBackupObserver(impl: CoinageInstallationRegistrar): CoinageAccountBackupObserver
 
     @Binds
+    fun bindCoinageInstallationGate(impl: RealCoinageInstallationGate): CoinageInstallationGate
+
+    @Binds
+    fun bindCoinageSetupNoticeMixinFactory(impl: RealCoinageSetupNoticeMixinFactory): CoinageSetupNoticeMixin.Factory
+
+    @Binds
     @IntoMap
     @TxDomainKey(COINAGE_INSTALLATION_DOMAIN_ID)
     fun bindCoinageInstallationRegistrationOracle(impl: CoinageInstallationRegistrationOracle): TxCompletionOracle
-
-    @Binds
-    @IntoSet
-    fun bindCoinageBackupTabWarningProvider(impl: CoinageBackupTabWarningProvider): TabWarningProvider
 
     @Binds
     fun bindVoucherRepository(impl: RealVoucherRepository): VoucherRepository

@@ -33,11 +33,16 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUBMISSION
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
+import io.paritytech.polkadotapp.test_shared.LONG_WAIT
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
@@ -607,6 +612,29 @@ class RealClaimReceivedCoinsUseCaseTest {
         assertEquals(CoinageTransferDetection.Claimed(Balance.ZERO, finalized = true), reported.last())
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a submission still waiting emits no failed verdict and the claim completes once it proceeds`() = runTest {
+        val coin = key(1)
+        val release = CompletableDeferred<Unit>()
+        givenChainSees(listOf(coin.accountId))
+        givenSubmissionHeldUntil(release, thenRegisters = entry(FINALIZED_SUCCESS, claiming = coin.accountId))
+        val reported = mutableListOf<CoinageTransferDetection>()
+        val collection = backgroundScope.launch { claimOf(coin).collect { reported += it } }
+        runCurrent()
+        advanceTimeBy(LONG_WAIT)
+
+        assertFalse(reported.any { it is CoinageTransferDetection.NotClaimed })
+        assertClaimedOnce(coin.keypair)
+        assertFalse(collection.isCompleted)
+
+        release.complete(Unit)
+        runCurrent()
+
+        assertTrue(collection.isCompleted)
+        assertTrue(reported.last() is CoinageTransferDetection.Claimed)
+    }
+
     // ---- harness ----
 
     /**
@@ -732,6 +760,18 @@ class RealClaimReceivedCoinsUseCaseTest {
         coEvery { submissionUseCase(any(), any(), any(), any()) } answers {
             ledger.value = listOf(entry(status, claiming = claiming))
             signal.complete(Unit)
+
+            Result.success(Unit)
+        }
+    }
+
+    private fun givenSubmissionHeldUntil(release: CompletableDeferred<Unit>, thenRegisters: CoinageTransactionState) {
+        val ledger = MutableStateFlow(noEntries())
+
+        every { transactionService.subscribeOperationGroupStatuses(groupId) } returns ledger
+        coEvery { submissionUseCase(any(), any(), any(), any()) } coAnswers {
+            release.await()
+            ledger.value = listOf(thenRegisters)
 
             Result.success(Unit)
         }

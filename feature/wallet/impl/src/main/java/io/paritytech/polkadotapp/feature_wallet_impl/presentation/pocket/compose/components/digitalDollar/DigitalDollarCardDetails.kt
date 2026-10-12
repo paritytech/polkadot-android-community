@@ -279,7 +279,6 @@ private fun DigitalDollarCardDetailsPreview() {
                         PocketCardUiModel.DigitalDollar.Amounts(TokenAmountModel.mock, TokenAmountModel.mock)
                     ),
                     syncInProgress = false,
-                    accountBackupPending = false,
                 ),
                 onBack = {},
                 cardIndex = 0,

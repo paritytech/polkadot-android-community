@@ -23,6 +23,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBot
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentWorkerStarter
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServiceStarter
+import io.paritytech.polkadotapp.feature_coinage_api.presentation.mixin.CoinageSetupNoticeMixin
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
 import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
@@ -66,12 +67,16 @@ class RootViewModel @Inject constructor(
     observeAccountOnboardingStatus: ObserveAccountOnboardingStatusUseCase,
     bottomNavHeightProvider: BottomNavHeightProvider,
     chainHealthMixinFactory: ChainHealthMixin.Factory,
+    coinageSetupNoticeMixinFactory: CoinageSetupNoticeMixin.Factory,
     coroutineDispatchers: CoroutineDispatchers,
 ) : BaseViewModel(), RootContract {
+    private val coinageSetupNotice = coinageSetupNoticeMixinFactory.create(this)
+
     override val chatOverlays = chatEngine.observeActiveOverlays()
     override val isOnboarded = observeAccountOnboardingStatus().map { it.isOnboarded }
     override val bottomNavHeight = bottomNavHeightProvider.heightDp
     override val chainsHealth = chainHealthMixinFactory.create(this).model
+    override val isCoinageSetupNoticeVisible = coinageSetupNotice.isVisible
 
     private val networkStatusTooltipDismissed = MutableStateFlow(!rootInteractor.shouldShowNetworkStatusTooltip())
     private val chainRingsOnScreen = chainsHealth.map { it.rows.isNotEmpty() }
@@ -140,6 +145,10 @@ class RootViewModel @Inject constructor(
         if (networkStatusTooltipDismissed.value) return
         networkStatusTooltipDismissed.value = true
         rootInteractor.markNetworkStatusTooltipShown()
+    }
+
+    override fun dismissCoinageSetupNotice() {
+        coinageSetupNotice.dismiss()
     }
 
     private suspend fun checkDevReset() {

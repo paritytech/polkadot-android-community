@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
@@ -62,7 +63,7 @@ class UnloadAndSplitVouchersStrategy(
     context(diagnostics: StalenessReportCollector)
     override suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer> =
         diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
-            runCatching { mintBatches() }.flatMap { minted ->
+            runCancellableCatching { mintBatches() }.flatMap { minted ->
                 transactionService.preCommitHandoff(minted.handedOff()).map { handoffCommit ->
                     val policy = CoinageSubmissionParams.unloadPolicy(params)
 

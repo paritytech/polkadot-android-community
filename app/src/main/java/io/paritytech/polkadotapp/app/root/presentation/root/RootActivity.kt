@@ -9,8 +9,12 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.graphics.Insets
@@ -39,6 +43,7 @@ import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.ObserveViewModelEvents
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.feature_coinage_api.presentation.notice.CoinageSetupNoticeHost
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBarDefaults
 import javax.inject.Inject
@@ -90,6 +95,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
         }
         setupRootNavBar()
         setupAppNotificationOverlay()
+        setupCoinageSetupNotice()
 
         setupChatExtensionOverlay()
         setupChainHealthBar()
@@ -148,6 +154,30 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
                         ObserveViewModelEvents(viewModel, appNotifier)
 
                         AppNotificationHost(notifier = appNotifier)
+                    }
+                }
+            }
+        }
+        addContentView(composeView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    }
+
+    private fun setupCoinageSetupNotice() {
+        val composeView = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val paymentAssetBrand by paymentAssetBrandProvider.brand.collectAsStateWithLifecycle()
+                val isVisible by viewModel.isCoinageSetupNoticeVisible.collectAsStateWithLifecycle()
+
+                CompositionLocalProvider(LocalPaymentAssetBrand provides paymentAssetBrand) {
+                    PolkadotTheme {
+                        CoinageSetupNoticeHost(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .statusBarsPadding()
+                                .padding(top = ChainHealthBarDefaults.ContentHeight),
+                            isVisible = isVisible,
+                            onDismiss = viewModel::dismissCoinageSetupNotice,
+                        )
                     }
                 }
             }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
@@ -92,9 +93,27 @@ private fun AppNotificationItem(notification: AppNotification) {
         is AppNotification.Error -> NovaIcons.Alert
     }
 
-    PolkadotSurface(
+    AppNoticeItem(
         modifier = Modifier.fillMaxWidth(),
-        color = backgroundColor,
+        icon = icon,
+        iconTint = iconTint,
+        background = backgroundColor,
+        message = notification.message,
+    )
+}
+
+@Composable
+fun AppNoticeItem(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    iconTint: Color,
+    background: Color,
+    message: String,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    PolkadotSurface(
+        modifier = modifier,
+        color = background,
         shape = RoundedCornerShape(28.dp),
     ) {
         Row(
@@ -113,10 +132,12 @@ private fun AppNotificationItem(notification: AppNotification) {
 
             NovaText(
                 modifier = Modifier.weight(1f),
-                text = notification.message.withCurrencyTickerStyle(PolkadotTheme.typography.title.small),
+                text = message.withCurrencyTickerStyle(PolkadotTheme.typography.title.small),
                 color = PolkadotTheme.colors.fg.primary,
                 style = PolkadotTheme.typography.title.small,
             )
+
+            trailing?.invoke()
         }
     }
 }

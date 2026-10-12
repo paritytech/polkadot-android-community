@@ -722,7 +722,6 @@
     <string name="asset_details_transfer_button">Transfer</string>
     <string name="asset_details_actions_disabled">Actions will be available after you finish updating your balance</string>
     <string name="asset_details_backup_in_progress">Updating balance</string>
-    <string name="pocket_digital_dollar_account_backup_pending">Account backup is still in progress…</string>
     <string name="asset_details_backup_in_progress_subsequent">Continue updating balance</string>
     <string name="asset_details_balance_restored">Balance restored</string>
     <string name="asset_details_balance_restored_description">If it differs from the previous value, press Update until correct</string>
@@ -785,6 +784,10 @@
     <string name="settings_revoke_payments">Revoke Payments</string>
 
     <string name="settings_backup">Backup</string>
+    <string name="settings_payments_setup">Payments setup</string>
+    <string name="settings_payments_setup_in_progress">In progress</string>
+    <string name="settings_payments_setup_delayed">Taking longer than expected</string>
+    <string name="settings_payments_setup_complete">Complete</string>
     <string name="settings_terms_of_use">Terms of use</string>
     <string name="settings_privacy_policy">Privacy policy</string>
     <string name="settings_products">Apps</string>
@@ -891,6 +894,8 @@
     <string name="chain_health_statement_store">Statement Store</string>
     <string name="chain_health_tooltip_title">Network status</string>
     <string name="chain_health_tooltip_message">These rings track your connection to each chain and to the statement store.</string>
+    <string name="coinage_setup_notice_message">We\'re still setting up payments. You can keep using them, but settlement will be delayed until setup is finished.</string>
+    <string name="coinage_setup_notice_dismiss">Dismiss</string>
 
     <string name="splash_waiting_for_network_title">Waiting for network connection…</string>
     <string name="splash_waiting_for_network_message">Turn off Airplane Mode or check your internet</string>

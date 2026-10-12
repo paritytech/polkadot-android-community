@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -14,11 +15,13 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.AlertOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowRight
+import io.paritytech.polkadotapp.design.components.icon.vectors.CashOutlined
 import io.paritytech.polkadotapp.design.components.icon.vectors.CloudOutlined
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuListItem
 import io.paritytech.polkadotapp.design.components.menu.PolkadotMenuListScope
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -29,24 +32,8 @@ fun PolkadotMenuListScope.SettingsMenuItem(
     label: String? = null
 ) {
     PolkadotMenuListItem(
-        leading = icon?.let {
-            {
-                NovaIcon(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .align(Alignment.Center),
-                    imageVector = it,
-                    tint = PolkadotTheme.colors.fg.secondary
-                )
-            }
-        },
-        title = {
-            NovaText(
-                text = title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
+        leading = icon?.let { { MenuLeadingIcon(it) } },
+        title = { MenuTitle(title) },
         trailing = { MenuValueChevron(label) },
         onClick = onClick
     )
@@ -58,22 +45,8 @@ fun PolkadotMenuListScope.BackupSettingsMenuItem(
     isBackupMissing: Boolean
 ) {
     PolkadotMenuListItem(
-        leading = {
-            NovaIcon(
-                modifier = Modifier
-                    .size(20.dp)
-                    .align(Alignment.Center),
-                imageVector = NovaIcons.CloudOutlined,
-                tint = PolkadotTheme.colors.fg.secondary
-            )
-        },
-        title = {
-            NovaText(
-                text = stringResource(RCommon.string.settings_backup),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
+        leading = { MenuLeadingIcon(NovaIcons.CloudOutlined) },
+        title = { MenuTitle(stringResource(RCommon.string.settings_backup)) },
         description = {
             if (isBackupMissing) {
                 NovaText(
@@ -100,6 +73,41 @@ fun PolkadotMenuListScope.BackupSettingsMenuItem(
             }
         },
         onClick = onClick
+    )
+}
+
+@Composable
+fun PolkadotMenuListScope.PaymentsSetupMenuItem(status: CoinageAccountBackupStatus) {
+    PolkadotMenuListItem(
+        leading = { MenuLeadingIcon(NovaIcons.CashOutlined) },
+        title = { MenuTitle(stringResource(RCommon.string.settings_payments_setup)) },
+        description = { NovaText(text = stringResource(status.descriptionRes())) },
+    )
+}
+
+private fun CoinageAccountBackupStatus.descriptionRes(): Int = when (this) {
+    CoinageAccountBackupStatus.Registering -> RCommon.string.settings_payments_setup_in_progress
+    CoinageAccountBackupStatus.Delayed -> RCommon.string.settings_payments_setup_delayed
+    CoinageAccountBackupStatus.Completed -> RCommon.string.settings_payments_setup_complete
+}
+
+@Composable
+private fun BoxScope.MenuLeadingIcon(icon: ImageVector) {
+    NovaIcon(
+        modifier = Modifier
+            .size(20.dp)
+            .align(Alignment.Center),
+        imageVector = icon,
+        tint = PolkadotTheme.colors.fg.secondary
+    )
+}
+
+@Composable
+private fun MenuTitle(text: String) {
+    NovaText(
+        text = text,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
 }
 

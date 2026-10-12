@@ -39,12 +39,17 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUCCESS
 import io.paritytech.polkadotapp.feature_transactions.api.domain.model.TransactionSignerSource
+import io.paritytech.polkadotapp.test_shared.LONG_WAIT
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
@@ -550,6 +555,29 @@ class RealOnboardingUseCaseTest {
         assertEquals(CoinageTransferDetection.Claimed(Balance.ZERO, finalized = true), reported.last())
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `an onboarding whose submission is still waiting does not fail`() = runTest {
+        val release = CompletableDeferred<Unit>()
+        givenAmountBreaksInto(listOf(SMALL))
+        givenAccountHolds(listOf(price(listOf(SMALL))))
+        givenSubmissionHeldUntil(release, thenRegisters = SMALL)
+        val reported = mutableListOf<CoinageTransferDetection>()
+        val collection = backgroundScope.launch { onboarding().collect { reported += it } }
+        runCurrent()
+        advanceTimeBy(LONG_WAIT)
+
+        assertFalse(reported.any { it is CoinageTransferDetection.NotClaimed })
+        assertOnboardedOnce(listOf(SMALL))
+        assertFalse(collection.isCompleted)
+
+        release.complete(Unit)
+        runCurrent()
+
+        assertTrue(collection.isCompleted)
+        assertTrue(reported.last() is CoinageTransferDetection.Claimed)
+    }
+
     // ---- harness ----
 
     /**
@@ -670,6 +698,18 @@ class RealOnboardingUseCaseTest {
         coEvery { submissionUseCase(any(), any(), any(), any()) } answers {
             ledger.value = listOf(entry(status, denomination))
             signal.complete(Unit)
+
+            Result.success(Unit)
+        }
+    }
+
+    private fun givenSubmissionHeldUntil(release: CompletableDeferred<Unit>, thenRegisters: ValueExponent) {
+        val ledger = MutableStateFlow(noEntries())
+
+        every { transactionService.subscribeOperationGroupStatuses(groupId) } returns ledger
+        coEvery { submissionUseCase(any(), any(), any(), any()) } coAnswers {
+            release.await()
+            ledger.value = listOf(entry(FINALIZED_SUCCESS, thenRegisters))
 
             Result.success(Unit)
         }
