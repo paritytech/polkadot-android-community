@@ -912,7 +912,19 @@
     <string name="pocket_debug_breakdown_gaining_privacy">Gaining privacy</string>
     <string name="pocket_debug_breakdown_pending">Pending</string>
     <string name="pocket_debug_breakdown_can_spend_gaining">Can spend gaining privacy</string>
-    <string name="pocket_coinage_show_details">Show Details</string>
+    <string name="pocket_debug_coinage_test_live">Live</string>
+    <string name="pocket_debug_coinage_test_values">All values</string>
+    <string name="pocket_debug_coinage_test_states">All states</string>
+    <string name="pocket_debug_coinage_test_fifty">50</string>
+    <string name="pocket_debug_coinage_test_five_hundred">500</string>
+    <string name="pocket_coinage_trace_hops">Hops since last clearing: %d</string>
+    <string name="pocket_coinage_trace_quality">Clearing quality: %s</string>
+    <string name="pocket_coinage_trace_quality_unknown">Unknown</string>
+    <string name="pocket_coinage_trace_quality_very_low">Very low</string>
+    <string name="pocket_coinage_trace_quality_low">Low</string>
+    <string name="pocket_coinage_trace_quality_fair">Fair</string>
+    <string name="pocket_coinage_trace_quality_good">Good</string>
+    <string name="pocket_coinage_trace_quality_high">High</string>
 
     <string name="payment_privacy_mode_title">Payments Privacy Mode</string>
     <string name="payment_privacy_mode_fastest_label">Fastest</string>
