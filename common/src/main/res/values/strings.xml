@@ -895,8 +895,7 @@
     <string name="splash_waiting_for_network_title">Waiting for network connection…</string>
     <string name="splash_waiting_for_network_message">Turn off Airplane Mode or check your internet</string>
 
-    <string name="pocket_digital_dollar_title">%1$s Card</string>
-    <string name="pocket_digital_dollar_card_title">%1$s</string>
+    <string name="pocket_digital_dollar_title">%1$s</string>
     <string name="pocket_digital_dollar_faucet_top_up">Faucet Top Up</string>
     <string name="pocket_action_get">Get</string>
     <string name="pocket_action_get_description">Add %1$s via bank, crypto or credit card</string>
