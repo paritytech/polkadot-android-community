@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.common.presentation.compose.TickerWordmark
 import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.PaymentAssetBrand
@@ -131,7 +132,8 @@ private fun Headline(
         )
         NovaText(
             modifier = Modifier.alignByBaseline(),
-            text = LocalPaymentAssetBrand.current.symbol.withCurrencyTickerStyle(PolkadotTheme.typography.headline.large),
+            text = LocalPaymentAssetBrand.current.symbol
+                .withCurrencyTickerStyle(PolkadotTheme.typography.headline.large, TickerWordmark.SmallCaps),
             style = PolkadotTheme.typography.headline.large,
             color = PolkadotTheme.colors.fg.secondary
         )

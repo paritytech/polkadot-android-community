@@ -19,11 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.paritytech.polkadotapp.common.presentation.compose.TickerWordmark
+import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.loading.onLoaded
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
@@ -38,6 +41,7 @@ import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.topbar.PolkadotTopBar
 import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleAlignment
+import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleSize
 import io.paritytech.polkadotapp.design.components.topbar.rememberTopBarAction
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
@@ -112,9 +116,11 @@ private fun DigitalDollarCardDetailsContent(
         modifier = Modifier.fillMaxSize()
     ) {
         PolkadotTopBar(
-            title = stringResource(RCommon.string.pocket_digital_dollar_title, LocalPaymentAssetBrand.current.symbol),
+            title = stringResource(RCommon.string.pocket_digital_dollar_title, LocalPaymentAssetBrand.current.symbol)
+                .withCurrencyTickerStyle(PolkadotTheme.typography.title.large),
             navigationAction = rememberTopBarAction(onBack),
-            titleAlignment = TopBarTitleAlignment.Center
+            titleAlignment = TopBarTitleAlignment.Center,
+            titleSize = TopBarTitleSize.Medium
         )
 
         Column(
@@ -213,7 +219,8 @@ private fun SendCashActions(
                 .fillMaxHeight(),
             icon = NovaIcons.ArrowUpwards,
             title = stringResource(RCommon.string.pocket_action_get),
-            description = stringResource(RCommon.string.pocket_action_get_description, assetSymbol),
+            description = stringResource(RCommon.string.pocket_action_get_description, assetSymbol)
+                .withCurrencyTickerStyle(PolkadotTheme.typography.body.small, TickerWordmark.Capital),
             onClick = onGetCashClick
         )
 
@@ -223,7 +230,8 @@ private fun SendCashActions(
                 .fillMaxHeight(),
             icon = NovaIcons.ArrowDownwards,
             title = stringResource(RCommon.string.common_send),
-            description = stringResource(RCommon.string.pocket_action_send_description, assetSymbol),
+            description = stringResource(RCommon.string.pocket_action_send_description, assetSymbol)
+                .withCurrencyTickerStyle(PolkadotTheme.typography.body.small, TickerWordmark.Capital),
             onClick = onSendClick
         )
     }
@@ -234,7 +242,7 @@ private fun CashActionButton(
     modifier: Modifier = Modifier,
     icon: ImageVector,
     title: String,
-    description: String,
+    description: AnnotatedString,
     onClick: () -> Unit
 ) {
     PolkadotButton(

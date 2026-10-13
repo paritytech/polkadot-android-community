@@ -49,7 +49,6 @@ import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.designsystem.typography.PolkadotCashLogo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
@@ -111,7 +110,7 @@ private fun Header() {
 
         NovaText(
             text = stringResource(RCommon.string.payment_privacy_mode_title, LocalPaymentAssetBrand.current.symbol)
-                .withCurrencyTickerStyle(PolkadotTheme.typography.body.large, PolkadotCashLogo.Capital),
+                .withCurrencyTickerStyle(PolkadotTheme.typography.body.large),
             style = PolkadotTheme.typography.body.large,
             color = PolkadotTheme.colors.fg.primary
         )

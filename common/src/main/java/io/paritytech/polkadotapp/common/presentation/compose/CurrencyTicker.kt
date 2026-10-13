@@ -16,30 +16,32 @@ import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.typography.PolkadotCashLogo
 import io.paritytech.polkadotapp.designsystem.typography.PolkadotFontFamilies
 
+enum class TickerWordmark { BySentence, Capital, SmallCaps }
+
 @Composable
 fun String.withCurrencyTickerStyle(
     style: TextStyle,
-    logo: PolkadotCashLogo = PolkadotCashLogo.SmallCaps
-): AnnotatedString = remember(this) { AnnotatedString(this) }.withCurrencyTickerStyle(style, logo)
+    wordmark: TickerWordmark = TickerWordmark.BySentence
+): AnnotatedString = remember(this) { AnnotatedString(this) }.withCurrencyTickerStyle(style, wordmark)
 
 @Composable
 fun AnnotatedString.withCurrencyTickerStyle(
     style: TextStyle,
-    logo: PolkadotCashLogo = PolkadotCashLogo.SmallCaps
+    wordmark: TickerWordmark = TickerWordmark.BySentence
 ): AnnotatedString {
     val ticker = LocalPaymentAssetBrand.current.symbol
     val spanStyle = rememberTickerSpanStyle()
 
-    return remember(this, ticker, spanStyle, logo) { styleTicker(this, ticker, logo, spanStyle) }
+    return remember(this, ticker, spanStyle, wordmark) { styleTicker(this, ticker, wordmark, spanStyle) }
 }
 
 internal fun styleTicker(
     source: AnnotatedString,
     ticker: String,
-    logo: PolkadotCashLogo,
+    wordmark: TickerWordmark,
     smallCaps: SpanStyle
 ): AnnotatedString = if (ticker == CASH_LOGO_TICKER) {
-    drawTickerAsLogo(source, logo)
+    drawTickerAsLogo(source, wordmark)
 } else {
     buildAnnotatedString {
         append(source)
@@ -83,10 +85,12 @@ private fun AnnotatedString.Builder.styleTickerOccurrences(source: String, ticke
 }
 
 // The ticker takes the glyph's case, which picks the wordmark; only its first letter is drawn, the rest stays for screen readers.
-internal fun drawTickerAsLogo(source: AnnotatedString, logo: PolkadotCashLogo): AnnotatedString {
+internal fun drawTickerAsLogo(source: AnnotatedString, wordmark: TickerWordmark): AnnotatedString {
     val ranges = tickerRanges(source.text, CASH_LOGO_TICKER)
-    val logoTicker = CASH_LOGO_TICKER.inCaseOf(logo.glyph)
-    val text = ranges.fold(source.text) { text, range -> text.replaceRange(range.start, range.end, logoTicker) }
+    val text = ranges.fold(source.text) { text, range ->
+        val glyph = source.text.logoAt(range.start, wordmark).glyph
+        text.replaceRange(range.start, range.end, CASH_LOGO_TICKER.inCaseOf(glyph))
+    }
 
     return buildAnnotatedString {
         append(AnnotatedString(text, source.spanStyles, source.paragraphStyles))
@@ -99,6 +103,17 @@ internal fun drawTickerAsLogo(source: AnnotatedString, logo: PolkadotCashLogo): 
 }
 
 private fun String.inCaseOf(glyph: String): String = if (glyph.first().isLowerCase()) lowercase() else uppercase()
+
+private fun String.logoAt(start: Int, wordmark: TickerWordmark): PolkadotCashLogo = when (wordmark) {
+    TickerWordmark.Capital -> PolkadotCashLogo.Capital
+    TickerWordmark.SmallCaps -> PolkadotCashLogo.SmallCaps
+    TickerWordmark.BySentence -> if (opensSentenceAt(start)) PolkadotCashLogo.Capital else PolkadotCashLogo.SmallCaps
+}
+
+private fun String.opensSentenceAt(start: Int): Boolean =
+    substring(0, start).trimEnd().lastOrNull()?.let { it in SENTENCE_ENDS } ?: true
+
+private const val SENTENCE_ENDS = ".!?"
 
 private const val CASH_LOGO_TICKER = "CASH"
 

@@ -11,7 +11,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
-import io.paritytech.polkadotapp.designsystem.typography.PolkadotCashLogo
 import io.paritytech.polkadotapp.designsystem.typography.PolkadotFontFamilies
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -53,8 +52,8 @@ class CurrencyTickerTest {
     }
 
     @Test
-    fun `should draw a standalone ticker as the small caps wordmark`() {
-        val logoText = drawTickerAsLogo(AnnotatedString("12.34 CASH"), PolkadotCashLogo.SmallCaps)
+    fun `should draw a ticker inside a sentence as the small caps wordmark`() {
+        val logoText = drawTickerAsLogo(AnnotatedString("12.34 CASH"), wordmark = TickerWordmark.BySentence)
 
         assertEquals("12.34 cash", logoText.text)
         assertEquals(listOf(TextRange(6, 7)), logoText.logoRanges())
@@ -62,8 +61,8 @@ class CurrencyTickerTest {
     }
 
     @Test
-    fun `should draw a standalone ticker as the capital wordmark`() {
-        val logoText = drawTickerAsLogo(AnnotatedString("CASH Privacy Mode"), PolkadotCashLogo.Capital)
+    fun `should draw a ticker that opens the text as the capital wordmark`() {
+        val logoText = drawTickerAsLogo(AnnotatedString("CASH Privacy Mode"), wordmark = TickerWordmark.BySentence)
 
         assertEquals("CASH Privacy Mode", logoText.text)
         assertEquals(listOf(TextRange(0, 1)), logoText.logoRanges())
@@ -71,9 +70,34 @@ class CurrencyTickerTest {
     }
 
     @Test
-    fun `should draw every standalone ticker as a logo`() {
+    fun `should draw a ticker after a sentence end as the capital wordmark`() {
+        assertLogo(source = "Done. CASH arrives soon", text = "Done. CASH arrives soon")
+        assertLogo(source = "Done! CASH", text = "Done! CASH")
+        assertLogo(source = "Done? CASH", text = "Done? CASH")
+        assertLogo(source = "Step 2. CASH is ready", text = "Step 2. CASH is ready")
+    }
+
+    @Test
+    fun `should pick the wordmark for each ticker on its own`() {
+        assertLogo(source = "CASH sent, 5 CASH left", text = "CASH sent, 5 cash left", logo = listOf(TextRange(0, 1), TextRange(13, 14)))
         assertLogo(source = "1 CASH = 1 CASH", text = "1 cash = 1 cash", logo = listOf(TextRange(2, 3), TextRange(11, 12)))
-        assertLogo(source = "CASH", text = "cash", logo = listOf(TextRange(0, 1)))
+        assertLogo(source = "Add CASH via bank", text = "Add cash via bank")
+        assertLogo(source = " CASH", text = " CASH")
+    }
+
+    @Test
+    fun `should draw a ticker that continues an amount as the small caps wordmark`() {
+        assertEquals("cash", drawTickerAsLogo(AnnotatedString("CASH"), wordmark = TickerWordmark.SmallCaps).text)
+        assertEquals(" cash", drawTickerAsLogo(AnnotatedString(" CASH"), wordmark = TickerWordmark.SmallCaps).text)
+        assertEquals("Send 12. cash", drawTickerAsLogo(AnnotatedString("Send 12. CASH"), wordmark = TickerWordmark.SmallCaps).text)
+    }
+
+    @Test
+    fun `should draw a ticker inside a sentence as the capital wordmark when asked`() {
+        val logoText = drawTickerAsLogo(AnnotatedString("Add CASH via bank"), wordmark = TickerWordmark.Capital)
+
+        assertEquals("Add CASH via bank", logoText.text)
+        assertEquals(listOf(TextRange(4, 5)), logoText.logoRanges())
     }
 
     @Test
@@ -89,7 +113,7 @@ class CurrencyTickerTest {
             withStyle(secondary) { append("CASH") }
         }
 
-        val logoText = drawTickerAsLogo(source, PolkadotCashLogo.SmallCaps)
+        val logoText = drawTickerAsLogo(source, wordmark = TickerWordmark.BySentence)
 
         assertEquals(listOf(TextRange(4, 8)), logoText.spanStyles.filter { it.item == secondary }.map { TextRange(it.start, it.end) })
     }
@@ -100,7 +124,7 @@ class CurrencyTickerTest {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("2 CASH") }
         }
 
-        val styles = drawTickerAsLogo(source, PolkadotCashLogo.SmallCaps).spanStyles
+        val styles = drawTickerAsLogo(source, wordmark = TickerWordmark.BySentence).spanStyles
         val logo = styles.single { it.item.fontFamily == PolkadotFontFamilies.cashLogo }
 
         assertEquals(FontWeight.Normal, logo.item.fontWeight)
@@ -110,7 +134,7 @@ class CurrencyTickerTest {
 
     @Test
     fun `should draw the wordmark only for the CASH brand`() {
-        val logoText = styleTicker(AnnotatedString("12.34 CASH"), TICKER, PolkadotCashLogo.SmallCaps, SMALL_CAPS)
+        val logoText = styleTicker(AnnotatedString("12.34 CASH"), TICKER, TickerWordmark.BySentence, SMALL_CAPS)
 
         assertEquals("12.34 cash", logoText.text)
         assertEquals(listOf(TextRange(6, 7)), logoText.logoRanges())
@@ -119,7 +143,7 @@ class CurrencyTickerTest {
 
     @Test
     fun `should keep the small caps ticker for any other brand`() {
-        val tickerText = styleTicker(AnnotatedString("12.34 USDX"), "USDX", PolkadotCashLogo.SmallCaps, SMALL_CAPS)
+        val tickerText = styleTicker(AnnotatedString("12.34 USDX"), "USDX", TickerWordmark.BySentence, SMALL_CAPS)
 
         assertEquals("12.34 USDX", tickerText.text)
         assertEquals(emptyList<TextRange>(), tickerText.logoRanges())
@@ -133,7 +157,7 @@ class CurrencyTickerTest {
             withStyle(centered) { append("Pay 5 CASH now") }
         }
 
-        val logoText = drawTickerAsLogo(source, PolkadotCashLogo.SmallCaps)
+        val logoText = drawTickerAsLogo(source, wordmark = TickerWordmark.BySentence)
 
         assertEquals(listOf(TextRange(0, 14)), logoText.paragraphStyles.map { TextRange(it.start, it.end) })
     }
@@ -142,11 +166,11 @@ class CurrencyTickerTest {
         assertEquals(expected, tickerRanges(source, TICKER))
     }
 
-    private fun assertLogo(source: String, text: String, logo: List<TextRange>) {
-        val logoText = drawTickerAsLogo(AnnotatedString(source), PolkadotCashLogo.SmallCaps)
+    private fun assertLogo(source: String, text: String, logo: List<TextRange>? = null) {
+        val logoText = drawTickerAsLogo(AnnotatedString(source), wordmark = TickerWordmark.BySentence)
 
         assertEquals(text, logoText.text)
-        assertEquals(logo, logoText.logoRanges())
+        logo?.let { assertEquals(it, logoText.logoRanges()) }
     }
 
     private fun AnnotatedString.logoRanges() = spanStyles
