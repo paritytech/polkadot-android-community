@@ -7,9 +7,11 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
+import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RegisteredInstallationStorage
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableSubmission
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
@@ -41,6 +43,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -55,6 +58,7 @@ class CoinageInstallationRegistrarTest {
     private var failNextAttempts = 0
     private var attemptGate: CompletableDeferred<Unit>? = null
     private val onboarded = MutableStateFlow(true)
+    private val storage = InMemoryRegisteredInstallationStorage()
 
     private val config = mockk<AccountDataStoreConfigProvider> {
         coEvery { contractAddress() } returns Result.success(CONTRACT)
@@ -258,6 +262,120 @@ class CoinageInstallationRegistrarTest {
         assertEquals(1, engine.recoveryStarts)
     }
 
+    @Test
+    fun `a stored key the engine has finalized reads completed before onboarding and sync`() = registrarTest {
+        onboarded.value = false
+        coEvery { config.contractAddress() } returns Result.failure(IllegalStateException("remote config not synced"))
+        storage.saveValue(TARGET.registrationGroup())
+        engine.set(listOf(state(1, FINALIZED_SUCCESS)))
+
+        start()
+
+        assertEquals(CoinageAccountBackupStatus.Completed, status())
+        assertEquals(0, attempts.size)
+    }
+
+    @Test
+    fun `a stored key the engine has not finalized starts at registering`() = registrarTest {
+        onboarded.value = false
+        storage.saveValue(TARGET.registrationGroup())
+
+        start()
+
+        assertEquals(CoinageAccountBackupStatus.Registering, status())
+    }
+
+    @Test
+    fun `a stored key whose group only failed starts at registering`() = registrarTest {
+        onboarded.value = false
+        storage.saveValue(TARGET.registrationGroup())
+        engine.set(listOf(state(1, FAILURE)))
+
+        start()
+
+        assertEquals(CoinageAccountBackupStatus.Registering, status())
+    }
+
+    @Test
+    fun `a stored key whose group cannot be read starts at registering`() = registrarTest {
+        onboarded.value = false
+        storage.saveValue(TARGET.registrationGroup())
+        engine.set(listOf(state(1, FINALIZED_SUCCESS)))
+        engine.failGroupReads = true
+
+        start()
+
+        assertEquals(CoinageAccountBackupStatus.Registering, status())
+    }
+
+    @Test
+    fun `a stored key for another installation is not looked up and the registration runs`() = registrarTest {
+        storage.saveValue(InstallationRegistrationTarget(CONTRACT, OTHER_INSTALLATION).registrationGroup())
+
+        start()
+
+        assertEquals(0, engine.groupReads)
+        assertEquals(listOf(TARGET), attempts)
+    }
+
+    @Test
+    fun `a finalized registration that cannot be remembered still completes`() = registrarTest {
+        storage.failSaves = true
+        engine.set(listOf(state(1, FINALIZED_SUCCESS)))
+
+        start()
+
+        assertEquals(CoinageAccountBackupStatus.Completed, status())
+    }
+
+    @Test
+    fun `a stored key for another installation starts at registering`() = registrarTest {
+        onboarded.value = false
+        val other = InstallationRegistrationTarget(CONTRACT, OTHER_INSTALLATION).registrationGroup()
+        storage.saveValue(other)
+        engine.set(listOf(state(1, FINALIZED_SUCCESS)), group = other)
+
+        start()
+
+        assertEquals(CoinageAccountBackupStatus.Registering, status())
+    }
+
+    @Test
+    fun `a finalized registration is stored`() = registrarTest {
+        start()
+        assertEquals(null, storage.getValue())
+
+        engine.set(engine.current().map { it.copy(status = FINALIZED_SUCCESS) })
+        runCurrent()
+
+        assertEquals(TARGET.registrationGroup(), storage.getValue())
+    }
+
+    @Test
+    fun `a stored key with a changed contract goes back to registering and registers`() = registrarTest {
+        storage.saveValue(TARGET.registrationGroup())
+        engine.set(listOf(state(1, FINALIZED_SUCCESS)))
+        coEvery { config.contractAddress() } returns Result.success(OTHER_CONTRACT)
+        val statuses = collectStatuses()
+
+        start()
+
+        assertEquals(listOf(CoinageAccountBackupStatus.Completed, CoinageAccountBackupStatus.Registering), statuses)
+        assertEquals(listOf(InstallationRegistrationTarget(OTHER_CONTRACT, TEST_INSTALLATION)), attempts)
+    }
+
+    @Test
+    fun `recovery still starts for a matching stored key`() = registrarTest {
+        storage.saveValue(TARGET.registrationGroup())
+        engine.set(listOf(state(1, FINALIZED_SUCCESS)))
+
+        start()
+
+        assertEquals(1, engine.recoveryStarts)
+        assertEquals(0, attempts.size)
+        assertEquals(CoinageAccountBackupStatus.Completed, status())
+    }
+
     private fun registrarTest(body: suspend RegistrarScope.() -> Unit) = runTest {
         val registrar = CoinageInstallationRegistrar(
             observeAccountOnboardingStatusUseCase = onboardingStatus,
@@ -267,6 +385,7 @@ class CoinageInstallationRegistrarTest {
             submitter = submitter,
             chainConnectionRefCounter = mockk<ChainConnectionRefCounter>(relaxed = true),
             knownChains = KnownChains(people = "people", assetHub = "asset-hub", bulletIn = "bullet-in", hydration = null),
+            registeredInstallationStorage = storage,
             dispatchers = testDispatchers(),
         )
 
@@ -292,9 +411,35 @@ class CoinageInstallationRegistrarTest {
         suspend fun status() = registrar.subscribeStatus().first()
 
         fun CoroutineScope.launchCollecting() = registrar.subscribeStatus().launchIn(this)
+
+        fun collectStatuses(): List<CoinageAccountBackupStatus> {
+            val statuses = mutableListOf<CoinageAccountBackupStatus>()
+            registrar.subscribeStatus().onEach { statuses += it }.launchIn(backgroundScope)
+            return statuses
+        }
     }
 
     private fun state(id: Long, status: DurableTxStatus) = DurableTxState(DurableTxId(id), status)
+
+    private class InMemoryRegisteredInstallationStorage : RegisteredInstallationStorage {
+        private val stored = MutableStateFlow<OperationGroupId?>(null)
+        var failSaves = false
+
+        override fun valueFlow(): Flow<OperationGroupId?> = stored
+
+        override suspend fun getValue(): OperationGroupId? = stored.value
+
+        override suspend fun saveValue(value: OperationGroupId) {
+            if (failSaves) error("preferences unwritable")
+            stored.value = value
+        }
+
+        override suspend fun removeValue() {
+            stored.value = null
+        }
+
+        override suspend fun requireValue(): OperationGroupId = requireNotNull(stored.value)
+    }
 
     /**
      * Emits like a Room flow: every write re-emits, identical or not, and a subscriber first sees the current rows.
@@ -324,7 +469,14 @@ class CoinageInstallationRegistrarTest {
             }
         }
 
-        override suspend fun getGroupStates(domain: TxDomainId, groupId: OperationGroupId) = Result.success(current(groupId))
+        var failGroupReads = false
+        var groupReads = 0
+            private set
+
+        override suspend fun getGroupStates(domain: TxDomainId, groupId: OperationGroupId): Result<List<DurableTxState>> {
+            groupReads++
+            return if (failGroupReads) Result.failure(IllegalStateException("durable table unreadable")) else Result.success(current(groupId))
+        }
 
         override fun startRecovery() {
             recoveryStarts++
@@ -364,5 +516,6 @@ class CoinageInstallationRegistrarTest {
         val CONTRACT = ByteArray(20) { 0x0c }.toDataByteArray()
         val OTHER_CONTRACT = ByteArray(20) { 0x0d }.toDataByteArray()
         val TARGET = InstallationRegistrationTarget(CONTRACT, TEST_INSTALLATION)
+        val OTHER_INSTALLATION = CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES) { 0x11 }.toDataByteArray())
     }
 }

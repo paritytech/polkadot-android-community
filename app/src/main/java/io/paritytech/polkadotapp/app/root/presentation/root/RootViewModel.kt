@@ -18,6 +18,7 @@ import io.paritytech.polkadotapp.common.utils.enable
 import io.paritytech.polkadotapp.common.utils.isEnabled
 import io.paritytech.polkadotapp.common.utils.shareInBackground
 import io.paritytech.polkadotapp.common.utils.stateInBackground
+import io.paritytech.polkadotapp.common.utils.untilDismissed
 import io.paritytech.polkadotapp.feature_chats_api.domain.chatRequest.ChatRequestServiceCoordinator
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.ChatBotStateController
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
@@ -35,6 +36,7 @@ import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAcc
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.domain.warmUp.JwtAuthWarmUpService
 import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
@@ -83,6 +85,14 @@ class RootViewModel @Inject constructor(
     ) { dismissed, onboarded, ringsOnScreen ->
         !dismissed && onboarded && ringsOnScreen
     }.stateInBackground(initialValue = false)
+
+    private val paymentsSetupNoticeDismissals = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    override val isPaymentsSetupNoticeVisible = combine(rootInteractor.observePaymentsSetupPending(), isOnboarded) { pending, onboarded ->
+        pending && onboarded
+    }
+        .untilDismissed(paymentsSetupNoticeDismissals)
+        .stateInBackground(initialValue = false)
 
     private val servicesScope = ComputationalScope(viewModelScope + coroutineDispatchers.computation)
 
@@ -140,6 +150,10 @@ class RootViewModel @Inject constructor(
         if (networkStatusTooltipDismissed.value) return
         networkStatusTooltipDismissed.value = true
         rootInteractor.markNetworkStatusTooltipShown()
+    }
+
+    override fun dismissPaymentsSetupNotice() {
+        paymentsSetupNoticeDismissals.tryEmit(Unit)
     }
 
     private suspend fun checkDevReset() {
