@@ -50,14 +50,11 @@ class HardcodedComposeText(config: Config) : Rule(
         val name = getArgumentName()?.asName?.asString()
 
         return when {
-            name == LABEL && calleeName.isAnimationApi() -> null
+            name == LABEL && calleeName in ANIMATION_CALLS -> null
             name in TEXT_PARAMETERS -> name
             else -> null
         }
     }
-
-    private fun String.isAnimationApi() =
-        startsWith("animate") || startsWith("Animated") || this in ANIMATION_CALLS
 
     private fun KtStringTemplateExpression.hasTranslatableText() =
         entries.any { it is KtLiteralStringTemplateEntry && it.text.any(Char::isLetter) }
@@ -69,12 +66,35 @@ class HardcodedComposeText(config: Config) : Rule(
 
         val ANIMATION_CALLS = setOf(
             "Animatable",
-            "createDeferredAnimation",
-            "updateTransition",
-            "rememberTransition",
-            "rememberInfiniteTransition",
-            "createChildTransition",
+            "AnimatedContent",
+            "AnimatedVisibility",
             "Crossfade",
+            "animateColor",
+            "animateColorAsState",
+            "animateDp",
+            "animateDpAsState",
+            "animateEnterExit",
+            "animateFloat",
+            "animateFloatAsState",
+            "animateInt",
+            "animateIntAsState",
+            "animateIntOffset",
+            "animateIntOffsetAsState",
+            "animateIntSize",
+            "animateIntSizeAsState",
+            "animateOffset",
+            "animateOffsetAsState",
+            "animateRect",
+            "animateRectAsState",
+            "animateSize",
+            "animateSizeAsState",
+            "animateValue",
+            "animateValueAsState",
+            "createChildTransition",
+            "createDeferredAnimation",
+            "rememberInfiniteTransition",
+            "rememberTransition",
+            "updateTransition",
         )
     }
 }

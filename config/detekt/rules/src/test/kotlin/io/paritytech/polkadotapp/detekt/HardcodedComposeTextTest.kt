@@ -151,6 +151,23 @@ class HardcodedComposeTextTest {
             """val child = transition.createChildTransition(label = "x") { it }""",
             """val fade = remember { Animatable(0f, Float.VectorConverter, label = "x") }""",
             """val deferred = transition.createDeferredAnimation(Offset.VectorConverter, label = "x")""",
+            """val d by animateDpAsState(1.dp, label = "x")""",
+            """val o by animateOffsetAsState(o, label = "x")""",
+            """val s by animateSizeAsState(s, label = "x")""",
+            """val r by animateRectAsState(r, label = "x")""",
+            """val io by animateIntOffsetAsState(io, label = "x")""",
+            """val iz by animateIntSizeAsState(iz, label = "x")""",
+            """val v by animateValueAsState(v, converter, label = "x")""",
+            """val tc by transition.animateColor(label = "x") { c }""",
+            """val td by transition.animateDp(label = "x") { 1.dp }""",
+            """val ti by transition.animateInt(label = "x") { 1 }""",
+            """val tio by transition.animateIntOffset(label = "x") { io }""",
+            """val tiz by transition.animateIntSize(label = "x") { iz }""",
+            """val to by transition.animateOffset(label = "x") { o }""",
+            """val tr by transition.animateRect(label = "x") { r }""",
+            """val ts by transition.animateSize(label = "x") { s }""",
+            """val tv by transition.animateValue(converter, label = "x") { v }""",
+            """Box(Modifier.animateEnterExit(enter = e, exit = x, label = "x"))""",
         ).forEach(::assertNoFindings)
     }
 
@@ -162,10 +179,34 @@ class HardcodedComposeTextTest {
     }
 
     @Test
-    fun `reports title when passed to an animation-named composable`() {
-        val findings = lintComposable("""AnimatedBanner(title = "Send")""")
+    fun `reports title when passed to an animation API`() {
+        val findings = lintComposable("""AnimatedContent(targetState = s, title = "Send") {}""")
 
         assertEquals(1, findings.size)
+    }
+
+    @Test
+    fun `ignores literal when it is not passed directly as a named argument`() {
+        listOf(
+            """Text("Hello")""",
+            """Text(text = if (done) "Done" else "Pending")""",
+            """Text(text = when (state) { Ready -> "Done" else -> "Pending" })""",
+            """Text(text = "Hello, " + name)""",
+            """
+            val greeting = "Hello"
+            Text(text = greeting)
+            """,
+        ).forEach(::assertNoFindings)
+    }
+
+    @Test
+    fun `reports label when a custom composable is named like an animation API`() {
+        listOf(
+            """AnimatedTabItem(label = "Home")""",
+            """animateBadge(label = "New")""",
+        ).forEach { body ->
+            assertEquals(body, 1, lintComposable(body).size)
+        }
     }
 
     @Test
