@@ -98,6 +98,7 @@ private fun EchoMessageBubble(
         content.fold(
             onSuccess = { echo ->
                 Column {
+                    @Suppress("HardcodedComposeText")
                     Text(
                         text = "🔊 Echo",
                         style = PolkadotTheme.typography.body.small,
@@ -113,6 +114,7 @@ private fun EchoMessageBubble(
                         modifier = Modifier.padding(top = PolkadotTheme.spacings.tiny)
                     )
 
+                    @Suppress("HardcodedComposeText")
                     Text(
                         text = "You watched this message for total of ${echo.watchTime} seconds",
                         style = PolkadotTheme.typography.body.large,
@@ -122,6 +124,7 @@ private fun EchoMessageBubble(
                 }
             },
             onFailure = {
+                @Suppress("HardcodedComposeText")
                 Text(
                     text = "Failed to decode echo message",
                     style = PolkadotTheme.typography.body.large,

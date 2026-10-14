@@ -101,5 +101,6 @@ internal fun Project.configureDetekt() {
     dependencies {
         add("detektPlugins", libs.findLibrary("detekt-formatting").get())
         add("detektPlugins", libs.findLibrary("detekt-compose-rules").get())
+        add("detektPlugins", project(":config:detekt:rules"))
     }
 }

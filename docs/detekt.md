@@ -33,6 +33,7 @@ HTML reports are generated at: `<module>/build/reports/detekt/detekt.html`
 
 - **Config file**: `config/detekt/config.yml`
 - **Formatting rules**: Enabled with auto-correct
+- **Project rules**: `config/detekt/rules`, rule set `polkadotapp`. `HardcodedComposeText` fails the build when a composable passes a string literal as a named `text`, `title`, `subtitle`, `label`, `placeholder` or `headerText` argument; move the text to `strings.xml`. Its tests run with `./gradlew :config:detekt:rules:test`.
 
 ## Suppressing Violations
 
