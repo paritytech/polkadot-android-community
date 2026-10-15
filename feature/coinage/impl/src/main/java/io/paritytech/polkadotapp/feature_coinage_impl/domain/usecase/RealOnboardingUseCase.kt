@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_balances_api.data.type.TokenBalanceTypeRegistry
 import io.paritytech.polkadotapp.feature_balances_api.data.type.subscribeAccountBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.breakdownRoundDown
@@ -122,7 +123,7 @@ class RealOnboardingUseCase @Inject constructor(
             // Every denomination has a voucher that finalized. Onboarding finished.
             if (outstanding.isEmpty()) break
 
-            currentInstallationProvider.awaitBackedUp()
+            with(StalenessReportCollector.NoOp) { currentInstallationProvider.awaitBackedUp() }
                 .onFailure { coinageLogW("Onboarding could not read the current installation group=${groupId.value}") }
 
             // Deliberately checked before attempting, where a claim would still try once. The funds are the

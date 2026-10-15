@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.common
 
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.CurrentInstallationProvider
 import kotlinx.coroutines.CompletableDeferred
@@ -19,6 +20,7 @@ class HeldInstallationGate : CurrentInstallationProvider {
         waiters.last().complete(Result.success(installation))
     }
 
+    context(diagnostics: StalenessReportCollector)
     override suspend fun awaitBackedUp(): Result<CoinageInstallationId> =
         outcome ?: CompletableDeferred<Result<CoinageInstallationId>>().also { waiters += it }.await()
 

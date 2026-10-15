@@ -17,10 +17,14 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.common.HeldInstallationGate
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.CurrentInstallationProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferMemoBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlanner
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlannerFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.PaymentsSetupPendingException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.TransferSubmissionFailedException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategy
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategyFactory
@@ -37,15 +41,22 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.PENDING_SUBMISSION
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
+import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
 import io.paritytech.polkadotapp.test_shared.any
+import io.paritytech.polkadotapp.test_shared.assertSuccess
 import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.whenever
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito
@@ -53,8 +64,11 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import java.math.BigDecimal
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.time.measureTime
 
 /**
  * Backs both the send and the running plan preview, so it has to reach the funds a confirmed send may use —
@@ -74,16 +88,12 @@ class RealPrepareCoinageTransferUseCaseTest {
     private val exactStrategy: ExactMatchStrategy = mock()
     private val handoffCommit: CoinageHandoffCommit = mock()
 
-    private val useCase = RealPrepareCoinageTransferUseCase(
-        assetSelector = assetSelector,
-        plannerFactory = plannerFactory,
-        exactMatchStrategyFactory = exactMatchStrategyFactory,
-        splitStrategyFactory = splitStrategyFactory,
-        unloadAndSplitStrategyFactory = mock(),
-        chainAssetProvider = mock(),
-        memoBuilder = memoBuilder,
-        transactionService = transactionService,
-    )
+    private val timeProvider = FakeTimeProvider { NOW.toEpochMilliseconds() }
+
+    private val useCase = createUseCase(HeldInstallationGate().apply { release(TEST_INSTALLATION) })
+
+    private val pendingSetup = HeldInstallationGate()
+    private val useCaseAwaitingSetup = createUseCase(pendingSetup)
 
     private val amount: BigDecimal = BigDecimal.TEN
     private val plan = TransferPlan(StrategyType.ExactCoins(coins = emptyList()))
@@ -285,11 +295,88 @@ class RealPrepareCoinageTransferUseCaseTest {
         }
     }
 
-    private suspend fun prepareChatSend(chatPlan: TransferPlan = splitPlan) =
-        with(StalenessReportCollector.NoOp) { useCase.prepareScheduledMemo(chatPlan, RETRY_UNTIL) }
+    @Test
+    fun `a merchant send schedules only once payments are set up when setup is pending`() = runBlocking<Unit> {
+        withSplitScheduling()
+        withSchedulingAccepted()
+        withGroupReports(listOf(stateOf(PENDING)))
 
-    private suspend fun prepareMerchantSend() =
-        with(StalenessReportCollector.NoOp) { useCase.prepareMemo(splitPlan, RETRY_UNTIL) }
+        val prepared = async(start = CoroutineStart.UNDISPATCHED) { prepareMerchantSend(useCase = useCaseAwaitingSetup) }
+
+        verifySplitNeverScheduled()
+
+        pendingSetup.release(TEST_INSTALLATION)
+
+        assertSuccess(prepared.await())
+    }
+
+    @Test
+    fun `a merchant send stops waiting for payments setup when its window runs out`() = runBlocking<Unit> {
+        withSplitScheduling()
+
+        val waited = measureTime {
+            val prepared = withTimeout(SETUP_TEST_TIMEOUT) { prepareMerchantSend(useCase = useCaseAwaitingSetup) }
+
+            assertTrue(
+                "expected PaymentsSetupPendingException but was ${prepared.exceptionOrNull()}",
+                prepared.exceptionOrNull() is PaymentsSetupPendingException,
+            )
+        }
+
+        assertTrue("waited $waited", waited >= RETRY_UNTIL - NOW)
+        verifySplitNeverScheduled()
+    }
+
+    @Test
+    fun `a chat send keeps waiting when payments setup outlasts its window`() = runBlocking<Unit> {
+        withSplitScheduling()
+
+        val prepared = async(start = CoroutineStart.UNDISPATCHED) { prepareChatSend(useCase = useCaseAwaitingSetup) }
+        delay(RETRY_UNTIL - NOW + SETUP_WINDOW_OVERRUN)
+
+        assertFalse(prepared.isCompleted)
+
+        pendingSetup.release(TEST_INSTALLATION)
+
+        assertSuccess(prepared.await())
+    }
+
+    @Test
+    fun `a send does not wait for payments setup when its plan uses exact coins`() = runBlocking<Unit> {
+        withExactScheduling()
+
+        assertSuccess(prepareChatSend(plan, useCaseAwaitingSetup))
+        assertSuccess(prepareMerchantSend(plan, useCaseAwaitingSetup))
+    }
+
+    private suspend fun prepareChatSend(
+        chatPlan: TransferPlan = splitPlan,
+        useCase: RealPrepareCoinageTransferUseCase = this.useCase,
+    ) = with(StalenessReportCollector.NoOp) { useCase.prepareScheduledMemo(chatPlan, RETRY_UNTIL) }
+
+    private suspend fun prepareMerchantSend(
+        merchantPlan: TransferPlan = splitPlan,
+        useCase: RealPrepareCoinageTransferUseCase = this.useCase,
+    ) = with(StalenessReportCollector.NoOp) { useCase.prepareMemo(merchantPlan, RETRY_UNTIL) }
+
+    private suspend fun verifySplitNeverScheduled() {
+        verify(splitStrategy, never()).let { verified ->
+            with(eq(StalenessReportCollector.NoOp)) { verified.schedule(any()) }
+        }
+    }
+
+    private fun createUseCase(installationProvider: CurrentInstallationProvider) = RealPrepareCoinageTransferUseCase(
+        assetSelector = assetSelector,
+        plannerFactory = plannerFactory,
+        exactMatchStrategyFactory = exactMatchStrategyFactory,
+        splitStrategyFactory = splitStrategyFactory,
+        unloadAndSplitStrategyFactory = mock(),
+        chainAssetProvider = mock(),
+        memoBuilder = memoBuilder,
+        transactionService = transactionService,
+        currentInstallationProvider = installationProvider,
+        timeProvider = timeProvider,
+    )
 
     private suspend fun withSplitScheduling() {
         whenever(splitStrategyFactory.create(any())).thenReturn(splitStrategy)
@@ -365,6 +452,9 @@ class RealPrepareCoinageTransferUseCaseTest {
 
     private companion object {
         val RETRY_UNTIL: Instant = Instant.fromEpochSeconds(1_000)
+        val NOW: Instant = RETRY_UNTIL - 100.milliseconds
+        val SETUP_WINDOW_OVERRUN = 100.milliseconds
+        val SETUP_TEST_TIMEOUT = 5.seconds
     }
 
     private fun coinOf(derivationIndex: Int) = Coin(

@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flatRecover
@@ -16,10 +17,12 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.installation.CurrentInstallationProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferMemoBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlanner
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlannerFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.PaymentsSetupPendingException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.TransferSubmissionFailedException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategyFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ScheduledTransfer
@@ -36,6 +39,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import java.math.BigDecimal
 import javax.inject.Inject
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -50,6 +54,8 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val memoBuilder: TransferMemoBuilder,
     private val transactionService: CoinageTransactionService,
+    private val currentInstallationProvider: CurrentInstallationProvider,
+    private val timeProvider: TimeProvider,
 ) : PrepareCoinageTransferUseCase {
     private companion object {
         /** How long the sender waits for the transactions to reach the wire before calling the send failed. */
@@ -91,7 +97,8 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
     override suspend fun prepareMemo(plan: TransferPlan, retryUntil: Instant): Result<PreparedTransferMemo> {
-        return createStrategy(plan).schedule(TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true))
+        return awaitPaymentsSetUp(plan, waitLimit = retryUntil - timeProvider.now())
+            .flatMap { schedule(plan, retryUntil) }
             .flatMap { scheduled ->
                 // The memo never leaves when its transactions do not, so its coins need not wait for a relaunch.
                 submitNow(scheduled)
@@ -108,7 +115,8 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
     override suspend fun prepareScheduledMemo(plan: TransferPlan, retryUntil: Instant): Result<PreparedTransferMemo> {
-        return createStrategy(plan).schedule(TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true))
+        return awaitPaymentsSetUp(plan, waitLimit = Duration.INFINITE)
+            .flatMap { schedule(plan, retryUntil) }
             .flatMap { scheduled ->
                 memoBuilder.buildMemo(scheduled.entries).map { memo ->
                     PreparedTransferMemo(memo, SchedulingHandoffCommit(scheduled, transactionService))
@@ -117,6 +125,19 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
             .onSuccess {
                 coinageLogD("Scheduled TransferMemo built: coins=${it.memo.coins.size}, total=${it.memo.totalValue}")
             }
+    }
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun schedule(plan: TransferPlan, retryUntil: Instant): Result<ScheduledTransfer> =
+        createStrategy(plan).schedule(TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true))
+
+    context(diagnostics: StalenessReportCollector)
+    private suspend fun awaitPaymentsSetUp(plan: TransferPlan, waitLimit: Duration): Result<Unit> {
+        if (!plan.strategyType.mintsNewAssets) return Result.success(Unit)
+
+        val backedUp = withTimeoutOrNull(waitLimit) { currentInstallationProvider.awaitBackedUp() }
+
+        return backedUp?.coerceToUnit() ?: Result.failure(PaymentsSetupPendingException())
     }
 
     /**
@@ -158,6 +179,9 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
         }
     }
 }
+
+private val StrategyType.mintsNewAssets: Boolean
+    get() = this !is StrategyType.ExactCoins
 
 /**
  * The payment's transactions are registered in the same step that makes its handoff final, so they share the
