@@ -204,8 +204,7 @@ private class LedgerHandoffCommit(
     private val settled = AtomicBoolean(false)
 
     override suspend fun commit(): Result<Unit> = assetLedger.commitHandoffs(keys)
-        .onSuccess { coinageLogI("handoff-committed keys=${keys.map { it.shortKey() }}") }
-        .onFailure { error -> coinageLogW("handoff-commit-failed keys=${keys.map { it.shortKey() }} error=$error") }
+        .logHandoffCommit(keys)
         .also { settle() }
 
     override suspend fun release(): Result<Unit> = assetLedger.releaseUncommittedHandoffs(keys)
@@ -225,10 +224,12 @@ private class AtomicHandoffCommit(
 ) : CoinageHandoffCommit {
     private val keys = marks.map { it.publicKey }
 
-    override suspend fun commit(): Result<Unit> = assetLedger.markHandedOffCommitted(marks)
-        .onSuccess { coinageLogI("handoff-committed keys=${keys.map { it.shortKey() }}") }
-        .onFailure { error -> coinageLogW("handoff-commit-failed keys=${keys.map { it.shortKey() }} error=$error") }
+    override suspend fun commit(): Result<Unit> = assetLedger.markHandedOffCommitted(marks).logHandoffCommit(keys)
 
     // Nothing is written before commit, so there is no reservation to drop and nothing for the guard to count.
     override suspend fun release(): Result<Unit> = Result.success(Unit)
 }
+
+private fun Result<Unit>.logHandoffCommit(keys: List<AssetPublicKey>) = this
+    .onSuccess { coinageLogI("handoff-committed keys=${keys.map { it.shortKey() }}") }
+    .onFailure { error -> coinageLogW("handoff-commit-failed keys=${keys.map { it.shortKey() }} error=$error") }
