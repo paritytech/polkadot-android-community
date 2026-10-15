@@ -48,7 +48,8 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.Local
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.DigitalDollarCardDetailsViewModel
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.debug.rememberCoinageDebugChoices
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.CoinageScene
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.debug.CoinageTestDataMode
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketCardSharedElement
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketContentSlide
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.BalanceRestoreUiState
@@ -90,6 +91,8 @@ fun DigitalDollarCardDetails(
         onCoinTapped = viewModel::onCoinTapped,
         onCoinsFlickedDown = viewModel::onCoinsFlickedDown,
         onHeadingClicked = viewModel::onHeadingClicked,
+        onTestDataSelected = viewModel::onTestDataSelected,
+        onCoinSetSelected = viewModel::onCoinSetSelected,
         onShareLogsClick = viewModel::onShareLogsClick,
         onBackupUpdateClick = viewModel::onBackupUpdateClick,
         onBackupCloseClick = viewModel::onBackupCloseClick
@@ -109,12 +112,12 @@ private fun DigitalDollarCardDetailsContent(
     onCoinTapped: (String?) -> Unit,
     onCoinsFlickedDown: () -> Unit,
     onHeadingClicked: () -> Unit,
+    onTestDataSelected: (CoinageTestDataMode) -> Unit,
+    onCoinSetSelected: (CoinageScene.CoinSet) -> Unit,
     onShareLogsClick: () -> Unit,
     onBackupUpdateClick: () -> Unit,
     onBackupCloseClick: () -> Unit
 ) {
-    val debugChoices = rememberCoinageDebugChoices()
-
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -197,7 +200,8 @@ private fun DigitalDollarCardDetailsContent(
                         onCoinsFlickedDown = onCoinsFlickedDown,
                         onHeadingClicked = onHeadingClicked,
                         onShareLogsClick = onShareLogsClick,
-                        debugChoices = debugChoices
+                        onTestDataSelected = onTestDataSelected,
+                        onCoinSetSelected = onCoinSetSelected
                     )
                 }
             }
@@ -315,7 +319,9 @@ private fun DigitalDollarCardDetailsPreview() {
                         actionsEnabled = true,
                         shareLogsEnabled = true,
                         detailsVisible = false,
-                        focusedCoin = null
+                        focusedCoin = null,
+                        coinSet = CoinageScene.CoinSet.SHIPPED,
+                        testData = CoinageTestDataMode.LIVE
                     )
                 ),
                 state = DigitalDollarCardDetailsUiState(
@@ -327,6 +333,8 @@ private fun DigitalDollarCardDetailsPreview() {
                 onCoinTapped = {},
                 onCoinsFlickedDown = {},
                 onHeadingClicked = {},
+                onTestDataSelected = {},
+                onCoinSetSelected = {},
                 onShareLogsClick = {},
                 onBackupUpdateClick = {},
                 onBackupCloseClick = {}
