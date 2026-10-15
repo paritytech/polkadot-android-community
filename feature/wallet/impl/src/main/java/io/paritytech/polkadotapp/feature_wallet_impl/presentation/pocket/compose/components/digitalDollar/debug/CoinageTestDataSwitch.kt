@@ -1,14 +1,28 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.debug
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
@@ -24,6 +38,26 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import java.math.BigDecimal
 import io.paritytech.polkadotapp.common.R as RCommon
+
+/**
+ * The debug choices, held above the loading state so a reload of the holdings does not reset them. Production
+ * never changes them from live holdings and the shipped coin set.
+ */
+@Stable
+internal class CoinageDebugChoices(testData: CoinageTestDataMode, coinSet: CoinageScene.CoinSet) {
+    var testData by mutableStateOf(testData)
+    var coinSet by mutableStateOf(coinSet)
+}
+
+@Composable
+internal fun rememberCoinageDebugChoices(): CoinageDebugChoices = rememberSaveable(
+    saver = listSaver(
+        save = { listOf(it.testData, it.coinSet) },
+        restore = { CoinageDebugChoices(it[0] as CoinageTestDataMode, it[1] as CoinageScene.CoinSet) }
+    )
+) {
+    CoinageDebugChoices(CoinageTestDataMode.LIVE, CoinageScene.CoinSet.SHIPPED)
+}
 
 /**
  * Which set of holdings the coins draw. Scaffolding for reviewing the depiction against wallets the app cannot
@@ -85,6 +119,53 @@ internal fun CoinageTestDataSwitch(
         }
     }
 }
+
+/** The two coin sets, side by side for comparison on a device. A debug comparison, not a setting. */
+@Composable
+internal fun CoinageCoinSetSwitch(
+    modifier: Modifier = Modifier,
+    set: CoinageScene.CoinSet,
+    onSetChange: (CoinageScene.CoinSet) -> Unit
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NovaText(
+            text = stringResource(RCommon.string.pocket_debug_coinage_coin_set),
+            style = PolkadotTheme.typography.body.small,
+            color = PolkadotTheme.colors.fg.primary
+        )
+
+        Row(
+            modifier = Modifier
+                .border(1.dp, PolkadotTheme.colors.fg.secondary, CircleShape)
+                .clip(CircleShape)
+                .selectableGroup()
+        ) {
+            CoinageScene.CoinSet.entries.forEach { option ->
+                val selected = option == set
+
+                NovaText(
+                    modifier = Modifier
+                        .background(if (selected) PolkadotTheme.colors.fg.primary else Color.Transparent)
+                        .selectable(selected = selected, role = Role.RadioButton, onClick = { onSetChange(option) })
+                        .padding(horizontal = PolkadotTheme.spacings.small, vertical = PolkadotTheme.spacings.tiny),
+                    text = stringResource(option.title),
+                    style = PolkadotTheme.typography.body.small,
+                    color = if (selected) PolkadotTheme.colors.bg.surface.container else PolkadotTheme.colors.fg.primary
+                )
+            }
+        }
+    }
+}
+
+private val CoinageScene.CoinSet.title: Int
+    get() = when (this) {
+        CoinageScene.CoinSet.VARIED -> RCommon.string.pocket_debug_coinage_coin_set_varied
+        CoinageScene.CoinSet.PLAIN -> RCommon.string.pocket_debug_coinage_coin_set_plain
+    }
 
 internal object CoinageTestData {
     private const val STATUS_EXPONENT = 4

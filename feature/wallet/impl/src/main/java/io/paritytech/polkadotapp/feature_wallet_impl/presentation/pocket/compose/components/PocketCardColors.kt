@@ -8,5 +8,4 @@ object PocketCardColors {
     val PrimaryInverted = Color(0xFF0B0C0F)
     val SecondaryInverted = Color(0xFF6F727A)
     val Transparent = Color.Transparent
-    val DigitalDollarCardBackground = Color.Black
 }
