@@ -87,7 +87,7 @@ object CoinageAssetStore {
     private fun bytes(assets: AssetManager, name: String): ByteArray =
         assets.open("$ROOT/$name").use { it.readBytes() }
 
-    /** Six rows of two `vec4`: reflectance plus roughness, then the darker tone plus a pad. */
+    /** One row of two `vec4` per metal: reflectance plus roughness, then the darker tone plus a pad. */
     private fun List<RawMetal>.rows(): FloatArray {
         val rows = FloatArray(size * 8)
 

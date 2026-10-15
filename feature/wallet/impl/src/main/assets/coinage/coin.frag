@@ -35,7 +35,7 @@ uniform float uRoomLift;        // light added to the whole studio: its grey wal
 uniform vec4 uPanels[6];        // three softboxes of our own, two vec4 each: unit direction + cos(half
                                 // angle), gain + pad
 uniform int uDebug;
-uniform vec4 uMetals[12];       // six metals, two vec4 each: f0 + roughness, tone + pad
+uniform vec4 uMetals[14];       // seven metals, two vec4 each: f0 + roughness, tone + pad
 
 uniform sampler2D uAtlas;
 uniform samplerCube uEnv;
