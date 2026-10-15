@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model
 
 /**
- * A handoff that is reserved but not yet final.
+ * A handoff that is not yet final: either reserved already, or prepared to be written only by [commit].
  *
  * Hold one from the moment the assets are chosen until whatever carries their keys is durable, then commit.
  * Where that is depends on the transport: for a chat payment it is the message row, so the commit belongs
