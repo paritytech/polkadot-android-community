@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
@@ -171,17 +170,6 @@ fun <T> Flow<T>.gate(flag: Flow<Boolean>) = combineToPair(this, flag)
 
 fun <T> Flow<T>.reevaluate(trigger: Flow<*>): Flow<T> =
     combine(this, trigger.map { }.onStart { emit(Unit) }) { value, _ -> value }
-
-fun Flow<Boolean>.untilDismissed(dismissals: Flow<Unit>): Flow<Boolean> = distinctUntilChanged()
-    .transformLatest { shown ->
-        emit(shown)
-
-        if (shown) {
-            dismissals.first()
-            emit(false)
-        }
-    }
-    .distinctUntilChanged()
 
 fun <T> Flow<T>.zipWithPrevious(): Flow<Pair<T?, T>> =
     flow {

@@ -4,12 +4,10 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
-import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RegisteredInstallationStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
@@ -51,7 +49,6 @@ class CoinageInstallationRegistrar @Inject constructor(
     private val submitter: InstallationRegistrationSubmitter,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val knownChains: KnownChains,
-    private val registeredInstallationStorage: RegisteredInstallationStorage,
     dispatchers: CoroutineDispatchers,
 ) : CoroutineScope by CoroutineScope(dispatchers.io + SupervisorJob()) {
     private val registration: SharedFlow<CoinageAccountBackupStatus> = flow {
@@ -71,8 +68,6 @@ class CoinageInstallationRegistrar @Inject constructor(
             if (target != finalizedBefore) emit(false)
 
             registerUntilFinalized(target)
-            runCancellableCatching { registeredInstallationStorage.saveValue(target.registrationGroup()) }
-                .onFailure { coinageLogW("Installation registration: could not remember the finalized registration") }
             emit(true)
         }
         emitAll(combine(completed, overdueAfter(EXPECTED_REGISTRATION_TIME), ::statusOf))
@@ -124,14 +119,15 @@ class CoinageInstallationRegistrar @Inject constructor(
             .first { states -> states.none { it.status.isLive } }
     }
 
+    // Read before remote config syncs, so a registration that already finalized does not hold allocations until then.
     private suspend fun finalizedRegistrationOf(installation: CoinageInstallationId): InstallationRegistrationTarget? {
-        val group = registeredInstallationStorage.getValue() ?: return null
-        val target = group.registrationTargetOrNull()?.takeIf { it.installation == installation } ?: return null
+        val contract = configProvider.lastKnownContractAddress().getOrNull() ?: return null
+        val target = InstallationRegistrationTarget(contract, installation)
 
-        return durableTransactionService.getGroupStates(COINAGE_INSTALLATION_DOMAIN, group).fold(
+        return durableTransactionService.getGroupStates(COINAGE_INSTALLATION_DOMAIN, target.registrationGroup()).fold(
             onSuccess = { states -> target.takeIf { states.any { it.status == DurableTxStatus.FINALIZED_SUCCESS } } },
             onFailure = {
-                coinageLogW("Installation registration: could not read the remembered registration, checking it again")
+                coinageLogW("Installation registration: could not read the earlier registration, checking it again")
                 null
             },
         )

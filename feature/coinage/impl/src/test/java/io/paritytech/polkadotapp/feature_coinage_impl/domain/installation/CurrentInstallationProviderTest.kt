@@ -1,8 +1,8 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.installation
 
-import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessRegionHandle
-import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
-import io.paritytech.polkadotapp.common.utils.progressStallReport.StallableRegion
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus.Completed
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus.Delayed
@@ -10,9 +10,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccount
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.PreviousInstallation
 import io.paritytech.polkadotapp.test_shared.settle
-import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -25,22 +23,25 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
-import org.mockito.Mockito.mock
 
 class CurrentInstallationProviderTest {
     private val status = MutableSharedFlow<CoinageAccountBackupStatus>(replay = 1)
 
-    private val registrar = mock<CoinageInstallationRegistrar>().also {
-        whenever(it.subscribeStatus()).thenReturn(status)
+    private val registrar = mockk<CoinageInstallationRegistrar> {
+        every { subscribeStatus() } returns status
     }
 
-    private val provider = RealCurrentInstallationProvider(registrar, CurrentInstallationOnly())
+    private val installationRepository = mockk<CoinageInstallationRepository> {
+        coEvery { getOrCreateCurrent() } returns TEST_INSTALLATION
+    }
+
+    private val provider = RealCurrentInstallationProvider(registrar, installationRepository)
 
     @Test
     fun `a completed backup returns the installation at once`() = providerTest {
         status.emit(Completed)
 
-        assertEquals(Result.success(TEST_INSTALLATION), awaitBackedUp())
+        assertEquals(Result.success(TEST_INSTALLATION), provider.awaitBackedUp())
     }
 
     @Test
@@ -104,7 +105,7 @@ class CurrentInstallationProviderTest {
     @Test
     fun `a status that leaves completed holds the next caller`() = providerTest {
         status.emit(Completed)
-        awaitBackedUp()
+        provider.awaitBackedUp()
 
         status.emit(Registering)
         val call = request()
@@ -118,7 +119,7 @@ class CurrentInstallationProviderTest {
     fun `a cancelled waiter is cancelled, not failed`() = providerTest {
         status.emit(Registering)
         var result: Result<CoinageInstallationId>? = null
-        val call = launch(start = CoroutineStart.UNDISPATCHED) { result = awaitBackedUp() }
+        val call = launch(start = CoroutineStart.UNDISPATCHED) { result = provider.awaitBackedUp() }
         settle()
 
         call.cancel()
@@ -156,7 +157,7 @@ class CurrentInstallationProviderTest {
         status.emit(Completed)
         val flags = collectFlags()
 
-        repeat(3) { awaitBackedUp() }
+        repeat(3) { provider.awaitBackedUp() }
         settle()
 
         assertEquals(listOf(false), flags)
@@ -208,32 +209,6 @@ class CurrentInstallationProviderTest {
     }
 
     @Test
-    fun `opens a region for the wait when the backup is still pending`() = providerTest {
-        status.emit(Registering)
-        val regions = RecordingCollector()
-
-        val call = async(start = CoroutineStart.UNDISPATCHED) { awaitBackedUp(regions) }
-        settle()
-        assertEquals(1, regions.started)
-        assertEquals(0, regions.ended)
-
-        status.emit(Completed)
-        call.await()
-
-        assertEquals(1, regions.ended)
-    }
-
-    @Test
-    fun `opens no region when the backup is already completed`() = providerTest {
-        status.emit(Completed)
-        val regions = RecordingCollector()
-
-        awaitBackedUp(regions)
-
-        assertEquals(0, regions.started)
-    }
-
-    @Test
     fun `subscribeStatus forwards the registrar status`() = providerTest {
         val seen = mutableListOf<CoinageAccountBackupStatus>()
         val job = launch(start = CoroutineStart.UNDISPATCHED) { provider.subscribeStatus().toList(seen) }
@@ -253,39 +228,11 @@ class CurrentInstallationProviderTest {
     }
 
     private fun CoroutineScope.request(): Deferred<Result<CoinageInstallationId>> =
-        async(start = CoroutineStart.UNDISPATCHED) { awaitBackedUp() }
-
-    private suspend fun awaitBackedUp(diagnostics: StalenessReportCollector = StalenessReportCollector.NoOp) =
-        with(diagnostics) { provider.awaitBackedUp() }
+        async(start = CoroutineStart.UNDISPATCHED) { provider.awaitBackedUp() }
 
     private fun CoroutineScope.collectFlags(): List<Boolean> {
         val flags = mutableListOf<Boolean>()
         launch(start = CoroutineStart.UNDISPATCHED) { provider.subscribeAllocationWaiting().toList(flags) }
         return flags
-    }
-
-    private class RecordingCollector : StalenessRegionHandle {
-        var started = 0
-        var ended = 0
-
-        override fun startRegion(region: StallableRegion): StalenessRegionHandle = also { started++ }
-
-        override fun end() {
-            ended++
-        }
-    }
-
-    private class CurrentInstallationOnly : CoinageInstallationRepository {
-        override suspend fun getOrCreateCurrent(): CoinageInstallationId = TEST_INSTALLATION
-
-        override suspend fun addPrevious(installations: Collection<CoinageInstallationId>) = error("not used")
-
-        override suspend fun getPrevious(): List<PreviousInstallation> = error("not used")
-
-        override suspend fun updateCoinScanNextIndex(installation: CoinageInstallationId, nextIndex: Int) = error("not used")
-
-        override suspend fun updateVoucherScanNextIndex(installation: CoinageInstallationId, nextIndex: Int) = error("not used")
-
-        override suspend fun markInitialScanCompleted(installation: CoinageInstallationId) = error("not used")
     }
 }

@@ -67,9 +67,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.Coinag
 import io.paritytech.polkadotapp.feature_coinage_impl.data.signer.context.RealCoinageSigningContextProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.DeepRecoveryCompletedStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RealDeepRecoveryCompletedStorage
-import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RealRegisteredInstallationStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RecyclingStrategyStorage
-import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.RegisteredInstallationStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.storage.createRecyclingStrategyStorage
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetLedger
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageStateReaderFactory
@@ -242,9 +240,6 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindCurrentInstallationProvider(impl: RealCurrentInstallationProvider): CurrentInstallationProvider
-
-    @Binds
-    fun bindRegisteredInstallationStorage(impl: RealRegisteredInstallationStorage): RegisteredInstallationStorage
 
     @Binds
     @IntoMap

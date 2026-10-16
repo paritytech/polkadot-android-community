@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.common
 
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAllocator
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
@@ -62,7 +61,7 @@ class RealCoinAllocator @Inject constructor(
     }
 
     private suspend fun <T> withBackedUpInstallation(allocate: suspend (CoinageInstallationId) -> T): Result<T> =
-        with(StalenessReportCollector.NoOp) { currentInstallationProvider.awaitBackedUp() }.flatMap { installation ->
+        currentInstallationProvider.awaitBackedUp().flatMap { installation ->
             allocationMutex.withLock { runCancellableCatching { allocate(installation) } }
         }
 

@@ -7,7 +7,6 @@ import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.throttleLatest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.totalBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
@@ -15,7 +14,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingS
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
-import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageAccountBackupObserver
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
@@ -25,10 +23,9 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -57,7 +54,6 @@ class CoinRecyclingEvaluator @Inject constructor(
     private val recyclingUseCase: CoinageRecyclingUseCase,
     private val dispatchers: CoroutineDispatchers,
     private val readinessUpdates: VoucherReadinessUpdates,
-    private val backupObserver: CoinageAccountBackupObserver,
 ) {
     private class Assets(
         val coins: List<TrackedCoin>,
@@ -70,7 +66,6 @@ class CoinRecyclingEvaluator @Inject constructor(
     private class Input(
         val assets: Assets,
         val strategyType: RecyclingStrategyType,
-        val backupCompleted: Boolean,
     )
 
     /**
@@ -84,14 +79,13 @@ class CoinRecyclingEvaluator @Inject constructor(
     context(scope: ComputationalScope)
     fun start() {
         scope.launch(dispatchers.computation) {
-            val assets = combine(coinageAssetsUseCase.subscribeCoins(), coinageAssetsUseCase.subscribeVouchers(), ::Assets)
+            combine(coinageAssetsUseCase.subscribeCoins(), coinageAssetsUseCase.subscribeVouchers(), ::Assets)
                 .throttleLatest(EVALUATION_INTERVAL)
-
-            // Outside the throttle: switching strategy should re-judge the wallet at once rather than up
-            // to an interval later. Only the asset churn needs damping.
-            combine(assets, settings.strategyFlow(), observeBackupCompleted(), ::Input)
+                // Outside the throttle: switching strategy should re-judge the wallet at once rather than up
+                // to an interval later. Only the asset churn needs damping.
+                .combine(settings.strategyFlow(), ::Input)
                 .withReadinessUpdates(readinessUpdates, { it.assets.vouchers }, { it.strategyType })
-                .collect { input ->
+                .transform { input ->
                     // Both passes run off the same input rather than waiting for the next emission: the
                     // wallet may not change again for minutes, and the immediate verdicts must not stand
                     // that long.
@@ -103,17 +97,15 @@ class CoinRecyclingEvaluator @Inject constructor(
 
                             // Deliberately not a collector of verdictsState: a StateFlow drops equal values,
                             // so a retry after a failed recycle would never reach one.
-                            if (input.backupCompleted) recycleGated(input, verdicts)
+                            emit(input to verdicts)
                         }
                         .logFailure(LOG_TAG)
                 }
+                // Recycling can wait on the backup, so the evaluation never waits on it and the newest verdicts go next.
+                .conflate()
+                .collect { (input, verdicts) -> recycleGated(input, verdicts) }
         }
     }
-
-    private fun observeBackupCompleted(): Flow<Boolean> = backupObserver.subscribeStatus()
-        .map { it == CoinageAccountBackupStatus.Completed }
-        .onStart { emit(false) }
-        .distinctUntilChanged()
 
     /**
      * Gets a balance on screen without waiting for the chain, at the cost of a verdict that only the chain's

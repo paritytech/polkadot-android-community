@@ -60,10 +60,6 @@ suspend inline fun <reified E> assertPresentationErrorShown(viewModel: BaseViewM
     assertTrue("expected a ${E::class.simpleName} but was ${error ?: event}", error is E)
 }
 
-fun assertSuccess(result: Result<*>) {
-    assertTrue("Expected a success, got $result", result.isSuccess)
-}
-
 fun assertFailure(result: Result<*>) {
     assertTrue("Expected a failure, got $result", result.isFailure)
 }

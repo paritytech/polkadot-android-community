@@ -1,19 +1,15 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
-import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus.Completed
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus.Delayed
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccountBackupStatus.Registering
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageAccountBackupObserver
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -23,95 +19,100 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVouch
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
 import io.paritytech.polkadotapp.feature_coinage_impl.data.source.ClockChangesSource
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
-import io.paritytech.polkadotapp.test_shared.any
+import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
 import io.paritytech.polkadotapp.test_shared.testDispatchers
-import io.paritytech.polkadotapp.test_shared.whenever
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.Mockito.mock
-import kotlin.time.Instant
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CoinRecyclingEvaluatorTest {
     @Test
-    fun `verdicts are published before the backup status has emitted`() = runTest {
-        val fixture = EvaluatorFixture(this, status = MutableSharedFlow())
+    fun `verdicts keep updating when a recycle is still waiting`() = runTest {
+        val fixture = EvaluatorFixture(this, recycleRelease = CompletableDeferred())
 
         fixture.start()
+        fixture.addSecondDueCoin()
 
-        assertEquals(CoinRecyclingState.MUST_RECYCLE, fixture.verdicts.last().getValue(DUE_COIN.derivationIndex))
-        assertEquals(emptyList<List<Coin>>(), fixture.recycled)
+        assertTrue(SECOND_DUE_COIN.derivationIndex in fixture.verdicts.last())
     }
 
     @Test
-    fun `while the backup is pending verdicts are published and nothing is recycled`() = runTest {
-        val status = MutableStateFlow<CoinageAccountBackupStatus>(Registering)
-        val fixture = EvaluatorFixture(this, status)
+    fun `no second recycle starts when the first one is still running`() = runTest {
+        val fixture = EvaluatorFixture(this, recycleRelease = CompletableDeferred())
 
         fixture.start()
-        status.value = Delayed
-        runCurrent()
-
-        assertEquals(CoinRecyclingState.MUST_RECYCLE, fixture.verdicts.last().getValue(DUE_COIN.derivationIndex))
-        assertEquals(emptyList<List<Coin>>(), fixture.recycled)
-    }
-
-    @Test
-    fun `a completed backup recycles the gated coins without a new asset event, once`() = runTest {
-        val status = MutableSharedFlow<CoinageAccountBackupStatus>(replay = 1)
-        status.emit(Registering)
-        val fixture = EvaluatorFixture(this, status)
-
-        fixture.start()
-        status.emit(Completed)
-        runCurrent()
-        status.emit(Completed)
-        runCurrent()
+        fixture.addSecondDueCoin()
 
         assertEquals(listOf(listOf(DUE_COIN)), fixture.recycled)
     }
 
-    private class EvaluatorFixture(private val scope: TestScope, status: Flow<CoinageAccountBackupStatus>) {
+    @Test
+    fun `the newest evaluation is recycled when the running attempt finishes`() = runTest {
+        val recycleRelease = CompletableDeferred<Unit>()
+        val fixture = EvaluatorFixture(this, recycleRelease)
+
+        fixture.start()
+        fixture.addSecondDueCoin()
+        recycleRelease.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf(listOf(DUE_COIN), listOf(DUE_COIN, SECOND_DUE_COIN)), fixture.recycled)
+    }
+
+    @Test
+    fun `the next evaluation recycles again when the previous attempt has finished`() = runTest {
+        val fixture = EvaluatorFixture(this, recycleRelease = CompletableDeferred(Unit))
+
+        fixture.start()
+        fixture.addSecondDueCoin()
+
+        assertEquals(listOf(listOf(DUE_COIN), listOf(DUE_COIN, SECOND_DUE_COIN)), fixture.recycled)
+    }
+
+    private class EvaluatorFixture(private val scope: TestScope, recycleRelease: CompletableDeferred<Unit>) {
         val recycled = mutableListOf<List<Coin>>()
         val verdicts = mutableListOf<RecyclingVerdicts>()
 
-        private val clock = object : TimeProvider {
-            override fun now() = Instant.fromEpochMilliseconds(scope.testScheduler.currentTime)
-        }
-        private val updates = VoucherReadinessUpdates(clock, mock<ClockChangesSource>().also { whenever(it.changes()).thenReturn(emptyFlow()) })
-        private val assets: CoinageAssetsUseCase = mock()
-        private val settings: CoinageRecyclingStrategySettings = mock()
-        private val capacities: RingCapacityProvider = mock()
-        private val converter: CoinageBalanceConverterUseCase = mock()
-        private val quota: UnloadQuotaTracker = mock()
-        private val recycling: CoinageRecyclingUseCase = mock()
-        private val backupObserver: CoinageAccountBackupObserver = mock()
+        private val coins = MutableStateFlow(listOf(tracked(DUE_COIN)))
+        private val clock = FakeTimeProvider { scope.testScheduler.currentTime }
 
-        init {
-            runBlocking {
-                whenever(assets.subscribeCoins()).thenReturn(MutableStateFlow(listOf(TrackedCoin(DUE_COIN, CoinageAssetState.UNTRACKED))))
-                whenever(assets.subscribeVouchers()).thenReturn(MutableStateFlow(emptyList<TrackedVoucher>()))
-                whenever(settings.strategyFlow()).thenReturn(MutableStateFlow(RecyclingStrategyType.MIN_PRIVACY))
-                whenever(capacities.peekCapacitiesFor(any())).thenReturn(emptyMap())
-                whenever(capacities.capacitiesFor(any())).thenReturn(Result.success(emptyMap()))
-                whenever(converter.create()).thenReturn(Result.success(testConversionContext))
-                whenever(quota.isQuotaRunningLow()).thenReturn(Result.success(false))
-                whenever(backupObserver.subscribeStatus()).thenReturn(status)
-                whenever(recycling.recycle(any())).thenAnswer { invocation ->
-                    recycled += invocation.getArgument<List<Coin>>(0)
-                    Result.success(Unit)
-                }
+        private val assets = mockk<CoinageAssetsUseCase> {
+            every { subscribeCoins() } returns coins
+            every { subscribeVouchers() } returns MutableStateFlow(emptyList<TrackedVoucher>())
+        }
+        private val settings = mockk<CoinageRecyclingStrategySettings> {
+            every { strategyFlow() } returns MutableStateFlow(RecyclingStrategyType.MIN_PRIVACY)
+        }
+        private val capacities = mockk<RingCapacityProvider> {
+            coEvery { peekCapacitiesFor(any()) } returns emptyMap()
+            coEvery { capacitiesFor(any()) } returns Result.success(emptyMap())
+        }
+        private val converter = mockk<CoinageBalanceConverterUseCase> {
+            coEvery { create() } returns Result.success(testConversionContext)
+        }
+        private val quota = mockk<UnloadQuotaTracker> {
+            coEvery { isQuotaRunningLow() } returns Result.success(false)
+        }
+        private val recycling = mockk<CoinageRecyclingUseCase> {
+            coEvery { recycle(any()) } coAnswers {
+                recycled += firstArg<List<Coin>>()
+                recycleRelease.await()
+                Result.success(Unit)
             }
+        }
+        private val clockChanges = mockk<ClockChangesSource> {
+            every { changes() } returns emptyFlow()
         }
 
         private val evaluator = CoinRecyclingEvaluator(
@@ -122,8 +123,7 @@ class CoinRecyclingEvaluatorTest {
             converter,
             recycling,
             scope.testDispatchers(),
-            updates,
-            backupObserver,
+            VoucherReadinessUpdates(clock, clockChanges),
         )
 
         fun start() {
@@ -131,11 +131,25 @@ class CoinRecyclingEvaluatorTest {
             with(ComputationalScope(scope.backgroundScope)) { evaluator.start() }
             scope.runCurrent()
         }
+
+        fun addSecondDueCoin() {
+            coins.value = listOf(tracked(DUE_COIN), tracked(SECOND_DUE_COIN))
+            scope.advanceTimeBy(PAST_EVALUATION_INTERVAL)
+            scope.runCurrent()
+        }
     }
 
     private companion object {
         const val FORCED_AGE = 14
 
-        val DUE_COIN = Coin(testKey(0), ValueExponent(1), Coin.Age.Known(FORCED_AGE), true, mock(), CoinProvenance.UNKNOWN)
+        val PAST_EVALUATION_INTERVAL = 6.seconds
+
+        val DUE_COIN = dueCoin(derivationIndex = 0)
+        val SECOND_DUE_COIN = dueCoin(derivationIndex = 1)
+
+        fun dueCoin(derivationIndex: Int) =
+            Coin(testKey(derivationIndex), ValueExponent(1), Coin.Age.Known(FORCED_AGE), true, mockk(), CoinProvenance.UNKNOWN)
+
+        fun tracked(coin: Coin) = TrackedCoin(coin, CoinageAssetState.UNTRACKED)
     }
 }

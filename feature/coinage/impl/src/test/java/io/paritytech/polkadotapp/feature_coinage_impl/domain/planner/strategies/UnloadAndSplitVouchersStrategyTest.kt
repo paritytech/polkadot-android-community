@@ -1,22 +1,19 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
-import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
-import io.paritytech.polkadotapp.feature_coinage_api.domain.common.CoinAmountBreakdown
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
-import io.paritytech.polkadotapp.test_shared.any
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -25,9 +22,6 @@ import kotlinx.coroutines.yield
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.time.ExperimentalTime
@@ -35,7 +29,7 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
 class UnloadAndSplitVouchersStrategyTest {
-    private val transactionService: CoinageTransactionService = mock(CoinageTransactionService::class.java)
+    private val transactionService = mockk<CoinageTransactionService>()
 
     private val strategy = UnloadAndSplitVouchersStrategy(
         payload = StrategyType.UnloadAndSplit(
@@ -43,12 +37,14 @@ class UnloadAndSplitVouchersStrategyTest {
             recipientAmount = BigDecimal.ONE,
             exactCoins = emptyList(),
         ),
-        chain = mock(Chain::class.java),
-        coinRepository = mock(CoinRepository::class.java),
+        chain = mockk(relaxed = true),
+        coinRepository = mockk(relaxed = true),
         transactionService = transactionService,
-        coinageTransactionFactory = mock(CoinageTransaction.Factory::class.java),
-        breakdownUseCase = HeldBreakdownUseCase(),
-        balanceConverterUseCase = mock(CoinageBalanceConverterUseCase::class.java),
+        coinageTransactionFactory = mockk(relaxed = true),
+        breakdownUseCase = mockk<CoinAmountBreakdownUseCase> {
+            coEvery { createCoinAmountBreakdown() } coAnswers { awaitCancellation() }
+        },
+        balanceConverterUseCase = mockk(relaxed = true),
     )
 
     @Test
@@ -61,7 +57,7 @@ class UnloadAndSplitVouchersStrategyTest {
 
         assertTrue("the scheduling was not cancelled", scheduling.isCancelled)
         assertNull("a cancelled scheduling produced a result", result)
-        verify(transactionService, never()).preCommitHandoff(any())
+        coVerify(exactly = 0) { transactionService.preCommitHandoff(any()) }
     }
 
     private fun voucherInRecycler(index: Int) = RecyclerVoucher(
@@ -72,10 +68,6 @@ class UnloadAndSplitVouchersStrategyTest {
         recyclerFungibility = RecyclerFungibility.NONE,
         maxRecyclerFungibility = RecyclerFungibility.NONE,
     )
-
-    private class HeldBreakdownUseCase : CoinAmountBreakdownUseCase {
-        override suspend fun createCoinAmountBreakdown(): Result<CoinAmountBreakdown> = awaitCancellation()
-    }
 
     private companion object {
         val PARAMS = TransferSubmissionParams(buildUntil = Instant.DISTANT_FUTURE, retryFailures = false)
