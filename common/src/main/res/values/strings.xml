@@ -676,11 +676,11 @@
     <string name="chat_payment_status_reclaim_failed">Reclaiming failed</string>
     <string name="chat_payment_reclaim_action">Reclaim funds</string>
     <string name="chat_payment_reclaim_retry_action">Try to reclaim again</string>
-    <string name="chat_payment_status_returned_to_sender">You didn\'t claim it in time, so it went back to the sender</string>
+    <string name="chat_payment_status_returned_to_sender">Claim period expired. Sender can reclaim the funds</string>
     <string name="chat_last_message_payment_incoming">%1$s sent you %2$s</string>
     <string name="chat_last_message_payment_incoming_sending">%1$s is sending you %2$s</string>
     <string name="chat_last_message_payment_outgoing">You sent %1$s</string>
-    <string name="chat_last_message_payment_returned_to_sender">%2$s went back to %1$s</string>
+    <string name="chat_last_message_payment_returned_to_sender">%2$s from %1$s expired</string>
     <string name="chat_last_message_payment_reclaimed">You reclaimed %1$s</string>
     <string name="chat_reply_transfer_incoming">Sent you %1$s</string>
     <string name="chat_reply_transfer_outgoing">You sent %1$s</string>

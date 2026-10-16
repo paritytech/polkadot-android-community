@@ -148,6 +148,7 @@ private fun PaymentMessageContent(
 
     val differingAmount = message.differingAmount
     val isReclaimed = message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.Reclaimed
+    val isReturnedToSender = message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ReturnedToSender
 
     val bubbleMaxWidth = minOf(PaymentMessageMaxWidth, getMaxMessageWidth())
     val boxHorizontalInset = PolkadotTheme.spacings.extraMedium
@@ -190,7 +191,7 @@ private fun PaymentMessageContent(
                 PaymentAmounts(
                     amount = message.amount,
                     differingAmount = differingAmount,
-                    struckThrough = isReclaimed,
+                    struckThrough = isReclaimed || isReturnedToSender,
                     maxWidthPx = amountMaxWidthPx,
                     primaryTextColor = primaryTextColor,
                     secondaryTextColor = secondaryTextColor
