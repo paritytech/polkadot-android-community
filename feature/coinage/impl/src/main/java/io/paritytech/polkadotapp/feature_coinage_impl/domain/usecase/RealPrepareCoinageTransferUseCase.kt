@@ -91,7 +91,11 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
     override suspend fun prepareMemo(plan: TransferPlan, retryUntil: Instant): Result<PreparedTransferMemo> {
-        return createStrategy(plan).schedule(TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true))
+        return createStrategy(plan)
+            .schedule(
+                TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true),
+                transactionService::preCommitHandoff,
+            )
             .flatMap { scheduled ->
                 // The memo never leaves when its transactions do not, so its coins need not wait for a relaunch.
                 submitNow(scheduled)
@@ -108,7 +112,11 @@ class RealPrepareCoinageTransferUseCase @Inject constructor(
     @OptIn(ExperimentalTime::class)
     context(diagnostics: StalenessReportCollector)
     override suspend fun prepareScheduledMemo(plan: TransferPlan, retryUntil: Instant): Result<PreparedTransferMemo> {
-        return createStrategy(plan).schedule(TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true))
+        return createStrategy(plan)
+            .schedule(
+                TransferSubmissionParams(buildUntil = retryUntil, retryFailures = true),
+                transactionService::prepareHandoff,
+            )
             .flatMap { scheduled ->
                 memoBuilder.buildMemo(scheduled.entries).map { memo ->
                     PreparedTransferMemo(memo, SchedulingHandoffCommit(scheduled, transactionService))

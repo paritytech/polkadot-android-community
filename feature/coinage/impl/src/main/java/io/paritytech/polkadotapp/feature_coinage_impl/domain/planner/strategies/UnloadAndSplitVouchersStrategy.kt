@@ -7,7 +7,6 @@ import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isInRecycler
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageScheduledTransactionRequest
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
@@ -23,7 +22,6 @@ import io.paritytech.polkadotapp.common.R as RCommon
 
 class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
     private val coinRepository: CoinRepository,
-    private val transactionService: CoinageTransactionService,
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
@@ -35,7 +33,6 @@ class UnloadAndSplitVouchersStrategyFactory @Inject constructor(
         payload = payload,
         chain = chain,
         coinRepository = coinRepository,
-        transactionService = transactionService,
         coinageTransactionFactory = coinageTransactionFactory,
         breakdownUseCase = breakdownUseCase,
         balanceConverterUseCase = balanceConverterUseCase,
@@ -46,7 +43,6 @@ class UnloadAndSplitVouchersStrategy(
     payload: StrategyType.UnloadAndSplit,
     private val chain: Chain,
     private val coinRepository: CoinRepository,
-    private val transactionService: CoinageTransactionService,
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val breakdownUseCase: CoinAmountBreakdownUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
@@ -60,10 +56,13 @@ class UnloadAndSplitVouchersStrategy(
      * they share one pinned block and person proof.
      */
     context(diagnostics: StalenessReportCollector)
-    override suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer> =
+    override suspend fun schedule(
+        params: TransferSubmissionParams,
+        reserveHandoff: HandoffReservation,
+    ): Result<ScheduledTransfer> =
         diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
             runCatching { mintBatches() }.flatMap { minted ->
-                transactionService.preCommitHandoff(minted.handedOff()).map { handoffCommit ->
+                reserveHandoff(minted.handedOff()).map { handoffCommit ->
                     val policy = CoinageSubmissionParams.unloadPolicy(params)
 
                     ScheduledTransfer(

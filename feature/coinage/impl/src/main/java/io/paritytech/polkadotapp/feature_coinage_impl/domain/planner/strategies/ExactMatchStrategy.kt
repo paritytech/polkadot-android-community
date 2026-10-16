@@ -2,22 +2,18 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import javax.inject.Inject
 
-class ExactMatchStrategyFactory @Inject constructor(
-    private val transactionService: CoinageTransactionService,
-) {
+class ExactMatchStrategyFactory @Inject constructor() {
     fun create(payload: StrategyType.ExactCoins): ExactMatchStrategy {
-        return ExactMatchStrategy(payload, transactionService)
+        return ExactMatchStrategy(payload)
     }
 }
 
 class ExactMatchStrategy(
     payload: StrategyType.ExactCoins,
-    private val transactionService: CoinageTransactionService,
 ) : TransferStrategy {
     private val coins = payload.coins
 
@@ -28,10 +24,13 @@ class ExactMatchStrategy(
      * Marks no region: a local handoff mark cannot stall.
      */
     context(_: StalenessReportCollector)
-    override suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer> {
+    override suspend fun schedule(
+        params: TransferSubmissionParams,
+        reserveHandoff: HandoffReservation,
+    ): Result<ScheduledTransfer> {
         val handedOff = coins.map { OwnAsset.Coin(it.derivationIndex) }
 
-        return transactionService.preCommitHandoff(handedOff)
+        return reserveHandoff(handedOff)
             .map { commit -> ScheduledTransfer(coins.toMemoEntries(), commit, transactions = emptyList()) }
     }
 }
