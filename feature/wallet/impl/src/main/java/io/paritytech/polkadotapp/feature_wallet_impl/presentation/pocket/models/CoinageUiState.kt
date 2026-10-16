@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.CoinageCoinTrace
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.CoinageScene
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins.debug.CoinageTestDataMode
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 
@@ -20,7 +21,11 @@ data class CoinageUiState(
     val shareLogsEnabled: Boolean,
     val detailsVisible: Boolean,
     /** The coin picked out of the spread grid, if any. Always null while the coins are collapsed. */
-    val focusedCoin: String?
+    val focusedCoin: String?,
+    /** [CoinageScene.CoinSet.SHIPPED] unless switched in a build with the coinage debug features. */
+    val coinSet: CoinageScene.CoinSet,
+    /** [CoinageTestDataMode.LIVE] unless switched in a build with the coinage debug features. */
+    val testData: CoinageTestDataMode
 ) {
     /**
      * The two figures partition [totalBalance] exactly, and [coins] is a picture of the same two — one coin
