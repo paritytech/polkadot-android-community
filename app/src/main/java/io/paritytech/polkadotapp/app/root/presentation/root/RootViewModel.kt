@@ -35,16 +35,10 @@ import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAcc
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.domain.warmUp.JwtAuthWarmUpService
 import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -90,18 +84,16 @@ class RootViewModel @Inject constructor(
         !dismissed && onboarded && ringsOnScreen
     }.stateInBackground(initialValue = false)
 
-    private val paymentsSetupNoticeDismissals = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val paymentsSetupNoticeDismissed = MutableStateFlow(false)
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override val isPaymentsSetupNoticeVisible = combine(rootInteractor.observePaymentsSetupPending(), isOnboarded) { pending, onboarded ->
-        pending && onboarded
-    }
-        // A repeated `true` from either source must not bring back a notice dismissed during this wait.
-        .distinctUntilChanged()
-        .flatMapLatest { waiting ->
-            if (waiting) paymentsSetupNoticeDismissals.map { false }.onStart { emit(true) } else flowOf(false)
-        }
-        .stateInBackground(initialValue = false)
+    // Registration starts only after onboarding, so a wait before it is not a delayed backup.
+    override val isPaymentsSetupNoticeVisible = combine(
+        rootInteractor.observePaymentsSetupPending(),
+        isOnboarded,
+        paymentsSetupNoticeDismissed,
+    ) { pending, onboarded, dismissed ->
+        pending && onboarded && !dismissed
+    }.stateInBackground(initialValue = false)
 
     private val servicesScope = ComputationalScope(viewModelScope + coroutineDispatchers.computation)
 
@@ -162,7 +154,7 @@ class RootViewModel @Inject constructor(
     }
 
     override fun dismissPaymentsSetupNotice() {
-        paymentsSetupNoticeDismissals.tryEmit(Unit)
+        paymentsSetupNoticeDismissed.value = true
     }
 
     private suspend fun checkDevReset() {
