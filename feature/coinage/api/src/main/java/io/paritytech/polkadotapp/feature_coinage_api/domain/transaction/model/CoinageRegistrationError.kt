@@ -35,6 +35,11 @@ sealed class CoinageRegistrationError(message: String) : Throwable(message) {
         "input $input carries a handoff mark"
     )
 
+    /** A reclaim takes back a key that left the device; one that never left is an ordinary own input. */
+    data class ReclaimedInputNotHandedOff(val input: CoinageInput) : CoinageRegistrationError(
+        "reclaimed input $input carries no handoff mark"
+    )
+
     /** The mirror of [InputHandedOff]: an asset a transaction of ours holds cannot also leave the device. */
     data class HandoffOfClaimedAsset(val asset: OwnAsset) : CoinageRegistrationError(
         "$asset is claimed by a transaction that has not failed, so it cannot be handed off"

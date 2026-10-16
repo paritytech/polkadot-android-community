@@ -55,8 +55,16 @@ sealed interface CoinagePaymentStatus {
      * stale read can claim it was never there.
      */
     data class Claimed(val finalized: Boolean) : CoinagePaymentStatus
+
+    /** Our own transaction is taking it back and has not landed yet. */
+    data object Reclaiming : CoinagePaymentStatus
+
+    /** Our own transaction took it back; [finalized] as in [Claimed]. */
+    data class Reclaimed(val finalized: Boolean) : CoinagePaymentStatus
 }
 
 /** Whether nothing can change this any more, and so whether a payment may be closed on it. */
 val CoinagePaymentStatus.isTerminal: Boolean
-    get() = this is CoinagePaymentStatus.Failed || (this is CoinagePaymentStatus.Claimed && finalized)
+    get() = this is CoinagePaymentStatus.Failed ||
+        (this is CoinagePaymentStatus.Claimed && finalized) ||
+        (this is CoinagePaymentStatus.Reclaimed && finalized)

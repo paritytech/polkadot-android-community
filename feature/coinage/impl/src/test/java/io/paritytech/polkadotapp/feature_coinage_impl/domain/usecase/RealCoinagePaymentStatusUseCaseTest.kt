@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -230,6 +231,45 @@ class RealCoinagePaymentStatusUseCaseTest {
         assertEquals(CoinagePaymentStatus.Claimed(finalized = false), statusOfCoin())
     }
 
+    /** Our reclaim is the only thing that may spend a handed-off coin, so a consumer here is that reclaim. */
+    @Test
+    fun `a coin our reclaim is waiting to take back reads as reclaiming`() = runTest {
+        givenCoin(onChain = true, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = PRESENT, reclaim = PENDING_SUBMISSION)
+
+        assertEquals(CoinagePaymentStatus.Reclaiming, statusOfCoin())
+    }
+
+    /**
+     * Our reclaim is out and the coin has vanished, even from the finalized chain. Whose transaction took it is
+     * not known until ours resolves, and calling it the peer's would close the payment as received.
+     */
+    @Test
+    fun `a coin vanishing under a submitted reclaim is not taken for the peer's claim`() = runTest {
+        givenCoin(onChain = false, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = ABSENT, reclaim = PENDING)
+
+        assertEquals(CoinagePaymentStatus.Reclaiming, statusOfCoin())
+    }
+
+    @Test
+    fun `a coin our reclaim took at the best head is reclaimed but unproven`() = runTest {
+        givenCoin(onChain = false, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = PRESENT, reclaim = PENDING_SUCCESS)
+
+        val status = statusOfCoin()
+
+        assertEquals(CoinagePaymentStatus.Reclaimed(finalized = false), status)
+        assertFalse(status.isTerminal)
+    }
+
+    @Test
+    fun `a coin our finalized reclaim took is proven reclaimed rather than claimed`() = runTest {
+        givenCoin(onChain = false, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = ABSENT, reclaim = FINALIZED_SUCCESS)
+
+        val status = statusOfCoin()
+
+        assertEquals(CoinagePaymentStatus.Reclaimed(finalized = true), status)
+        assertTrue(status.isTerminal)
+    }
+
     private suspend fun statusOfCoin(): CoinagePaymentStatus =
         useCase.subscribeStatuses(listOf(ACCOUNT)).first().getValue(ACCOUNT).status
 
@@ -239,6 +279,7 @@ class RealCoinagePaymentStatusUseCaseTest {
         minter: DurableTxStatus?,
         atFinalized: FinalizedRead,
         installation: CoinageInstallationId = TEST_INSTALLATION,
+        reclaim: DurableTxStatus? = null,
     ) {
         val coin = Coin(
             derivationIndex = CoinageKeyIndex(installation, 0),
@@ -252,7 +293,7 @@ class RealCoinagePaymentStatusUseCaseTest {
         val tracked = TrackedCoin(
             coin = coin,
             // Handed off is what makes this a payment: the key has left the device.
-            state = CoinageAssetState(handedOff = true, minterStatus = minter, consumerStatus = null),
+            state = CoinageAssetState(handedOff = true, minterStatus = minter, consumerStatus = reclaim),
         )
 
         every { coinageAssetsUseCase.subscribeCoinsBy(any()) } returns flowOf(listOf(tracked))

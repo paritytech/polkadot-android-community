@@ -10,18 +10,21 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableE
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicService
 import javax.inject.Inject
 
-/** A claim of a coin a peer handed us, signed by the peer's key, into [destination]. */
+/**
+ * A coin moved into [destination], signed by the coin's own key: a claim of one a peer handed us, or a reclaim of
+ * one we handed off.
+ */
 class ClaimExtrinsicBuilder @Inject constructor(
     private val coinageTransactionOrigins: CoinageTransactionOrigins,
     private val extrinsicService: ExtrinsicService,
 ) {
     suspend fun build(
         chain: Chain,
-        receivedKeypair: Keypair,
+        coinKeypair: Keypair,
         destination: AccountId,
     ): Result<EnrichedSendableExtrinsic> = extrinsicService.buildExtrinsic(
         chain = chain,
-        origin = coinageTransactionOrigins.createAsCoinOrigin(receivedKeypair),
+        origin = coinageTransactionOrigins.createAsCoinOrigin(coinKeypair),
         options = ExtrinsicService.SubmissionOptions(),
         formExtrinsic = { coinage.transfer(destination) },
     )

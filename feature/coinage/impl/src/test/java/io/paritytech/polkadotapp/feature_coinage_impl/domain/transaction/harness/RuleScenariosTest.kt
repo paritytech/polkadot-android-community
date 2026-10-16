@@ -113,6 +113,25 @@ class RuleScenariosTest {
         assertTrue(claimAfterHandoff.exceptionOrNull() is CoinageRegistrationError.InputHandedOff)
     }
 
+    /**
+     * A reclaim is the one input a handoff mark lets through, only onto a coin that carries one, and only once:
+     * the Unique consumer rule still holds, which is what makes a second tap on the button harmless.
+     */
+    @Test
+    fun `a reclaim spends a handed-off coin once and nothing that was never handed off`() = scenario {
+        mintCoinsOnChain(COIN_A, COIN_C, finality = FINALIZED)
+        service.preCommitHandoff(listOf(OwnAsset.Coin(testKey(COIN_A)))).getOrThrow().commit().getOrThrow()
+
+        assertTrue(registerReclaim(COIN_A, COIN_B).isSuccess)
+        assertEquals(PENDING, assetStateOf(COIN_A).consumerStatus)
+
+        val secondReclaim = registerReclaim(COIN_A, COIN_D)
+        assertTrue(secondReclaim.exceptionOrNull() is CoinageRegistrationError.InputAlreadyClaimed)
+
+        val reclaimOfOwnCoin = registerReclaim(COIN_C, COIN_D)
+        assertTrue(reclaimOfOwnCoin.exceptionOrNull() is CoinageRegistrationError.ReclaimedInputNotHandedOff)
+    }
+
     @Test
     fun `ownCoinInputs declines while the input minter's own window is still open`() = scenario {
         disableFallbackTxSearch()

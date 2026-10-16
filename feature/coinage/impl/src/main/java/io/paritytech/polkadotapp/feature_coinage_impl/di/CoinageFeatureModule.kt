@@ -26,6 +26,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBacku
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServiceStarter
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
@@ -104,16 +105,19 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.RealCoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.recovery.CoinageResourceOracle
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_CLAIM_POLICY_ID
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_RECLAIM_POLICY_ID
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_SPLIT_POLICY_ID
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_UNLOAD_POLICY_ID
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ClaimRebuild
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.InputGatedSubmissionPolicy
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ReclaimRebuild
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.SplitRebuild
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.UnloadRebuild
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.CoinageOnboardingSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.CoinageTransferSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealClaimReceivedCoinsUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealReclaimHandedOffCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageAssetsUseCase
@@ -184,6 +188,18 @@ object CoinageSubmissionPolicyModule {
         timeProvider: TimeProvider,
     ): AsyncDurableSubmissionPolicy = InputGatedSubmissionPolicy(
         CoinageSubmissionParams.CLAIM_POLICY_ID, rebuild, chainAssetProvider, assetLedger, timeProvider
+    )
+
+    @Provides
+    @IntoMap
+    @SubmissionPolicyKey(COINAGE_RECLAIM_POLICY_ID)
+    fun provideReclaimSubmissionPolicy(
+        rebuild: ReclaimRebuild,
+        @DigitalDollarChainAssetProvider chainAssetProvider: ChainAssetProvider,
+        assetLedger: CoinageAssetLedger,
+        timeProvider: TimeProvider,
+    ): AsyncDurableSubmissionPolicy = InputGatedSubmissionPolicy(
+        CoinageSubmissionParams.RECLAIM_POLICY_ID, rebuild, chainAssetProvider, assetLedger, timeProvider
     )
 }
 
@@ -336,6 +352,9 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindClaimReceivedCoinsUseCase(impl: RealClaimReceivedCoinsUseCase): ClaimReceivedCoinsUseCase
+
+    @Binds
+    fun bindReclaimHandedOffCoinsUseCase(impl: RealReclaimHandedOffCoinsUseCase): ReclaimHandedOffCoinsUseCase
 
     @Binds
     fun bindCoinageRecyclingUseCase(impl: RealCoinageRecyclingUseCase): CoinageRecyclingUseCase

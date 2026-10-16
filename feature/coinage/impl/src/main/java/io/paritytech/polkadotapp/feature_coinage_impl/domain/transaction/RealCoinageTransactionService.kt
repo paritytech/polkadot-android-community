@@ -158,6 +158,7 @@ class RealCoinageTransactionService @Inject constructor(
 
     private suspend fun CoinageInput.publicKey(): AssetPublicKey = when (this) {
         is CoinageInput.Coin.Own -> coinKeypairDerivation.getDerivedAccountId(derivationIndex)
+        is CoinageInput.Coin.Reclaimed -> coinKeypairDerivation.getDerivedAccountId(derivationIndex)
         is CoinageInput.Coin.Received -> publicKey
         is CoinageInput.Voucher -> voucherRingDerivation.memberKeyOf(ringVrfIndex)
     }

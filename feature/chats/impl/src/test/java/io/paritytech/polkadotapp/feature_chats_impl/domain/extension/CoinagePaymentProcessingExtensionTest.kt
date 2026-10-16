@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.extension
 
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.MockKMatcherScope
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -10,6 +11,7 @@ import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519Keypai
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
@@ -32,17 +34,23 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import java.math.BigInteger
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -59,12 +67,24 @@ class CoinagePaymentProcessingExtensionTest {
     private val paymentStatusUseCase: CoinagePaymentStatusUseCase = mockk()
     private val claimReceivedCoinsUseCase: ClaimReceivedCoinsUseCase = mockk()
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase = mockk()
+    private val reclaimHandedOffCoinsUseCase: ReclaimHandedOffCoinsUseCase = mockk()
+
+    /** Inside the claim window unless a test says otherwise. */
+    private var now = Instant.fromEpochMilliseconds(SENT_AT) + 1.hours
+    private var failedReclaims = emptySet<AccountId>()
 
     private val extension = CoinagePaymentProcessingExtension(
         paymentStatusUseCase = paymentStatusUseCase,
         claimReceivedCoinsUseCase = claimReceivedCoinsUseCase,
         balanceConverterUseCase = balanceConverterUseCase,
+        reclaimHandedOffCoinsUseCase = reclaimHandedOffCoinsUseCase,
+        timeProvider = mockk<TimeProvider> { every { now() } answers { now } },
     )
+
+    @Before
+    fun stubReclaims() {
+        every { reclaimHandedOffCoinsUseCase.subscribeFailedReclaims(any()) } answers { flowOf(failedReclaims) }
+    }
 
     /** The outgoing path derives a keypair per coin key; only the seam matters, and the real one needs JNI. */
     @Before
@@ -559,10 +579,245 @@ class CoinagePaymentProcessingExtensionTest {
         }
     }
 
+    // ---- claim window, incoming ----
+
+    /**
+     * The recipient opened the app after the window closed and the coins are not on chain: the sender took them
+     * back, or never sent them, and either way the money is theirs.
+     */
+    @Test
+    fun `an incoming payment whose coins are gone after its window went back to the sender`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        givenClaimReports(CoinageTransferDetection.Absent) { awaitCancellation() }
+
+        val message = incomingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ReturnedToSender)) }
+        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
+    }
+
+    /** Inside the window missing coins are simply not minted yet. */
+    @Test
+    fun `an incoming payment whose coins are not there yet inside its window still reads as receiving`() = runTest {
+        givenClaimReports(CoinageTransferDetection.Absent) { awaitCancellation() }
+
+        val message = incomingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Detecting)) }
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.ReturnedToSender)) }
+    }
+
+    /**
+     * Coins still on chain after the window are ours to claim, and the claim is already under way. Saying they went
+     * back would be contradicted a moment later.
+     */
+    @Test
+    fun `an incoming payment still on chain after its window keeps reading as receiving`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        givenClaimReports(CoinageTransferDetection.Claiming) { awaitCancellation() }
+
+        val message = incomingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Detected(FULL))) }
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.ReturnedToSender)) }
+    }
+
+    /** The claim keeps watching past the window, and coins that turn up after all are a payment received. */
+    @Test
+    fun `an incoming payment claimed after its window reads as received`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        givenClaimReports(
+            CoinageTransferDetection.Absent,
+            CoinageTransferDetection.Claiming,
+            CoinageTransferDetection.Claimed(FULL, finalized = true),
+        )
+
+        val message = incomingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Transferred(FULL))) }
+        coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
+    }
+
+    /** A claim that gave up after the window left the money with the sender, which is not an invalid payment. */
+    @Test
+    fun `an incoming payment whose claim gave up after its window is closed as gone back`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        givenClaimReports(CoinageTransferDetection.NotClaimed)
+
+        val message = incomingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ReturnedToSender)) }
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.FailedTransfer)) }
+        coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
+    }
+
+    @Test
+    fun `an incoming payment whose claim gave up inside its window is still invalid`() = runTest {
+        givenClaimReports(CoinageTransferDetection.NotClaimed)
+
+        val message = incomingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.FailedTransfer)) }
+    }
+
+    /** The window closing while the app is open is enough: nothing on chain has to change for the message to. */
+    @Test
+    fun `an incoming payment whose coins are gone turns gone back as its window closes`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 6.hours - 1.minutes
+        givenClaimReports(CoinageTransferDetection.Absent) { awaitCancellation() }
+
+        val message = incomingPayment()
+        startWork(message, scheduler = testScheduler)
+
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.ReturnedToSender)) }
+
+        advanceTimeBy(2.minutes)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ReturnedToSender)) }
+    }
+
+    // ---- reclaim ----
+
+    @Test
+    fun `an outgoing payment is offered back as its window closes`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 6.hours - 1.minutes
+        givenCoins(CoinagePaymentStatus.AwaitingClaim)
+
+        val message = outgoingPayment()
+        startWork(message, scheduler = testScheduler)
+
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.Unclaimed)) }
+
+        advanceTimeBy(2.minutes)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Unclaimed)) }
+    }
+
+    /** The recipient let the window pass: the sender is offered the coins back, and the payment stays open. */
+    @Test
+    fun `an outgoing payment nobody claimed in time is offered back`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        givenCoins(CoinagePaymentStatus.AwaitingClaim, CoinagePaymentStatus.AwaitingClaim)
+
+        val message = outgoingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Unclaimed)) }
+        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
+    }
+
+    /** Within the window the recipient may simply not have opened the app yet, so nothing is offered back. */
+    @Test
+    fun `an outgoing payment inside its claim window is not offered back`() = runTest {
+        givenCoins(CoinagePaymentStatus.AwaitingClaim, CoinagePaymentStatus.AwaitingClaim)
+
+        startWork(outgoingPayment())
+
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.Unclaimed)) }
+    }
+
+    /** One coin on its way back is enough to say so: the sender has acted, and waits for nothing else. */
+    @Test
+    fun `an outgoing payment being taken back reads as reclaiming`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        givenCoins(CoinagePaymentStatus.Reclaiming, CoinagePaymentStatus.AwaitingClaim)
+
+        val message = outgoingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Reclaiming)) }
+        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
+    }
+
+    /** A reclaim seen only at the best head can still be forked away, so the payment is shown back but kept open. */
+    @Test
+    fun `an outgoing payment reclaimed at best reads as reclaimed but is not closed`() = runTest {
+        givenCoins(CoinagePaymentStatus.Reclaimed(finalized = false), CoinagePaymentStatus.Reclaimed(finalized = false))
+
+        val message = outgoingPayment()
+        startWork(message)
+
+        coVerify {
+            context.modifyMessage(
+                message.chatId,
+                message.id,
+                match { it is CoinagePayment && it.status is CoinagePayment.Status.Reclaimed },
+            )
+        }
+        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
+    }
+
+    @Test
+    fun `an outgoing payment reclaimed beyond recall is closed as reclaimed`() = runTest {
+        givenCoins(CoinagePaymentStatus.Reclaimed(finalized = true), CoinagePaymentStatus.Reclaimed(finalized = true))
+
+        val message = outgoingPayment()
+        startWork(message)
+
+        coVerify {
+            context.modifyMessage(
+                message.chatId,
+                message.id,
+                match { it is CoinagePayment && it.status is CoinagePayment.Status.Reclaimed },
+            )
+        }
+        coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
+    }
+
+    /** The reclaim gave up while the coin is still there, so the sender is asked to try again. */
+    @Test
+    fun `an outgoing payment whose reclaim failed offers to try again`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        failedReclaims = setOf(accountId(0))
+        givenCoins(CoinagePaymentStatus.AwaitingClaim)
+
+        val message = outgoingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ReclaimFailed)) }
+        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
+    }
+
+    /** A coin the peer took after a failed reclaim is theirs: that is a received payment, not a failure. */
+    @Test
+    fun `an outgoing payment the peer claimed after a failed reclaim reads as received`() = runTest {
+        now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
+        failedReclaims = setOf(accountId(0))
+        givenCoins(CoinagePaymentStatus.Claimed(finalized = true))
+
+        val message = outgoingPayment()
+        startWork(message)
+
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Transferred(PARTIAL))) }
+        coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
+    }
+
+    /** The attempts are found from the message itself, so they survive a restart like the claims do. */
+    @Test
+    fun `reclaims are read back from a group derived from the message`() = runTest {
+        givenCoins(CoinagePaymentStatus.AwaitingClaim)
+
+        val message = outgoingPayment()
+        startWork(message)
+
+        coVerify { reclaimHandedOffCoinsUseCase.subscribeFailedReclaims(CoinageOperationGroupId("chat-reclaim:${message.id}")) }
+    }
+
     // ---- harness ----
 
-    private fun startWork(vararg unprocessed: ChatMessage, arriving: List<ChatMessage> = emptyList()) {
-        scope = CoroutineScope(UnconfinedTestDispatcher())
+    /** [scheduler] is the test's own when it needs to move time on; the window's timer runs on its clock. */
+    private fun startWork(
+        vararg unprocessed: ChatMessage,
+        arriving: List<ChatMessage> = emptyList(),
+        scheduler: TestCoroutineScheduler? = null,
+    ) {
+        scope = CoroutineScope(UnconfinedTestDispatcher(scheduler))
 
         every { context.scope } returns TestComputationalScope(scope)
         every { context.subscribeNewMessages(any(), any()) } returns arriving.asFlow()
@@ -595,14 +850,17 @@ class CoinagePaymentProcessingExtensionTest {
         failed: Int,
         finalized: Boolean,
     ) {
-        val states = buildMap {
-            repeat(claimed) { put(accountId(it), stateOf(CoinagePaymentStatus.Claimed(finalized))) }
-            repeat(awaiting) { put(accountId(claimed + it), stateOf(CoinagePaymentStatus.AwaitingClaim)) }
-            repeat(failed) { put(accountId(claimed + awaiting + it), stateOf(CoinagePaymentStatus.Failed)) }
-            repeat(detecting) {
-                put(accountId(claimed + awaiting + failed + it), stateOf(CoinagePaymentStatus.Detecting))
-            }
-        }
+        givenCoins(
+            *Array(claimed) { CoinagePaymentStatus.Claimed(finalized) },
+            *Array(awaiting) { CoinagePaymentStatus.AwaitingClaim },
+            *Array(failed) { CoinagePaymentStatus.Failed },
+            *Array(detecting) { CoinagePaymentStatus.Detecting },
+        )
+    }
+
+    /** One coin per status, at [accountId] of its position. */
+    private fun givenCoins(vararg statuses: CoinagePaymentStatus) {
+        val states = statuses.withIndex().associate { (index, status) -> accountId(index) to stateOf(accountId(index), status) }
 
         every { paymentStatusUseCase.subscribeStatuses(any()) } returns flow {
             emit(states)
@@ -616,10 +874,13 @@ class CoinagePaymentProcessingExtensionTest {
 
     private fun accountId(seed: Int): AccountId = byteArrayOf(seed.toByte()).toDataByteArray()
 
-    private fun stateOf(status: CoinagePaymentStatus) = CoinagePaymentState(
-        coin = Coin(derivationIndex = CoinageKeyIndex(CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES).toDataByteArray()), 0), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = accountId(0), provenance = CoinProvenance.UNKNOWN),
+    private fun stateOf(accountId: AccountId, status: CoinagePaymentStatus) = CoinagePaymentState(
+        coin = Coin(derivationIndex = CoinageKeyIndex(CoinageInstallationId(ByteArray(CoinageInstallationId.SIZE_BYTES).toDataByteArray()), 0), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = accountId, provenance = CoinProvenance.UNKNOWN),
         status = status,
     )
+
+    private fun MockKMatcherScope.paymentWith(status: CoinagePayment.Status) =
+        match<ChatMessage.Content> { it is CoinagePayment && it.status == status }
 
     private fun outgoingPayment() = incomingPayment().copy(origin = ChatMessageOrigin.User)
 
