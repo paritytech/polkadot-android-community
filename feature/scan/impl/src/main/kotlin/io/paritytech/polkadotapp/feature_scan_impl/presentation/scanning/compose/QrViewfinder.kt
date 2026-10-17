@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_scan_impl.presentation.scanning.compos
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.viewfinder.core.ImplementationMode
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,17 +14,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.utils.openAppSettings
 import io.paritytech.polkadotapp.design.components.dialog.NovaAlertDialog
+import io.paritytech.polkadotapp.design.components.docklet.DockletColors
+import io.paritytech.polkadotapp.design.components.docklet.dockletBlurEffect
 import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import io.paritytech.polkadotapp.common.R as RCommon
+
+private val FrozenFrameBlurSigma = 10.dp
+private const val FrozenFrameBrightness = 0.75f
 
 internal class PermissionMissingHint(
     val missing: StateFlow<Boolean>,
@@ -51,12 +60,26 @@ internal fun QrViewfinder(
 
     Box(modifier = modifier) {
         val surfaceRequest by surfaceRequestFlow.collectAsStateWithLifecycle()
-        surfaceRequest?.let {
+        val lastRequest by remember(surfaceRequestFlow) { surfaceRequestFlow.filterNotNull() }
+            .collectAsStateWithLifecycle(initialValue = null)
+        val frozen = !cameraActive
+        (surfaceRequest ?: lastRequest.takeIf { frozen })?.let {
             CameraXViewfinder(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        renderEffect = if (frozen) dockletBlurEffect(FrozenFrameBlurSigma, density) else null
+                    },
                 surfaceRequest = it,
                 implementationMode = implementationMode,
             )
+            if (frozen) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(DockletColors.Shade.copy(alpha = 1f - FrozenFrameBrightness)),
+                )
+            }
         }
 
         if (permissionMissingHint != null) {
