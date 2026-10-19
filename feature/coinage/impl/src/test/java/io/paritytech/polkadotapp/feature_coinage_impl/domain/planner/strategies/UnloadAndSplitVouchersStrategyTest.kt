@@ -1,6 +1,10 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
-import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
@@ -21,42 +25,56 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransa
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_members_api.data.model.RingIndex
-import io.paritytech.polkadotapp.test_shared.any
-import io.paritytech.polkadotapp.test_shared.eq
-import io.paritytech.polkadotapp.test_shared.whenever
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
+import java.math.BigInteger
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
 class UnloadAndSplitVouchersStrategyTest {
-    private val chain: Chain = mock()
-    private val coinRepository: CoinRepository = mock()
-    private val transactionService: CoinageTransactionService = mock()
-    private val coinageTransactionFactory: CoinageTransaction.Factory = mock()
-    private val transaction: CoinageTransaction = mock()
-    private val breakdownUseCase: CoinAmountBreakdownUseCase = mock()
-    private val balanceConverterUseCase: CoinageBalanceConverterUseCase = mock()
-    private val handoffCommit: CoinageHandoffCommit = mock()
+    private val transactionService = mockk<CoinageTransactionService>()
+    private val coinRepository = mockk<CoinRepository>(relaxed = true)
+    private val transaction = mockk<CoinageTransaction>(relaxed = true)
+    private val breakdownUseCase = mockk<CoinAmountBreakdownUseCase>()
+    private val balanceConverterUseCase = mockk<CoinageBalanceConverterUseCase>(relaxed = true)
+    private val handoffCommit = mockk<CoinageHandoffCommit>()
     private val handedOff = listOf(OwnAsset.Coin(testKey(2)))
 
     private val strategy = UnloadAndSplitVouchersStrategy(
         payload = StrategyType.UnloadAndSplit(
-            vouchersToUnload = listOf(voucherInRecycler()),
+            vouchersToUnload = listOf(voucherInRecycler(index = 1)),
             recipientAmount = 32.0.centsToDollar(),
             exactCoins = emptyList(),
         ),
-        chain = chain,
+        chain = mockk(relaxed = true),
         coinRepository = coinRepository,
         transactionService = transactionService,
-        coinageTransactionFactory = coinageTransactionFactory,
+        coinageTransactionFactory = mockk { every { newTransaction() } returns transaction },
         breakdownUseCase = breakdownUseCase,
         balanceConverterUseCase = balanceConverterUseCase,
     )
+
+    @Test
+    fun `a schedule cancelled while it waits is a cancellation, not a failed result`() = runBlocking<Unit> {
+        withBreakdownHeld()
+
+        var result: Result<ScheduledTransfer>? = null
+        val scheduling = launch { result = schedule(CoinReservationMode.PRECOMMIT) }
+        yield()
+
+        scheduling.cancelAndJoin()
+
+        assertTrue("the scheduling was not cancelled", scheduling.isCancelled)
+        assertNull("a cancelled scheduling produced a result", result)
+        coVerify(exactly = 0) { transactionService.preCommitHandoff(any()) }
+    }
 
     @Test
     fun `prepares the handoff of its outputs when scheduled in PREPARE mode`() = runBlocking<Unit> {
@@ -81,47 +99,46 @@ class UnloadAndSplitVouchersStrategyTest {
     private suspend fun schedule(mode: CoinReservationMode) =
         with(StalenessReportCollector.NoOp) { strategy.schedule(PARAMS, mode) }
 
-    private suspend fun withVoucherBatchMinted() {
-        whenever(chain.id).thenReturn(CHAIN_ID)
-        whenever(coinRepository.fetchMaxConsolidation(any())).thenReturn(Result.success(MAX_CONSOLIDATION))
-        whenever(breakdownUseCase.createCoinAmountBreakdown()).thenReturn(
+    private fun withBreakdownHeld() {
+        coEvery { breakdownUseCase.createCoinAmountBreakdown() } coAnswers { awaitCancellation() }
+    }
+
+    private fun withVoucherBatchMinted() {
+        coEvery { breakdownUseCase.createCoinAmountBreakdown() } returns
             Result.success(RealCoinAmountBreakdownContext(coinageTestPrecision, testConversionContext, ALLOWED_EXPONENTS))
-        )
-        whenever(balanceConverterUseCase.create()).thenReturn(Result.success(testConversionContext))
-        whenever(coinageTransactionFactory.newTransaction()).thenReturn(transaction)
-        whenever(transaction.mintCoins(any(), any())).thenReturn(Result.success(emptyList()))
-        whenever(transaction.build()).thenReturn(CoinageTransactionAssets(emptyList(), emptyList(), handedOff))
+        coEvery { balanceConverterUseCase.create() } returns Result.success(testConversionContext)
+        coEvery { coinRepository.fetchMaxConsolidation(any()) } returns Result.success(MAX_CONSOLIDATION)
+        coEvery { transaction.mintCoins(any(), any()) } returns Result.success(emptyList())
+        every { transaction.build() } returns CoinageTransactionAssets(emptyList(), emptyList(), handedOff)
     }
 
-    private suspend fun withHandoffAccepted() {
-        whenever(transactionService.prepareHandoff(any())).thenReturn(Result.success(handoffCommit))
-        whenever(transactionService.preCommitHandoff(any())).thenReturn(Result.success(handoffCommit))
+    private fun withHandoffAccepted() {
+        coEvery { transactionService.prepareHandoff(any()) } returns Result.success(handoffCommit)
+        coEvery { transactionService.preCommitHandoff(any()) } returns Result.success(handoffCommit)
     }
 
-    private suspend fun verifyHandoffPrepared() {
-        verify(transactionService).prepareHandoff(eq(handedOff))
-        verify(transactionService, never()).preCommitHandoff(any())
+    private fun verifyHandoffPrepared() {
+        coVerify { transactionService.prepareHandoff(handedOff) }
+        coVerify(exactly = 0) { transactionService.preCommitHandoff(any()) }
     }
 
-    private suspend fun verifyHandoffPreCommitted() {
-        verify(transactionService).preCommitHandoff(eq(handedOff))
-        verify(transactionService, never()).prepareHandoff(any())
+    private fun verifyHandoffPreCommitted() {
+        coVerify { transactionService.preCommitHandoff(handedOff) }
+        coVerify(exactly = 0) { transactionService.prepareHandoff(any()) }
     }
 
-    private fun voucherInRecycler() = RecyclerVoucher(
-        ringVrfKeyIndex = testKey(1),
-        ringVrfPublicKey = mock(),
+    private fun voucherInRecycler(index: Int) = RecyclerVoucher(
+        ringVrfKeyIndex = testKey(index),
+        ringVrfPublicKey = byteArrayOf(index.toByte()).toDataByteArray(),
         recyclerValue = ValueExponent(5),
-        location = RecyclerVoucher.Location.InRecycler(RingIndex(1.toBigInteger()), recyclerMembers = FULL_RING, enteredAt = null),
+        location = RecyclerVoucher.Location.InRecycler(RingIndex(BigInteger.ZERO), recyclerMembers = 1, enteredAt = null),
         recyclerFungibility = RecyclerFungibility.NONE,
         maxRecyclerFungibility = RecyclerFungibility.NONE,
     )
 
     private companion object {
-        const val CHAIN_ID = "coinage"
         const val MAX_CONSOLIDATION = 64
-        const val FULL_RING = 767
         val ALLOWED_EXPONENTS = (-2..7).map { ValueExponent(it) }.toSet()
-        val PARAMS = TransferSubmissionParams(buildUntil = Instant.fromEpochSeconds(1_000), retryFailures = true)
+        val PARAMS = TransferSubmissionParams(buildUntil = Instant.DISTANT_FUTURE, retryFailures = false)
     }
 }
