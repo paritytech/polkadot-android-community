@@ -23,8 +23,10 @@ import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonC
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
+import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ScanFrame
+import io.paritytech.polkadotapp.design.components.icon.vectors.ScanPlus
 
 private val RestIconSize = dockletIconSize(0f)
 
@@ -81,6 +83,18 @@ private fun LobeIcon(progress: () -> Float, open: Boolean, iconColor: @Composabl
         style = style,
         size = DockletLobeIconSize(RestIconSize),
         shape = PolkadotButtonShape.pill,
+    )
+    NovaIcon(
+        modifier = Modifier
+            .size(RestIconSize)
+            .graphicsLayer {
+                val scale = dockletIconSize(progress()) / RestIconSize
+                scaleX = scale
+                scaleY = scale
+                alpha = 1f - progress().coerceIn(0f, 1f)
+            },
+        imageVector = NovaIcons.ScanPlus,
+        tint = color,
     )
 }
 
