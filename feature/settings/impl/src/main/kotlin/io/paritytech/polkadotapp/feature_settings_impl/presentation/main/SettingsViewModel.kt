@@ -31,8 +31,9 @@ class SettingsViewModel @Inject constructor(
         interactor.observeBackupExists(),
         interactor.subscribeHasBlockedContacts(),
         interactor.observePrivacyMode(),
+        interactor.observePaymentsBackupStatus(),
         appThemeSelector.selectedTheme
-    ) { backupExists, hasBlockedUsers, privacyMode, selectedTheme ->
+    ) { backupExists, hasBlockedUsers, privacyMode, paymentsBackupStatus, selectedTheme ->
         SettingsUiState(
             isDebug = BuildConfig.DEBUG,
             debugMenuEnabled = FeatureOption.DEBUG_MENU.isEnabled,
@@ -41,6 +42,7 @@ class SettingsViewModel @Inject constructor(
             isLanguageSettingsAvailable = isLanguageSettingsAvailable,
             selectedTheme = selectedTheme,
             privacyMode = privacyMode,
+            paymentsBackupStatus = paymentsBackupStatus,
             isBackupMissing = !backupExists,
             hasBlockedUsers = hasBlockedUsers
         )
@@ -56,6 +58,7 @@ class SettingsViewModel @Inject constructor(
                 isLanguageSettingsAvailable = isLanguageSettingsAvailable,
                 selectedTheme = PolkadotAppTheme.DEFAULT,
                 privacyMode = null,
+                paymentsBackupStatus = null,
                 isBackupMissing = false,
                 hasBlockedUsers = false
             )
