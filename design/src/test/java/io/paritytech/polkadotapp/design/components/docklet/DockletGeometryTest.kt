@@ -189,6 +189,27 @@ class DockletGeometryTest {
     }
 
     @Test
+    fun `card height is 0 when the keyboard leaves no room below the status inset`() {
+        val card = DockletGeometry.step2CardFrame(phoneRestDock(), keyboardTop = 80.dp, statusInset = 37.8f.dp)
+
+        assertDp(0f, card.height)
+    }
+
+    @Test
+    fun `keyboard dock sits 4 dp above the keyboard top when the keyboard covers the rest dock`() {
+        val dock = DockletGeometry.keyboardDock(phoneRestDock(), keyboardTop = 552.5f.dp)
+
+        assertDp(548.5f, dock.bottom)
+    }
+
+    @Test
+    fun `keyboard dock stays at rest when the keyboard is below the dock`() {
+        val rest = phoneRestDock()
+
+        assertEquals(rest, DockletGeometry.keyboardDock(rest, keyboardTop = PhoneHeight.dp))
+    }
+
+    @Test
     fun `dock bottom is 4 dp above the keyboard top when step 2 lays out`() {
         assertDp(548.5f, DockletGeometry.step2DockBottom(phoneRestDock(), keyboardTop = 552.5f.dp))
     }
@@ -240,16 +261,7 @@ class DockletGeometryTest {
         DockletGeometry.dockFrame(PhoneWidth.dp, PhoneHeight.dp, 47.3f.dp, threeButtonNavigation = true)
 
     private fun sampleCubic(start: DockletPoint, segment: CubicSegment, samples: Int): List<DockletPoint> =
-        (0..samples).map { index ->
-            val t = index.toFloat() / samples
-            val u = 1f - t
-            fun axis(p0: Float, p1: Float, p2: Float, p3: Float) =
-                u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3
-            DockletPoint(
-                x = axis(start.x, segment.control1.x, segment.control2.x, segment.end.x),
-                y = axis(start.y, segment.control1.y, segment.control2.y, segment.end.y),
-            )
-        }
+        (0..samples).map { index -> cubicPoint(start, segment, index.toFloat() / samples) }
 
     private fun assertDp(expected: Float, actual: Dp) = assertEquals(expected, actual.value, EPS)
 
@@ -266,22 +278,8 @@ class DockletGeometryTest {
         }
     }
 
-    private fun assertPoint(x: Float, y: Float, actual: DockletPoint) {
-        assertEquals(x, actual.x, EPS)
-        assertEquals(y, actual.y, EPS)
-    }
-
-    private fun assertCurves(expected: List<List<Pair<Float, Float>>>, actual: List<CubicSegment>) {
-        assertEquals(expected.size, actual.size)
-        expected.zip(actual).forEach { (points, segment) ->
-            listOf(segment.control1, segment.control2, segment.end).zip(points).forEach { (point, expectedPoint) ->
-                assertPoint(expectedPoint.first, expectedPoint.second, point)
-            }
-        }
-    }
-
     private companion object {
-        const val EPS = 1e-3f
+        const val EPS = GeometryEps
         const val PhoneWidth = 392.7f
         const val PhoneHeight = 894.5f
         const val TallHeight = 1100f

@@ -79,6 +79,7 @@ import io.paritytech.polkadotapp.design.components.docklet.DockletFrame
 import io.paritytech.polkadotapp.design.components.docklet.DockletGeometry
 import io.paritytech.polkadotapp.design.components.docklet.DockletSlot
 import io.paritytech.polkadotapp.design.components.docklet.DockletStep
+import io.paritytech.polkadotapp.design.components.docklet.liftDockWhileKeyboardLeaves
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.NetworkStatus
@@ -96,7 +97,6 @@ import io.paritytech.polkadotapp.feature_products_api.domain.browser.TabInfo
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.flow.first
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private const val APPS_PER_ROW = 5
@@ -157,23 +157,20 @@ fun RootNavBar(
         val keyboardTop = { screenHeight - with(density) { ime.getBottom(density).toDp() } }
         var dockOnKeyboard by remember { mutableStateOf(false) }
         LaunchedEffect(cardState, ime, density) {
-            snapshotFlow { cardState.isOpen }.collect { open ->
-                if (!open && ime.getBottom(density) > 0) {
-                    dockOnKeyboard = true
-                    snapshotFlow { cardState.isOpen || ime.getBottom(density) == 0 }.first { it }
-                    dockOnKeyboard = false
-                }
-            }
+            liftDockWhileKeyboardLeaves(
+                cardOpen = snapshotFlow { cardState.isOpen },
+                keyboardUp = snapshotFlow { ime.getBottom(density) > 0 },
+                onLift = { dockOnKeyboard = it },
+            )
         }
-        val restLift = {
-            if (dockOnKeyboard) (dock.bottom - DockletGeometry.step2DockBottom(dock, keyboardTop())).coerceAtLeast(0.dp) else 0.dp
-        }
-        val pill = DockletGeometry.pillFrame(dock)
+        val liftedDock = { if (dockOnKeyboard) DockletGeometry.keyboardDock(dock, keyboardTop()) else dock }
         val frames: () -> DockletCardFrames = remember(dock, statusInset) {
             {
+                val lifted = liftedDock()
+                val pill = DockletGeometry.pillFrame(lifted)
                 DockletCardFrames(
-                    rest = DockletFrame(pill.left, pill.top - restLift(), pill.width, PillBodyHeight),
-                    step1 = DockletGeometry.step1CardFrame(dock),
+                    rest = DockletFrame(pill.left, pill.top, pill.width, PillBodyHeight),
+                    step1 = DockletGeometry.step1CardFrame(lifted),
                     step2 = DockletGeometry.step2CardFrame(dock, keyboardTop(), statusInset),
                 )
             }
@@ -227,13 +224,13 @@ fun RootNavBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset {
+                        val lifted = liftedDock()
                         val open = lerp(
-                            DockletGeometry.step1DockTop(dock),
-                            DockletGeometry.step2DockBottom(dock, keyboardTop()) - DockletGeometry.DockHeight,
+                            DockletGeometry.step1DockTop(lifted),
+                            DockletGeometry.keyboardDock(dock, keyboardTop()).top,
                             cardState.stepProgress,
                         )
-                        val rest = dock.top - restLift()
-                        IntOffset(0, (lerp(rest, open, cardState.clampedProgress) - dock.top).roundToPx())
+                        IntOffset(0, (lerp(lifted.top, open, cardState.clampedProgress) - dock.top).roundToPx())
                     },
                 slots = slots,
                 cardProgress = { cardState.clampedProgress },

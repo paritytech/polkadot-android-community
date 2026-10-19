@@ -96,7 +96,8 @@ internal class BackdropLayer(private val radiusPx: () -> Float, saturation: Floa
     var coordinates: LayoutCoordinates? = null
     var width = 0
     var height = 0
-    private val saturationFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) })
+    private val saturationFilter =
+        ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) }).takeIf { saturation != 1f }
     private var appliedRadius = 0f
 
     val visible: Boolean get() = radiusPx() > 0f
@@ -107,12 +108,8 @@ internal class BackdropLayer(private val radiusPx: () -> Float, saturation: Floa
         if (width == 0 || height == 0 || radius <= 0f) return
 
         if (radius != appliedRadius) {
-            node.setRenderEffect(
-                RenderEffect.createColorFilterEffect(
-                    saturationFilter,
-                    RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP),
-                )
-            )
+            val blur = RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
+            node.setRenderEffect(saturationFilter?.let { RenderEffect.createColorFilterEffect(it, blur) } ?: blur)
             appliedRadius = radius
         }
         val position = layout.positionInWindow()

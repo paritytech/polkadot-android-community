@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.design.components.docklet
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,12 +8,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -32,6 +34,11 @@ import io.paritytech.polkadotapp.design.components.text.PolkadotInputField
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 
 private val CaretBrush = SolidColor(DockletColors.Caret)
+private val SearchKeyboardOptions = KeyboardOptions(
+    capitalization = KeyboardCapitalization.None,
+    autoCorrectEnabled = false,
+    imeAction = ImeAction.Search,
+)
 
 private val ButtonSearchIconSize = 20.dp
 private val FieldSearchIconSize = 22.dp
@@ -130,6 +137,7 @@ private fun SearchFieldContent(value: String, onValueChange: (String) -> Unit, p
             onValueChange = onValueChange,
             textStyle = DockletTypography.Query.copy(color = PolkadotTheme.colors.fg.primary),
             cursorBrush = CaretBrush,
+            keyboardOptions = SearchKeyboardOptions,
             placeholder = {
                 NovaText(
                     text = placeholder,
@@ -173,7 +181,7 @@ private fun ClearButton(onClick: () -> Unit) {
 @Composable
 private fun DockletSearchFieldPreview() {
     PolkadotTheme {
-        Box(modifier = Modifier.background(DockletColors.CardFill)) {
+        PolkadotSurface(color = DockletColors.CardFill) {
             DockletSearchField(
                 modifier = Modifier.fillMaxWidth(),
                 value = "mo",

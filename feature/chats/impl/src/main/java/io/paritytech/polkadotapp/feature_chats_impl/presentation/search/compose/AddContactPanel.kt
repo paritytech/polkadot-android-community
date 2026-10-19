@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -244,7 +243,7 @@ private data class AddContactPanelActions(
 @Composable
 private fun AddContactPanelPreview(state: AddContactUiState, step: AddContactStep) {
     PolkadotTheme {
-        Box(modifier = Modifier.background(DockletColors.CardFill)) {
+        PolkadotSurface(color = DockletColors.CardFill) {
             AddContactPanelInternal(
                 modifier = Modifier
                     .fillMaxWidth()

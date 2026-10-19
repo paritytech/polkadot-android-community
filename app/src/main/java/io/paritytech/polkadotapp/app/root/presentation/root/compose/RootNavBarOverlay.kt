@@ -152,8 +152,11 @@ fun RootNavBarOverlay(
     }
 
     val cardOpen = !hidden && pull.scanExpanded
-    BackHandler(enabled = cardOpen) { pull.collapsePanels() }
-    OverlayBackCallback(enabled = cardOpen) { pull.collapsePanels() }
+    // Composed only while open, so it registers after the screens' own BackHandlers and runs before them.
+    if (cardOpen) {
+        BackHandler { pull.collapsePanels() }
+        OverlayBackCallback { pull.collapsePanels() }
+    }
 
     val scrimVisible by remember(hidden, forceShown) {
         derivedStateOf { !hidden && (pull.panelExpanded || (pull.isOpen && !forceShown)) }
@@ -257,11 +260,11 @@ fun RootNavBarOverlay(
 
 // Outranks the keyboard's default-priority back callback, so one Back closes the card and the keyboard.
 @Composable
-private fun OverlayBackCallback(enabled: Boolean, onBack: () -> Unit) {
+private fun OverlayBackCallback(onBack: () -> Unit) {
     val activity = LocalActivity.current
     val currentOnBack by rememberUpdatedState(onBack)
-    DisposableEffect(activity, enabled) {
-        val unregister = if (enabled && activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+    DisposableEffect(activity) {
+        val unregister = if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             registerOverlayBack(activity) { currentOnBack() }
         } else {
             null

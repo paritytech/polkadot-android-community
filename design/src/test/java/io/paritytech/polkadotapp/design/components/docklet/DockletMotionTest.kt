@@ -135,6 +135,11 @@ class DockletMotionTest {
     }
 
     @Test
+    fun `contents-out easing follows the ease-out when half the fade has passed`() {
+        assertEquals(0.875f, DockletMotion.ContentsOutEasing.transform(0.5f), EPS)
+    }
+
+    @Test
     fun `contents-out easing reaches 1 when the fade completes`() {
         assertEquals(1f, DockletMotion.ContentsOutEasing.transform(1f), EPS)
     }

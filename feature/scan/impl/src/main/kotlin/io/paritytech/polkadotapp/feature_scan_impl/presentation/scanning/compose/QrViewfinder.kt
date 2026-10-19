@@ -3,7 +3,6 @@ package io.paritytech.polkadotapp.feature_scan_impl.presentation.scanning.compos
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.viewfinder.core.ImplementationMode
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -25,6 +24,7 @@ import io.paritytech.polkadotapp.common.utils.openAppSettings
 import io.paritytech.polkadotapp.design.components.dialog.NovaAlertDialog
 import io.paritytech.polkadotapp.design.components.docklet.DockletColors
 import io.paritytech.polkadotapp.design.components.docklet.dockletBlurEffect
+import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,11 +74,10 @@ internal fun QrViewfinder(
                 implementationMode = implementationMode,
             )
             if (frozen) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(DockletColors.Shade.copy(alpha = 1f - FrozenFrameBrightness)),
-                )
+                PolkadotSurface(
+                    modifier = Modifier.matchParentSize(),
+                    color = DockletColors.Shade.copy(alpha = 1f - FrozenFrameBrightness),
+                ) {}
             }
         }
 

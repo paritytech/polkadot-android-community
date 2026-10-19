@@ -228,11 +228,40 @@ class DockletCardStateTest {
         assertEquals(DockletMotionMode.CrossFade, state.motionMode)
     }
 
+    @Test
+    fun `open is ignored when the card is already open`() = runTest {
+        val state = cardState()
+        state.startSwipeUp()
+        state.dragSwipe(0.6f)
+
+        state.releaseSwipeUp(0.6f, 0f, Travel, onOpened = { state.open(DockletStep.Step1) }, onKeyboardRequest = {})
+        advanceUntilIdle()
+
+        assertEquals(DockletStep.Step2, state.step)
+    }
+
+    @Test
+    fun `close is ignored when a swipe down already closed the card`() = runTest {
+        val moments = mutableListOf<DockletMoment>()
+        val state = cardState(haptics = { moments += it })
+        state.open(DockletStep.Step1)
+        advanceUntilIdle()
+        state.startSwipeDown()
+        state.dragSwipe(0.4f)
+        state.releaseSwipeDown(closedFraction = 0.6f, downwardDpPerSecond = 0f, travel = Travel) {}
+        advanceTimeBy(FrameMillis * 2)
+
+        state.close()
+
+        assertEquals(1, moments.count { it == DockletMoment.Close })
+    }
+
     private fun TestScope.cardState(
+        haptics: DockletHaptics = DockletHaptics {},
         motionMode: () -> DockletMotionMode = { DockletMotionMode.Morph },
     ) = DockletCardState(
         scope = CoroutineScope(coroutineContext + TestMonotonicFrameClock(this) + Job()),
-        haptics = DockletHaptics {},
+        haptics = haptics,
         currentMotionMode = motionMode,
     )
 

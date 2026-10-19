@@ -106,37 +106,14 @@ class CardOutlineTest {
         return outline.segments.flatMap { segment ->
             val from = start
             start = segment.end
-            (0..SamplesPerSegment).map { index ->
-                val t = index.toFloat() / SamplesPerSegment
-                val u = 1f - t
-                fun axis(p0: Float, p1: Float, p2: Float, p3: Float) =
-                    u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3
-                DockletPoint(
-                    axis(from.x, segment.control1.x, segment.control2.x, segment.end.x),
-                    axis(from.y, segment.control1.y, segment.control2.y, segment.end.y),
-                )
-            }
+            (0..SamplesPerSegment).map { index -> cubicPoint(from, segment, index.toFloat() / SamplesPerSegment) }
         }
     }
 
     private fun offset(outline: DockletCardOutline, point: DockletPoint) = point.x - outline.width / 2
 
-    private fun assertPoint(x: Float, y: Float, actual: DockletPoint) {
-        assertEquals(x, actual.x, EPS)
-        assertEquals(y, actual.y, EPS)
-    }
-
-    private fun assertCurves(expected: List<List<Pair<Float, Float>>>, actual: List<CubicSegment>) {
-        assertEquals(expected.size, actual.size)
-        expected.zip(actual).forEach { (points, segment) ->
-            listOf(segment.control1, segment.control2, segment.end).zip(points).forEach { (point, expectedPoint) ->
-                assertPoint(expectedPoint.first, expectedPoint.second, point)
-            }
-        }
-    }
-
     private companion object {
-        const val EPS = 1e-3f
+        const val EPS = GeometryEps
         const val SamplesPerSegment = 50
     }
 }

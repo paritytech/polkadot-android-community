@@ -57,26 +57,31 @@ internal fun BoxScope.PillLobe(
         propagateMinConstraints = true,
     ) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            val color = iconColor()
-            val style = remember(color) { DockletLobeButtonStyle(color) }
-            PolkadotIconButton(
-                modifier = Modifier
-                    .clearAndSetSemantics {}
-                    .graphicsLayer {
-                        val scale = dockletIconSize(progress()) / RestIconSize
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                icon = NovaIcons.ScanFrame,
-                onClick = onClose,
-                enabled = open,
-                style = style,
-                size = DockletLobeIconSize(RestIconSize),
-                shape = PolkadotButtonShape.pill,
-            )
+            LobeIcon(progress = progress, open = open, iconColor = iconColor, onClose = onClose)
             anchor()
         }
     }
+}
+
+@Composable
+private fun LobeIcon(progress: () -> Float, open: Boolean, iconColor: @Composable () -> Color, onClose: () -> Unit) {
+    val color = iconColor()
+    val style = remember(color) { DockletLobeButtonStyle(color) }
+    PolkadotIconButton(
+        modifier = Modifier
+            .clearAndSetSemantics {}
+            .graphicsLayer {
+                val scale = dockletIconSize(progress()) / RestIconSize
+                scaleX = scale
+                scaleY = scale
+            },
+        icon = NovaIcons.ScanFrame,
+        onClick = onClose,
+        enabled = open,
+        style = style,
+        size = DockletLobeIconSize(RestIconSize),
+        shape = PolkadotButtonShape.pill,
+    )
 }
 
 @Immutable

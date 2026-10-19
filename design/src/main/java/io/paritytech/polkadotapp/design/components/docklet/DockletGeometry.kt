@@ -138,21 +138,24 @@ object DockletGeometry {
         )
     }
 
-    fun step1CardFrame(restDock: DockletFrame): DockletFrame {
-        val bodyBottom = restDock.top - Step1Rise + CardBodyBelowDockTop
-        return DockletFrame(restDock.left, bodyBottom - Step1BodyHeight, restDock.width, Step1BodyHeight)
+    fun step1CardFrame(dock: DockletFrame): DockletFrame {
+        val bodyBottom = dock.top - Step1Rise + CardBodyBelowDockTop
+        return DockletFrame(dock.left, bodyBottom - Step1BodyHeight, dock.width, Step1BodyHeight)
     }
 
-    fun step1DockTop(restDock: DockletFrame): Dp = restDock.top - Step1Rise
+    fun step1DockTop(dock: DockletFrame): Dp = dock.top - Step1Rise
 
-    fun step2DockBottom(restDock: DockletFrame, keyboardTop: Dp): Dp =
-        min(restDock.bottom.value, (keyboardTop - KeyboardGap).value).dp
+    internal fun step2DockBottom(dock: DockletFrame, keyboardTop: Dp): Dp =
+        min(dock.bottom.value, (keyboardTop - KeyboardGap).value).dp
 
-    fun step2CardFrame(restDock: DockletFrame, keyboardTop: Dp, statusInset: Dp): DockletFrame {
-        val dockTop = step2DockBottom(restDock, keyboardTop) - DockHeight
+    fun keyboardDock(dock: DockletFrame, keyboardTop: Dp): DockletFrame =
+        dock.copy(top = step2DockBottom(dock, keyboardTop) - DockHeight)
+
+    fun step2CardFrame(dock: DockletFrame, keyboardTop: Dp, statusInset: Dp): DockletFrame {
+        val dockTop = keyboardDock(dock, keyboardTop).top
         val bodyBottom = dockTop + CardBodyBelowDockTop
         val top = max((statusInset + Step2TopGap).value, (bodyBottom - MaxStep2BodyHeight).value).dp
-        return DockletFrame(restDock.left, top, restDock.width, bodyBottom - top)
+        return DockletFrame(dock.left, top, dock.width, (bodyBottom - top).coerceAtLeast(0.dp))
     }
 
     fun cardOutline(width: Float, height: Float): DockletCardOutline {

@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -96,40 +97,54 @@ private fun DockSurface(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(DockletGeometry.DockHeight)
-            .dropShadow(DockShape) {
-                radius = DockletMaterials.blurRadiusPx(ShadowSigma.value, density)
-                spread = ShadowSpread.toPx()
-                offset = Offset(0f, ShadowOffsetY.toPx())
-                color = DockletColors.Shade
-                alpha = ShadowAlpha * (1f - cardProgress().coerceIn(0f, 1f))
-            }
-            .dockletBackdrop(
-                backdrop = backdrop,
-                shape = DockShape,
-                sigma = { if (backdrop?.showsWebView == true) 0.dp else DockletMaterials.DockBlurSigma },
-                saturation = DockletMaterials.DockSaturation,
-            )
-            .drawWithCache {
-                val path = dockPath(size, density)
-                val cutout = cutoutPath(size.width, density)
-                onDrawBehind { drawDockGlass(path, cutout) }
-            }
-            .clip(DockShape),
+            .height(DockletGeometry.DockHeight),
     ) {
-        SlotRow(
+        // Fade through the layer: dropShadow caches one bitmap per Shadow value, alpha included.
+        Box(
             modifier = Modifier
-                .padding(vertical = DockletGeometry.ItemRowPadding)
-                .fillMaxWidth()
-                .height(DockletGeometry.ItemRowHeight)
+                .matchParentSize()
                 .graphicsLayer {
-                    val dim = cardProgress().coerceIn(0f, 1f)
-                    alpha = lerp(1f, DockletMaterials.DockItemsFadedAlpha, dim)
-                    renderEffect = dockletBlurEffect(DockletMaterials.DockItemsBlurSigma * dim, density)
+                    alpha = 1f - cardProgress().coerceIn(0f, 1f)
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                }
+                .dropShadow(DockShape) {
+                    radius = DockletMaterials.blurRadiusPx(ShadowSigma.value, density)
+                    spread = ShadowSpread.toPx()
+                    offset = Offset(0f, ShadowOffsetY.toPx())
+                    color = DockletColors.Shade
+                    alpha = ShadowAlpha
                 },
-            slots = slots,
-            onSlotTap = onSlotTap,
         )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .dockletBackdrop(
+                    backdrop = backdrop,
+                    shape = DockShape,
+                    sigma = { if (backdrop?.showsWebView == true) 0.dp else DockletMaterials.DockBlurSigma },
+                    saturation = DockletMaterials.DockSaturation,
+                )
+                .drawWithCache {
+                    val path = dockPath(size, density)
+                    val cutout = cutoutPath(size.width, density)
+                    onDrawBehind { drawDockGlass(path, cutout) }
+                }
+                .clip(DockShape),
+        ) {
+            SlotRow(
+                modifier = Modifier
+                    .padding(vertical = DockletGeometry.ItemRowPadding)
+                    .fillMaxWidth()
+                    .height(DockletGeometry.ItemRowHeight)
+                    .graphicsLayer {
+                        val dim = cardProgress().coerceIn(0f, 1f)
+                        alpha = lerp(1f, DockletMaterials.DockItemsFadedAlpha, dim)
+                        renderEffect = dockletBlurEffect(DockletMaterials.DockItemsBlurSigma * dim, density)
+                    },
+                slots = slots,
+                onSlotTap = onSlotTap,
+            )
+        }
     }
 }
 
