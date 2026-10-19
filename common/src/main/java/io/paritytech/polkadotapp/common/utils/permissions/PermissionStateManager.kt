@@ -4,7 +4,6 @@ import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.paritytech.polkadotapp.common.data.storage.preferences.Preferences
-import io.paritytech.polkadotapp.common.data.storage.preferences.edit
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import javax.inject.Inject
 
@@ -17,44 +16,42 @@ class PermissionStateManager @Inject constructor(
             return PermissionResult.GRANTED
         }
 
-        val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(contextManager.requireActivity(), permission)
-        val wasRationaleShownBefore = isRationaleShown(permission)
-
-        return resolveState(shouldShowRationale, wasRationaleShownBefore)
+        return resolveDenial(shouldShowRationale(permission), wasDeniedBefore(permission))
     }
 
     fun onPermissionResult(permission: String, isGranted: Boolean): PermissionResult {
         if (isGranted) {
+            setDeniedBefore(permission, false)
             return PermissionResult.GRANTED
         }
 
-        val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(contextManager.requireActivity(), permission)
-
-        if (shouldShowRationale) {
-            setRationaleShown(permission)
-        }
-
-        val wasRationaleShownBefore = isRationaleShown(permission)
-        return resolveState(shouldShowRationale, wasRationaleShownBefore)
+        val result = resolveDenial(shouldShowRationale(permission), wasDeniedBefore(permission))
+        setDeniedBefore(permission, true)
+        return result
     }
 
-    private fun resolveState(shouldShowRationale: Boolean, wasRationaleShownBefore: Boolean): PermissionResult {
+    // No rationale means either never asked or permanently denied; only an earlier denial tells them apart.
+    private fun resolveDenial(shouldShowRationale: Boolean, wasDeniedBefore: Boolean): PermissionResult {
         return when {
             shouldShowRationale -> PermissionResult.DENIED
 
-            wasRationaleShownBefore -> PermissionResult.DENIED_FOREVER
+            wasDeniedBefore -> PermissionResult.DENIED_FOREVER
 
             else -> PermissionResult.DENIED
         }
     }
 
-    private fun setRationaleShown(permission: String) {
-        preferences.edit { putBoolean(getKey(permission), true) }
+    private fun shouldShowRationale(permission: String): Boolean {
+        return ActivityCompat.shouldShowRequestPermissionRationale(contextManager.requireActivity(), permission)
     }
 
-    private fun isRationaleShown(permission: String): Boolean {
+    private fun setDeniedBefore(permission: String, denied: Boolean) {
+        preferences.putBoolean(getKey(permission), denied)
+    }
+
+    private fun wasDeniedBefore(permission: String): Boolean {
         return preferences.getBoolean(getKey(permission), false)
     }
 
-    private fun getKey(permission: String) = "permission_rationale_shown ($permission)"
+    private fun getKey(permission: String) = "permission_denied ($permission)"
 }
