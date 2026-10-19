@@ -217,7 +217,7 @@ private fun CardLayer(
                 scaleX = pressScale.value
                 scaleY = pressScale.value
             }
-            .dockletBackdrop(backdrop, shape, { DockletMaterials.PillBlurSigma }, DockletMaterials.PillSaturation)
+            .dockletBackdrop(backdrop, shape) { DockletMaterials.PillBlurSigma }
             .drawWithCache {
                 val path = cardPath(size, density, 1f - morphProgress())
                 onDrawBehind { drawDockletGlass(path, palette) }

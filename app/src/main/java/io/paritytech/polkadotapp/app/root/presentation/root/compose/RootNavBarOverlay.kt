@@ -177,7 +177,6 @@ fun RootNavBarOverlay(
                         sigma = {
                             if (backdrop?.showsWebView == true) 0.dp else DockletMaterials.BehindCardBlurSigma * cardState.clampedProgress
                         },
-                        saturation = 1f,
                     )
                     .drawBehind {
                         drawRect(DockletColors.Shade, alpha = BEHIND_CARD_DIM * cardState.clampedProgress)

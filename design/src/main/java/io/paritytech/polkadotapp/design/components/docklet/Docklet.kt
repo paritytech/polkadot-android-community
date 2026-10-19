@@ -101,7 +101,6 @@ private fun DockSurface(
                     backdrop = backdrop,
                     shape = DockShape,
                     sigma = { if (backdrop?.showsWebView == true) 0.dp else DockletMaterials.DockBlurSigma },
-                    saturation = DockletMaterials.DockSaturation,
                 )
                 .drawWithCache {
                     val path = dockPath(size, density)

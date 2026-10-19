@@ -1,7 +1,5 @@
 package io.paritytech.polkadotapp.design.components.docklet
 
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
 import android.graphics.RenderNode
 import android.graphics.Shader
@@ -91,13 +89,11 @@ private fun View.containsWebView(): Boolean {
 
 @RequiresApi(Build.VERSION_CODES.S)
 @Stable
-internal class BackdropLayer(private val radiusPx: () -> Float, saturation: Float) {
+internal class BackdropLayer(private val radiusPx: () -> Float) {
     val node = RenderNode("DockletBackdropLayer")
     var coordinates: LayoutCoordinates? = null
     var width = 0
     var height = 0
-    private val saturationFilter =
-        ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(saturation) }).takeIf { saturation != 1f }
     private var appliedRadius = 0f
 
     val visible: Boolean get() = radiusPx() > 0f
@@ -108,8 +104,7 @@ internal class BackdropLayer(private val radiusPx: () -> Float, saturation: Floa
         if (width == 0 || height == 0 || radius <= 0f) return
 
         if (radius != appliedRadius) {
-            val blur = RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
-            node.setRenderEffect(saturationFilter?.let { RenderEffect.createColorFilterEffect(it, blur) } ?: blur)
+            node.setRenderEffect(RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP))
             appliedRadius = radius
         }
         val position = layout.positionInWindow()
@@ -135,20 +130,20 @@ fun rememberDockletBackdrop(source: View?): DockletBackdrop? {
 }
 
 @Composable
-fun Modifier.dockletBackdrop(backdrop: DockletBackdrop?, shape: Shape, sigma: () -> Dp, saturation: Float): Modifier =
+fun Modifier.dockletBackdrop(backdrop: DockletBackdrop?, shape: Shape, sigma: () -> Dp): Modifier =
     if (backdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        backdropLayer(backdrop, shape, sigma, saturation)
+        backdropLayer(backdrop, shape, sigma)
     } else {
         this
     }
 
 @RequiresApi(Build.VERSION_CODES.S)
 @Composable
-private fun Modifier.backdropLayer(backdrop: DockletBackdrop, shape: Shape, sigma: () -> Dp, saturation: Float): Modifier {
+private fun Modifier.backdropLayer(backdrop: DockletBackdrop, shape: Shape, sigma: () -> Dp): Modifier {
     val density = LocalDensity.current.density
     val currentSigma by rememberUpdatedState(sigma)
-    val layer = remember(saturation, density) {
-        BackdropLayer({ DockletMaterials.blurRadiusPx(currentSigma().value, density * BackdropScale) }, saturation)
+    val layer = remember(density) {
+        BackdropLayer { DockletMaterials.blurRadiusPx(currentSigma().value, density * BackdropScale) }
     }
     DisposableEffect(backdrop, layer) {
         backdrop.register(layer)

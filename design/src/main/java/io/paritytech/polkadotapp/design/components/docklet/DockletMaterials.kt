@@ -23,8 +23,6 @@ object DockletMaterials {
     val DockBlurSigma = 10.dp
     val BehindCardBlurSigma = 8.dp
     val DockItemsBlurSigma = 3.dp
-    const val PillSaturation = 1.6f
-    const val DockSaturation = 1.5f
     const val BehindCardBrightness = 0.7f
     const val DockItemsFadedAlpha = 0.55f
 
