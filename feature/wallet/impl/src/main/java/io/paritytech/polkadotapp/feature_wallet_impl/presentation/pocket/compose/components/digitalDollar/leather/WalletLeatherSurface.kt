@@ -38,14 +38,6 @@ import java.util.concurrent.CountDownLatch
 import kotlin.math.abs
 import kotlin.math.exp
 
-/**
- * The leather wallet, lit by the phone's motion. Size it to the card: `aspectRatio(WalletLeatherRenderer.ASPECT)`.
- *
- * The light reads the same gravity-based tilt the other card effects and the coins answer to, so there is one
- * sensor and one notion of neutral; the reference's own gyroscope pipeline is not used. TextureView-backed, so
- * the card's text and the identity card can draw over and around it, and transparent outside the wallet's
- * outline. It takes no touches, so the card's own click still lands.
- */
 @Composable
 internal fun WalletLeatherSurface(modifier: Modifier = Modifier) {
     val assets = LocalContext.current.assets
@@ -58,9 +50,7 @@ internal fun WalletLeatherSurface(modifier: Modifier = Modifier) {
     }
 
     Box(modifier = modifier) {
-        // The last lit frame, under the live surface. A new surface is empty until it has drawn, and the
-        // shared-element overlay that moves the card between screens does not draw the surface at all; both
-        // showed the page through the card for a moment, which read as the wallet flashing dark.
+        // The last lit frame, so a not-yet-drawn surface or the shared-element overlay never shows the page through.
         WalletLeatherSnapshot.latest?.let { frame ->
             Image(
                 modifier = Modifier.matchParentSize(),
@@ -137,10 +127,20 @@ internal class WalletLight {
     @Volatile
     var onAim: (() -> Unit)? = null
 
+    private var wokenX = REST_X
+    private var wokenY = REST_Y
+
     fun aim(handX: Float, handY: Float) {
         targetX = REST_X + AMPLITUDE * handX.coerceIn(-1f, 1f)
         targetY = REST_Y + AMPLITUDE * handY.coerceIn(-1f, 1f)
-        onAim?.invoke()
+
+        // Sensor noise on a phone lying still moves the target by more than a drawable step at every reading;
+        // waking the render thread for it kept the card's GL thread busy for nothing.
+        if (abs(targetX - wokenX) > WAKE || abs(targetY - wokenY) > WAKE) {
+            wokenX = targetX
+            wokenY = targetY
+            onAim?.invoke()
+        }
     }
 
     companion object {
@@ -150,6 +150,9 @@ internal class WalletLight {
 
         /** How far a full tilt moves the light from rest. */
         const val AMPLITUDE = 0.55f
+
+        /** Target movement, in tilt units, worth waking the render thread for: about a third of a degree. */
+        const val WAKE = 0.01f
     }
 }
 
@@ -184,6 +187,7 @@ private class WalletLeatherLoop(
     private var drawnX = Float.NaN
     private var drawnY = Float.NaN
     private var capturedAt = -1L
+    private val capture = Runnable { captureIfSettled() }
 
     fun start(width: Int, height: Int) = handler.post {
         this.width = width
@@ -216,6 +220,7 @@ private class WalletLeatherLoop(
         handler.post {
             light.onAim = null
             running = false
+            handler.removeCallbacks(capture)
             Choreographer.getInstance().removeFrameCallback(this)
 
             if (context != EGL14.EGL_NO_CONTEXT) {
@@ -273,16 +278,24 @@ private class WalletLeatherLoop(
         val arrived = abs(targetX - drawnX) <= IDLE && abs(targetY - drawnY) <= IDLE
 
         if (arrived && drawnAt != capturedAt) {
-            // Read back before the next swap would overwrite the back buffer: redraw the settled frame into it.
-            renderer.draw(width, height, drawnX, drawnY)
-            WalletLeatherSnapshot.capture(width, height)
-            capturedAt = drawnAt
+            handler.removeCallbacks(capture)
+            handler.postDelayed(capture, SNAPSHOT_DELAY_MILLIS)
         }
 
         if (!arrived) {
             scheduled = true
             Choreographer.getInstance().postFrameCallback(this)
         }
+    }
+
+    /** Only once the light has stayed put: a readback per small settle was most of the idle cost. */
+    private fun captureIfSettled() {
+        if (!running || scheduled || drawnAt == capturedAt) return
+
+        // Redrawn into the back buffer, because the swap left its contents undefined.
+        renderer.draw(width, height, drawnX, drawnY)
+        WalletLeatherSnapshot.capture(width, height)
+        capturedAt = drawnAt
     }
 
     private fun setUpEgl() {
@@ -331,5 +344,7 @@ private class WalletLeatherLoop(
 
         /** A little under a sixtieth, so a 120 Hz display draws every second vsync rather than every third. */
         const val MIN_INTERVAL = (1_000_000_000L / 60 * 9) / 10
+
+        const val SNAPSHOT_DELAY_MILLIS = 500L
     }
 }

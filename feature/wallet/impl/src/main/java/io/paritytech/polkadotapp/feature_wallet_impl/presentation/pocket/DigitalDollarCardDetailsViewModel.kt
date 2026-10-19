@@ -61,7 +61,6 @@ class DigitalDollarCardDetailsViewModel @Inject constructor(
     private val testData = MutableStateFlow(CoinageTestDataMode.LIVE)
     private val coinSet = MutableStateFlow(CoinageScene.CoinSet.SHIPPED)
 
-    /** Never anything but live holdings and the shipped coins without the coinage debug features. */
     private val debugState = combine(testData, coinSet) { mode, set ->
         if (FeatureOption.COINAGE_DEBUG_FEATURES.isEnabled) {
             DebugState(mode, set)

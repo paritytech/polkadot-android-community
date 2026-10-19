@@ -53,7 +53,6 @@ internal fun CoinageTestDataSwitch(
     }
 }
 
-/** The two coin sets, side by side for comparison on a device. A debug comparison, not a setting. */
 @Composable
 internal fun CoinageCoinSetSwitch(
     modifier: Modifier = Modifier,

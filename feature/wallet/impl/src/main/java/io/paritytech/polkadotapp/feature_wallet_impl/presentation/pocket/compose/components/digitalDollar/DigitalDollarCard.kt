@@ -50,80 +50,76 @@ fun DigitalDollarCard(
     onSelected: ((PocketCardUiModel.DigitalDollar) -> Unit)? = null,
     isExpanded: Boolean
 ) {
-    // The card is the wallet photograph: its proportions and its own outline, no frame and no corner radius.
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(WalletLeatherRenderer.ASPECT)
-            .then(
-                if (onSelected != null) {
-                    Modifier.clickable(
-                        interactionSource = null,
-                        indication = null,
-                        role = Role.Button,
-                        onClick = { onSelected(card) }
-                    )
-                } else {
-                    Modifier
-                }
-            )
-    ) {
-        WalletLeatherSurface(modifier = Modifier.matchParentSize())
-
+    Box(modifier = modifier) {
         Box(
             modifier = Modifier
-                .matchParentSize()
-                .padding(
-                    horizontal = PolkadotTheme.spacings.large,
-                    vertical = PolkadotTheme.spacings.mediumIncreased
+                .fillMaxWidth()
+                .aspectRatio(WalletLeatherRenderer.ASPECT)
+                .clickable(
+                    enabled = onSelected != null,
+                    interactionSource = null,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = { onSelected?.invoke(card) }
                 )
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            WalletLeatherSurface(modifier = Modifier.matchParentSize())
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(
+                        horizontal = PolkadotTheme.spacings.large,
+                        vertical = PolkadotTheme.spacings.mediumIncreased
+                    )
             ) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    PaymentAssetLogoImage(
-                        modifier = Modifier
-                            .height(LogoHeight)
-                            .aspectRatio(PaymentAssetLogoVariant.Square.aspectRatio),
-                        variant = PaymentAssetLogoVariant.Square
-                    )
-                }
-
-                BalanceAmount(
-                    amounts = card.amounts,
-                    cardId = card.id,
-                    isHidden = isExpanded
-                )
-            }
-
-            if (isExpanded) {
-                Column(
-                    modifier = Modifier.align(Alignment.BottomStart)
-                ) {
-                    AnimatedContent(
-                        targetState = card.balanceStatus,
-                        contentKey = { it::class },
-                        label = "DigitalDollarBalanceStatus"
-                    ) { status ->
-                        when (status) {
-                            DigitalDollarBalanceStatus.Syncing -> SyncProgress()
-                            DigitalDollarBalanceStatus.AccountBackupPending -> AccountBackupPending()
-                            is DigitalDollarBalanceStatus.PartlyReady -> PartlyReadyBalance(amount = status.amount)
-
-                            DigitalDollarBalanceStatus.TotalOnly -> Unit
-                        }
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PaymentAssetLogoImage(
+                            modifier = Modifier
+                                .height(LogoHeight)
+                                .aspectRatio(PaymentAssetLogoVariant.Square.aspectRatio),
+                            variant = PaymentAssetLogoVariant.Square
+                        )
                     }
 
                     BalanceAmount(
                         amounts = card.amounts,
                         cardId = card.id,
-                        isHidden = false
+                        isHidden = isExpanded
                     )
+                }
+
+                if (isExpanded) {
+                    Column(
+                        modifier = Modifier.align(Alignment.BottomStart)
+                    ) {
+                        AnimatedContent(
+                            targetState = card.balanceStatus,
+                            contentKey = { it::class },
+                            label = "DigitalDollarBalanceStatus"
+                        ) { status ->
+                            when (status) {
+                                DigitalDollarBalanceStatus.Syncing -> SyncProgress()
+                                DigitalDollarBalanceStatus.AccountBackupPending -> AccountBackupPending()
+                                is DigitalDollarBalanceStatus.PartlyReady -> PartlyReadyBalance(amount = status.amount)
+
+                                DigitalDollarBalanceStatus.TotalOnly -> Unit
+                            }
+                        }
+
+                        BalanceAmount(
+                            amounts = card.amounts,
+                            cardId = card.id,
+                            isHidden = false
+                        )
+                    }
                 }
             }
         }

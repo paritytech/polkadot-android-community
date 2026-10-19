@@ -22,9 +22,7 @@ data class CoinageUiState(
     val detailsVisible: Boolean,
     /** The coin picked out of the spread grid, if any. Always null while the coins are collapsed. */
     val focusedCoin: String?,
-    /** [CoinageScene.CoinSet.SHIPPED] unless switched in a build with the coinage debug features. */
     val coinSet: CoinageScene.CoinSet,
-    /** [CoinageTestDataMode.LIVE] unless switched in a build with the coinage debug features. */
     val testData: CoinageTestDataMode
 ) {
     /**

@@ -52,11 +52,6 @@ object CoinageScene {
         TITANIUM(6f)
     }
 
-    /**
-     * Which coins the denominations are drawn as. [PLAIN] is every coin round, unmilled and titanium, telling the
-     * denominations apart by size alone. [VARIED] is four metals, four outlines and milling, kept for comparison.
-     * Builds without the debug switch always draw [SHIPPED], and so does a debug build until it is switched.
-     */
     enum class CoinSet {
         VARIED,
         PLAIN;

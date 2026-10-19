@@ -45,7 +45,6 @@ internal class WalletLeatherRenderer(private val assets: AssetManager) {
         GLES30.glBindVertexArray(vertexArray)
         GLES30.glUseProgram(program)
 
-        // (left, top, right, bottom) in clip space: the whole surface.
         GLES30.glUniform4f(uniform("uRect"), -1f, 1f, 1f, -1f)
         texture(name = "uImg", unit = 0)
         texture(name = "uReg", unit = 1)
