@@ -41,6 +41,7 @@ import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonS
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButtonSize
 import io.paritytech.polkadotapp.design.components.docklet.DockletGeometry
+import io.paritytech.polkadotapp.design.components.docklet.DockletGlassTheme
 import io.paritytech.polkadotapp.design.components.docklet.DockletSearchButton
 import io.paritytech.polkadotapp.design.components.docklet.DockletSearchField
 import io.paritytech.polkadotapp.design.components.docklet.LocalDockletPalette
@@ -166,7 +167,7 @@ private fun AddContactScanStep(
         PolkadotSurface(
             modifier = Modifier.size(ScanTileSize),
             shape = RoundedCornerShape(ScanTileRadius),
-            color = LocalDockletPalette.current.cameraBacking,
+            color = PolkadotTheme.colors.bg.surface.container,
         ) {
             scanner(Modifier.fillMaxSize())
         }
@@ -243,24 +244,26 @@ private data class AddContactPanelActions(
 @Composable
 private fun AddContactPanelPreview(state: AddContactUiState, step: AddContactStep) {
     PolkadotTheme {
-        PolkadotSurface(color = LocalDockletPalette.current.glassFill) {
-            AddContactPanelInternal(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .size(width = 382.dp, height = if (step == AddContactStep.Scan) 204.dp else 424.dp),
-                step = step,
-                state = state,
-                keyboardRequested = false,
-                actions = AddContactPanelActions(
-                    onSearchFieldClick = {},
-                    onScanClick = {},
-                    onClose = {},
-                    onSearchChange = {},
-                    onSearchResultClick = {},
-                    onRecentClick = {},
-                ),
-                scanner = { modifier -> Box(modifier = modifier) },
-            )
+        DockletGlassTheme {
+            PolkadotSurface(color = LocalDockletPalette.current.glassFill) {
+                AddContactPanelInternal(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .size(width = 382.dp, height = if (step == AddContactStep.Scan) 204.dp else 424.dp),
+                    step = step,
+                    state = state,
+                    keyboardRequested = false,
+                    actions = AddContactPanelActions(
+                        onSearchFieldClick = {},
+                        onScanClick = {},
+                        onClose = {},
+                        onSearchChange = {},
+                        onSearchResultClick = {},
+                        onRecentClick = {},
+                    ),
+                    scanner = { modifier -> Box(modifier = modifier) },
+                )
+            }
         }
     }
 }

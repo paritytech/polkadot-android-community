@@ -17,23 +17,23 @@ internal val LobeTouchTarget = 48.dp
 
 @Composable
 fun rememberDockletFieldButtonStyle(): PolkadotButtonStyle {
-    val palette = LocalDockletPalette.current
+    val fill = LocalDockletPalette.current.fieldFill
     val contentColor = PolkadotTheme.colors.fg.primary
-    return remember(palette, contentColor) { DockletFieldButtonStyle(palette, contentColor) }
+    return remember(fill, contentColor) { DockletFieldButtonStyle(fill, contentColor) }
 }
 
 @Immutable
 private data class DockletFieldButtonStyle(
-    private val palette: DockletPalette,
+    private val fill: Color,
     private val contentColor: Color,
 ) : PolkadotButtonStyle {
     override val colors = PolkadotButtonColors(
-        containerBrush = SolidColor(palette.fieldFill),
+        containerBrush = SolidColor(fill),
         contentColor = contentColor,
-        disabledContainerBrush = SolidColor(palette.fieldFill),
+        disabledContainerBrush = SolidColor(fill),
         disabledContentColor = contentColor,
     )
-    override val rippleColor: Color = palette.ripple
+    override val rippleColor: Color = contentColor
 }
 
 @Immutable

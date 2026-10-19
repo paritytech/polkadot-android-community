@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.designsystem.colors.LocalPolkadotColors
 import kotlin.math.min
 
 private val HandleWidth = 36.dp
@@ -106,11 +105,6 @@ fun DockletCard(
         role = Role.Button
         onClick { onOpenRequest(DockletStep.Step1); true }
     }
-    val pageColors = LocalPolkadotColors.current
-    val anchor: @Composable BoxScope.() -> Unit = {
-        CompositionLocalProvider(LocalPolkadotColors provides pageColors) { lobeAnchor() }
-    }
-
     DockletGlassTheme {
         if (state.motionMode == DockletMotionMode.CrossFade) {
             val restOwnsGestures = !state.isOpen || state.swipingUp
@@ -131,7 +125,7 @@ fun DockletCard(
                     closeLabel = closeLabel,
                     iconColor = lobeIconColor,
                     onClose = onCloseRequest,
-                    anchor = anchor,
+                    anchor = lobeAnchor,
                 )
             }
             if (cardShown) {
@@ -176,7 +170,7 @@ fun DockletCard(
                     closeLabel = closeLabel,
                     iconColor = lobeIconColor,
                     onClose = onCloseRequest,
-                    anchor = anchor,
+                    anchor = lobeAnchor,
                 )
             }
         }

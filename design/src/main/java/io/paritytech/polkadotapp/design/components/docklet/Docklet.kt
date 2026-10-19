@@ -3,6 +3,8 @@ package io.paritytech.polkadotapp.design.components.docklet
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -145,7 +146,7 @@ private fun SlotRow(
                 modifier = Modifier
                     .offset { IntOffset((highlightCentre - DockletGeometry.SlotWidth / 2).roundToPx(), 0) }
                     .size(DockletGeometry.SlotWidth, DockletGeometry.ItemRowHeight)
-                    .dockletHighlight(LocalDockletPalette.current.highlight),
+                    .background(LocalDockletPalette.current.highlight, CircleShape),
             )
         }
         slots.zip(spans).forEachIndexed { index, (slot, span) ->
@@ -162,7 +163,6 @@ private fun SlotRow(
 @Composable
 private fun SlotItem(span: DockletSpan, slot: DockletSlot, iconShift: Dp, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
-    val palette = LocalDockletPalette.current
     val iconColor by animateColorAsState(
         targetValue = if (slot.selected) PolkadotTheme.colors.fg.primary else PolkadotTheme.colors.fg.secondary,
         animationSpec = tween(HighlightMillis, easing = DockletMotion.HighlightEasing),
@@ -187,7 +187,7 @@ private fun SlotItem(span: DockletSpan, slot: DockletSlot, iconShift: Dp, onClic
                 .offset { IntOffset(iconShift.roundToPx(), 0) }
                 .requiredSize(DockletGeometry.SlotWidth, DockletGeometry.ItemRowHeight)
                 .clip(CircleShape)
-                .indication(interactionSource, ripple(color = palette.ripple)),
+                .indication(interactionSource, LocalIndication.current),
         )
         Box(modifier = Modifier.offset { IntOffset(iconShift.roundToPx(), 0) }) {
             Box(

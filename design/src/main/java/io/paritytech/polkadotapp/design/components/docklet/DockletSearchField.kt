@@ -121,7 +121,7 @@ private fun SearchFieldRow(value: String, onValueChange: (String) -> Unit, place
 
 @Composable
 private fun SearchFieldContent(value: String, onValueChange: (String) -> Unit, placeholder: String, horizontalPadding: Dp) {
-    val caret = LocalDockletPalette.current.caret
+    val caret = PolkadotTheme.colors.bg.accent
     val caretBrush = remember(caret) { SolidColor(caret) }
     Row(
         modifier = Modifier.padding(start = horizontalPadding, end = horizontalPadding - (ClearTouchTarget - ClearCircleSize) / 2),
@@ -167,13 +167,13 @@ private fun ClearButton(onClick: () -> Unit) {
         PolkadotSurface(
             modifier = Modifier.requiredSize(ClearCircleSize),
             shape = CircleShape,
-            color = LocalDockletPalette.current.clearBackground,
+            color = PolkadotTheme.colors.bg.action.secondary,
             contentAlignment = Alignment.Center,
         ) {
             NovaIcon(
                 modifier = Modifier.requiredSize(ClearGlyphSize),
                 imageVector = NovaIcons.Close,
-                tint = LocalDockletPalette.current.clearGlyph,
+                tint = PolkadotTheme.colors.fg.primary,
             )
         }
     }
@@ -183,13 +183,15 @@ private fun ClearButton(onClick: () -> Unit) {
 @Composable
 private fun DockletSearchFieldPreview() {
     PolkadotTheme {
-        PolkadotSurface(color = LocalDockletPalette.current.glassFill) {
-            DockletSearchField(
-                modifier = Modifier.fillMaxWidth(),
-                value = "mo",
-                onValueChange = {},
-                placeholder = "",
-            )
+        DockletGlassTheme {
+            PolkadotSurface(color = LocalDockletPalette.current.glassFill) {
+                DockletSearchField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = "mo",
+                    onValueChange = {},
+                    placeholder = "",
+                )
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonS
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ScanFrame
+import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 
 private val RestIconSize = dockletIconSize(0f)
 
@@ -66,7 +67,7 @@ internal fun BoxScope.PillLobe(
 @Composable
 private fun LobeIcon(progress: () -> Float, open: Boolean, iconColor: @Composable () -> Color, onClose: () -> Unit) {
     val color = iconColor()
-    val ripple = LocalDockletPalette.current.ripple
+    val ripple = PolkadotTheme.colors.fg.primary
     val style = remember(color, ripple) { DockletLobeButtonStyle(color, ripple) }
     PolkadotIconButton(
         modifier = Modifier

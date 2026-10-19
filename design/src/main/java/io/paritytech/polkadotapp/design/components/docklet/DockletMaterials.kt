@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.design.components.docklet
 
 import android.os.Build
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -51,11 +50,6 @@ fun dockletBlurEffect(sigma: Dp, density: Float): BlurEffect? {
 internal fun DrawScope.drawDockletGlass(path: Path, palette: DockletPalette) {
     drawPath(path, palette.glassFill)
     drawInnerLine(path, palette.glassStroke)
-}
-
-fun Modifier.dockletHighlight(color: Color): Modifier = drawWithCache {
-    val path = Path().apply { addOutline(CircleShape.createOutline(size, layoutDirection, this@drawWithCache)) }
-    onDrawBehind { drawPath(path, color) }
 }
 
 fun Modifier.dockletFieldOutline(shape: Shape, palette: DockletPalette): Modifier = drawWithCache {
