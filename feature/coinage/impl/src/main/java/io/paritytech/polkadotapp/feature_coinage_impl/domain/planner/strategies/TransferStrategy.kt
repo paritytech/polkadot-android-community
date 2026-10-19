@@ -4,10 +4,7 @@ import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessRepor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.PlannedMemoEntry
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageHandoffCommit
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageScheduledTransactionRequest
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
-
-typealias HandoffReservation = suspend (List<OwnAsset>) -> Result<CoinageHandoffCommit>
 
 sealed interface TransferStrategy {
     /**
@@ -21,7 +18,7 @@ sealed interface TransferStrategy {
     context(diagnostics: StalenessReportCollector)
     suspend fun schedule(
         params: TransferSubmissionParams,
-        reserveHandoff: HandoffReservation,
+        reservationMode: CoinReservationMode,
     ): Result<ScheduledTransfer>
 }
 

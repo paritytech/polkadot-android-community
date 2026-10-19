@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.plusHop
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.splitHop
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageScheduledTransactionRequest
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.consumeCoin
@@ -16,15 +17,18 @@ import javax.inject.Inject
 import io.paritytech.polkadotapp.common.R as RCommon
 
 class SplitCoinStrategyFactory @Inject constructor(
+    private val transactionService: CoinageTransactionService,
     private val coinageTransactionFactory: CoinageTransaction.Factory,
 ) {
     fun create(payload: StrategyType.Split): SplitCoinStrategy = SplitCoinStrategy(
+        transactionService = transactionService,
         payload = payload,
         coinageTransactionFactory = coinageTransactionFactory,
     )
 }
 
 class SplitCoinStrategy(
+    private val transactionService: CoinageTransactionService,
     payload: StrategyType.Split,
     private val coinageTransactionFactory: CoinageTransaction.Factory,
 ) : TransferStrategy {
@@ -46,7 +50,7 @@ class SplitCoinStrategy(
     context(diagnostics: StalenessReportCollector)
     override suspend fun schedule(
         params: TransferSubmissionParams,
-        reserveHandoff: HandoffReservation,
+        reservationMode: CoinReservationMode,
     ): Result<ScheduledTransfer> =
         diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
             val transaction = coinageTransactionFactory.newTransaction()
@@ -54,7 +58,7 @@ class SplitCoinStrategy(
             val outputs = transaction.mintSplitOutputs().getOrElse { return Result.failure(it) }
             val assets = transaction.build()
 
-            reserveHandoff(assets.handedOff).map { handoffCommit ->
+            transactionService.reserveAssets(assets.handedOff, reservationMode).map { handoffCommit ->
                 ScheduledTransfer(
                     entries = (exactCoins + outputs.recipient).toMemoEntries(),
                     handoffCommit = handoffCommit,

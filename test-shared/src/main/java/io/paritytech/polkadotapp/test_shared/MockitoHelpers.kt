@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.test_shared
 
-import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatcher
 import org.mockito.Mockito
 import org.mockito.stubbing.OngoingStubbing
@@ -26,10 +25,6 @@ fun <T> any(): T = Mockito.any<T>()
 fun <T> isA(classRef: Class<T>): T = Mockito.isA<T>(classRef)
 
 fun <T> argThat(argumentMatcher: ArgumentMatcher<T>): T = Mockito.argThat<T>(argumentMatcher)
-
-/** [ArgumentCaptor.capture] typed as the parameter (a suspend function type, say); null until the call matches. */
-@Suppress("UNCHECKED_CAST")
-fun <T> capture(captor: ArgumentCaptor<*>): T = captor.capture() as T
 
 fun <T> whenever(methodCall: T): OngoingStubbing<T> =
     Mockito.`when`(methodCall)

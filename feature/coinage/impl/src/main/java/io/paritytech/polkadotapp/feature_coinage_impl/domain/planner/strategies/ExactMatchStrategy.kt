@@ -2,18 +2,22 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
+import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.TransferSubmissionParams
 import javax.inject.Inject
 
-class ExactMatchStrategyFactory @Inject constructor() {
+class ExactMatchStrategyFactory @Inject constructor(
+    private val transactionService: CoinageTransactionService,
+) {
     fun create(payload: StrategyType.ExactCoins): ExactMatchStrategy {
-        return ExactMatchStrategy(payload)
+        return ExactMatchStrategy(payload, transactionService)
     }
 }
 
 class ExactMatchStrategy(
     payload: StrategyType.ExactCoins,
+    private val transactionService: CoinageTransactionService,
 ) : TransferStrategy {
     private val coins = payload.coins
 
@@ -26,11 +30,11 @@ class ExactMatchStrategy(
     context(_: StalenessReportCollector)
     override suspend fun schedule(
         params: TransferSubmissionParams,
-        reserveHandoff: HandoffReservation,
+        reservationMode: CoinReservationMode,
     ): Result<ScheduledTransfer> {
         val handedOff = coins.map { OwnAsset.Coin(it.derivationIndex) }
 
-        return reserveHandoff(handedOff)
+        return transactionService.reserveAssets(handedOff, reservationMode)
             .map { commit -> ScheduledTransfer(coins.toMemoEntries(), commit, transactions = emptyList()) }
     }
 }

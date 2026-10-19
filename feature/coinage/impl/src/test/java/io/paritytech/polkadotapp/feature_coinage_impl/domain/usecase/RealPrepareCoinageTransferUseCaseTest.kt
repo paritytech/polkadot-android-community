@@ -23,9 +23,9 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPla
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.TransferPlannerFactory
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.InsufficientBalanceException
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.exceptions.TransferSubmissionFailedException
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.CoinReservationMode
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategy
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ExactMatchStrategyFactory
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.HandoffReservation
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.ScheduledTransfer
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.SplitCoinStrategy
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.SplitCoinStrategyFactory
@@ -40,7 +40,6 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Durable
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicy
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.SubmissionPolicyId
 import io.paritytech.polkadotapp.test_shared.any
-import io.paritytech.polkadotapp.test_shared.capture
 import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.awaitCancellation
@@ -51,7 +50,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -153,14 +151,12 @@ class RealPrepareCoinageTransferUseCaseTest {
     }
 
     @Test
-    fun `reserves through a prepared handoff when a chat send is prepared`() = runBlocking<Unit> {
+    fun `prepares the handoff when a chat send is prepared`() = runBlocking<Unit> {
         withSplitScheduling()
 
         prepareChatSend()
-        reserveThroughSplitStrategy()
 
-        verifyHandoffPrepared()
-        verifyNoHandoffReserved()
+        verifySplitReservedWith(CoinReservationMode.PREPARE)
     }
 
     @Test
@@ -229,8 +225,7 @@ class RealPrepareCoinageTransferUseCaseTest {
         val prepared = prepareMerchantSend()
 
         assertTrue(prepared.isSuccess)
-        reserveThroughSplitStrategy()
-        verifyHandoffReserved()
+        verifySplitReservedWith(CoinReservationMode.PRECOMMIT)
         verify(transactionService).scheduleTransactions(eq(listOf(splitTransaction)), anyGroupId())
         verify(handoffCommit, never()).commit()
     }
@@ -345,18 +340,13 @@ class RealPrepareCoinageTransferUseCaseTest {
         withMemoAndCommit()
     }
 
-    private suspend fun reserveThroughSplitStrategy() {
-        val reservation = ArgumentCaptor.forClass(Function2::class.java)
+    private suspend fun verifySplitReservedWith(mode: CoinReservationMode) {
         val verified = verify(splitStrategy)
-        with(eq(StalenessReportCollector.NoOp)) { verified.schedule(any(), capture(reservation)) }
-
-        capturedReservation(reservation)(handedOff)
+        with(eq(StalenessReportCollector.NoOp)) { verified.schedule(any(), eq(mode)) }
     }
 
     private suspend fun withMemoAndCommit() {
         whenever(memoBuilder.buildMemo(any())).thenReturn(Result.success(TransferMemo(emptyList(), Balance.ZERO)))
-        whenever(transactionService.preCommitHandoff(any())).thenReturn(Result.success(handoffCommit))
-        whenever(transactionService.prepareHandoff(any())).thenReturn(Result.success(handoffCommit))
         whenever(handoffCommit.commit()).thenReturn(Result.success(Unit))
     }
 
@@ -383,21 +373,6 @@ class RealPrepareCoinageTransferUseCaseTest {
     private suspend fun verifyNothingScheduled() {
         verify(transactionService, never()).scheduleTransactions(any(), anyGroupId())
     }
-
-    private suspend fun verifyHandoffPrepared() {
-        verify(transactionService).prepareHandoff(eq(handedOff))
-    }
-
-    private suspend fun verifyNoHandoffReserved() {
-        verify(transactionService, never()).preCommitHandoff(any())
-    }
-
-    private suspend fun verifyHandoffReserved() {
-        verify(transactionService).preCommitHandoff(eq(handedOff))
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun capturedReservation(captor: ArgumentCaptor<*>) = captor.value as HandoffReservation
 
     private fun stateOf(status: DurableTxStatus) = CoinageTransactionState(
         id = CoinageTransactionId(1),
