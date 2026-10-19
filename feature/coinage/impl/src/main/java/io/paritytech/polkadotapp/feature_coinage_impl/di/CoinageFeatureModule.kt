@@ -24,7 +24,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageBacku
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServiceStarter
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
-import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
@@ -35,6 +34,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyc
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.OnboardingUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreConfigProvider
@@ -115,7 +115,6 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submiss
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.CoinageOnboardingSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.CoinageTransferSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealClaimReceivedCoinsUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealReclaimHandedOffCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinAmountBreakdownUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageAssetsUseCase
@@ -128,6 +127,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinage
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageTransferSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealOnboardingUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealPrepareCoinageTransferUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealReclaimHandedOffCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealShareCoinageLogsUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealTotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider

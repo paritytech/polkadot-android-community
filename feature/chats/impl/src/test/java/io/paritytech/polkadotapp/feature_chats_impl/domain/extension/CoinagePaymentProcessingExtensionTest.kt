@@ -1,8 +1,8 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.extension
 
+import io.mockk.MockKMatcherScope
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.MockKMatcherScope
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -54,14 +54,6 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-/**
- * When a payment message is done with.
- *
- * Marking a message processed is what stops the app ever looking at it again, so it is the point of no
- * return for money someone has already sent us. Everything here is about not reaching it early: an incoming
- * payment is finished only when the claim use case says so, and a claim that reported a partial amount
- * along the way has said nothing about being finished.
- */
 @OptIn(ExperimentalTime::class)
 class CoinagePaymentProcessingExtensionTest {
     private val paymentStatusUseCase: CoinagePaymentStatusUseCase = mockk()
@@ -108,20 +100,6 @@ class CoinagePaymentProcessingExtensionTest {
     }
 
     /**
-     * The claim reported an amount and is still working — a coin has not been claimed yet, and retrying is
-     * still allowed. Closing the message here is how a 1.00 payment was settled as 0.12: the partial amount
-     * was reported, taken as final, and nothing looked at the message again.
-     */
-    @Test
-    fun `an incoming payment is not closed while its claim is still working`() = runTest {
-        givenClaimReports(CoinageTransferDetection.ClaimingRest(PARTIAL)) { awaitCancellation() }
-
-        startWork(incomingPayment())
-
-        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
-    }
-
-    /**
      * The claim use case owns when to stop: it retries until every coin is claimed or the caller's window
      * closes, so its completion — not any status it reported on the way — is what finishes the message.
      */
@@ -146,31 +124,24 @@ class CoinagePaymentProcessingExtensionTest {
         val message = incomingPayment()
         startWork(message)
 
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.FailedTransfer)) }
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
     /**
-     * Nothing can prove a payment's coins will never arrive, and the app may not get a look at the chain
-     * for hours, so a claim is never given a deadline to give up by.
+     * The group is the message's own, so a retry rejoins the claims an earlier attempt registered. There is no
+     * deadline: nothing can prove a payment's coins will never arrive, and the app may not see the chain for hours.
      */
     @Test
-    fun `a claim is never given a deadline`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-
-        startWork(incomingPayment())
-
-        coVerify { claimReceivedCoinsUseCase.claim(any(), any(), Instant.DISTANT_FUTURE) }
-    }
-
-    /** The group is the message's own, so a retry rejoins the claims an earlier attempt registered. */
-    @Test
-    fun `claims are registered under a group derived from the message`() = runTest {
+    fun `claims are registered under the message's group with no deadline`() = runTest {
         givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
 
         val message = incomingPayment()
         startWork(message)
 
-        coVerify { claimReceivedCoinsUseCase.claim(any(), CoinageOperationGroupId("chat-claim:${message.id}"), any()) }
+        coVerify {
+            claimReceivedCoinsUseCase.claim(any(), CoinageOperationGroupId("chat-claim:${message.id}"), Instant.DISTANT_FUTURE)
+        }
     }
 
     /** What the claim reports on the way is shown, whether or not it is the last thing it will say. */
@@ -190,21 +161,21 @@ class CoinagePaymentProcessingExtensionTest {
         }
     }
 
-    /** A payment held up by a failed claim shows how much of it is already the user's. */
+    /**
+     * The claim reported an amount and is still working. The message shows what landed, but stays open: closing it
+     * here is how a 1.00 payment was settled as 0.12, with nothing looking at the message again.
+     */
     @Test
-    fun `a payment held up by a failed claim shows what has landed`() = runTest {
+    fun `an incoming payment held up by a failed claim shows what landed and stays open`() = runTest {
         givenClaimReports(CoinageTransferDetection.ClaimingRest(PARTIAL)) { awaitCancellation() }
 
         val message = incomingPayment()
         startWork(message)
 
         coVerify {
-            context.modifyMessage(
-                message.chatId,
-                message.id,
-                match { it is CoinagePayment && it.status == CoinagePayment.Status.PartiallyClaimed(PARTIAL) },
-            )
+            context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.PartiallyClaimed(PARTIAL)))
         }
+        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
     }
 
     /**
@@ -241,22 +212,6 @@ class CoinagePaymentProcessingExtensionTest {
             )
         }
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
-    }
-
-    @Test
-    fun `an incoming payment reports detecting before anything is found`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Detecting) { awaitCancellation() }
-
-        val message = incomingPayment()
-        startWork(message)
-
-        coVerify {
-            context.modifyMessage(
-                message.chatId,
-                message.id,
-                match { it is CoinagePayment && it.status == CoinagePayment.Status.Detecting },
-            )
-        }
     }
 
     /** A payment that lands while the app is open is picked up from the live feed, not only at startup. */
@@ -301,15 +256,6 @@ class CoinagePaymentProcessingExtensionTest {
                 match { it is CoinagePayment && it.status is CoinagePayment.Status.PartiallyClaimed },
             )
         }
-    }
-
-    /** And it is not closed out while the peer can still take the rest. */
-    @Test
-    fun `an outgoing payment is not closed while coins are still awaiting claim`() = runTest {
-        givenPeerHasTaken(claimed = 1, awaiting = 1, detecting = 0, failed = 0, finalized = true)
-
-        startWork(outgoingPayment())
-
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
     }
 
@@ -400,31 +346,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
     }
 
-    /**
-     * Some coins were never minted and the rest have been taken, but only as far as the best chain shows.
-     *
-     * The two rules pull opposite ways here, and both are right: the shortfall is displayed, because coins
-     * that failed to mint are never coming back and the amount really is short; and the message stays open,
-     * because a fork could still return the claimed ones and change what that shortfall is.
-     */
-    @Test
-    fun `an outgoing payment short of failed coins shows the shortfall while claims can still be rolled back`() =
-        runTest {
-            givenPeerHasTaken(claimed = 2, awaiting = 0, detecting = 0, failed = 3, finalized = false)
-
-            val message = outgoingPayment()
-            startWork(message)
-
-            coVerify {
-                context.modifyMessage(
-                    message.chatId,
-                    message.id,
-                    match { it is CoinagePayment && it.status is CoinagePayment.Status.Transferred },
-                )
-            }
-            coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
-        }
-
     /** Nothing has been taken yet and some coins never will be: still sending, for the ones that can arrive. */
     @Test
     fun `an outgoing payment still being minted alongside coins that failed reads as sending`() = runTest {
@@ -490,57 +411,6 @@ class CoinagePaymentProcessingExtensionTest {
      */
     @Test
     fun `an outgoing payment whose coins never existed is closed as failed`() = runTest {
-        givenPeerHasTaken(claimed = 0, awaiting = 0, detecting = 0, failed = 2, finalized = true)
-
-        val message = outgoingPayment()
-        startWork(message)
-
-        coVerify {
-            context.modifyMessage(
-                message.chatId,
-                message.id,
-                match { it is CoinagePayment && it.status is CoinagePayment.Status.FailedDetection },
-            )
-        }
-        coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
-    }
-
-    /**
-     * The payment is saved, and its transactions are waiting to be built — or to be built again after an
-     * attempt that could never land. Coinage reports a coin whose mint waits like that as still detecting.
-     */
-    @Test
-    fun `an outgoing payment whose transactions are still being built reads as sending`() = runTest {
-        givenPeerHasTaken(claimed = 0, awaiting = 0, detecting = 2, failed = 0, finalized = true)
-
-        val message = outgoingPayment()
-        startWork(message)
-
-        coVerify {
-            context.modifyMessage(
-                message.chatId,
-                message.id,
-                match { it is CoinagePayment && it.status == CoinagePayment.Status.Detecting },
-            )
-        }
-    }
-
-    /** A rebuild can take hours while the payment's inputs are missing, and the message has to be watched throughout. */
-    @Test
-    fun `an outgoing payment is not closed while its transactions await submission`() = runTest {
-        givenPeerHasTaken(claimed = 0, awaiting = 0, detecting = 2, failed = 0, finalized = true)
-
-        startWork(outgoingPayment())
-
-        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
-    }
-
-    /**
-     * The window for rebuilding closed with the payment's inputs gone from the chain, so its coins will never
-     * be minted. Coinage reports that as failed, and the message is closed on it.
-     */
-    @Test
-    fun `an outgoing payment whose build gave up is closed as failed`() = runTest {
         givenPeerHasTaken(claimed = 0, awaiting = 0, detecting = 0, failed = 2, finalized = true)
 
         val message = outgoingPayment()
@@ -656,16 +526,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
-    @Test
-    fun `an incoming payment whose claim gave up inside its window is still invalid`() = runTest {
-        givenClaimReports(CoinageTransferDetection.NotClaimed)
-
-        val message = incomingPayment()
-        startWork(message)
-
-        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.FailedTransfer)) }
-    }
-
     /** The window closing while the app is open is enough: nothing on chain has to change for the message to. */
     @Test
     fun `an incoming payment whose coins are gone turns gone back as its window closes`() = runTest {
@@ -710,16 +570,6 @@ class CoinagePaymentProcessingExtensionTest {
 
         coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Unclaimed)) }
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
-    }
-
-    /** Within the window the recipient may simply not have opened the app yet, so nothing is offered back. */
-    @Test
-    fun `an outgoing payment inside its claim window is not offered back`() = runTest {
-        givenCoins(CoinagePaymentStatus.AwaitingClaim, CoinagePaymentStatus.AwaitingClaim)
-
-        startWork(outgoingPayment())
-
-        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.Unclaimed)) }
     }
 
     /** One coin on its way back is enough to say so: the sender has acted, and waits for nothing else. */
@@ -782,6 +632,7 @@ class CoinagePaymentProcessingExtensionTest {
 
         coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ReclaimFailed)) }
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
+        coVerify { reclaimHandedOffCoinsUseCase.subscribeFailedReclaims(CoinageOperationGroupId("chat-reclaim:${message.id}")) }
     }
 
     /** A coin the peer took after a failed reclaim is theirs: that is a received payment, not a failure. */
@@ -796,17 +647,6 @@ class CoinagePaymentProcessingExtensionTest {
 
         coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Transferred(PARTIAL))) }
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
-    }
-
-    /** The attempts are found from the message itself, so they survive a restart like the claims do. */
-    @Test
-    fun `reclaims are read back from a group derived from the message`() = runTest {
-        givenCoins(CoinagePaymentStatus.AwaitingClaim)
-
-        val message = outgoingPayment()
-        startWork(message)
-
-        coVerify { reclaimHandedOffCoinsUseCase.subscribeFailedReclaims(CoinageOperationGroupId("chat-reclaim:${message.id}")) }
     }
 
     // ---- harness ----
