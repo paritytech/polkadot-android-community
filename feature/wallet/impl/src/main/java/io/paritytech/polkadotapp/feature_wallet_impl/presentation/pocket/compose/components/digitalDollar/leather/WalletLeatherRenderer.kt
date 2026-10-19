@@ -52,6 +52,7 @@ internal class WalletLeatherRenderer(private val assets: AssetManager) {
         GLES30.glUniform2f(uniform("uTilt"), tiltX, tiltY)
         GLES30.glUniform1f(uniform("uCrease"), CREASES)
         GLES30.glUniform1f(uniform("uGuard"), GUARD)
+        GLES30.glUniform1f(uniform("uOcclusion"), OCCLUSION)
         GLES30.glUniform1fv(uniform("uMetal"), MATERIAL_SLOTS, Materials.metal, 0)
         GLES30.glUniform1fv(uniform("uRough"), MATERIAL_SLOTS, Materials.rough, 0)
         GLES30.glUniform1fv(uniform("uRelief"), MATERIAL_SLOTS, Materials.relief, 0)
@@ -168,5 +169,8 @@ internal class WalletLeatherRenderer(private val assets: AssetManager) {
         /** Crease-scale relief and the head-on guard, both on, as the reference's `params.json` ships. */
         private const val CREASES = 1f
         private const val GUARD = 1f
+
+        /** The photo's own shadows take no highlight, as the reference's `params.json` ships. */
+        private const val OCCLUSION = 1f
     }
 }
