@@ -1,55 +1,35 @@
 package io.paritytech.polkadotapp.common.utils.permissions
 
-import android.content.Context
-import android.content.pm.PackageManager
-import androidx.activity.ComponentActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import android.Manifest
 import io.paritytech.polkadotapp.common.data.storage.preferences.Preferences
-import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
-import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.whenever
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.MockedStatic
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.mockStatic
 
 class PermissionStateManagerTest {
-    private val activity = mock(ComponentActivity::class.java)
-    private val contextManager = mock(ContextManager::class.java)
+    private val permissionStatusChecker = mock(PermissionStatusChecker::class.java)
     private val preferences = mock(Preferences::class.java)
     private val stored = mutableMapOf<String, Boolean>()
 
-    private lateinit var activityCompat: MockedStatic<ActivityCompat>
-    private lateinit var contextCompat: MockedStatic<ContextCompat>
-
-    private val manager = PermissionStateManager(contextManager, preferences)
+    private val manager = PermissionStateManager(permissionStatusChecker, preferences)
 
     @Before
     fun setUp() {
-        whenever(contextManager.requireActivity()).thenReturn(activity)
-        whenever(contextManager.applicationContext).thenReturn(mock(Context::class.java))
         whenever(preferences.getBoolean(anyString(), anyBoolean())).thenAnswer {
             stored[it.getArgument(0)] ?: it.getArgument(1)
         }
         doAnswer { stored[it.getArgument(0)] = it.getArgument(1) }
             .`when`(preferences).putBoolean(anyString(), anyBoolean())
-        activityCompat = mockStatic(ActivityCompat::class.java)
-        contextCompat = mockStatic(ContextCompat::class.java)
-        contextCompat.`when`<Int> { ContextCompat.checkSelfPermission(any(), anyString()) }
-            .thenReturn(PackageManager.PERMISSION_DENIED)
     }
 
-    @After
-    fun tearDown() {
-        activityCompat.close()
-        contextCompat.close()
+    @Test
+    fun `result is granted when the permission is granted`() {
+        assertEquals(PermissionResult.GRANTED, manager.onPermissionResult(CAMERA, isGranted = true))
     }
 
     @Test
@@ -91,6 +71,14 @@ class PermissionStateManagerTest {
     }
 
     @Test
+    fun `denial is permanent when only the record of an earlier rationale exists`() {
+        withRationaleShownRecord()
+        withRationale(false)
+
+        assertEquals(PermissionResult.DENIED_FOREVER, manager.onPermissionResult(CAMERA, isGranted = false))
+    }
+
+    @Test
     fun `earlier denial is forgotten when the permission is granted`() {
         withEarlierDenial()
         manager.onPermissionResult(CAMERA, isGranted = true)
@@ -108,7 +96,15 @@ class PermissionStateManagerTest {
     }
 
     @Test
+    fun `state is granted when the permission is already granted`() {
+        withPermissionGranted(true)
+
+        assertEquals(PermissionResult.GRANTED, manager.getPermissionState(CAMERA))
+    }
+
+    @Test
     fun `state is permanent denial when there is no rationale after an earlier denial`() {
+        withPermissionGranted(false)
         withEarlierDenial()
         withRationale(false)
 
@@ -117,6 +113,7 @@ class PermissionStateManagerTest {
 
     @Test
     fun `state stays not permanent when it is only checked`() {
+        withPermissionGranted(false)
         withRationale(false)
         manager.getPermissionState(CAMERA)
 
@@ -124,8 +121,11 @@ class PermissionStateManagerTest {
     }
 
     private fun withRationale(shouldShow: Boolean) {
-        activityCompat.`when`<Boolean> { ActivityCompat.shouldShowRequestPermissionRationale(any(), anyString()) }
-            .thenReturn(shouldShow)
+        whenever(permissionStatusChecker.shouldShowRationale(anyString())).thenReturn(shouldShow)
+    }
+
+    private fun withPermissionGranted(granted: Boolean) {
+        whenever(permissionStatusChecker.isGranted(anyString())).thenReturn(granted)
     }
 
     private fun withEarlierDenial() {
@@ -133,8 +133,12 @@ class PermissionStateManagerTest {
         manager.onPermissionResult(CAMERA, isGranted = false)
     }
 
+    private fun withRationaleShownRecord() {
+        stored["permission_rationale_shown ($CAMERA)"] = true
+    }
+
     private companion object {
-        const val CAMERA = "android.permission.CAMERA"
-        const val MICROPHONE = "android.permission.RECORD_AUDIO"
+        const val CAMERA = Manifest.permission.CAMERA
+        const val MICROPHONE = Manifest.permission.RECORD_AUDIO
     }
 }
