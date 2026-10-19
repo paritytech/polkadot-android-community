@@ -215,6 +215,7 @@ private fun CardLayer(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = remember(morphProgress) { DockletCardShape { 1f - morphProgress() } }
+    val glassBase = LocalDockletGlassBase.current
     Box(
         modifier = Modifier
             .placeAt(frame)
@@ -234,6 +235,7 @@ private fun CardLayer(
                         fillBlend = DockletMotion.cardFillBlend(progress),
                         pillArcAlpha = 1f - progress,
                         pillCentre = Offset(size.width / 2, bodyHeight + dockletIconCentreBelowBody(progress).toPx()),
+                        base = glassBase,
                     )
                 }
             },

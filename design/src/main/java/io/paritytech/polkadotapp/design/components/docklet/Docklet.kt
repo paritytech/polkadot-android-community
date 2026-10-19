@@ -94,6 +94,7 @@ private fun DockSurface(
     backdrop: DockletBackdrop?,
     onSlotTap: (DockletSlot) -> Unit,
 ) {
+    val glassBase = LocalDockletGlassBase.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -127,7 +128,7 @@ private fun DockSurface(
                 .drawWithCache {
                     val path = dockPath(size, density)
                     val cutout = cutoutPath(size.width, density)
-                    onDrawBehind { drawDockGlass(path, cutout) }
+                    onDrawBehind { drawDockGlass(path, cutout, glassBase) }
                 }
                 .clip(DockShape),
         ) {

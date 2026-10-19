@@ -8,7 +8,9 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import io.paritytech.polkadotapp.designsystem.colors.LocalPolkadotColors
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
 
@@ -33,10 +35,20 @@ object DockletColors {
 
 private const val TextSelectionAlpha = 0.34f
 
+private const val LightPageLuminance = 0.5f
+
+// The brief's glass values assume a dark page; on a light theme this base keeps the dock and the card dark.
+private const val LightPageGlassBaseAlpha = 0.85f
+
+internal val LocalDockletGlassBase = staticCompositionLocalOf { Color.Transparent }
+
 @Composable
 fun DockletGlassTheme(content: @Composable () -> Unit) {
     val colors = remember { PolkadotAppTheme.BerlinNight.colors() }
+    val pageIsLight = LocalPolkadotColors.current.bg.surface.main.luminance() > LightPageLuminance
+    val glassBase = if (pageIsLight) colors.bg.surface.main.copy(alpha = LightPageGlassBaseAlpha) else Color.Transparent
     CompositionLocalProvider(
+        LocalDockletGlassBase provides glassBase,
         LocalPolkadotColors provides colors,
         LocalContentColor provides colors.fg.primary,
         LocalIndication provides ripple(color = colors.fg.primary),

@@ -73,7 +73,8 @@ fun dockletBlurEffect(sigma: Dp, density: Float): BlurEffect? {
     return if (radius > 0f) BlurEffect(radius, radius, TileMode.Decal) else null
 }
 
-internal fun DrawScope.drawDockGlass(path: Path, cutout: Path) {
+internal fun DrawScope.drawDockGlass(path: Path, cutout: Path, base: Color) {
+    drawPath(path, base)
     val radialRadius = size.width * DockFillWidthShare
     drawPath(path, ellipticalRadialBrush(radialRadius, size.height, size.width / 2))
     drawInnerLine(path, rimBrush(DockRimAlphas))
@@ -89,7 +90,8 @@ internal fun DrawScope.drawDockGlass(path: Path, cutout: Path) {
     }
 }
 
-internal fun DrawScope.drawCardGlass(path: Path, fillBlend: Float, pillArcAlpha: Float, pillCentre: Offset) {
+internal fun DrawScope.drawCardGlass(path: Path, fillBlend: Float, pillArcAlpha: Float, pillCentre: Offset, base: Color) {
+    drawPath(path, base)
     if (fillBlend < 1f) {
         drawPath(path, Brush.verticalGradient(listOf(GlassFillTop, GlassFillBottom)), alpha = 1f - fillBlend)
     }
