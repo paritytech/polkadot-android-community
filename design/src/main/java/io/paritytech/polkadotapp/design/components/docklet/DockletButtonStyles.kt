@@ -1,7 +1,9 @@
 package io.paritytech.polkadotapp.design.components.docklet
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.Dp
@@ -12,15 +14,21 @@ import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButto
 
 internal val LobeTouchTarget = 48.dp
 
+@Composable
+fun rememberDockletFieldButtonStyle(): PolkadotButtonStyle {
+    val palette = LocalDockletPalette.current
+    return remember(palette) { DockletFieldButtonStyle(palette) }
+}
+
 @Immutable
-object DockletFieldButtonStyle : PolkadotButtonStyle {
+private data class DockletFieldButtonStyle(private val palette: DockletPalette) : PolkadotButtonStyle {
     override val colors = PolkadotButtonColors(
-        containerBrush = SolidColor(DockletColors.FieldFill),
-        contentColor = DockletColors.SearchIcon,
-        disabledContainerBrush = SolidColor(DockletColors.FieldFill),
-        disabledContentColor = DockletColors.SearchIcon,
+        containerBrush = SolidColor(palette.fieldFill),
+        contentColor = palette.searchIcon,
+        disabledContainerBrush = SolidColor(palette.fieldFill),
+        disabledContentColor = palette.searchIcon,
     )
-    override val rippleColor: Color = DockletColors.Ripple
+    override val rippleColor: Color = palette.ripple
 }
 
 @Immutable

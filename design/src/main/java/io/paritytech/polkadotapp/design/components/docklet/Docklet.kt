@@ -94,7 +94,7 @@ private fun DockSurface(
     backdrop: DockletBackdrop?,
     onSlotTap: (DockletSlot) -> Unit,
 ) {
-    val glassBase = LocalDockletGlassBase.current
+    val palette = LocalDockletPalette.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -128,7 +128,7 @@ private fun DockSurface(
                 .drawWithCache {
                     val path = dockPath(size, density)
                     val cutout = cutoutPath(size.width, density)
-                    onDrawBehind { drawDockGlass(path, cutout, glassBase) }
+                    onDrawBehind { drawDockGlass(path, cutout, palette.glassBase) }
                 }
                 .clip(DockShape),
         ) {
@@ -169,7 +169,7 @@ private fun SlotRow(
                 modifier = Modifier
                     .offset { IntOffset((highlightCentre - DockletGeometry.SlotWidth / 2).roundToPx(), 0) }
                     .size(DockletGeometry.SlotWidth, DockletGeometry.ItemRowHeight)
-                    .dockletHighlight(),
+                    .dockletHighlight(LocalDockletPalette.current.highlight),
             )
         }
         slots.zip(spans).forEachIndexed { index, (slot, span) ->
@@ -186,8 +186,9 @@ private fun SlotRow(
 @Composable
 private fun SlotItem(span: DockletSpan, slot: DockletSlot, iconShift: Dp, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
+    val palette = LocalDockletPalette.current
     val iconColor by animateColorAsState(
-        targetValue = if (slot.selected) PolkadotTheme.colors.fg.primary else DockletColors.Placeholder,
+        targetValue = if (slot.selected) PolkadotTheme.colors.fg.primary else palette.placeholder,
         animationSpec = tween(HighlightMillis, easing = DockletMotion.HighlightEasing),
         label = "DockletSlotIconColor",
     )
@@ -210,7 +211,7 @@ private fun SlotItem(span: DockletSpan, slot: DockletSlot, iconShift: Dp, onClic
                 .offset { IntOffset(iconShift.roundToPx(), 0) }
                 .requiredSize(DockletGeometry.SlotWidth, DockletGeometry.ItemRowHeight)
                 .clip(CircleShape)
-                .indication(interactionSource, ripple(color = DockletColors.Ripple)),
+                .indication(interactionSource, ripple(color = palette.ripple)),
         )
         Box(modifier = Modifier.offset { IntOffset(iconShift.roundToPx(), 0) }) {
             Box(

@@ -41,12 +41,12 @@ import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonS
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButtonSize
 import io.paritytech.polkadotapp.design.components.docklet.DockletColors
-import io.paritytech.polkadotapp.design.components.docklet.DockletFieldButtonStyle
 import io.paritytech.polkadotapp.design.components.docklet.DockletGeometry
 import io.paritytech.polkadotapp.design.components.docklet.DockletSearchButton
 import io.paritytech.polkadotapp.design.components.docklet.DockletSearchField
 import io.paritytech.polkadotapp.design.components.docklet.dockletContentsTransition
 import io.paritytech.polkadotapp.design.components.docklet.dockletFieldOutline
+import io.paritytech.polkadotapp.design.components.docklet.rememberDockletFieldButtonStyle
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ScanFrame
 import io.paritytech.polkadotapp.design.components.spacer.HorizontalSpacer
@@ -208,7 +208,7 @@ private fun AddContactSearchStep(
                 modifier = Modifier.dockletFieldOutline(shape),
                 icon = NovaIcons.ScanFrame,
                 onClick = actions.onScanClick,
-                style = DockletFieldButtonStyle,
+                style = rememberDockletFieldButtonStyle(),
                 size = PolkadotIconButtonSize.mediumIncreased(),
                 shape = shape,
             )

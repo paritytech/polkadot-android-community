@@ -7,11 +7,13 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import io.paritytech.polkadotapp.designsystem.colors.LocalPolkadotColors
+import io.paritytech.polkadotapp.designsystem.colors.PolkadotColorsPalette
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
 
 object DockletColors {
@@ -34,21 +36,66 @@ object DockletColors {
 }
 
 private const val TextSelectionAlpha = 0.34f
-
 private const val LightPageLuminance = 0.5f
+private const val LightGlassBaseAlpha = 0.72f
+private const val LightCardFillAlpha = 0.3f
+private const val LightFieldFillAlpha = 0.06f
+private const val LightHandleAlpha = 0.24f
 
-// The brief's glass values assume a dark page; on a light theme this base keeps the dock and the card dark.
-private const val LightPageGlassBaseAlpha = 0.85f
+@Immutable
+data class DockletPalette(
+    val glassBase: Color,
+    val cardFill: Color,
+    val placeholder: Color,
+    val sectionHeader: Color,
+    val searchIcon: Color,
+    val fieldFill: Color,
+    val handle: Color,
+    val ripple: Color,
+    val highlight: Color,
+    val clearBackground: Color,
+    val clearGlyph: Color,
+)
 
-internal val LocalDockletGlassBase = staticCompositionLocalOf { Color.Transparent }
+private val DarkDockletPalette = DockletPalette(
+    glassBase = Color.Transparent,
+    cardFill = DockletColors.CardFill,
+    placeholder = DockletColors.Placeholder,
+    sectionHeader = DockletColors.SectionHeader,
+    searchIcon = DockletColors.SearchIcon,
+    fieldFill = DockletColors.FieldFill,
+    handle = DockletColors.Handle,
+    ripple = DockletColors.Ripple,
+    highlight = DockletColors.Light,
+    clearBackground = DockletColors.ClearBackground,
+    clearGlyph = DockletColors.ClearGlyph,
+)
+
+private fun lightDockletPalette(colors: PolkadotColorsPalette) = DockletPalette(
+    glassBase = colors.bg.surface.main.copy(alpha = LightGlassBaseAlpha),
+    cardFill = colors.bg.surface.main.copy(alpha = LightCardFillAlpha),
+    placeholder = colors.fg.secondary,
+    sectionHeader = colors.fg.secondary,
+    searchIcon = colors.fg.secondary,
+    fieldFill = colors.fg.primary.copy(alpha = LightFieldFillAlpha),
+    handle = colors.fg.primary.copy(alpha = LightHandleAlpha),
+    ripple = colors.fg.primary,
+    highlight = colors.fg.primary,
+    clearBackground = colors.fg.tertiary,
+    clearGlyph = colors.fg.primaryInverted,
+)
+
+val LocalDockletPalette = staticCompositionLocalOf { DarkDockletPalette }
 
 @Composable
 fun DockletGlassTheme(content: @Composable () -> Unit) {
-    val colors = remember { PolkadotAppTheme.BerlinNight.colors() }
-    val pageIsLight = LocalPolkadotColors.current.bg.surface.main.luminance() > LightPageLuminance
-    val glassBase = if (pageIsLight) colors.bg.surface.main.copy(alpha = LightPageGlassBaseAlpha) else Color.Transparent
+    val pageColors = LocalPolkadotColors.current
+    val pageIsLight = pageColors.bg.surface.main.luminance() > LightPageLuminance
+    val darkColors = remember { PolkadotAppTheme.BerlinNight.colors() }
+    val colors = if (pageIsLight) pageColors else darkColors
+    val palette = remember(colors, pageIsLight) { if (pageIsLight) lightDockletPalette(colors) else DarkDockletPalette }
     CompositionLocalProvider(
-        LocalDockletGlassBase provides glassBase,
+        LocalDockletPalette provides palette,
         LocalPolkadotColors provides colors,
         LocalContentColor provides colors.fg.primary,
         LocalIndication provides ripple(color = colors.fg.primary),

@@ -68,7 +68,8 @@ internal fun BoxScope.PillLobe(
 @Composable
 private fun LobeIcon(progress: () -> Float, open: Boolean, iconColor: @Composable () -> Color, onClose: () -> Unit) {
     val color = iconColor()
-    val style = remember(color) { DockletLobeButtonStyle(color) }
+    val ripple = LocalDockletPalette.current.ripple
+    val style = remember(color, ripple) { DockletLobeButtonStyle(color, ripple) }
     PolkadotIconButton(
         modifier = Modifier
             .clearAndSetSemantics {}
@@ -99,12 +100,11 @@ private fun LobeIcon(progress: () -> Float, open: Boolean, iconColor: @Composabl
 }
 
 @Immutable
-private data class DockletLobeButtonStyle(val iconColor: Color) : PolkadotButtonStyle {
+private data class DockletLobeButtonStyle(val iconColor: Color, override val rippleColor: Color) : PolkadotButtonStyle {
     override val colors = PolkadotButtonColors(
         containerBrush = SolidColor(Color.Transparent),
         contentColor = iconColor,
         disabledContainerBrush = SolidColor(Color.Transparent),
         disabledContentColor = iconColor,
     )
-    override val rippleColor: Color = DockletColors.Ripple
 }

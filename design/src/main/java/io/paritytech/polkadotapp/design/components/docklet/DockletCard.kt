@@ -215,7 +215,7 @@ private fun CardLayer(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = remember(morphProgress) { DockletCardShape { 1f - morphProgress() } }
-    val glassBase = LocalDockletGlassBase.current
+    val palette = LocalDockletPalette.current
     Box(
         modifier = Modifier
             .placeAt(frame)
@@ -235,7 +235,8 @@ private fun CardLayer(
                         fillBlend = DockletMotion.cardFillBlend(progress),
                         pillArcAlpha = 1f - progress,
                         pillCentre = Offset(size.width / 2, bodyHeight + dockletIconCentreBelowBody(progress).toPx()),
-                        base = glassBase,
+                        base = palette.glassBase,
+                        cardFill = palette.cardFill,
                     )
                 }
             },
@@ -298,7 +299,7 @@ private fun CardContents(
                             .padding(top = HandleTop)
                             .size(HandleWidth, HandleHeight),
                         shape = RoundedCornerShape(HandleRadius),
-                        color = DockletColors.Handle,
+                        color = LocalDockletPalette.current.handle,
                     ) {}
                 }
             },

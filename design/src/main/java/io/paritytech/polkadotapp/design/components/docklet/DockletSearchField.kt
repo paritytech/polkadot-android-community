@@ -60,7 +60,7 @@ fun DockletSearchButton(
                 .fillMaxWidth()
                 .height(DockletGeometry.FieldHeight)
                 .dockletFieldOutline(shape),
-            style = DockletFieldButtonStyle,
+            style = rememberDockletFieldButtonStyle(),
             size = PolkadotButtonSize.large(),
             shape = shape,
             content = { SearchButtonContent(text) },
@@ -74,13 +74,13 @@ private fun SearchButtonContent(text: String) {
         NovaIcon(
             modifier = Modifier.size(ButtonSearchIconSize),
             imageVector = NovaIcons.Search,
-            tint = DockletColors.SearchIcon,
+            tint = LocalDockletPalette.current.searchIcon,
         )
         HorizontalSpacer { tiny }
         NovaText(
             text = text,
             style = DockletTypography.FieldPlaceholder,
-            color = DockletColors.Placeholder,
+            color = LocalDockletPalette.current.placeholder,
             maxLines = 1,
         )
     }
@@ -113,7 +113,7 @@ private fun SearchFieldRow(value: String, onValueChange: (String) -> Unit, place
             .height(DockletGeometry.FieldHeight)
             .dockletFieldOutline(shape),
         shape = shape,
-        color = DockletColors.FieldFill,
+        color = LocalDockletPalette.current.fieldFill,
     ) {
         SearchFieldContent(value, onValueChange, placeholder, horizontalPadding)
     }
@@ -128,7 +128,7 @@ private fun SearchFieldContent(value: String, onValueChange: (String) -> Unit, p
         NovaIcon(
             modifier = Modifier.size(FieldSearchIconSize),
             imageVector = NovaIcons.Search,
-            tint = DockletColors.SearchIcon,
+            tint = LocalDockletPalette.current.searchIcon,
         )
         HorizontalSpacer { tiny }
         PolkadotInputField(
@@ -142,7 +142,7 @@ private fun SearchFieldContent(value: String, onValueChange: (String) -> Unit, p
                 NovaText(
                     text = placeholder,
                     style = DockletTypography.Query,
-                    color = DockletColors.Placeholder,
+                    color = LocalDockletPalette.current.placeholder,
                     maxLines = 1,
                 )
             },
@@ -165,13 +165,13 @@ private fun ClearButton(onClick: () -> Unit) {
         PolkadotSurface(
             modifier = Modifier.requiredSize(ClearCircleSize),
             shape = CircleShape,
-            color = DockletColors.ClearBackground,
+            color = LocalDockletPalette.current.clearBackground,
             contentAlignment = Alignment.Center,
         ) {
             NovaIcon(
                 modifier = Modifier.requiredSize(ClearGlyphSize),
                 imageVector = NovaIcons.Close,
-                tint = DockletColors.ClearGlyph,
+                tint = LocalDockletPalette.current.clearGlyph,
             )
         }
     }

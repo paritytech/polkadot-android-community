@@ -90,13 +90,20 @@ internal fun DrawScope.drawDockGlass(path: Path, cutout: Path, base: Color) {
     }
 }
 
-internal fun DrawScope.drawCardGlass(path: Path, fillBlend: Float, pillArcAlpha: Float, pillCentre: Offset, base: Color) {
+internal fun DrawScope.drawCardGlass(
+    path: Path,
+    fillBlend: Float,
+    pillArcAlpha: Float,
+    pillCentre: Offset,
+    base: Color,
+    cardFill: Color,
+) {
     drawPath(path, base)
     if (fillBlend < 1f) {
         drawPath(path, Brush.verticalGradient(listOf(GlassFillTop, GlassFillBottom)), alpha = 1f - fillBlend)
     }
     if (fillBlend > 0f) {
-        drawPath(path, DockletColors.CardFill, alpha = fillBlend)
+        drawPath(path, cardFill, alpha = fillBlend)
     }
     val rimAlphas = FloatArray(RimOffsets.size) { lerp(PillRimAlphas[it], DockRimAlphas[it], fillBlend) }
     drawInnerLine(path, rimBrush(rimAlphas))
@@ -114,13 +121,13 @@ internal fun DrawScope.drawCardGlass(path: Path, fillBlend: Float, pillArcAlpha:
     }
 }
 
-fun Modifier.dockletHighlight(): Modifier = drawWithCache {
+fun Modifier.dockletHighlight(color: Color): Modifier = drawWithCache {
     val outline = CircleShape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
     val line = topLine(path, LineWidth.toPx())
     onDrawBehind {
-        drawPath(path, DockletColors.Light.copy(alpha = HighlightAlpha))
-        drawPath(line, DockletColors.Light.copy(alpha = HighlightLineAlpha))
+        drawPath(path, color.copy(alpha = HighlightAlpha))
+        drawPath(line, color.copy(alpha = HighlightLineAlpha))
     }
 }
 
