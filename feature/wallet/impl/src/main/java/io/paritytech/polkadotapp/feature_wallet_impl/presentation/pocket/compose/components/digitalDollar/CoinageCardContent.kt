@@ -73,9 +73,11 @@ private fun DebugFeaturesCard(
         title = stringResource(RCommon.string.pocket_debug_features_title),
         subtitle = stringResource(RCommon.string.pocket_debug_features_subtitle)
     ) {
-        CoinageTestDataSwitch(mode = state.testData, onModeChange = onTestDataChange)
+        if (FeatureOption.COINAGE_DEBUG_TOOLS.isEnabled) {
+            CoinageTestDataSwitch(mode = state.testData, onModeChange = onTestDataChange)
 
-        CoinageCoinSetSwitch(set = state.coinSet, onSetChange = onCoinSetChange)
+            CoinageCoinSetSwitch(set = state.coinSet, onSetChange = onCoinSetChange)
+        }
 
         BalanceBreakdownTable(breakdown = state.tokensState.breakdown)
 
