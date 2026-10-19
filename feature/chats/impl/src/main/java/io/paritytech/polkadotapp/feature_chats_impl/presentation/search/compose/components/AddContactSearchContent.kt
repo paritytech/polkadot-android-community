@@ -15,8 +15,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.paritytech.polkadotapp.design.components.docklet.DockletTypography
-import io.paritytech.polkadotapp.design.components.docklet.LocalDockletPalette
 import io.paritytech.polkadotapp.design.components.progress.NovaCircularProgressIndicator
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
@@ -99,8 +97,8 @@ internal fun AddContactSearchHeader(query: String) {
         text = stringResource(
             if (query.isEmpty()) RCommon.string.search_section_recents else RCommon.string.search_section_results
         ),
-        style = DockletTypography.SectionHeader,
-        color = LocalDockletPalette.current.sectionHeader,
+        style = PolkadotTheme.typography.caption.medium,
+        color = PolkadotTheme.colors.fg.secondary,
     )
 }
 

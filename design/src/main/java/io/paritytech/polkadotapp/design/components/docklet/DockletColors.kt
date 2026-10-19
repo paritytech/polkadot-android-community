@@ -11,92 +11,67 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import io.paritytech.polkadotapp.designsystem.colors.LocalPolkadotColors
 import io.paritytech.polkadotapp.designsystem.colors.PolkadotColorsPalette
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
 
 object DockletColors {
-    val GlassLight = Color(0xFF919191)
-    val GlassDark = Color(0xFF2B2B2B)
-    const val GlassFillAlpha = 0.2f
-    val CardFill = Color(0xFF080808).copy(alpha = 0.3f)
-    val Placeholder = Color(0xFF999999)
-    val SectionHeader = Color(0xFF8E8E96)
-    val Caret = Color(0xFF0A84FF)
-    val ClearBackground = Color(0xFF3A3A3C)
-    val ClearGlyph = Color(0xFFE5E5EA)
-    val CameraBacking = Color(0xFF1A1B1F)
-    val SearchIcon = Color(0xFFECECEC)
     val Shade = Color.Black
-    val Ripple = Color.White
-    val Light = Color.White
-    val FieldFill = Color.White.copy(alpha = 0.06f)
-    val Handle = Color.White.copy(alpha = 0.32f)
 }
 
 private const val TextSelectionAlpha = 0.34f
-private const val LightPageLuminance = 0.5f
-private const val LightGlassBaseAlpha = 0.72f
-private const val LightCardFillAlpha = 0.3f
-private const val LightFieldFillAlpha = 0.06f
-private const val LightHandleAlpha = 0.24f
+private const val GlassFillAlpha = 0.7f
+
+// strokeGlass is not in the Android design system yet; its value in every theme is bgSurfaceContainerInverted at 0x1F.
+private const val GlassStrokeAlpha = 0x1F / 255f
+private const val HighlightAlpha = 0.12f
+private const val FieldFillAlpha = 0.06f
+private const val FieldLineAlpha = 0.18f
+private const val FieldOutlineAlpha = 0.08f
+private const val HandleAlpha = 0.32f
 
 @Immutable
 data class DockletPalette(
-    val glassBase: Color,
-    val cardFill: Color,
-    val placeholder: Color,
-    val sectionHeader: Color,
-    val searchIcon: Color,
-    val fieldFill: Color,
-    val handle: Color,
-    val ripple: Color,
+    val glassFill: Color,
+    val glassStroke: Color,
     val highlight: Color,
+    val fieldFill: Color,
+    val fieldLine: Color,
+    val fieldOutline: Color,
+    val handle: Color,
     val clearBackground: Color,
     val clearGlyph: Color,
+    val caret: Color,
+    val cameraBacking: Color,
+    val ripple: Color,
 )
 
-private val DarkDockletPalette = DockletPalette(
-    glassBase = Color.Transparent,
-    cardFill = DockletColors.CardFill,
-    placeholder = DockletColors.Placeholder,
-    sectionHeader = DockletColors.SectionHeader,
-    searchIcon = DockletColors.SearchIcon,
-    fieldFill = DockletColors.FieldFill,
-    handle = DockletColors.Handle,
-    ripple = DockletColors.Ripple,
-    highlight = DockletColors.Light,
-    clearBackground = DockletColors.ClearBackground,
-    clearGlyph = DockletColors.ClearGlyph,
-)
+private fun dockletPalette(colors: PolkadotColorsPalette): DockletPalette {
+    val inverted = colors.bg.surface.containerInverted
+    return DockletPalette(
+        glassFill = colors.bg.surface.container.copy(alpha = GlassFillAlpha),
+        glassStroke = inverted.copy(alpha = GlassStrokeAlpha),
+        highlight = inverted.copy(alpha = HighlightAlpha),
+        fieldFill = inverted.copy(alpha = FieldFillAlpha),
+        fieldLine = inverted.copy(alpha = FieldLineAlpha),
+        fieldOutline = inverted.copy(alpha = FieldOutlineAlpha),
+        handle = inverted.copy(alpha = HandleAlpha),
+        clearBackground = colors.bg.action.secondary,
+        clearGlyph = colors.fg.primary,
+        caret = colors.bg.accent,
+        cameraBacking = colors.bg.surface.container,
+        ripple = colors.fg.primary,
+    )
+}
 
-private fun lightDockletPalette(colors: PolkadotColorsPalette) = DockletPalette(
-    glassBase = colors.bg.surface.main.copy(alpha = LightGlassBaseAlpha),
-    cardFill = colors.bg.surface.main.copy(alpha = LightCardFillAlpha),
-    placeholder = colors.fg.secondary,
-    sectionHeader = colors.fg.secondary,
-    searchIcon = colors.fg.secondary,
-    fieldFill = colors.fg.primary.copy(alpha = LightFieldFillAlpha),
-    handle = colors.fg.primary.copy(alpha = LightHandleAlpha),
-    ripple = colors.fg.primary,
-    highlight = colors.fg.primary,
-    clearBackground = colors.fg.tertiary,
-    clearGlyph = colors.fg.primaryInverted,
-)
-
-val LocalDockletPalette = staticCompositionLocalOf { DarkDockletPalette }
+val LocalDockletPalette = staticCompositionLocalOf { dockletPalette(PolkadotAppTheme.BerlinNight.colors()) }
 
 @Composable
 fun DockletGlassTheme(content: @Composable () -> Unit) {
-    val pageColors = LocalPolkadotColors.current
-    val pageIsLight = pageColors.bg.surface.main.luminance() > LightPageLuminance
-    val darkColors = remember { PolkadotAppTheme.BerlinNight.colors() }
-    val colors = if (pageIsLight) pageColors else darkColors
-    val palette = remember(colors) { if (pageIsLight) lightDockletPalette(colors) else DarkDockletPalette }
+    val colors = LocalPolkadotColors.current
+    val palette = remember(colors) { dockletPalette(colors) }
     CompositionLocalProvider(
         LocalDockletPalette provides palette,
-        LocalPolkadotColors provides colors,
         LocalContentColor provides colors.fg.primary,
         LocalIndication provides ripple(color = colors.fg.primary),
         LocalTextSelectionColors provides TextSelectionColors(

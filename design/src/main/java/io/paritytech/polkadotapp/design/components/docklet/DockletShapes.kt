@@ -34,14 +34,6 @@ internal fun dockPath(size: Size, density: Float): Path {
     }
 }
 
-internal fun cutoutPath(width: Float, density: Float): Path {
-    val cutout = DockletGeometry.cutout(width / density / 2)
-    return Path().apply {
-        moveTo(cutout.start.x * density, cutout.start.y * density)
-        addSegments(cutout.segments, density)
-    }
-}
-
 internal fun cardPath(size: Size, density: Float, pillShare: Float): Path {
     val bodyHeight = size.height / density - DockletGeometry.LobeDepth.value
     val outline = DockletGeometry.cardOutlineCurves(size.width / density, bodyHeight, pillShare)

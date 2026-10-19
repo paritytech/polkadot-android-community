@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,7 +34,6 @@ import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.components.text.PolkadotInputField
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 
-private val CaretBrush = SolidColor(DockletColors.Caret)
 private val SearchKeyboardOptions = KeyboardOptions(
     capitalization = KeyboardCapitalization.None,
     autoCorrectEnabled = false,
@@ -59,7 +59,7 @@ fun DockletSearchButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(DockletGeometry.FieldHeight)
-                .dockletFieldOutline(shape),
+                .dockletFieldOutline(shape, LocalDockletPalette.current),
             style = rememberDockletFieldButtonStyle(),
             size = PolkadotButtonSize.large(),
             shape = shape,
@@ -74,13 +74,13 @@ private fun SearchButtonContent(text: String) {
         NovaIcon(
             modifier = Modifier.size(ButtonSearchIconSize),
             imageVector = NovaIcons.Search,
-            tint = LocalDockletPalette.current.searchIcon,
+            tint = PolkadotTheme.colors.fg.primary,
         )
         HorizontalSpacer { tiny }
         NovaText(
             text = text,
-            style = DockletTypography.FieldPlaceholder,
-            color = LocalDockletPalette.current.placeholder,
+            style = PolkadotTheme.typography.body.medium,
+            color = PolkadotTheme.colors.fg.secondary,
             maxLines = 1,
         )
     }
@@ -111,7 +111,7 @@ private fun SearchFieldRow(value: String, onValueChange: (String) -> Unit, place
             .fillMaxWidth()
             .dockletDragExclusion(exclusion)
             .height(DockletGeometry.FieldHeight)
-            .dockletFieldOutline(shape),
+            .dockletFieldOutline(shape, LocalDockletPalette.current),
         shape = shape,
         color = LocalDockletPalette.current.fieldFill,
     ) {
@@ -121,6 +121,8 @@ private fun SearchFieldRow(value: String, onValueChange: (String) -> Unit, place
 
 @Composable
 private fun SearchFieldContent(value: String, onValueChange: (String) -> Unit, placeholder: String, horizontalPadding: Dp) {
+    val caret = LocalDockletPalette.current.caret
+    val caretBrush = remember(caret) { SolidColor(caret) }
     Row(
         modifier = Modifier.padding(start = horizontalPadding, end = horizontalPadding - (ClearTouchTarget - ClearCircleSize) / 2),
         verticalAlignment = Alignment.CenterVertically,
@@ -128,21 +130,21 @@ private fun SearchFieldContent(value: String, onValueChange: (String) -> Unit, p
         NovaIcon(
             modifier = Modifier.size(FieldSearchIconSize),
             imageVector = NovaIcons.Search,
-            tint = LocalDockletPalette.current.searchIcon,
+            tint = PolkadotTheme.colors.fg.primary,
         )
         HorizontalSpacer { tiny }
         PolkadotInputField(
             modifier = Modifier.weight(1f),
             value = value,
             onValueChange = onValueChange,
-            textStyle = DockletTypography.Query.copy(color = PolkadotTheme.colors.fg.primary),
-            cursorBrush = CaretBrush,
+            textStyle = PolkadotTheme.typography.body.large.copy(color = PolkadotTheme.colors.fg.primary),
+            cursorBrush = caretBrush,
             keyboardOptions = SearchKeyboardOptions,
             placeholder = {
                 NovaText(
                     text = placeholder,
-                    style = DockletTypography.Query,
-                    color = LocalDockletPalette.current.placeholder,
+                    style = PolkadotTheme.typography.body.large,
+                    color = PolkadotTheme.colors.fg.secondary,
                     maxLines = 1,
                 )
             },
@@ -181,7 +183,7 @@ private fun ClearButton(onClick: () -> Unit) {
 @Composable
 private fun DockletSearchFieldPreview() {
     PolkadotTheme {
-        PolkadotSurface(color = DockletColors.CardFill) {
+        PolkadotSurface(color = LocalDockletPalette.current.glassFill) {
             DockletSearchField(
                 modifier = Modifier.fillMaxWidth(),
                 value = "mo",

@@ -40,10 +40,10 @@ import io.paritytech.polkadotapp.design.components.avatar.Mock
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButtonSize
-import io.paritytech.polkadotapp.design.components.docklet.DockletColors
 import io.paritytech.polkadotapp.design.components.docklet.DockletGeometry
 import io.paritytech.polkadotapp.design.components.docklet.DockletSearchButton
 import io.paritytech.polkadotapp.design.components.docklet.DockletSearchField
+import io.paritytech.polkadotapp.design.components.docklet.LocalDockletPalette
 import io.paritytech.polkadotapp.design.components.docklet.dockletContentsTransition
 import io.paritytech.polkadotapp.design.components.docklet.dockletFieldOutline
 import io.paritytech.polkadotapp.design.components.docklet.rememberDockletFieldButtonStyle
@@ -166,7 +166,7 @@ private fun AddContactScanStep(
         PolkadotSurface(
             modifier = Modifier.size(ScanTileSize),
             shape = RoundedCornerShape(ScanTileRadius),
-            color = DockletColors.CameraBacking,
+            color = LocalDockletPalette.current.cameraBacking,
         ) {
             scanner(Modifier.fillMaxSize())
         }
@@ -205,7 +205,7 @@ private fun AddContactSearchStep(
         Row(verticalAlignment = Alignment.CenterVertically) {
             val shape = PolkadotButtonShape.pill
             PolkadotIconButton(
-                modifier = Modifier.dockletFieldOutline(shape),
+                modifier = Modifier.dockletFieldOutline(shape, LocalDockletPalette.current),
                 icon = NovaIcons.ScanFrame,
                 onClick = actions.onScanClick,
                 style = rememberDockletFieldButtonStyle(),
@@ -243,7 +243,7 @@ private data class AddContactPanelActions(
 @Composable
 private fun AddContactPanelPreview(state: AddContactUiState, step: AddContactStep) {
     PolkadotTheme {
-        PolkadotSurface(color = DockletColors.CardFill) {
+        PolkadotSurface(color = LocalDockletPalette.current.glassFill) {
             AddContactPanelInternal(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -36,40 +35,6 @@ fun PolkadotAvatar(
     modifier: Modifier,
     onClick: (() -> Unit)? = null
 ) {
-    AvatarContent(
-        modifier = modifier,
-        model = model,
-        initialStyle = { boxSize -> rememberAvatarTextStyle(boxSize) },
-        initialColor = { colorScheme -> colorScheme.foreground },
-        onClick = onClick
-    )
-}
-
-@Composable
-fun PolkadotAvatar(
-    modifier: Modifier,
-    model: AvatarUiModel,
-    initialStyle: TextStyle,
-    initialColor: Color,
-    onClick: (() -> Unit)? = null
-) {
-    AvatarContent(
-        modifier = modifier,
-        model = model,
-        initialStyle = { initialStyle },
-        initialColor = { initialColor },
-        onClick = onClick
-    )
-}
-
-@Composable
-private fun AvatarContent(
-    modifier: Modifier,
-    model: AvatarUiModel,
-    initialStyle: @Composable (boxSize: Dp) -> TextStyle,
-    initialColor: @Composable (AvatarColorScheme) -> Color,
-    onClick: (() -> Unit)?
-) {
     when (model) {
         is AvatarUiModel.Image -> ImageAvatar(
             modifier = modifier,
@@ -81,8 +46,6 @@ private fun AvatarContent(
             modifier = modifier,
             name = model.name,
             colorScheme = model.colorScheme,
-            initialStyle = initialStyle,
-            initialColor = initialColor(model.colorScheme),
             onClick = onClick
         )
     }
@@ -112,8 +75,6 @@ private fun LetterAvatar(
     modifier: Modifier,
     name: String,
     colorScheme: AvatarColorScheme,
-    initialStyle: @Composable (boxSize: Dp) -> TextStyle,
-    initialColor: Color,
     onClick: (() -> Unit)?
 ) {
     val firstLetter = name.firstOrNull()?.uppercase() ?: "?"
@@ -131,8 +92,8 @@ private fun LetterAvatar(
 
             NovaText(
                 text = firstLetter,
-                style = initialStyle(boxSize),
-                color = initialColor,
+                style = rememberAvatarTextStyle(boxSize),
+                color = colorScheme.foreground,
                 textAlign = TextAlign.Center
             )
         }

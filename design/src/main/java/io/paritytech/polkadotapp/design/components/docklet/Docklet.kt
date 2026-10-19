@@ -27,9 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.dropShadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -54,10 +51,6 @@ import kotlinx.collections.immutable.persistentListOf
 
 private val SlotIconSize = 28.dp
 private val HighlightMillis = DockletMotion.HighlightDuration.inWholeMilliseconds.toInt()
-private val ShadowOffsetY = 14.dp
-private val ShadowSpread = (-6).dp
-private val ShadowSigma = 15.dp
-private const val ShadowAlpha = 0.5f
 
 @Immutable
 data class DockletSlot(
@@ -100,22 +93,6 @@ private fun DockSurface(
             .fillMaxWidth()
             .height(DockletGeometry.DockHeight),
     ) {
-        // Fade through the layer: dropShadow caches one bitmap per Shadow value, alpha included.
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer {
-                    alpha = 1f - cardProgress().coerceIn(0f, 1f)
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
-                }
-                .dropShadow(DockShape) {
-                    radius = DockletMaterials.blurRadiusPx(ShadowSigma.value, density)
-                    spread = ShadowSpread.toPx()
-                    offset = Offset(0f, ShadowOffsetY.toPx())
-                    color = DockletColors.Shade
-                    alpha = ShadowAlpha
-                },
-        )
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -127,8 +104,7 @@ private fun DockSurface(
                 )
                 .drawWithCache {
                     val path = dockPath(size, density)
-                    val cutout = cutoutPath(size.width, density)
-                    onDrawBehind { drawDockGlass(path, cutout, palette.glassBase) }
+                    onDrawBehind { drawDockletGlass(path, palette) }
                 }
                 .clip(DockShape),
         ) {
@@ -188,7 +164,7 @@ private fun SlotItem(span: DockletSpan, slot: DockletSlot, iconShift: Dp, onClic
     val interactionSource = remember { MutableInteractionSource() }
     val palette = LocalDockletPalette.current
     val iconColor by animateColorAsState(
-        targetValue = if (slot.selected) PolkadotTheme.colors.fg.primary else palette.placeholder,
+        targetValue = if (slot.selected) PolkadotTheme.colors.fg.primary else PolkadotTheme.colors.fg.secondary,
         animationSpec = tween(HighlightMillis, easing = DockletMotion.HighlightEasing),
         label = "DockletSlotIconColor",
     )

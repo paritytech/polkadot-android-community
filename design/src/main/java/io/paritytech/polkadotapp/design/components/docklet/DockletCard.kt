@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -226,19 +225,8 @@ private fun CardLayer(
             }
             .dockletBackdrop(backdrop, shape, { DockletMaterials.PillBlurSigma }, DockletMaterials.PillSaturation)
             .drawWithCache {
-                val progress = morphProgress()
-                val path = cardPath(size, density, 1f - progress)
-                val bodyHeight = size.height - DockletGeometry.LobeDepth.toPx()
-                onDrawBehind {
-                    drawCardGlass(
-                        path = path,
-                        fillBlend = DockletMotion.cardFillBlend(progress),
-                        pillArcAlpha = 1f - progress,
-                        pillCentre = Offset(size.width / 2, bodyHeight + dockletIconCentreBelowBody(progress).toPx()),
-                        base = palette.glassBase,
-                        cardFill = palette.cardFill,
-                    )
-                }
+                val path = cardPath(size, density, 1f - morphProgress())
+                onDrawBehind { drawDockletGlass(path, palette) }
             },
         content = content,
     )

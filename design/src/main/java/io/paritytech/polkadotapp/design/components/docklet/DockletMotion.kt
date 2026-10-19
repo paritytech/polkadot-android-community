@@ -34,8 +34,6 @@ object DockletMotion {
     private const val WidthDelay = 0.04f
     private const val WidthSmoothstepShare = 0.35f
     private const val SwipeContentsFrom = 0.88f
-    private const val CardFillFrom = 0.2f
-    private const val CardFillTo = 0.7f
     private val ContentsRise = 8.dp
     private val ContentsBlur = 8.dp
 
@@ -73,7 +71,4 @@ object DockletMotion {
 
     fun swipeContentsAlpha(swipeProgress: Float): Float =
         ((swipeProgress - SwipeContentsFrom) / (1f - SwipeContentsFrom)).coerceIn(0f, 1f)
-
-    fun cardFillBlend(morphProgress: Float): Float =
-        ((morphProgress - CardFillFrom) / (CardFillTo - CardFillFrom)).coerceIn(0f, 1f)
 }

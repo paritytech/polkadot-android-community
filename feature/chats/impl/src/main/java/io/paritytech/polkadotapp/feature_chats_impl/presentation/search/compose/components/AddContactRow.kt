@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import io.paritytech.polkadotapp.design.components.avatar.AvatarUiModel
 import io.paritytech.polkadotapp.design.components.avatar.PolkadotAvatar
-import io.paritytech.polkadotapp.design.components.docklet.DockletTypography
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatSearch.compose.components.ChatSearchPersonAvatarSize
@@ -34,13 +33,11 @@ internal fun AddContactRow(
         PolkadotAvatar(
             modifier = Modifier.size(ChatSearchPersonAvatarSize),
             model = avatarModel,
-            initialStyle = DockletTypography.AvatarInitial,
-            initialColor = PolkadotTheme.colors.fg.primary,
         )
         NovaText(
             modifier = Modifier.weight(1f),
             text = title,
-            style = DockletTypography.RowTitle,
+            style = PolkadotTheme.typography.body.largeEmphasized,
             color = PolkadotTheme.colors.fg.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

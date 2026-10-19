@@ -114,22 +114,6 @@ class DockletMotionTest {
     }
 
     @Test
-    fun `card fill keeps the Pill gradient when morph progress is 0 2`() {
-        assertEquals(0f, DockletMotion.cardFillBlend(0.2f), EPS)
-        assertEquals(0f, DockletMotion.cardFillBlend(0.1f), EPS)
-    }
-
-    @Test
-    fun `card fill is halfway to flat when morph progress is 0 45`() {
-        assertEquals(0.5f, DockletMotion.cardFillBlend(0.45f), EPS)
-    }
-
-    @Test
-    fun `card fill is flat when morph progress is 0 7`() {
-        assertEquals(1f, DockletMotion.cardFillBlend(0.7f), EPS)
-    }
-
-    @Test
     fun `contents-in easing holds 0 when the transition is still inside the delay`() {
         assertEquals(0f, DockletMotion.ContentsInEasing.transform(0.6f), EPS)
     }
