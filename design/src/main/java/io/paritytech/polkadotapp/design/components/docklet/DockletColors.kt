@@ -93,7 +93,7 @@ fun DockletGlassTheme(content: @Composable () -> Unit) {
     val pageIsLight = pageColors.bg.surface.main.luminance() > LightPageLuminance
     val darkColors = remember { PolkadotAppTheme.BerlinNight.colors() }
     val colors = if (pageIsLight) pageColors else darkColors
-    val palette = remember(colors, pageIsLight) { if (pageIsLight) lightDockletPalette(colors) else DarkDockletPalette }
+    val palette = remember(colors) { if (pageIsLight) lightDockletPalette(colors) else DarkDockletPalette }
     CompositionLocalProvider(
         LocalDockletPalette provides palette,
         LocalPolkadotColors provides colors,

@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -73,11 +74,7 @@ private fun LobeIcon(progress: () -> Float, open: Boolean, iconColor: @Composabl
     PolkadotIconButton(
         modifier = Modifier
             .clearAndSetSemantics {}
-            .graphicsLayer {
-                val scale = dockletIconSize(progress()) / RestIconSize
-                scaleX = scale
-                scaleY = scale
-            },
+            .graphicsLayer { scaleWithLobe(progress()) },
         icon = NovaIcons.ScanFrame,
         onClick = onClose,
         enabled = open,
@@ -89,14 +86,18 @@ private fun LobeIcon(progress: () -> Float, open: Boolean, iconColor: @Composabl
         modifier = Modifier
             .size(RestIconSize)
             .graphicsLayer {
-                val scale = dockletIconSize(progress()) / RestIconSize
-                scaleX = scale
-                scaleY = scale
+                scaleWithLobe(progress())
                 alpha = 1f - progress().coerceIn(0f, 1f)
             },
         imageVector = NovaIcons.ScanPlus,
         tint = color,
     )
+}
+
+private fun GraphicsLayerScope.scaleWithLobe(progress: Float) {
+    val scale = dockletIconSize(progress) / RestIconSize
+    scaleX = scale
+    scaleY = scale
 }
 
 @Immutable
