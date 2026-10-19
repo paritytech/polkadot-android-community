@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies
 
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.StrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.plusHop
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.splitHop
@@ -70,7 +71,7 @@ class SplitCoinStrategy(
             }
         }
 
-    private suspend fun CoinageTransaction.mintSplitOutputs(): Result<TransferOutputs> = runCatching {
+    private suspend fun CoinageTransaction.mintSplitOutputs(): Result<TransferOutputs> = runCancellableCatching {
         consumeCoin(coinToSplit)
         handOffCoins(exactCoins)
         val recipientCoins = mintAndHandOffCoins(recipientDenominations, splitProvenance).getOrThrow()
