@@ -88,6 +88,15 @@ class PermissionStateManagerTest {
     }
 
     @Test
+    fun `record of an earlier rationale is forgotten when the permission is granted`() {
+        withRationaleShownRecord()
+        manager.onPermissionResult(CAMERA, isGranted = true)
+        withRationale(false)
+
+        assertEquals(PermissionResult.DENIED, manager.onPermissionResult(CAMERA, isGranted = false))
+    }
+
+    @Test
     fun `denial is not permanent when only another permission was denied before`() {
         withEarlierDenial()
         withRationale(false)

@@ -26,7 +26,7 @@ class PermissionStateManager @Inject constructor(
         return result
     }
 
-    // No rationale is ambiguous (never asked, dismissed, or denied for good), so an earlier denial decides.
+    // shouldShowRationale is false whether the permission was never asked, dismissed, or denied for good.
     private fun resolveDenial(shouldShowRationale: Boolean, wasDeniedBefore: Boolean): PermissionResult {
         return when {
             shouldShowRationale -> PermissionResult.DENIED

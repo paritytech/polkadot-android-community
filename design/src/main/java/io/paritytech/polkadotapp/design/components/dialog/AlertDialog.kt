@@ -4,7 +4,7 @@ package io.paritytech.polkadotapp.design.components.dialog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -88,9 +88,10 @@ private fun AlertDialogContent(
             )
             VerticalSpacer { large }
 
-            Row(
+            FlowRow(
                 modifier = Modifier.align(Alignment.End),
-                horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
+                horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.small)
             ) {
                 if (negativeButtonTitle != null) {
                     PolkadotTextButton(
