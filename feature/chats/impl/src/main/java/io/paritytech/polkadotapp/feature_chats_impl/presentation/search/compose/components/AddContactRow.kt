@@ -37,7 +37,7 @@ internal fun AddContactRow(
         NovaText(
             modifier = Modifier.weight(1f),
             text = title,
-            style = PolkadotTheme.typography.body.largeEmphasized,
+            style = PolkadotTheme.typography.title.medium,
             color = PolkadotTheme.colors.fg.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
