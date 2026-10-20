@@ -1,10 +1,9 @@
 package io.paritytech.polkadotapp.design.components.docklet
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -46,6 +46,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.GlobeAltFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.SettingsFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.WalletFilled
 import io.paritytech.polkadotapp.design.components.navigationbar.NotificationDot
+import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -141,12 +142,13 @@ private fun SlotRow(
             label = "DockletHighlightCentre",
         )
         if (selectedIndex in centres.indices) {
-            Box(
+            PolkadotSurface(
                 modifier = Modifier
                     .offset { IntOffset((highlightCentre - DockletGeometry.SlotWidth / 2).roundToPx(), 0) }
-                    .size(DockletGeometry.SlotWidth, DockletGeometry.ItemRowHeight)
-                    .background(LocalDockletPalette.current.highlight, CircleShape),
-            )
+                    .size(DockletGeometry.SlotWidth, DockletGeometry.ItemRowHeight),
+                shape = CircleShape,
+                color = LocalDockletPalette.current.highlight,
+            ) {}
         }
         slots.zip(spans).forEachIndexed { index, (slot, span) ->
             SlotItem(
@@ -162,11 +164,12 @@ private fun SlotRow(
 @Composable
 private fun SlotItem(span: DockletSpan, slot: DockletSlot, iconShift: Dp, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
-    val iconColor by animateColorAsState(
-        targetValue = if (slot.selected) PolkadotTheme.colors.fg.primary else PolkadotTheme.colors.fg.secondary,
+    val selection by animateFloatAsState(
+        targetValue = if (slot.selected) 1f else 0f,
         animationSpec = tween(HighlightMillis, easing = DockletMotion.HighlightEasing),
-        label = "DockletSlotIconColor",
+        label = "DockletSlotSelection",
     )
+    val iconColor = lerp(PolkadotTheme.colors.fg.secondary, PolkadotTheme.colors.fg.primary, selection)
     Box(
         modifier = Modifier
             .offset { IntOffset(span.start.roundToPx(), 0) }
