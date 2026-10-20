@@ -17,15 +17,12 @@ class RealAppThemeSelector @Inject constructor(
 ) : AppThemeSelector {
     override val selectedTheme: Flow<PolkadotAppTheme> = preferences
         .stringFlow(KEY_SELECTED_APP_THEME_ID)
-        .map(::themeFromId)
+        .map(PolkadotAppTheme.Companion::fromId)
 
     override val currentTheme: PolkadotAppTheme
-        get() = themeFromId(preferences.getString(KEY_SELECTED_APP_THEME_ID))
+        get() = PolkadotAppTheme.fromId(preferences.getString(KEY_SELECTED_APP_THEME_ID))
 
     override fun select(theme: PolkadotAppTheme) {
         preferences.edit { putString(KEY_SELECTED_APP_THEME_ID, theme.id) }
     }
 }
-
-private fun themeFromId(id: String?): PolkadotAppTheme =
-    id?.let(PolkadotAppTheme.Companion::fromId) ?: PolkadotAppTheme.DEFAULT
