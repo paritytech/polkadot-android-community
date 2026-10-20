@@ -47,7 +47,8 @@ fun PolkadotTheme(
     content: @Composable () -> Unit
 ) {
     val selector = rememberAppThemeSelector()
-    val theme by selector.selectedTheme.collectAsStateWithLifecycle(PolkadotAppTheme.DEFAULT)
+    val initialTheme = remember(selector) { selector.currentTheme }
+    val theme by selector.selectedTheme.collectAsStateWithLifecycle(initialTheme)
 
     val activity = LocalActivity.current
     if (activity != null) {
@@ -145,6 +146,7 @@ private val PolkadotAppTheme.isDark: Boolean
 
 private object DefaultAppThemeSelector : AppThemeSelector {
     override val selectedTheme = flowOf(PolkadotAppTheme.DEFAULT)
+    override val currentTheme = PolkadotAppTheme.DEFAULT
     override fun select(theme: PolkadotAppTheme) = Unit
 }
 

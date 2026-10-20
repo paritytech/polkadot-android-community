@@ -6,5 +6,7 @@ import kotlinx.coroutines.flow.Flow
 interface AppThemeSelector {
     val selectedTheme: Flow<PolkadotAppTheme>
 
+    val currentTheme: PolkadotAppTheme
+
     fun select(theme: PolkadotAppTheme)
 }
