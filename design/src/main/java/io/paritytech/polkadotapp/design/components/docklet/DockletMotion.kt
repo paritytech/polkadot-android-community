@@ -2,6 +2,8 @@ package io.paritytech.polkadotapp.design.components.docklet
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.TweenSpec
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -30,6 +32,8 @@ object DockletMotion {
     val ContentsInEasing = Easing { contentsIn((ContentsInDelay + ContentsInDuration) * it.toDouble()).alpha }
     val ContentsOutEasing = Easing { 1f - contentsOutAlpha(ContentsOutDuration * it.toDouble()) }
     val HighlightEasing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
+
+    fun <T> stepChangeSpec(): TweenSpec<T> = tween(MorphDuration.inWholeMilliseconds.toInt(), easing = HeightEasing)
 
     private const val WidthDelay = 0.04f
     private const val WidthSmoothstepShare = 0.35f

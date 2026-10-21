@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -80,6 +79,7 @@ import io.paritytech.polkadotapp.design.components.docklet.DockletGeometry
 import io.paritytech.polkadotapp.design.components.docklet.DockletSlot
 import io.paritytech.polkadotapp.design.components.docklet.DockletStep
 import io.paritytech.polkadotapp.design.components.docklet.liftDockWhileKeyboardLeaves
+import io.paritytech.polkadotapp.design.components.docklet.rememberDockletKeyboardHeight
 import io.paritytech.polkadotapp.design.components.icon.NovaIcon
 import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.NetworkStatus
@@ -146,7 +146,7 @@ fun RootNavBar(
     val navigationInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val threeButtonNavigation = WindowInsets.tappableElement.asPaddingValues().calculateBottomPadding() > 0.dp
     val statusInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val ime = WindowInsets.ime
+    val keyboardHeight = rememberDockletKeyboardHeight()
     val networkStatusItem = FeatureOption.TAB_BAR_CONNECTIVITY_INDICATOR.isEnabled
     val currentOnRestingHeightChange by rememberUpdatedState(onRestingHeightChange)
     val currentOnBarWidthChange by rememberUpdatedState(onBarWidthChange)
@@ -154,12 +154,12 @@ fun RootNavBar(
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val dock = DockletGeometry.dockFrame(maxWidth, maxHeight, navigationInset, threeButtonNavigation)
         val screenHeight = maxHeight
-        val keyboardTop = { screenHeight - with(density) { ime.getBottom(density).toDp() } }
+        val keyboardTop = { screenHeight - keyboardHeight() }
         var dockOnKeyboard by remember { mutableStateOf(false) }
-        LaunchedEffect(cardState, ime, density) {
+        LaunchedEffect(cardState, keyboardHeight) {
             liftDockWhileKeyboardLeaves(
                 cardOpen = snapshotFlow { cardState.isOpen },
-                keyboardUp = snapshotFlow { ime.getBottom(density) > 0 },
+                keyboardUp = snapshotFlow { keyboardHeight() > 0.dp },
                 onLift = { dockOnKeyboard = it },
             )
         }

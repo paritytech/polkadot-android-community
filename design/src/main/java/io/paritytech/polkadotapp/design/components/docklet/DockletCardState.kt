@@ -230,8 +230,7 @@ class DockletCardState internal constructor(
         if (height.value <= 0f) {
             stepBlend.snapTo(blend)
         } else {
-            val millis = DockletMotion.MorphDuration.inWholeMilliseconds.toInt()
-            stepBlend.animateTo(blend, tween(millis, easing = DockletMotion.HeightEasing))
+            stepBlend.animateTo(blend, DockletMotion.stepChangeSpec())
         }
     }
 
