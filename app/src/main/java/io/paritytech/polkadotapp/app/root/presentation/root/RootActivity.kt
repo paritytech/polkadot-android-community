@@ -45,7 +45,6 @@ import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.ObserveViewModelEvents
 import io.paritytech.polkadotapp.common.utils.observe
 import io.paritytech.polkadotapp.common.utils.observeWhenCreated
-import io.paritytech.polkadotapp.design.theme.AppThemeSelector
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.designsystem.themes.PolkadotAppTheme
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.ChainHealthBar
@@ -70,9 +69,6 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
 
     @Inject
     lateinit var paymentAssetBrandProvider: PaymentAssetBrandProvider
-
-    @Inject
-    lateinit var appThemeSelector: AppThemeSelector
 
     private val viewModel by viewModels<RootViewModel>()
 
@@ -126,7 +122,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
     private fun syncSplashScreenTheme() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
 
-        appThemeSelector.selectedTheme.observeWhenCreated { theme ->
+        viewModel.appTheme.observeWhenCreated { theme ->
             splashScreen.setSplashScreenTheme(theme.splashScreenTheme)
         }
     }
