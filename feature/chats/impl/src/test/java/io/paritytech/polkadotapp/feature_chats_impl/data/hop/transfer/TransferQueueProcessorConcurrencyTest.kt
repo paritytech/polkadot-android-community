@@ -2,14 +2,10 @@
 
 package io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer
 
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.mockk
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.HopTransferRetryState
 import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -394,14 +390,13 @@ class TransferQueueProcessorConcurrencyTest {
 
     @Test
     fun `the sequential pass keeps one item in flight when more are pending`() = runTest {
-        val queue = mockk<TransferQueue<FakeItem>>(relaxUnitFun = true)
-        coEvery { queue.nextPending() } returns FakeItem("a", HopTransferRetryState.None)
-        coEvery { queue.process(any()) } coAnswers { awaitCancellation() }
+        val queue = FakeSequentialQueue()
+        queue.addHanging("a", "b", "c")
 
         backgroundScope.launch { processor().processPending(queue) }
         runCurrent()
 
-        coVerify(exactly = 1) { queue.process(any()) }
+        assertEquals(1, queue.inFlightCount)
     }
 
     private fun TestScope.processor() =
