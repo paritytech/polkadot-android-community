@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushToken
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage.Content
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.DeviceInfo
 import java.util.UUID
+import kotlin.time.Duration.Companion.hours
 
 typealias ChatMessageId = String
 
@@ -74,6 +75,15 @@ data class ChatMessage(
                 data class Transferred(val amount: Balance) : Status
                 data object FailedDetection : Status
                 data object FailedTransfer : Status
+                data object Unclaimed : Status
+                data object ReturnedToSender : Status
+                data object Reclaiming : Status
+                data class Reclaimed(val amount: Balance) : Status
+                data object ReclaimFailed : Status
+            }
+
+            companion object {
+                val CLAIM_WINDOW = 6.hours
             }
         }
 

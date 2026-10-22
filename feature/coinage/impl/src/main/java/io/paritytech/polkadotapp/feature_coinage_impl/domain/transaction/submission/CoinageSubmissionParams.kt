@@ -16,6 +16,7 @@ import kotlin.time.Instant
 const val COINAGE_SPLIT_POLICY_ID = "coinage-split"
 const val COINAGE_UNLOAD_POLICY_ID = "coinage-unload"
 const val COINAGE_CLAIM_POLICY_ID = "coinage-claim"
+const val COINAGE_RECLAIM_POLICY_ID = "coinage-reclaim"
 
 /**
  * What a transfer's policy needs beyond the ledger. The transfer gives up once [buildUntil] has passed with its
@@ -43,10 +44,13 @@ object CoinageSubmissionParams {
     val SPLIT_POLICY_ID = SubmissionPolicyId(COINAGE_SPLIT_POLICY_ID)
     val UNLOAD_POLICY_ID = SubmissionPolicyId(COINAGE_UNLOAD_POLICY_ID)
     val CLAIM_POLICY_ID = SubmissionPolicyId(COINAGE_CLAIM_POLICY_ID)
+    val RECLAIM_POLICY_ID = SubmissionPolicyId(COINAGE_RECLAIM_POLICY_ID)
 
     fun splitPolicy(params: TransferSubmissionParams) = SubmissionPolicy(SPLIT_POLICY_ID, params.encode())
 
     fun unloadPolicy(params: TransferSubmissionParams) = SubmissionPolicy(UNLOAD_POLICY_ID, params.encode())
+
+    fun reclaimPolicy(params: TransferSubmissionParams) = SubmissionPolicy(RECLAIM_POLICY_ID, params.encode())
 
     fun claimPolicy(params: ClaimSubmissionParams) = SubmissionPolicy(
         id = CLAIM_POLICY_ID,

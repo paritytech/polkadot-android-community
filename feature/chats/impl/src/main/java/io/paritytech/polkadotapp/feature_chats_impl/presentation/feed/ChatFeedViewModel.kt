@@ -509,7 +509,14 @@ class ChatFeedViewModel @Inject constructor(
             is MessageAction.DismissActionMenu -> {
                 messagePopupSection.update { null }
             }
+
+            is MessageAction.ReclaimPayment -> reclaimPayment(action.message.id)
         }
+    }
+
+    private fun reclaimPayment(messageId: ChatMessageId) = launchUnit {
+        interactor.reclaimPayment(chatId, messageId)
+            .onFailure { showError(it) }
     }
 
     override fun onAcceptChatRequest() = launchUnit {

@@ -66,10 +66,13 @@ class RealCoinageAssetLedger @Inject constructor(
             return CoinageRegistrationError.OutputNotFresh(it.output)
         }
 
-        // Blocked handoff: a handed-off asset is never an input.
+        // Blocked handoff: a handed-off asset is never an input, unless it is being reclaimed.
         val handedOff = scope.filterHandedOff(inputKeys)
-        inputs.firstOrNull { it.publicKey in handedOff }?.let {
+        inputs.firstOrNull { it.publicKey in handedOff && it.input !is CoinageInput.Coin.Reclaimed }?.let {
             return CoinageRegistrationError.InputHandedOff(it.input)
+        }
+        inputs.firstOrNull { it.publicKey !in handedOff && it.input is CoinageInput.Coin.Reclaimed }?.let {
+            return CoinageRegistrationError.ReclaimedInputNotHandedOff(it.input)
         }
 
         // Unique consumer: an asset is an input of at most one transaction that is not a failure.
@@ -301,6 +304,7 @@ private fun CoinageInput.kind() = when (this) {
 
 private fun CoinageInput.indexOrNull() = when (this) {
     is CoinageInput.Coin.Own -> derivationIndex
+    is CoinageInput.Coin.Reclaimed -> derivationIndex
     is CoinageInput.Coin.Received -> null
     is CoinageInput.Voucher -> ringVrfIndex
 }

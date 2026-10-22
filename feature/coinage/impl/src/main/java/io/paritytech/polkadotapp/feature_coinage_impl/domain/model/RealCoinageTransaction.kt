@@ -47,6 +47,10 @@ private class RealCoinageTransaction(
         inputs += CoinageInput.Coin.Received(publicKey)
     }
 
+    override fun reclaimCoin(coin: Coin) {
+        inputs += CoinageInput.Coin.Reclaimed(coin.derivationIndex)
+    }
+
     override fun useVouchers(vouchers: List<RecyclerVoucher>) {
         inputs += vouchers.map { CoinageInput.Voucher(it.ringVrfKeyIndex) }
     }

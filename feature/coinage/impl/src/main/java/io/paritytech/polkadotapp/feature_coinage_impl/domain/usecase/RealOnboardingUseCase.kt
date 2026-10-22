@@ -349,6 +349,7 @@ class RealOnboardingUseCase @Inject constructor(
 
         when (detection) {
             is CoinageTransferDetection.Detecting -> coinageLogD("Onboarding detecting group=$group")
+            is CoinageTransferDetection.Absent -> coinageLogD("Onboarding absent group=$group")
             is CoinageTransferDetection.Claiming -> coinageLogD("Onboarding in flight group=$group")
 
             is CoinageTransferDetection.ClaimingRest ->

@@ -11,6 +11,7 @@ data class ChatMessageSurfaceStyle(
     val backgroundColor: Color,
     val border: BorderStroke? = null,
     val textColor: Color? = null,
+    val alpha: Float = 1f,
 ) {
     companion object {
         @Composable
