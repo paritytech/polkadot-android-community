@@ -73,7 +73,9 @@ fun DigitalDollarCard(
                     )
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(LogoHeight),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -88,11 +90,13 @@ fun DigitalDollarCard(
                         )
                     }
 
-                    BalanceAmount(
-                        amounts = card.amounts,
-                        cardId = card.id,
-                        isHidden = isExpanded
-                    )
+                    Box(modifier = Modifier.wrapContentHeight(unbounded = true)) {
+                        BalanceAmount(
+                            amounts = card.amounts,
+                            cardId = card.id,
+                            isHidden = isExpanded
+                        )
+                    }
                 }
 
                 if (isExpanded) {
@@ -212,7 +216,7 @@ private object AmountShimmerSizes {
     val HEIGHT = 28.dp
 }
 
-private val LogoHeight = 36.dp
+private val LogoHeight = 32.dp
 
 @Preview
 @Composable
