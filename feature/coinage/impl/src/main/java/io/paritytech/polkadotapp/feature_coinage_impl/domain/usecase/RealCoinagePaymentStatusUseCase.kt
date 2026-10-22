@@ -80,8 +80,6 @@ class RealCoinagePaymentStatusUseCase @Inject constructor(
 }
 
 private fun TrackedCoin.paymentStatus(atFinalized: Map<AccountId, Boolean>): CoinagePaymentStatus = when {
-    // A handed-off coin is an input of nothing but our own reclaim, so a consumer here is that reclaim. It goes
-    // first: once it lands the coin is absent too, which the rules below would read as the peer's claim.
     state.consumerStatus == FINALIZED_SUCCESS -> CoinagePaymentStatus.Reclaimed(finalized = true)
 
     state.consumerStatus == DurableTxStatus.PENDING_SUCCESS -> CoinagePaymentStatus.Reclaimed(finalized = false)

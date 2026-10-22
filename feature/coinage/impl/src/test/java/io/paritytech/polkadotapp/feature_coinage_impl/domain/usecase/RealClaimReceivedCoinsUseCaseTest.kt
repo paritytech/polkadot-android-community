@@ -463,10 +463,6 @@ class RealClaimReceivedCoinsUseCaseTest {
         assertEquals(CoinageTransferDetection.Detecting, reported.first())
     }
 
-    /**
-     * The chain answered and none of the coins is there. The caller is told so, because after the claim window
-     * that is the sender having the money back — something "detecting" cannot say.
-     */
     @Test
     fun `a claim the chain answers with none of the coins reports them absent`() = runTest {
         val coin = key(1)
@@ -478,7 +474,6 @@ class RealClaimReceivedCoinsUseCaseTest {
         assertEquals(CoinageTransferDetection.Absent, reported.last())
     }
 
-    /** Absence is a reading of the chain, and a read that failed is not one. */
     @Test
     fun `a chain that never answered is not taken to say the coins are absent`() = runTest {
         val coin = key(1)

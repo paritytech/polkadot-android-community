@@ -14,7 +14,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
  */
 internal fun claimGroupOf(messageId: ChatMessageId) = CoinageOperationGroupId("chat-claim:$messageId")
 
-/** Derived from the message like [claimGroupOf], so the attempts the sender started can be found again. */
 internal fun reclaimGroupOf(messageId: ChatMessageId) = CoinageOperationGroupId("chat-reclaim:$messageId")
 
 internal fun CoinagePayment.coinAccountIds(): List<AccountId> =

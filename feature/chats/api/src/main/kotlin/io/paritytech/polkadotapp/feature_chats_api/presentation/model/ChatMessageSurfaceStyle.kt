@@ -11,7 +11,6 @@ data class ChatMessageSurfaceStyle(
     val backgroundColor: Color,
     val border: BorderStroke? = null,
     val textColor: Color? = null,
-    /** Applied to the bubble and its content as one layer, so nested surfaces dim with it rather than over it. */
     val alpha: Float = 1f,
 ) {
     companion object {

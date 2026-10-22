@@ -277,7 +277,6 @@ suspend fun DurabilityHarness.register(
     groupId = null,
 )
 
-/** [register], taking back a coin whose key was handed off. */
 suspend fun DurabilityHarness.registerReclaim(
     inputCoin: Int,
     outputCoin: Int,

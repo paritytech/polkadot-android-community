@@ -56,10 +56,8 @@ sealed interface CoinagePaymentStatus {
      */
     data class Claimed(val finalized: Boolean) : CoinagePaymentStatus
 
-    /** Our own transaction is taking it back and has not landed yet. */
     data object Reclaiming : CoinagePaymentStatus
 
-    /** Our own transaction took it back; [finalized] as in [Claimed]. */
     data class Reclaimed(val finalized: Boolean) : CoinagePaymentStatus
 }
 

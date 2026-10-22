@@ -94,7 +94,6 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
             val claimable = look.orEmpty()
 
-            // Only a look can say the coins are not there; a pass that got none keeps what the last one said.
             if (look != null) {
                 val absent = claimable.isEmpty() && settled.isEmpty()
                 if (absent && !nothingOnChain) reportDetection(groupId, CoinageTransferDetection.Absent, ::send)

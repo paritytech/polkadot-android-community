@@ -113,10 +113,6 @@ class RuleScenariosTest {
         assertTrue(claimAfterHandoff.exceptionOrNull() is CoinageRegistrationError.InputHandedOff)
     }
 
-    /**
-     * A reclaim is the one input a handoff mark lets through, only onto a coin that carries one, and only once:
-     * the Unique consumer rule still holds, which is what makes a second tap on the button harmless.
-     */
     @Test
     fun `a reclaim spends a handed-off coin once and nothing that was never handed off`() = scenario {
         mintCoinsOnChain(COIN_A, COIN_C, finality = FINALIZED)

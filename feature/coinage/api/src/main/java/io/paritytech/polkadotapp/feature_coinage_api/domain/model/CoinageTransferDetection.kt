@@ -12,10 +12,6 @@ sealed interface CoinageTransferDetection {
     /** Nothing the keys control is on chain yet, so there is nothing to claim. */
     data object Detecting : CoinageTransferDetection
 
-    /**
-     * [Detecting], with the chain having answered: none of the coins is on it and no claim of ours was registered.
-     * The sender took them back, never minted them, or has not minted them yet. Turns into [Claiming] if they show up.
-     */
     data object Absent : CoinageTransferDetection
 
     /**

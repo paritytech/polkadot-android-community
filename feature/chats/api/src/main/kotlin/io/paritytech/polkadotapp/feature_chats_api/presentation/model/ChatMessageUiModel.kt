@@ -84,7 +84,6 @@ sealed interface ChatMessageUiModel {
                     is ReturnedToSender -> false
                 }
 
-            /** The sender may take the coins back, from the bubble itself. */
             val canReclaim: Boolean
                 get() = this is Unclaimed || this is ReclaimFailed
 

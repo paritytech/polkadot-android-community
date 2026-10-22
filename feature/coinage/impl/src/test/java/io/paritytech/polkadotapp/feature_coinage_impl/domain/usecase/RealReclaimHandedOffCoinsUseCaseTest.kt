@@ -40,10 +40,6 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-/**
- * Taking back coins a peer never claimed. The peer still holds the keys, so only a coin still on chain is worth
- * a transaction, and a coin our own reclaim already holds must not get a second one.
- */
 @OptIn(ExperimentalTime::class)
 class RealReclaimHandedOffCoinsUseCaseTest {
     private val coinageAssetsUseCase: CoinageAssetsUseCase = mockk()
@@ -84,7 +80,6 @@ class RealReclaimHandedOffCoinsUseCaseTest {
         assertEquals(listOf(CoinageInput.Coin.Reclaimed(waiting.derivationIndex)), request.inputs)
     }
 
-    /** The peer got there first, or the coins are already on their way back: there is nothing to submit. */
     @Test
     fun `nothing is scheduled when no coin is left to reclaim`() = runTest {
         givenCoins(TrackedCoin(coin(1, onChain = false), handedOff(consumer = null)))
@@ -95,7 +90,6 @@ class RealReclaimHandedOffCoinsUseCaseTest {
         coVerify(exactly = 0) { transactionService.scheduleTransactions(any(), any()) }
     }
 
-    /** Trying again registers a new attempt for the same coin, and that attempt is what the coin answers to. */
     @Test
     fun `a coin reads as failed only while no newer attempt is live`() = runTest {
         every { transactionService.subscribeOperationGroupStatuses(GROUP) } returns flowOf(

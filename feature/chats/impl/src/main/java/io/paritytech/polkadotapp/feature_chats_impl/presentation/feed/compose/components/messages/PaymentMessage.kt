@@ -405,7 +405,6 @@ private fun PaymentStatusIcon(
             label = "ReclaimingSpinAngle"
         )
 
-        // The design's reclaim arrow is the retry one mirrored, so it turns the other way.
         Modifier
             .rotate(angle)
             .graphicsLayer { scaleX = -1f }

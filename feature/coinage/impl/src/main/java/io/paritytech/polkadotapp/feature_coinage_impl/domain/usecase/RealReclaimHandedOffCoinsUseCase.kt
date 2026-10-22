@@ -32,11 +32,6 @@ import javax.inject.Inject
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 
-/**
- * Past this window a reclaim stops waiting for a coin that is gone — the peer took it — and stops rebuilding an
- * attempt that failed for any reason other than expiring. Short, because until then the payment reads as being
- * reclaimed.
- */
 private val RECLAIM_RETRY_WINDOW = 5.minutes
 
 @OptIn(ExperimentalTime::class)
@@ -69,7 +64,7 @@ class RealReclaimHandedOffCoinsUseCase @Inject constructor(
 
     override fun subscribeFailedReclaims(groupId: CoinageOperationGroupId): Flow<Set<AccountId>> =
         transactionService.subscribeOperationGroupStatuses(groupId)
-            .map { attempts -> attempts.failedCoins() }
+            .map { attempts -> attempts.coinsWithOnlyFailedAttempts() }
             .distinctUntilChanged()
             .map { failed -> coinRepository.getCoinsBy(failed.toList()).mapToSet { it.accountId } }
 
@@ -94,8 +89,7 @@ class RealReclaimHandedOffCoinsUseCase @Inject constructor(
 
     private fun TrackedCoin.isReclaimable() = coin.isOnChain && state.handedOff && state.consumerStatus == null
 
-    // A retry registers a new attempt for the same coin, so a coin stays failed only while nothing newer is live.
-    private fun List<CoinageTransactionState>.failedCoins() =
+    private fun List<CoinageTransactionState>.coinsWithOnlyFailedAttempts() =
         coinsOf { it == DurableTxStatus.FAILURE } - coinsOf { it != DurableTxStatus.FAILURE }
 
     private fun List<CoinageTransactionState>.coinsOf(predicate: (DurableTxStatus) -> Boolean) =

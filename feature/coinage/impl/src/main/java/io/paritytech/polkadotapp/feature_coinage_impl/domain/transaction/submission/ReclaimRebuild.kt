@@ -20,10 +20,6 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Schedul
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-/**
- * Takes back a coin we handed to a peer, into the coin its first attempt recorded. The same `Coinage.transfer` a
- * claim is, signed with our own key for the coin rather than one carried in the params.
- */
 class ReclaimRebuild @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val coinRepository: CoinRepository,

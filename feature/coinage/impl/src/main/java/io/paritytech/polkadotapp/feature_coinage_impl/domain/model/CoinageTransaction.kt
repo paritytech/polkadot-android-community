@@ -29,7 +29,6 @@ interface CoinageTransaction {
     /** A coin whose key a peer sent us: an input, never one of our assets. */
     fun consumeReceivedCoin(publicKey: DataByteArray)
 
-    /** Our coin whose key we handed to a peer, taken back before they claim it. */
     fun reclaimCoin(coin: Coin)
 
     fun useVouchers(vouchers: List<RecyclerVoucher>)

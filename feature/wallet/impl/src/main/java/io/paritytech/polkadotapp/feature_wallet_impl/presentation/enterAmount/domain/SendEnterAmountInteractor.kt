@@ -109,7 +109,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
 
         /**
          * How long a chat payment's transactions keep being rebuilt while their inputs are gone from the chain.
-         * The recipient's claim window, so the sender is never offered coins back that are still being minted.
+         * The same window the recipient's claim gets, so neither side gives up while the other still tries.
          */
         private val CHAT_PAYMENT_RETRY_WINDOW = ChatMessage.Content.CoinagePayment.CLAIM_WINDOW
     }

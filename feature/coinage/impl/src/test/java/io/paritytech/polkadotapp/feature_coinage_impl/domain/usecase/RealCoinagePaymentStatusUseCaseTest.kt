@@ -231,7 +231,6 @@ class RealCoinagePaymentStatusUseCaseTest {
         assertEquals(CoinagePaymentStatus.Claimed(finalized = false), statusOfCoin())
     }
 
-    /** Our reclaim is the only thing that may spend a handed-off coin, so a consumer here is that reclaim. */
     @Test
     fun `a coin our reclaim is waiting to take back reads as reclaiming`() = runTest {
         givenCoin(onChain = true, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = PRESENT, reclaim = PENDING_SUBMISSION)
@@ -239,10 +238,6 @@ class RealCoinagePaymentStatusUseCaseTest {
         assertEquals(CoinagePaymentStatus.Reclaiming, statusOfCoin())
     }
 
-    /**
-     * Our reclaim is out and the coin has vanished, even from the finalized chain. Whose transaction took it is
-     * not known until ours resolves, and calling it the peer's would close the payment as received.
-     */
     @Test
     fun `a coin vanishing under a submitted reclaim is not taken for the peer's claim`() = runTest {
         givenCoin(onChain = false, everSeen = true, minter = FINALIZED_SUCCESS, atFinalized = ABSENT, reclaim = PENDING)

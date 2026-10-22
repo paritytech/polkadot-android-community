@@ -75,28 +75,14 @@ data class ChatMessage(
                 data class Transferred(val amount: Balance) : Status
                 data object FailedDetection : Status
                 data object FailedTransfer : Status
-
-                /** Sender only: the recipient let [CLAIM_WINDOW] pass, so the sender may take the coins back. */
                 data object Unclaimed : Status
-
-                /**
-                 * Recipient only: [CLAIM_WINDOW] passed and the coins are not on chain, so the money is the sender's —
-                 * taken back, or never sent. The claim keeps watching, and coins that show up after all still turn
-                 * this into [Transferred].
-                 */
                 data object ReturnedToSender : Status
                 data object Reclaiming : Status
-
-                /** Sender only; [amount] is what came back, less than was sent when the recipient took part of it. */
                 data class Reclaimed(val amount: Balance) : Status
                 data object ReclaimFailed : Status
             }
 
             companion object {
-                /**
-                 * How long the recipient has to claim before the sender is offered the coins back. Also how long the
-                 * sender's own transactions minting them keep being rebuilt, so the offer never races them.
-                 */
                 val CLAIM_WINDOW = 6.hours
             }
         }

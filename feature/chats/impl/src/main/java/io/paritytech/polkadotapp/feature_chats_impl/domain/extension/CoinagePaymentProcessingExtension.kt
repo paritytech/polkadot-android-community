@@ -124,14 +124,6 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             .flatMapLatest { claimStatusesOf(it, message, expected = content.totalValue) }
     }
 
-    /**
-     * Coins missing from the chain once the claim window has closed are the sender's again: taken back, or never
-     * minted, since the sender's own transactions stop being rebuilt with the window. Coins still on chain are
-     * claimed whatever the time, so those keep reading as received or receiving.
-     *
-     * Only absence waits for the window. The last word arrives as the claim completes, and waiting there would
-     * hold the message open for hours.
-     */
     private fun claimStatusesOf(
         detection: CoinageTransferDetection,
         message: ChatMessage,
@@ -157,8 +149,8 @@ class CoinagePaymentProcessingExtension @Inject constructor(
     }
 
     /**
-     * Ours until the peer takes them, or until we take them back once their claim window has closed. Stops once
-     * every coin has been claimed, reclaimed or proven never to have existed, since nothing after that can change.
+     * Ours until the peer takes them. Stops once every coin has been claimed or proven never to have existed,
+     * since nothing after that can change.
      */
     private fun handoffStatuses(message: ChatMessage, content: CoinagePayment): Flow<Status> {
         val accountIds = content.coinAccountIds()
@@ -189,7 +181,6 @@ class CoinagePaymentProcessingExtension @Inject constructor(
         emit(true)
     }
 
-    /** An incoming message carries the time it was sent, so both sides count the window from the same moment. */
     private fun claimWindowClosesAt(message: ChatMessage): Instant =
         Instant.fromEpochMilliseconds(message.timestamp) + CoinagePayment.CLAIM_WINDOW
 
@@ -233,10 +224,8 @@ class CoinagePaymentProcessingExtension @Inject constructor(
 
             awaiting.any { it.accountId in failedReclaims } -> Status.ReclaimFailed
 
-            // The peer may still claim these, but the sender no longer has to wait for that.
             claimWindowClosed && awaiting.isNotEmpty() -> Status.Unclaimed
 
-            // What the peer took before the reclaim landed is theirs, so the amount can come back short.
             reclaimed.isNotEmpty() -> Status.Reclaimed(valueOf(reclaimed))
 
             // Something is still to be taken. A large payment is minted by several transactions, so its

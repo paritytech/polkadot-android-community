@@ -61,7 +61,6 @@ class CoinagePaymentProcessingExtensionTest {
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase = mockk()
     private val reclaimHandedOffCoinsUseCase: ReclaimHandedOffCoinsUseCase = mockk()
 
-    /** Inside the claim window unless a test says otherwise. */
     private var now = Instant.fromEpochMilliseconds(SENT_AT) + 1.hours
     private var failedReclaims = emptySet<AccountId>()
 
@@ -128,10 +127,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
-    /**
-     * The group is the message's own, so a retry rejoins the claims an earlier attempt registered. There is no
-     * deadline: nothing can prove a payment's coins will never arrive, and the app may not see the chain for hours.
-     */
     @Test
     fun `claims are registered under the message's group with no deadline`() = runTest {
         givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
@@ -161,10 +156,6 @@ class CoinagePaymentProcessingExtensionTest {
         }
     }
 
-    /**
-     * The claim reported an amount and is still working. The message shows what landed, but stays open: closing it
-     * here is how a 1.00 payment was settled as 0.12, with nothing looking at the message again.
-     */
     @Test
     fun `an incoming payment held up by a failed claim shows what landed and stays open`() = runTest {
         givenClaimReports(CoinageTransferDetection.ClaimingRest(PARTIAL)) { awaitCancellation() }
@@ -449,12 +440,6 @@ class CoinagePaymentProcessingExtensionTest {
         }
     }
 
-    // ---- claim window, incoming ----
-
-    /**
-     * The recipient opened the app after the window closed and the coins are not on chain: the sender took them
-     * back, or never sent them, and either way the money is theirs.
-     */
     @Test
     fun `an incoming payment whose coins are gone after its window went back to the sender`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -467,7 +452,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
     }
 
-    /** Inside the window missing coins are simply not minted yet. */
     @Test
     fun `an incoming payment whose coins are not there yet inside its window still reads as receiving`() = runTest {
         givenClaimReports(CoinageTransferDetection.Absent) { awaitCancellation() }
@@ -479,10 +463,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.ReturnedToSender)) }
     }
 
-    /**
-     * Coins still on chain after the window are ours to claim, and the claim is already under way. Saying they went
-     * back would be contradicted a moment later.
-     */
     @Test
     fun `an incoming payment still on chain after its window keeps reading as receiving`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -495,7 +475,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.ReturnedToSender)) }
     }
 
-    /** The claim keeps watching past the window, and coins that turn up after all are a payment received. */
     @Test
     fun `an incoming payment claimed after its window reads as received`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -512,7 +491,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
-    /** A claim that gave up after the window left the money with the sender, which is not an invalid payment. */
     @Test
     fun `an incoming payment whose claim gave up after its window is closed as gone back`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -526,7 +504,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
-    /** The window closing while the app is open is enough: nothing on chain has to change for the message to. */
     @Test
     fun `an incoming payment whose coins are gone turns gone back as its window closes`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 6.hours - 1.minutes
@@ -541,8 +518,6 @@ class CoinagePaymentProcessingExtensionTest {
 
         coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ReturnedToSender)) }
     }
-
-    // ---- reclaim ----
 
     @Test
     fun `an outgoing payment is offered back as its window closes`() = runTest {
@@ -559,7 +534,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Unclaimed)) }
     }
 
-    /** The recipient let the window pass: the sender is offered the coins back, and the payment stays open. */
     @Test
     fun `an outgoing payment nobody claimed in time is offered back`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -572,7 +546,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
     }
 
-    /** One coin on its way back is enough to say so: the sender has acted, and waits for nothing else. */
     @Test
     fun `an outgoing payment being taken back reads as reclaiming`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -585,7 +558,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
     }
 
-    /** A reclaim seen only at the best head can still be forked away, so the payment is shown back but kept open. */
     @Test
     fun `an outgoing payment reclaimed at best reads as reclaimed but is not closed`() = runTest {
         givenCoins(CoinagePaymentStatus.Reclaimed(finalized = false), CoinagePaymentStatus.Reclaimed(finalized = false))
@@ -620,7 +592,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
-    /** The reclaim gave up while the coin is still there, so the sender is asked to try again. */
     @Test
     fun `an outgoing payment whose reclaim failed offers to try again`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -635,7 +606,6 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify { reclaimHandedOffCoinsUseCase.subscribeFailedReclaims(CoinageOperationGroupId("chat-reclaim:${message.id}")) }
     }
 
-    /** A coin the peer took after a failed reclaim is theirs: that is a received payment, not a failure. */
     @Test
     fun `an outgoing payment the peer claimed after a failed reclaim reads as received`() = runTest {
         now = Instant.fromEpochMilliseconds(SENT_AT) + 7.hours
@@ -651,7 +621,6 @@ class CoinagePaymentProcessingExtensionTest {
 
     // ---- harness ----
 
-    /** [scheduler] is the test's own when it needs to move time on; the window's timer runs on its clock. */
     private fun startWork(
         vararg unprocessed: ChatMessage,
         arriving: List<ChatMessage> = emptyList(),
@@ -698,7 +667,6 @@ class CoinagePaymentProcessingExtensionTest {
         )
     }
 
-    /** One coin per status, at [accountId] of its position. */
     private fun givenCoins(vararg statuses: CoinagePaymentStatus) {
         val states = statuses.withIndex().associate { (index, status) -> accountId(index) to stateOf(accountId(index), status) }
 
