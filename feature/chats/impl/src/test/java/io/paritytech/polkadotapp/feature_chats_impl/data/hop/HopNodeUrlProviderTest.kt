@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.hop
 
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.Chain
+import io.paritytech.polkadotapp.test_shared.assertFailureOf
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -71,7 +72,7 @@ class HopNodeUrlProviderTest {
 
         val result = runCatching { provider.pickForRetry(failedNodeUrl = NODE_A) }
 
-        assertTrue("expected IllegalStateException but was ${result.exceptionOrNull()}", result.exceptionOrNull() is IllegalStateException)
+        assertFailureOf<IllegalStateException>(result)
     }
 
     private suspend fun repeatedRetryPicks(failed: String): List<String> {

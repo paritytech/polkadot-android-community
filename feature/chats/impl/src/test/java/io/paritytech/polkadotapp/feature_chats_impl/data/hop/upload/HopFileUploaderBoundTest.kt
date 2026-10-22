@@ -20,6 +20,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.storage.AttachmentFileS
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
 import io.paritytech.polkadotapp.test_shared.any
+import io.paritytech.polkadotapp.test_shared.assertFailureOf
 import io.paritytech.polkadotapp.test_shared.capture
 import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.testDispatchers
@@ -142,7 +143,7 @@ class HopFileUploaderBoundTest {
         runCurrent()
         advanceTo(nodes.sentRequests.single().sentAt + EXPECTED_HOP_REQUEST_BOUND)
 
-        verify(nodes.sockets.single()).stop()
+        verifySessionSocketStopped()
     }
 
     @Test
@@ -180,7 +181,7 @@ class HopFileUploaderBoundTest {
 
         runCurrent()
 
-        assertTrue("expected FileNotFoundException but was ${failed.completedError()}", failed.completedError() is FileNotFoundException)
+        assertFailureOf<FileNotFoundException>(failed.getCompleted())
     }
 
     @Test
@@ -255,7 +256,7 @@ class HopFileUploaderBoundTest {
 
     private suspend fun withSinglePendingRow(upload: FileUpload) {
         whenever(fileUploadRepository.getNextPending(any())).thenReturn(upload, null)
-        whenever(fileUploadRepository.observePendingChanges()).thenReturn(MutableSharedFlow())
+        whenever(fileUploadRepository.observeQueueChanges()).thenReturn(MutableSharedFlow())
         whenever(fileUploadRepository.getNextBackoffEndAt()).thenReturn(null)
     }
 
@@ -284,6 +285,10 @@ class HopFileUploaderBoundTest {
         verify(preProcessor).preProcess(any())
     }
 
+    private fun verifySessionSocketStopped() {
+        verify(nodes.sockets.single()).stop()
+    }
+
     private suspend fun assertRescheduledWithFirstBackoff(messageId: String) {
         val firstFailureAt: ArgumentCaptor<Instant> = ArgumentCaptor.forClass(Instant::class.java)
         val nextAttemptAt: ArgumentCaptor<Instant> = ArgumentCaptor.forClass(Instant::class.java)
@@ -297,7 +302,7 @@ class HopFileUploaderBoundTest {
 
     private fun assertFailedWithRetryable(outcome: Deferred<Result<Unit>>) {
         assertTrue("expected the attempt to have completed", outcome.isCompleted)
-        assertEquals(RetryableTransferException::class.java, outcome.completedError()?.javaClass)
+        assertFailureOf<RetryableTransferException>(outcome.getCompleted())
     }
 
     private fun assertHappensBefore(earlier: String, later: String) {

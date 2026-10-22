@@ -31,7 +31,7 @@ class TransferQueueProcessor @Inject constructor(
         val wake = Channel<Unit>(Channel.CONFLATED)
 
         val changesWatcher = launch {
-            queue.pendingChanges().collect { wake.trySend(Unit) }
+            queue.queueChanges().collect { wake.trySend(Unit) }
         }
 
         while (true) {

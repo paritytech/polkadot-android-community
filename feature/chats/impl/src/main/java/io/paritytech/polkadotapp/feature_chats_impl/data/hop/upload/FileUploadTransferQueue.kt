@@ -18,7 +18,7 @@ class FileUploadTransferQueue @Inject constructor(
     override suspend fun nextPending(excluding: Collection<FileUpload>): FileUpload? =
         repository.getNextPending(excluding.map { it.messageId })
 
-    override fun pendingChanges(): Flow<Unit> = repository.observePendingChanges()
+    override fun queueChanges(): Flow<Unit> = repository.observeQueueChanges()
     override suspend fun nextBackoffEndAt(): Instant? = repository.getNextBackoffEndAt()
     override suspend fun markInProgress(item: FileUpload) = repository.markInProgress(item.messageId)
     override suspend fun process(item: FileUpload) = uploader.upload(item)

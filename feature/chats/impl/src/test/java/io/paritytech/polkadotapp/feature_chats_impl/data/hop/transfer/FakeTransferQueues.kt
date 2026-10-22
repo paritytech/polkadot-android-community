@@ -111,7 +111,7 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
             ?.let { FakeItem(it.id, it.retryState) }
     }
 
-    override fun pendingChanges(): Flow<Unit> = changes
+    override fun queueChanges(): Flow<Unit> = changes
 
     override suspend fun nextBackoffEndAt(): Instant? {
         yield()
@@ -191,6 +191,7 @@ internal class FakeSequentialQueue : TransferQueue<FakeItem> {
     private val statuses = mutableMapOf<String, RowStatus>()
     private val starts = mutableListOf<String>()
     private val returns = mutableSetOf<String>()
+    private var nextPendingCallCount = 0
 
     val inFlightCount: Int get() = starts.count { it !in returns }
 
@@ -203,6 +204,7 @@ internal class FakeSequentialQueue : TransferQueue<FakeItem> {
 
     override suspend fun nextPending(): FakeItem? {
         yield()
+        if (++nextPendingCallCount > QUERY_TRIPWIRE) awaitCancellation()
         return statuses.entries
             .firstOrNull { it.value == RowStatus.PENDING || it.value == RowStatus.IN_PROGRESS }
             ?.let { FakeItem(it.key, HopTransferRetryState.None) }

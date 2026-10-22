@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopService
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.THREE_CHUNK_FILE_SIZE
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.chunkSlices
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.patternBytes
+import io.paritytech.polkadotapp.test_shared.assertFailureOf
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.toList
@@ -79,7 +80,7 @@ class AttachmentFileStorageTest {
 
         val result = runCatching { storage.readChunks(uri, fromChunk = 0).toList() }
 
-        assertFileNotFound(result)
+        assertFailureOf<FileNotFoundException>(result)
     }
 
     @Test
@@ -99,7 +100,7 @@ class AttachmentFileStorageTest {
 
         val result = runCatching { storage.sizeOf(uri) }
 
-        assertFileNotFound(result)
+        assertFailureOf<FileNotFoundException>(result)
     }
 
     @Test
@@ -134,13 +135,6 @@ class AttachmentFileStorageTest {
         expected.zip(actual).forEachIndexed { index, (expectedChunk, actualChunk) ->
             assertArrayEquals("chunk $index", expectedChunk, actualChunk)
         }
-    }
-
-    private fun assertFileNotFound(result: Result<*>) {
-        assertTrue(
-            "expected FileNotFoundException but was ${result.exceptionOrNull()}",
-            result.exceptionOrNull() is FileNotFoundException
-        )
     }
 
     private class TrickleInputStream(private val bytes: ByteArray) : InputStream() {

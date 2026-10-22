@@ -389,7 +389,7 @@ class TransferQueueProcessorConcurrencyTest {
     }
 
     @Test
-    fun `the sequential pass keeps one item in flight when more are pending`() = runTest {
+    fun `the sequential pass keeps one item in flight when three are pending`() = runTest {
         val queue = FakeSequentialQueue()
         queue.addHanging("a", "b", "c")
 

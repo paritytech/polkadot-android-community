@@ -147,5 +147,3 @@ fun TestScope.runCurrentUntil(condition: () -> Boolean) {
         runCurrent()
     }
 }
-
-fun Deferred<Result<Unit>>.completedError(): Throwable? = getCompleted().exceptionOrNull()

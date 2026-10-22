@@ -15,10 +15,10 @@ class FileUploadRepositoryTest {
     private val repository = FileUploadRepository(dao)
 
     @Test
-    fun `every pending-table invalidation reaches the pass even when the pending ids are unchanged`() = runBlocking<Unit> {
+    fun `every upload-table write reaches the pass even when the pending ids are unchanged`() = runBlocking<Unit> {
         withPendingIdsInvalidated(listOf("a"), listOf("a"))
 
-        val changes = repository.observePendingChanges().toList()
+        val changes = repository.observeQueueChanges().toList()
 
         assertEquals(2, changes.size)
     }

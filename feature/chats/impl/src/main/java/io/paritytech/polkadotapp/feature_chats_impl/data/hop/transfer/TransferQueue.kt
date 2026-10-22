@@ -22,7 +22,7 @@ interface ConcurrentTransferQueue<T : WithRetryState> : TransferItemLifecycle<T>
 
     suspend fun nextPending(excluding: Collection<T>): T?
 
-    fun pendingChanges(): Flow<Unit>
+    fun queueChanges(): Flow<Unit>
 
     suspend fun nextBackoffEndAt(): Instant?
 }

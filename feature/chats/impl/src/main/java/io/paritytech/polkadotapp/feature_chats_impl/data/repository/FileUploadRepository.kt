@@ -30,7 +30,7 @@ class FileUploadRepository @Inject constructor(
         return dao.getNextPending(System.currentTimeMillis(), excluding.toList())?.toDomain()
     }
 
-    fun observePendingChanges(): Flow<Unit> {
+    fun observeQueueChanges(): Flow<Unit> {
         return dao.observePendingIds().map { }
     }
 

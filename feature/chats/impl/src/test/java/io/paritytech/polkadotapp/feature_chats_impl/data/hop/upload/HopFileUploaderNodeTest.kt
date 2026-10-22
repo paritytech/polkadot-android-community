@@ -8,9 +8,9 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.hop.THREE_CHUNK_FILE_SI
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.chunkSlices
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.patternBytes
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
+import io.paritytech.polkadotapp.test_shared.assertFailureOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -47,7 +47,7 @@ class HopFileUploaderNodeTest {
         uploads.withFileBytes(INLINE_FILE_SIZE)
         uploads.withRetryNode(failed = NODE_B, picked = NODE_C)
 
-        uploads.upload(fileUpload(uploads.fileUri, nodeUrl = NODE_B, attemptCount = 1, status = FileUpload.Status.PENDING))
+        uploads.upload(rescheduledRetryOn(NODE_B))
 
         uploads.verifySessionOpenedOn(NODE_C)
         uploads.verifyMovedTo(NODE_C)
@@ -57,7 +57,7 @@ class HopFileUploaderNodeTest {
     fun `a retry opens its session on the picked node when another node is available`() = runBlocking<Unit> {
         withRetryFromNodeAToNodeB()
 
-        uploads.upload(fileUpload(uploads.fileUri, nodeUrl = NODE_A, attemptCount = 1, status = FileUpload.Status.PENDING))
+        uploads.upload(rescheduledRetryOn(NODE_A))
 
         uploads.verifySessionOpenedOn(NODE_B)
         uploads.verifySessionNeverOpenedOn(NODE_A)
@@ -67,7 +67,7 @@ class HopFileUploaderNodeTest {
     fun `a retry stores the picked node when another node is available`() = runBlocking<Unit> {
         withRetryFromNodeAToNodeB()
 
-        uploads.upload(fileUpload(uploads.fileUri, nodeUrl = NODE_A, attemptCount = 1, status = FileUpload.Status.PENDING))
+        uploads.upload(rescheduledRetryOn(NODE_A))
 
         uploads.verifyMovedTo(NODE_B)
     }
@@ -151,7 +151,7 @@ class HopFileUploaderNodeTest {
     fun `the message names the node the upload finished on when the upload was rotated`() = runBlocking<Unit> {
         withRetryFromNodeAToNodeB()
 
-        uploads.upload(fileUpload(uploads.fileUri, nodeUrl = NODE_A, attemptCount = 1, status = FileUpload.Status.PENDING))
+        uploads.upload(rescheduledRetryOn(NODE_A))
 
         assertEquals(NODE_B, uploads.sentAttachment().nodeUrl)
     }
@@ -172,10 +172,10 @@ class HopFileUploaderNodeTest {
         uploads.withNoRetryNode(failed = NODE_A)
 
         val result = runCatching {
-            uploads.upload(fileUpload(uploads.fileUri, nodeUrl = NODE_A, attemptCount = 1, status = FileUpload.Status.PENDING))
+            uploads.upload(rescheduledRetryOn(NODE_A))
         }
 
-        assertTrue("expected IllegalStateException but was ${result.exceptionOrNull()}", result.exceptionOrNull() is IllegalStateException)
+        assertFailureOf<IllegalStateException>(result)
         uploads.verifyNoSessionOpened()
     }
 
@@ -186,6 +186,13 @@ class HopFileUploaderNodeTest {
         uploads.withFileSize(THREE_CHUNK_FILE_SIZE)
         uploads.withVideoChunks(fromChunk = 1, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices().drop(1))
     }
+
+    private fun rescheduledRetryOn(nodeUrl: String) = fileUpload(
+        uri = uploads.fileUri,
+        nodeUrl = nodeUrl,
+        attemptCount = 1,
+        status = FileUpload.Status.PENDING
+    )
 
     private fun interruptedRetryOnNodeB() = fileUpload(
         uri = uploads.fileUri,
