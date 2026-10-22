@@ -1,14 +1,28 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer
 
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.WithRetryState
+import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
-interface TransferQueue<T : WithRetryState> {
-    suspend fun nextPending(): T?
+interface TransferItemLifecycle<T : WithRetryState> {
     suspend fun markInProgress(item: T)
     suspend fun process(item: T)
     suspend fun markDone(item: T)
     suspend fun markFailed(item: T, error: Throwable)
     suspend fun scheduleRetry(item: T, reschedule: RetryDecision.Reschedule)
     suspend fun soonestNextAttemptAt(): Instant?
+}
+
+interface TransferQueue<T : WithRetryState> : TransferItemLifecycle<T> {
+    suspend fun nextPending(): T?
+}
+
+interface ConcurrentTransferQueue<T : WithRetryState> : TransferItemLifecycle<T> {
+    val maxInFlight: Int
+
+    suspend fun nextPending(excluding: Collection<T>): T?
+
+    fun pendingChanges(): Flow<Unit>
+
+    suspend fun nextBackoffEndAt(): Instant?
 }

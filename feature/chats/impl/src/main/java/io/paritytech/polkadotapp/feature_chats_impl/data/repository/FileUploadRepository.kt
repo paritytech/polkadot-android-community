@@ -26,8 +26,12 @@ class FileUploadRepository @Inject constructor(
         dao.insert(upload.toLocal())
     }
 
-    suspend fun getNextPending(): FileUpload? {
-        return dao.getNextPending(System.currentTimeMillis())?.toDomain()
+    suspend fun getNextPending(excluding: Collection<ChatMessageId>): FileUpload? {
+        return dao.getNextPending(System.currentTimeMillis(), excluding.toList())?.toDomain()
+    }
+
+    fun observePendingChanges(): Flow<Unit> {
+        return dao.observePendingIds().map { }
     }
 
     suspend fun scheduleRetry(
@@ -41,6 +45,10 @@ class FileUploadRepository @Inject constructor(
 
     suspend fun getSoonestNextAttemptAt(): Instant? {
         return dao.getSoonestNextAttemptAt()?.let(Instant::fromEpochMilliseconds)
+    }
+
+    suspend fun getNextBackoffEndAt(): Instant? {
+        return dao.getNextBackoffEndAt()?.let(Instant::fromEpochMilliseconds)
     }
 
     suspend fun isActive(messageId: ChatMessageId): Boolean {
@@ -57,6 +65,10 @@ class FileUploadRepository @Inject constructor(
 
     suspend fun updateProgress(messageId: ChatMessageId, uploadedChunks: Int, chunkHashes: List<String>) {
         dao.updateProgress(messageId, uploadedChunks, chunkHashes.joinToString(","))
+    }
+
+    suspend fun moveToNode(messageId: ChatMessageId, nodeUrl: String) {
+        dao.moveToNode(messageId, nodeUrl)
     }
 
     suspend fun markDone(messageId: ChatMessageId) {

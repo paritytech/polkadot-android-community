@@ -1,5 +1,7 @@
 package io.paritytech.polkadotapp.test_shared
 
+import io.paritytech.polkadotapp.common.utils.InformationSize
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatcher
 import org.mockito.Mockito
 import org.mockito.stubbing.OngoingStubbing
@@ -23,6 +25,8 @@ fun <T> any(): T = Mockito.any<T>()
  * null is returned.
  */
 fun <T> isA(classRef: Class<T>): T = Mockito.isA<T>(classRef)
+
+fun <T> capture(captor: ArgumentCaptor<T>): T = captor.capture()
 
 fun <T> argThat(argumentMatcher: ArgumentMatcher<T>): T = Mockito.argThat<T>(argumentMatcher)
 
@@ -49,3 +53,8 @@ fun anyLong(): Long = Mockito.anyLong()
 
 /** Argument matcher for [Int] — wraps Mockito's primitive-friendly matcher. */
 fun anyInt(): Int = Mockito.anyInt()
+
+fun anyInformationSize(): InformationSize {
+    Mockito.anyLong()
+    return InformationSize.ZERO
+}

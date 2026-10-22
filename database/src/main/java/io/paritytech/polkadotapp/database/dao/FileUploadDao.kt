@@ -16,15 +16,22 @@ interface FileUploadDao {
         """SELECT * FROM file_uploads
         WHERE status IN ('PENDING', 'IN_PROGRESS')
             AND (nextAttemptAt IS NULL OR nextAttemptAt <= :now)
+            AND messageId NOT IN (:excludedIds)
         ORDER BY createdAt ASC LIMIT 1"""
     )
-    suspend fun getNextPending(now: Long): FileUploadLocal?
+    suspend fun getNextPending(now: Long, excludedIds: List<String>): FileUploadLocal?
 
     @Query(
         """SELECT MIN(nextAttemptAt) FROM file_uploads
         WHERE status IN ('PENDING', 'IN_PROGRESS') AND nextAttemptAt IS NOT NULL"""
     )
     suspend fun getSoonestNextAttemptAt(): Long?
+
+    @Query("SELECT MIN(nextAttemptAt) FROM file_uploads WHERE status = 'PENDING' AND nextAttemptAt IS NOT NULL")
+    suspend fun getNextBackoffEndAt(): Long?
+
+    @Query("SELECT messageId FROM file_uploads WHERE status = 'PENDING'")
+    fun observePendingIds(): Flow<List<String>>
 
     @Query("SELECT * FROM file_uploads WHERE status IN ('PENDING', 'IN_PROGRESS', 'FAILED')")
     fun observeActive(): Flow<List<FileUploadLocal>>
@@ -37,6 +44,9 @@ interface FileUploadDao {
 
     @Query("UPDATE file_uploads SET uploadedChunks = :uploadedChunks, chunkHashes = :chunkHashes WHERE messageId = :messageId")
     suspend fun updateProgress(messageId: String, uploadedChunks: Int, chunkHashes: String)
+
+    @Query("UPDATE file_uploads SET nodeUrl = :nodeUrl, uploadedChunks = 0, chunkHashes = NULL WHERE messageId = :messageId")
+    suspend fun moveToNode(messageId: String, nodeUrl: String)
 
     @Query(
         """UPDATE file_uploads
