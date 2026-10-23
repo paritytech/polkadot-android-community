@@ -10,11 +10,12 @@ interface TransferItemLifecycle<T : WithRetryState> {
     suspend fun markDone(item: T)
     suspend fun markFailed(item: T, error: Throwable)
     suspend fun scheduleRetry(item: T, reschedule: RetryDecision.Reschedule)
-    suspend fun soonestNextAttemptAt(): Instant?
 }
 
 interface TransferQueue<T : WithRetryState> : TransferItemLifecycle<T> {
     suspend fun nextPending(): T?
+
+    suspend fun soonestNextAttemptAt(): Instant?
 }
 
 interface ConcurrentTransferQueue<T : WithRetryState> : TransferItemLifecycle<T> {

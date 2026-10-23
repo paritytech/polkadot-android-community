@@ -125,15 +125,6 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
             ?.let(Instant::fromEpochMilliseconds)
     }
 
-    override suspend fun soonestNextAttemptAt(): Instant? {
-        yield()
-        return rows.values
-            .filter { it.status == RowStatus.PENDING || it.status == RowStatus.IN_PROGRESS }
-            .mapNotNull { it.nextAttemptAtVirtualMs }
-            .minOrNull()
-            ?.let(Instant::fromEpochMilliseconds)
-    }
-
     override suspend fun markInProgress(item: FakeItem) = write(item.id) { status = RowStatus.IN_PROGRESS }
 
     override suspend fun process(item: FakeItem) {

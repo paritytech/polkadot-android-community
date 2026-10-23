@@ -4,7 +4,11 @@ import io.paritytech.polkadotapp.common.utils.InformationSize
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatcher
 import org.mockito.Mockito
+import org.mockito.invocation.Invocation
+import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.OngoingStubbing
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.startCoroutineUninterceptedOrReturn
 
 /**
  * Returns Mockito.eq() as nullable type to avoid java.lang.IllegalStateException when
@@ -57,4 +61,11 @@ fun anyInt(): Int = Mockito.anyInt()
 fun anyInformationSize(): InformationSize {
     Mockito.anyLong()
     return InformationSize.ZERO
+}
+
+fun <T> OngoingStubbing<T>.thenSuspend(answer: suspend (InvocationOnMock) -> Any?): OngoingStubbing<T> = thenAnswer { invocation ->
+    @Suppress("UNCHECKED_CAST")
+    val continuation = (invocation as Invocation).rawArguments.last() as Continuation<Any?>
+    val call: suspend () -> Any? = { answer(invocation) }
+    call.startCoroutineUninterceptedOrReturn(continuation)
 }

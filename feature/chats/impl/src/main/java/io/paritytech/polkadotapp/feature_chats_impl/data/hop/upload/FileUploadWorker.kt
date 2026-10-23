@@ -29,8 +29,8 @@ class FileUploadWorker @AssistedInject constructor(
 
         val processed = runCancellableCatching { transferQueueProcessor.processPendingConcurrently(transferQueue) }
 
-        transferQueue.soonestNextAttemptAt()?.let { soonest ->
-            enqueueDelayedTransfer<FileUploadWorker>(applicationContext, WORK_ID, soonest)
+        transferQueue.nextBackoffEndAt()?.let { backoffEnd ->
+            enqueueDelayedTransfer<FileUploadWorker>(applicationContext, WORK_ID, backoffEnd)
         }
 
         return processed.toWorkerResult(retryOnFailure = true)

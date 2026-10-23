@@ -21,12 +21,6 @@ interface FileUploadDao {
     )
     suspend fun getNextPending(now: Long, excludedIds: List<String>): FileUploadLocal?
 
-    @Query(
-        """SELECT MIN(nextAttemptAt) FROM file_uploads
-        WHERE status IN ('PENDING', 'IN_PROGRESS') AND nextAttemptAt IS NOT NULL"""
-    )
-    suspend fun getSoonestNextAttemptAt(): Long?
-
     @Query("SELECT MIN(nextAttemptAt) FROM file_uploads WHERE status = 'PENDING' AND nextAttemptAt IS NOT NULL")
     suspend fun getNextBackoffEndAt(): Long?
 

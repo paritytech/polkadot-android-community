@@ -29,6 +29,4 @@ class FileUploadTransferQueue @Inject constructor(
 
     override suspend fun scheduleRetry(item: FileUpload, reschedule: RetryDecision.Reschedule) =
         repository.scheduleRetry(item.messageId, reschedule.attemptCount, reschedule.firstFailureAt, reschedule.nextAttemptAt)
-
-    override suspend fun soonestNextAttemptAt(): Instant? = repository.getSoonestNextAttemptAt()
 }

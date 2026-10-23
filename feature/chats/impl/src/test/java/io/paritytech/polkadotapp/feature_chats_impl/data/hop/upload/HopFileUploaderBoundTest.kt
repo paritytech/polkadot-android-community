@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopNodeUrlProvider
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopService
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.NODE_A
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.auth.HopSigner
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.anyHopTicket
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.patternBytes
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransferRetryPolicy
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.MAX_IN_FLIGHT
@@ -25,10 +26,13 @@ import io.paritytech.polkadotapp.test_shared.assertFailureOf
 import io.paritytech.polkadotapp.test_shared.capture
 import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.testDispatchers
+import io.paritytech.polkadotapp.test_shared.thenSuspend
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -47,6 +51,7 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -65,6 +70,9 @@ class HopFileUploaderBoundTest {
     private val fileProvider: FileProvider = mock(FileProvider::class.java)
     private val uploadConcurrency: UploadConcurrency = mock(UploadConcurrency::class.java)
     private val preProcessor: FileUploadPreProcessor = mock(FileUploadPreProcessor::class.java)
+    private val hopService: HopService = mock(HopService::class.java)
+    private val session: HopService.Session = mock(HopService.Session::class.java)
+    private val submitTimes = mutableListOf<Duration>()
     private var onPreProcess: () -> Unit = {}
 
     private val nodes = RecordingHopNodes(hopSigner)
@@ -96,18 +104,14 @@ class HopFileUploaderBoundTest {
 
     @Test
     fun `a chunk fails sixty seconds after it was sent when its submit never answers`() = runTest {
-        nodes.withRealHopSigning()
         withFileBytes(attachmentFileStorage, fileUri, 2 * HopService.CHUNK_SIZE_BYTES)
         withUploadStillActive(fileUploadRepository)
-        val uploader = uploaderOverRealHopService()
+        withSessionAnsweringFirst(submits = 1, after = FIRST_CHUNK_RESPONSE_DELAY)
 
         val attemptStart = currentTime.milliseconds
-        val outcome = launchUpload(uploader, fileUpload(fileUri))
-        runCurrent()
+        val outcome = launchUpload(uploaderOverMockedSession(), fileUpload(fileUri))
         advanceTo(attemptStart + FIRST_CHUNK_RESPONSE_DELAY)
-        nodes.answerSuccessfully(nodes.sentRequests.single())
-        runCurrentUntil { nodes.sentRequests.size == 2 }
-        val secondChunkSentAt = nodes.sentRequests[1].sentAt
+        val secondChunkSentAt = submitTimes[1]
 
         advanceTo(attemptStart + EXPECTED_HOP_REQUEST_BOUND)
         assertActive(outcome)
@@ -119,15 +123,13 @@ class HopFileUploaderBoundTest {
 
     @Test
     fun `a chunked root fails sixty seconds after it was sent when its submit never answers`() = runTest {
-        nodes.withRealHopSigning()
         withFileBytes(attachmentFileStorage, fileUri, HopService.CHUNK_SIZE_BYTES)
         withUploadStillActive(fileUploadRepository)
-        nodes.withNodeAnsweringFirst(requests = 2)
-        val uploader = uploaderOverRealHopService()
+        withSessionAnsweringFirst(submits = 2)
 
-        val outcome = launchUpload(uploader, fileUpload(fileUri))
-        runCurrentUntil { nodes.sentRequests.size == 3 }
-        val rootSentAt = nodes.sentRequests.last().sentAt
+        val outcome = launchUpload(uploaderOverMockedSession(), fileUpload(fileUri))
+        runCurrent()
+        val rootSentAt = submitTimes.last()
 
         advanceTo(rootSentAt + EXPECTED_HOP_REQUEST_BOUND - 1.milliseconds)
         assertActive(outcome)
@@ -226,6 +228,31 @@ class HopFileUploaderBoundTest {
         preProcessors = setOf(preProcessor)
     )
 
+    private fun uploaderOverMockedSession(): HopFileUploader = HopFileUploader(
+        attachmentFileStorage = attachmentFileStorage,
+        hopService = hopService,
+        hopSigner = hopSigner,
+        hopNodeUrlProvider = hopNodeUrlProvider,
+        fileUploadRepository = fileUploadRepository,
+        messageAttachmentUpdater = messageAttachmentUpdater,
+        attachmentMetaBuilder = attachmentMetaBuilder,
+        preProcessors = setOf(preProcessor)
+    )
+
+    private suspend fun TestScope.withSessionAnsweringFirst(submits: Int, after: Duration = Duration.ZERO) {
+        whenever(hopService.withSession<Any?>(any(), any())).thenSuspend { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val block = invocation.arguments[1] as suspend HopService.Session.() -> Any?
+            block(session)
+        }
+        whenever(session.submitEntry(any(), anyHopTicket())).thenSuspend {
+            submitTimes += currentTime.milliseconds
+            if (submitTimes.size > submits) awaitCancellation()
+            delay(after)
+            ByteArray(SUBMIT_HASH_SIZE) { submitTimes.size.toByte() }
+        }
+    }
+
     private suspend fun TestScope.startPassWithStuckSubmit(): Job {
         nodes.withRealHopSigning()
         withFileBytes(attachmentFileStorage, fileUri, INLINE_FILE_SIZE)
@@ -316,6 +343,7 @@ class HopFileUploaderBoundTest {
 }
 
 private val FIRST_CHUNK_RESPONSE_DELAY = 50.seconds
+private const val SUBMIT_HASH_SIZE = 32
 private const val OTHER_MESSAGE_ID = "message-b"
 private const val EVENT_OPEN = "open"
 private const val EVENT_PRE_PROCESS = "preProcess"
