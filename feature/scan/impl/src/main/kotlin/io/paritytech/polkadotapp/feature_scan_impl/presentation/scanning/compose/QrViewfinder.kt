@@ -13,17 +13,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.utils.openAppSettings
 import io.paritytech.polkadotapp.design.components.dialog.NovaAlertDialog
+import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
+import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.blurEffect
 import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import io.paritytech.polkadotapp.common.R as RCommon
+
+private val FrozenFrameBlurSigma = 10.dp
+private const val FrozenFrameBrightness = 0.75f
 
 internal class PermissionMissingHint(
     val missing: StateFlow<Boolean>,
@@ -51,12 +60,25 @@ internal fun QrViewfinder(
 
     Box(modifier = modifier) {
         val surfaceRequest by surfaceRequestFlow.collectAsStateWithLifecycle()
-        surfaceRequest?.let {
+        val lastRequest by remember(surfaceRequestFlow) { surfaceRequestFlow.filterNotNull() }
+            .collectAsStateWithLifecycle(initialValue = null)
+        val frozen = !cameraActive
+        (surfaceRequest ?: lastRequest.takeIf { frozen })?.let {
             CameraXViewfinder(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        renderEffect = if (frozen) blurEffect(FrozenFrameBlurSigma, density) else null
+                    },
                 surfaceRequest = it,
                 implementationMode = implementationMode,
             )
+            if (frozen) {
+                PolkadotSurface(
+                    modifier = Modifier.matchParentSize(),
+                    color = PolkadotTheme.colors.bg.surface.overlay.copy(alpha = 1f - FrozenFrameBrightness),
+                ) {}
+            }
         }
 
         if (permissionMissingHint != null) {
