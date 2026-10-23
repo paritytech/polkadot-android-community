@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.repository
 
 import androidx.core.net.toUri
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.database.dao.FileUploadDao
@@ -16,7 +17,8 @@ import javax.inject.Inject
 import kotlin.time.Instant
 
 class FileUploadRepository @Inject constructor(
-    private val dao: FileUploadDao
+    private val dao: FileUploadDao,
+    private val timeProvider: TimeProvider
 ) {
     fun observeActive(): Flow<List<FileUpload>> {
         return dao.observeActive().map { uploads -> uploads.map { it.toDomain() } }
@@ -26,8 +28,12 @@ class FileUploadRepository @Inject constructor(
         dao.insert(upload.toLocal())
     }
 
-    suspend fun getNextPending(): FileUpload? {
-        return dao.getNextPending(System.currentTimeMillis())?.toDomain()
+    suspend fun getNextPending(excluding: Collection<ChatMessageId>): FileUpload? {
+        return dao.getNextPending(timeProvider.now().toEpochMilliseconds(), excluding.toList())?.toDomain()
+    }
+
+    fun observeQueueChanges(): Flow<Unit> {
+        return dao.observePendingIds().map { }
     }
 
     suspend fun scheduleRetry(
@@ -39,8 +45,8 @@ class FileUploadRepository @Inject constructor(
         dao.scheduleRetry(messageId, attemptCount, firstFailureAt.toEpochMilliseconds(), nextAttemptAt.toEpochMilliseconds())
     }
 
-    suspend fun getSoonestNextAttemptAt(): Instant? {
-        return dao.getSoonestNextAttemptAt()?.let(Instant::fromEpochMilliseconds)
+    suspend fun getNextBackoffEndAt(): Instant? {
+        return dao.getNextBackoffEndAt()?.let(Instant::fromEpochMilliseconds)
     }
 
     suspend fun isActive(messageId: ChatMessageId): Boolean {
@@ -57,6 +63,10 @@ class FileUploadRepository @Inject constructor(
 
     suspend fun updateProgress(messageId: ChatMessageId, uploadedChunks: Int, chunkHashes: List<String>) {
         dao.updateProgress(messageId, uploadedChunks, chunkHashes.joinToString(","))
+    }
+
+    suspend fun moveToNode(messageId: ChatMessageId, nodeUrl: String) {
+        dao.moveToNode(messageId, nodeUrl)
     }
 
     suspend fun markDone(messageId: ChatMessageId) {
