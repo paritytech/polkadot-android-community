@@ -49,6 +49,10 @@ class FileDownloadRepository @Inject constructor(
         return dao.isInProgress(messageId)
     }
 
+    suspend fun isPendingOrInProgress(messageId: ChatMessageId): Boolean {
+        return dao.isPendingOrInProgress(messageId)
+    }
+
     suspend fun cancel(messageId: ChatMessageId) {
         dao.markCancelled(messageId)
     }
