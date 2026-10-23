@@ -80,9 +80,10 @@ class HopFileUploader @Inject constructor(
     }
 
     private suspend fun attemptNodeUrl(upload: FileUpload): String {
-        val failedRepeatedly = upload.retryState.attemptCount >= FAILURES_BEFORE_NODE_SWITCH &&
+        val failures = upload.retryState.attemptCount
+        val failedTwiceOnThisNode = failures > 0 && failures % FAILURES_BEFORE_NODE_SWITCH == 0 &&
             upload.progress.status == FileUpload.Status.PENDING
-        if (!failedRepeatedly) return upload.nodeUrl
+        if (!failedTwiceOnThisNode) return upload.nodeUrl
 
         return hopNodeUrlProvider.pickForRetry(failedNodeUrl = upload.nodeUrl)
     }

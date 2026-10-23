@@ -43,9 +43,9 @@ class HopFileUploaderNodeTest {
 
     @Test
     fun `a first retry keeps its node when it failed once`() = runBlocking<Unit> {
-        withFirstRetryOnNodeA()
+        withRetryOnNodeA()
 
-        uploads.upload(firstRetryOnNodeA())
+        uploads.upload(retryOnNodeA(attempts = 1))
 
         uploads.verifySessionOpenedOn(NODE_A)
         uploads.verifyNeverAskedForAnotherNode()
@@ -53,11 +53,33 @@ class HopFileUploaderNodeTest {
 
     @Test
     fun `a first retry resumes its chunks when it failed once`() = runBlocking<Unit> {
-        withFirstRetryOnNodeA()
+        withRetryOnNodeA()
 
-        uploads.upload(firstRetryOnNodeA())
+        uploads.upload(retryOnNodeA(attempts = 1))
 
         uploads.verifyStreamedFrom(1)
+    }
+
+    @Test
+    fun `a retry keeps the node it moved to when it failed once there`() = runBlocking<Unit> {
+        withRetryOnNodeA()
+
+        uploads.upload(retryOnNodeA(attempts = REPEATED_FAILURES + 1))
+
+        uploads.verifySessionOpenedOn(NODE_A)
+        uploads.verifyNeverAskedForAnotherNode()
+    }
+
+    @Test
+    fun `a retry moves again when it failed twice on the node it moved to`() = runBlocking<Unit> {
+        uploads.withSuccessfulSession()
+        uploads.withFileBytes(INLINE_FILE_SIZE)
+        uploads.withRetryNode(failed = NODE_B, picked = NODE_C)
+
+        uploads.upload(retryAfterRepeatedFailuresOn(NODE_B, attempts = 2 * REPEATED_FAILURES))
+
+        uploads.verifySessionOpenedOn(NODE_C)
+        uploads.verifyMovedTo(NODE_C)
     }
 
     @Test
@@ -203,10 +225,11 @@ class HopFileUploaderNodeTest {
         uploads.withUploadStillActive()
         uploads.withRetryNode(failed = NODE_B, picked = NODE_C)
         uploads.withFileSize(THREE_CHUNK_FILE_SIZE)
+        uploads.withVideoChunks(fromChunk = 0, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices())
         uploads.withVideoChunks(fromChunk = 1, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices().drop(1))
     }
 
-    private suspend fun withFirstRetryOnNodeA() {
+    private suspend fun withRetryOnNodeA() {
         uploads.withSuccessfulSession()
         uploads.withUploadStillActive()
         uploads.withRetryNode(failed = NODE_A, picked = NODE_B)
@@ -215,19 +238,19 @@ class HopFileUploaderNodeTest {
         uploads.withVideoChunks(fromChunk = 1, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices().drop(1))
     }
 
-    private fun firstRetryOnNodeA() = fileUpload(
+    private fun retryOnNodeA(attempts: Int) = fileUpload(
         uri = uploads.fileUri,
         mimeType = VIDEO_MP4,
         nodeUrl = NODE_A,
-        attemptCount = 1,
+        attemptCount = attempts,
         status = FileUpload.Status.PENDING,
         uploadedChunkHashes = listOf(STORED_HASH_0)
     )
 
-    private fun retryAfterRepeatedFailuresOn(nodeUrl: String) = fileUpload(
+    private fun retryAfterRepeatedFailuresOn(nodeUrl: String, attempts: Int = REPEATED_FAILURES) = fileUpload(
         uri = uploads.fileUri,
         nodeUrl = nodeUrl,
-        attemptCount = REPEATED_FAILURES,
+        attemptCount = attempts,
         status = FileUpload.Status.PENDING
     )
 
@@ -235,7 +258,7 @@ class HopFileUploaderNodeTest {
         uri = uploads.fileUri,
         mimeType = VIDEO_MP4,
         nodeUrl = NODE_B,
-        attemptCount = 1,
+        attemptCount = REPEATED_FAILURES,
         status = FileUpload.Status.IN_PROGRESS,
         uploadedChunkHashes = listOf(STORED_HASH_0)
     )

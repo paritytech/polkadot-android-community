@@ -63,9 +63,9 @@ fun anyInformationSize(): InformationSize {
     return InformationSize.ZERO
 }
 
-fun <T> OngoingStubbing<T>.thenSuspend(answer: suspend (InvocationOnMock) -> Any?): OngoingStubbing<T> = thenAnswer { invocation ->
+fun <T> OngoingStubbing<T>.thenSuspend(answer: suspend (InvocationOnMock) -> T): OngoingStubbing<T> = thenAnswer { invocation ->
     @Suppress("UNCHECKED_CAST")
     val continuation = (invocation as Invocation).rawArguments.last() as Continuation<Any?>
-    val call: suspend () -> Any? = { answer(invocation) }
+    val call: suspend () -> T = { answer(invocation) }
     call.startCoroutineUninterceptedOrReturn(continuation)
 }

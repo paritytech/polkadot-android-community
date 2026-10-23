@@ -47,7 +47,6 @@ fun startEvent(nodeUrl: String) = "$EVENT_START$nodeUrl"
 class SentRequest(
     val socket: SocketService,
     val request: RuntimeRequest,
-    val listener: SocketService.ResponseListener<RpcResponse>,
     val sentAt: Duration
 )
 
@@ -92,11 +91,9 @@ class RecordingHopNodes(private val hopSigner: HopSigner) {
                 any<SocketService.ResponseListener<RpcResponse>>()
             )
         ).thenAnswer { invocation ->
-            @Suppress("UNCHECKED_CAST")
             val sent = SentRequest(
                 socket = socket,
                 request = invocation.arguments[0] as RuntimeRequest,
-                listener = invocation.arguments[2] as SocketService.ResponseListener<RpcResponse>,
                 sentAt = scope.currentTime.milliseconds
             )
             sentRequests += sent
