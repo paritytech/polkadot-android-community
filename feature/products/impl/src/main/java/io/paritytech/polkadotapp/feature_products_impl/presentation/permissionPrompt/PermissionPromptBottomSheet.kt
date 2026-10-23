@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeBottomSheet
+import io.paritytech.polkadotapp.design.utils.ProtectSensitiveScreen
 import io.paritytech.polkadotapp.feature_products_impl.presentation.permissionPrompt.compose.PermissionPromptScreen
 
 @AndroidEntryPoint
@@ -19,5 +20,8 @@ class PermissionPromptBottomSheet : BaseComposeBottomSheet<PermissionPromptViewM
     }
 
     @Composable
-    override fun Screen() = PermissionPromptScreen(viewModel)
+    override fun Screen() {
+        ProtectSensitiveScreen()
+        PermissionPromptScreen(viewModel)
+    }
 }
