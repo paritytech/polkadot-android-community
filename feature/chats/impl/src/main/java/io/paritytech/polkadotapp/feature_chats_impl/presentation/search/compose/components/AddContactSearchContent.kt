@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.design.components.progress.NovaCircularProgressIndicator
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
@@ -44,7 +45,11 @@ internal fun AddContactSearchContent(
 
         is AddContactSearchResults.Sections -> LazyColumn(modifier = Modifier.fillMaxSize()) {
             recentsSection(recents = results.recents, onRecentClick = onRecentClick)
-            allUsersSection(users = results.allUsers, onClick = onSearchResultClick)
+            allUsersSection(
+                users = results.allUsers,
+                loadingContactId = state.loadingContactId,
+                onClick = onSearchResultClick,
+            )
         }
 
         AddContactSearchResults.Waiting -> Unit
@@ -70,6 +75,7 @@ private fun LazyListScope.recentsSection(
         AddContactRow(
             title = recent.title,
             avatarModel = recent.avatarModel,
+            loading = false,
             onClick = { onRecentClick(recent.chatId) },
         )
     }
@@ -77,6 +83,7 @@ private fun LazyListScope.recentsSection(
 
 private fun LazyListScope.allUsersSection(
     users: ImmutableList<UserSearchResultUiModel>,
+    loadingContactId: AccountId?,
     onClick: (UserSearchResultUiModel) -> Unit,
 ) {
     items(
@@ -86,6 +93,7 @@ private fun LazyListScope.allUsersSection(
         AddContactRow(
             title = user.username,
             avatarModel = user.avatarModel,
+            loading = user.contactAccountId == loadingContactId,
             onClick = { onClick(user) },
         )
     }

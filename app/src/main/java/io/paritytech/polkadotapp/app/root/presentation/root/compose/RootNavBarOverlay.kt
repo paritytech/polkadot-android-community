@@ -49,12 +49,12 @@ import io.paritytech.polkadotapp.common.presentation.tabbar.DockletSlotAction
 import io.paritytech.polkadotapp.common.presentation.tabbar.TabBarBaseInset
 import io.paritytech.polkadotapp.common.presentation.tabbar.dockletSlotTap
 import io.paritytech.polkadotapp.common.presentation.tabs.BottomTab
-import io.paritytech.polkadotapp.design.components.docklet.DockletColors
 import io.paritytech.polkadotapp.design.components.docklet.DockletMaterials
 import io.paritytech.polkadotapp.design.components.docklet.DockletStep
 import io.paritytech.polkadotapp.design.components.docklet.dockletBackdrop
 import io.paritytech.polkadotapp.design.components.docklet.rememberDockletBackdrop
 import io.paritytech.polkadotapp.design.components.docklet.rememberDockletCardState
+import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthIndicatorsModel
 import io.paritytech.polkadotapp.feature_products_api.domain.browser.TabInfo
@@ -166,6 +166,7 @@ fun RootNavBarOverlay(
         derivedStateOf { !hidden && scannerTooltipVisible && pull.isFullyOpen }
     }
 
+    val shade = PolkadotTheme.colors.bg.surface.overlay
     Box(modifier = Modifier.fillMaxSize()) {
         if (!hidden) {
             Box(
@@ -174,12 +175,10 @@ fun RootNavBarOverlay(
                     .dockletBackdrop(
                         backdrop = backdrop,
                         shape = RectangleShape,
-                        sigma = {
-                            if (backdrop?.showsWebView == true) 0.dp else DockletMaterials.BehindCardBlurSigma * cardState.clampedProgress
-                        },
+                        sigma = { DockletMaterials.BehindCardBlurSigma * cardState.clampedProgress },
                     )
                     .drawBehind {
-                        drawRect(DockletColors.Shade, alpha = BEHIND_CARD_DIM * cardState.clampedProgress)
+                        drawRect(shade.copy(alpha = BEHIND_CARD_DIM * cardState.clampedProgress))
                     },
             )
         }

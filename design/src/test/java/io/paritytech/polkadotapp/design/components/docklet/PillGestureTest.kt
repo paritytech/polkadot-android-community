@@ -178,6 +178,21 @@ class PillGestureTest {
         assertTrue(DockletGestures.isRelease(upConsumed = false, ownsGesture = true, dragging = false))
     }
 
+    @Test
+    fun `close fraction is 0 5 when the card is dragged half its travel`() {
+        assertEquals(0.5f, DockletGestures.closedFraction(150f, 300f), EPS)
+    }
+
+    @Test
+    fun `close fraction stops at 1 when the card is dragged past its travel`() {
+        assertEquals(1f, DockletGestures.closedFraction(900f, 300f), EPS)
+    }
+
+    @Test
+    fun `close fraction stops at 0 when the card is dragged back above its open position`() {
+        assertEquals(0f, DockletGestures.closedFraction(-40f, 300f), EPS)
+    }
+
     private fun assertMillis(expected: Double, actual: Duration) =
         assertEquals(expected, actual.toDouble(DurationUnit.MILLISECONDS), MILLIS_EPS)
 

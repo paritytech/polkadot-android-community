@@ -22,9 +22,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.paritytech.polkadotapp.common.utils.openAppSettings
 import io.paritytech.polkadotapp.design.components.dialog.NovaAlertDialog
-import io.paritytech.polkadotapp.design.components.docklet.DockletColors
-import io.paritytech.polkadotapp.design.components.docklet.dockletBlurEffect
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
+import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.blurEffect
 import io.paritytech.polkadotapp.design.utils.collectAsEffect
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,7 +68,7 @@ internal fun QrViewfinder(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        renderEffect = if (frozen) dockletBlurEffect(FrozenFrameBlurSigma, density) else null
+                        renderEffect = if (frozen) blurEffect(FrozenFrameBlurSigma, density) else null
                     },
                 surfaceRequest = it,
                 implementationMode = implementationMode,
@@ -76,7 +76,7 @@ internal fun QrViewfinder(
             if (frozen) {
                 PolkadotSurface(
                     modifier = Modifier.matchParentSize(),
-                    color = DockletColors.Shade.copy(alpha = 1f - FrozenFrameBrightness),
+                    color = PolkadotTheme.colors.bg.surface.overlay.copy(alpha = 1f - FrozenFrameBrightness),
                 ) {}
             }
         }

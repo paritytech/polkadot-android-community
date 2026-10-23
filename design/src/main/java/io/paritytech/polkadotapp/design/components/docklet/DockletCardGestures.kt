@@ -111,7 +111,7 @@ internal fun rememberDockletCardGestures(
                                 state.startSwipeDown()
                             }
                             if (dragging) {
-                                amount = (downward / travelDown).coerceAtLeast(0f)
+                                amount = DockletGestures.closedFraction(downward.value, travelDown.value)
                                 state.dragSwipe(1f - amount)
                             }
                         }
@@ -173,7 +173,7 @@ internal fun rememberDockletListDrag(
 
                 val consumed = max(available.y, -dragged)
                 dragged += consumed
-                state.dragSwipe(1f - dragged / travel())
+                state.dragSwipe(1f - DockletGestures.closedFraction(dragged, travel()))
                 return Offset(0f, consumed)
             }
 
@@ -182,14 +182,14 @@ internal fun rememberDockletListDrag(
 
                 if (dragged == 0f) state.startSwipeDown()
                 dragged += available.y
-                state.dragSwipe(1f - dragged / travel())
+                state.dragSwipe(1f - DockletGestures.closedFraction(dragged, travel()))
                 return Offset(0f, available.y)
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
                 if (dragged <= 0f) return Velocity.Zero
 
-                val fraction = dragged / travel()
+                val fraction = DockletGestures.closedFraction(dragged, travel())
                 dragged = 0f
                 state.releaseSwipeDown(
                     closedFraction = fraction,

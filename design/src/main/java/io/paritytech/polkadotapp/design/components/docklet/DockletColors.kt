@@ -10,10 +10,6 @@ import io.paritytech.polkadotapp.design.utils.noLocalProvidedFor
 import io.paritytech.polkadotapp.designsystem.colors.LocalPolkadotColors
 import io.paritytech.polkadotapp.designsystem.colors.PolkadotColorsPalette
 
-object DockletColors {
-    val Shade = Color.Black
-}
-
 private const val GlassFillAlpha = 0.7f
 
 // strokeGlass is not in the Android design system yet; its value in every theme is bgSurfaceContainerInverted at 0x1F.

@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.core.view.isVisible
+import io.paritytech.polkadotapp.design.utils.blurRadiusPx
 
 private const val BackdropScale = 0.5f
 
@@ -42,7 +43,7 @@ class DockletBackdrop internal constructor(private val source: View) {
     private val sourceLocation = IntArray(2)
 
     // A WebView inside an offscreen RenderEffect layer draws misplaced or black.
-    var showsWebView by mutableStateOf(false)
+    internal var showsWebView by mutableStateOf(false)
         private set
 
     internal val preDrawListener = ViewTreeObserver.OnPreDrawListener {
@@ -67,6 +68,8 @@ class DockletBackdrop internal constructor(private val source: View) {
 
         val webView = source.containsWebView()
         if (webView != showsWebView) showsWebView = webView
+        if (layers.none { it.visible }) return
+
         content.setPosition(0, 0, source.width, source.height)
         val canvas = content.beginRecording()
         source.draw(canvas)
@@ -142,8 +145,8 @@ fun Modifier.dockletBackdrop(backdrop: DockletBackdrop?, shape: Shape, sigma: ()
 private fun Modifier.backdropLayer(backdrop: DockletBackdrop, shape: Shape, sigma: () -> Dp): Modifier {
     val density = LocalDensity.current.density
     val currentSigma by rememberUpdatedState(sigma)
-    val layer = remember(density) {
-        BackdropLayer { DockletMaterials.blurRadiusPx(currentSigma().value, density * BackdropScale) }
+    val layer = remember(backdrop, density) {
+        BackdropLayer { if (backdrop.showsWebView) 0f else blurRadiusPx(currentSigma().value, density * BackdropScale) }
     }
     DisposableEffect(backdrop, layer) {
         backdrop.register(layer)

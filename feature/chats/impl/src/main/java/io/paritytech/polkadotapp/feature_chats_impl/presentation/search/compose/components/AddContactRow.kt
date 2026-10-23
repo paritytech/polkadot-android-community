@@ -10,16 +10,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.avatar.AvatarUiModel
 import io.paritytech.polkadotapp.design.components.avatar.PolkadotAvatar
+import io.paritytech.polkadotapp.design.components.progress.NovaCircularProgressIndicator
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.chatSearch.compose.components.ChatSearchPersonAvatarSize
+
+private val LoadingIndicatorSize = 20.dp
+private val LoadingIndicatorStroke = 2.dp
 
 @Composable
 internal fun AddContactRow(
     title: String,
     avatarModel: AvatarUiModel,
+    loading: Boolean,
     onClick: () -> Unit,
 ) {
     Row(
@@ -42,5 +48,12 @@ internal fun AddContactRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (loading) {
+            NovaCircularProgressIndicator(
+                modifier = Modifier.size(LoadingIndicatorSize),
+                color = PolkadotTheme.colors.fg.primary,
+                strokeWidth = LoadingIndicatorStroke,
+            )
+        }
     }
 }

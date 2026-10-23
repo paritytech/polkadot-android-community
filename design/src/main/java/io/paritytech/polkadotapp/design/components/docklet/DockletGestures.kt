@@ -49,6 +49,8 @@ object DockletGestures {
         }
     }
 
+    fun closedFraction(dragged: Float, travel: Float): Float = (dragged / travel).coerceIn(0f, 1f)
+
     fun releaseSwipeUp(progress: Float, upwardDpPerSecond: Float, travel: Dp): DockletRelease {
         if (progress >= ReleaseThreshold) return DockletRelease.Open
 

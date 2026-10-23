@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.blurEffect
 import kotlin.math.min
 
 private val HandleWidth = 36.dp
@@ -194,7 +195,7 @@ fun AnimatedVisibilityScope.dockletContentsTransition(): Modifier {
         val frame = DockletMotion.contentsFrame(alpha)
         this.alpha = frame.alpha
         translationY = frame.rise.toPx()
-        renderEffect = dockletBlurEffect(frame.blurSigma, density)
+        renderEffect = blurEffect(frame.blurSigma, density)
     }
 }
 

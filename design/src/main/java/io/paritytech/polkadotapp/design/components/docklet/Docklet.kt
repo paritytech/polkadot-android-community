@@ -48,6 +48,7 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.WalletFilled
 import io.paritytech.polkadotapp.design.components.navigationbar.NotificationDot
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.blurEffect
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -101,7 +102,7 @@ private fun DockSurface(
                 .dockletBackdrop(
                     backdrop = backdrop,
                     shape = DockShape,
-                    sigma = { if (backdrop?.showsWebView == true) 0.dp else DockletMaterials.DockBlurSigma },
+                    sigma = { DockletMaterials.DockBlurSigma },
                 )
                 .drawWithCache {
                     val path = dockPath(size, density)
@@ -117,7 +118,7 @@ private fun DockSurface(
                     .graphicsLayer {
                         val dim = cardProgress().coerceIn(0f, 1f)
                         alpha = lerp(1f, DockletMaterials.DockItemsFadedAlpha, dim)
-                        renderEffect = dockletBlurEffect(DockletMaterials.DockItemsBlurSigma * dim, density)
+                        renderEffect = blurEffect(DockletMaterials.DockItemsBlurSigma * dim, density)
                     },
                 slots = slots,
                 onSlotTap = onSlotTap,
