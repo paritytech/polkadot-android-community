@@ -11,9 +11,10 @@ import kotlin.time.Instant
 
 class FileUploadTransferQueue @Inject constructor(
     private val repository: FileUploadRepository,
-    private val uploader: HopFileUploader
+    private val uploader: HopFileUploader,
+    uploadConcurrency: UploadConcurrency
 ) : ConcurrentTransferQueue<FileUpload> {
-    override val maxInFlight: Int = MAX_CONCURRENT_UPLOADS
+    override val maxInFlight: Int = uploadConcurrency.maxInFlight()
 
     override suspend fun nextPending(excluding: Collection<FileUpload>): FileUpload? =
         repository.getNextPending(excluding.map { it.messageId })
@@ -30,8 +31,4 @@ class FileUploadTransferQueue @Inject constructor(
         repository.scheduleRetry(item.messageId, reschedule.attemptCount, reschedule.firstFailureAt, reschedule.nextAttemptAt)
 
     override suspend fun soonestNextAttemptAt(): Instant? = repository.getSoonestNextAttemptAt()
-
-    private companion object {
-        const val MAX_CONCURRENT_UPLOADS = 10
-    }
 }

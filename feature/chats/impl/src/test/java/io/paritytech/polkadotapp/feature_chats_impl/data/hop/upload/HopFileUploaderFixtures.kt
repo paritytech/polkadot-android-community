@@ -70,6 +70,10 @@ suspend fun withSubmitAllowed(hopSigner: HopSigner) {
     whenever(hopSigner.ensureCanSubmit()).thenReturn(Unit)
 }
 
+fun withUploadSlots(uploadConcurrency: UploadConcurrency, count: Int) {
+    whenever(uploadConcurrency.maxInFlight()).thenReturn(count)
+}
+
 suspend fun withFileBytes(storage: AttachmentFileStorage, uri: Uri, size: Int): ByteArray {
     val bytes = patternBytes(size)
     whenever(storage.readFileBytes(uri)).thenReturn(bytes)

@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.hop.NODE_A
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.auth.HopSigner
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.patternBytes
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransferRetryPolicy
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.MAX_IN_FLIGHT
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.RetryableTransferException
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferQueueProcessor
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileUploadRepository
@@ -62,6 +63,7 @@ class HopFileUploaderBoundTest {
     private val attachmentMetaBuilder: AttachmentMetaBuilder = mock(AttachmentMetaBuilder::class.java)
     private val contentResolver: ContentResolver = mock(ContentResolver::class.java)
     private val fileProvider: FileProvider = mock(FileProvider::class.java)
+    private val uploadConcurrency: UploadConcurrency = mock(UploadConcurrency::class.java)
     private val preProcessor: FileUploadPreProcessor = mock(FileUploadPreProcessor::class.java)
     private var onPreProcess: () -> Unit = {}
 
@@ -228,7 +230,8 @@ class HopFileUploaderBoundTest {
         nodes.withRealHopSigning()
         withFileBytes(attachmentFileStorage, fileUri, INLINE_FILE_SIZE)
         withSinglePendingRow(fileUpload(fileUri))
-        val queue = FileUploadTransferQueue(fileUploadRepository, uploaderOverRealHopService())
+        withUploadSlots(uploadConcurrency, MAX_IN_FLIGHT)
+        val queue = FileUploadTransferQueue(fileUploadRepository, uploaderOverRealHopService(), uploadConcurrency)
         val processor = TransferQueueProcessor(HopTransferRetryPolicy(), FakeTimeProvider { testScheduler.currentTime })
 
         val pass = backgroundScope.launch { processor.processPendingConcurrently(queue) }
