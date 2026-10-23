@@ -80,8 +80,9 @@ class HopFileUploader @Inject constructor(
     }
 
     private suspend fun attemptNodeUrl(upload: FileUpload): String {
-        val failedBefore = upload.retryState.attemptCount > 0 && upload.progress.status == FileUpload.Status.PENDING
-        if (!failedBefore) return upload.nodeUrl
+        val failedRepeatedly = upload.retryState.attemptCount >= FAILURES_BEFORE_NODE_SWITCH &&
+            upload.progress.status == FileUpload.Status.PENDING
+        if (!failedRepeatedly) return upload.nodeUrl
 
         return hopNodeUrlProvider.pickForRetry(failedNodeUrl = upload.nodeUrl)
     }
@@ -186,6 +187,7 @@ class HopFileUploader @Inject constructor(
 
     companion object {
         private val HOP_REQUEST_TIMEOUT = 60.seconds
+        private const val FAILURES_BEFORE_NODE_SWITCH = 2
 
         fun determineNumberOfChunks(fileSize: InformationSize): Int {
             return ceil(fileSize.inWholeBytes.toDouble() / HopService.CHUNK_SIZE_BYTES).toInt()

@@ -42,12 +42,31 @@ class HopFileUploaderNodeTest {
     }
 
     @Test
-    fun `a retry moves to another node when it was rescheduled after a failure`() = runBlocking<Unit> {
+    fun `a first retry keeps its node when it failed once`() = runBlocking<Unit> {
+        withFirstRetryOnNodeA()
+
+        uploads.upload(firstRetryOnNodeA())
+
+        uploads.verifySessionOpenedOn(NODE_A)
+        uploads.verifyNeverAskedForAnotherNode()
+    }
+
+    @Test
+    fun `a first retry resumes its chunks when it failed once`() = runBlocking<Unit> {
+        withFirstRetryOnNodeA()
+
+        uploads.upload(firstRetryOnNodeA())
+
+        uploads.verifyStreamedFrom(1)
+    }
+
+    @Test
+    fun `a retry moves to another node when it failed twice`() = runBlocking<Unit> {
         uploads.withSuccessfulSession()
         uploads.withFileBytes(INLINE_FILE_SIZE)
         uploads.withRetryNode(failed = NODE_B, picked = NODE_C)
 
-        uploads.upload(rescheduledRetryOn(NODE_B))
+        uploads.upload(retryAfterRepeatedFailuresOn(NODE_B))
 
         uploads.verifySessionOpenedOn(NODE_C)
         uploads.verifyMovedTo(NODE_C)
@@ -57,7 +76,7 @@ class HopFileUploaderNodeTest {
     fun `a retry opens its session on the picked node when another node is available`() = runBlocking<Unit> {
         withRetryFromNodeAToNodeB()
 
-        uploads.upload(rescheduledRetryOn(NODE_A))
+        uploads.upload(retryAfterRepeatedFailuresOn(NODE_A))
 
         uploads.verifySessionOpenedOn(NODE_B)
         uploads.verifySessionNeverOpenedOn(NODE_A)
@@ -67,7 +86,7 @@ class HopFileUploaderNodeTest {
     fun `a retry stores the picked node when another node is available`() = runBlocking<Unit> {
         withRetryFromNodeAToNodeB()
 
-        uploads.upload(rescheduledRetryOn(NODE_A))
+        uploads.upload(retryAfterRepeatedFailuresOn(NODE_A))
 
         uploads.verifyMovedTo(NODE_B)
     }
@@ -151,7 +170,7 @@ class HopFileUploaderNodeTest {
     fun `the message names the node the upload finished on when the upload was rotated`() = runBlocking<Unit> {
         withRetryFromNodeAToNodeB()
 
-        uploads.upload(rescheduledRetryOn(NODE_A))
+        uploads.upload(retryAfterRepeatedFailuresOn(NODE_A))
 
         assertEquals(NODE_B, uploads.sentAttachment().nodeUrl)
     }
@@ -172,7 +191,7 @@ class HopFileUploaderNodeTest {
         uploads.withNoRetryNode(failed = NODE_A)
 
         val result = runCatching {
-            uploads.upload(rescheduledRetryOn(NODE_A))
+            uploads.upload(retryAfterRepeatedFailuresOn(NODE_A))
         }
 
         assertFailureOf<IllegalStateException>(result)
@@ -187,10 +206,28 @@ class HopFileUploaderNodeTest {
         uploads.withVideoChunks(fromChunk = 1, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices().drop(1))
     }
 
-    private fun rescheduledRetryOn(nodeUrl: String) = fileUpload(
+    private suspend fun withFirstRetryOnNodeA() {
+        uploads.withSuccessfulSession()
+        uploads.withUploadStillActive()
+        uploads.withRetryNode(failed = NODE_A, picked = NODE_B)
+        uploads.withFileSize(THREE_CHUNK_FILE_SIZE)
+        uploads.withVideoChunks(fromChunk = 0, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices())
+        uploads.withVideoChunks(fromChunk = 1, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices().drop(1))
+    }
+
+    private fun firstRetryOnNodeA() = fileUpload(
+        uri = uploads.fileUri,
+        mimeType = VIDEO_MP4,
+        nodeUrl = NODE_A,
+        attemptCount = 1,
+        status = FileUpload.Status.PENDING,
+        uploadedChunkHashes = listOf(STORED_HASH_0)
+    )
+
+    private fun retryAfterRepeatedFailuresOn(nodeUrl: String) = fileUpload(
         uri = uploads.fileUri,
         nodeUrl = nodeUrl,
-        attemptCount = 1,
+        attemptCount = REPEATED_FAILURES,
         status = FileUpload.Status.PENDING
     )
 
@@ -221,7 +258,7 @@ class HopFileUploaderNodeTest {
         uri = uploads.fileUri,
         mimeType = VIDEO_MP4,
         nodeUrl = NODE_A,
-        attemptCount = 1,
+        attemptCount = REPEATED_FAILURES,
         status = FileUpload.Status.PENDING,
         uploadedChunkHashes = listOf(STORED_HASH_0)
     )
@@ -238,8 +275,12 @@ class HopFileUploaderNodeTest {
         uri = uploads.fileUri,
         mimeType = VIDEO_MP4,
         nodeUrl = NODE_A,
-        attemptCount = 1,
+        attemptCount = REPEATED_FAILURES,
         status = FileUpload.Status.PENDING,
         uploadedChunkHashes = listOf(STALE_HASH_0, STALE_HASH_1)
     )
+
+    private companion object {
+        const val REPEATED_FAILURES = 2
+    }
 }
