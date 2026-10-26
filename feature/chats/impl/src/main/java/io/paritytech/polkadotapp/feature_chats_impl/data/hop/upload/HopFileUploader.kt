@@ -7,6 +7,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
+import io.paritytech.polkadotapp.common.utils.chunkedSequence
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Attachment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
 import io.paritytech.polkadotapp.feature_chats_impl.data.AttachmentMetaBuilder
@@ -24,14 +25,12 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.storage.AttachmentFileS
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToByteArray
 import javax.inject.Inject
 import kotlin.math.ceil
-import kotlin.math.min
 import kotlin.time.Duration.Companion.seconds
 
 class HopFileUploader @Inject constructor(
@@ -81,9 +80,9 @@ class HopFileUploader @Inject constructor(
 
     private suspend fun attemptNodeUrl(upload: FileUpload): String {
         val failures = upload.retryState.attemptCount
-        val failedTwiceOnThisNode = failures > 0 && failures % FAILURES_BEFORE_NODE_SWITCH == 0 &&
+        val shouldSwitchNode = failures > 0 && failures % FAILURES_BEFORE_NODE_SWITCH == 0 &&
             upload.progress.status == FileUpload.Status.PENDING
-        if (!failedTwiceOnThisNode) return upload.nodeUrl
+        if (!shouldSwitchNode) return upload.nodeUrl
 
         return hopNodeUrlProvider.pickForRetry(failedNodeUrl = upload.nodeUrl)
     }
@@ -132,7 +131,7 @@ class HopFileUploader @Inject constructor(
 
         if (allChunkHashes.size >= totalChunks) return allChunkHashes
 
-        content.chunks(fromChunk = allChunkHashes.size, totalChunks).collect { chunk ->
+        content.chunks(fromChunk = allChunkHashes.size).collect { chunk ->
             if (!fileUploadRepository.isActive(upload.messageId)) throw TransferCancelledException()
 
             allChunkHashes.add(submitWithinTimeout(chunk, upload.ticket))
@@ -152,12 +151,9 @@ class HopFileUploader @Inject constructor(
             ?: throw RetryableTransferException("Hop submit did not complete within $HOP_REQUEST_TIMEOUT")
     }
 
-    private fun UploadContent.chunks(fromChunk: Int, totalChunks: Int): Flow<ByteArray> = when (this) {
+    private fun UploadContent.chunks(fromChunk: Int): Flow<ByteArray> = when (this) {
         is UploadContent.OnDisk -> attachmentFileStorage.readChunks(uri, fromChunk)
-        is UploadContent.InMemory -> (fromChunk until totalChunks).asFlow().map { i ->
-            val start = i * HopService.CHUNK_SIZE_BYTES
-            bytes.copyOfRange(start, min(start + HopService.CHUNK_SIZE_BYTES, bytes.size))
-        }
+        is UploadContent.InMemory -> bytes.chunkedSequence(HopService.CHUNK_SIZE_BYTES).drop(fromChunk).asFlow()
     }
 
     private suspend fun updateMessage(upload: FileUpload, nodeUrl: String, metadataHash: ByteArray, meta: Attachment.Meta) {

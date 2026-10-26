@@ -4,6 +4,9 @@ import java.io.ByteArrayOutputStream
 
 fun ByteArray.dropBytes(count: Int) = copyOfRange(count, size)
 
+fun ByteArray.chunkedSequence(chunkSize: Int): Sequence<ByteArray> =
+    (indices step chunkSize).asSequence().map { start -> copyOfRange(start, minOf(start + chunkSize, size)) }
+
 fun ByteArray.compareTo(other: ByteArray, unsigned: Boolean): Int {
     if (size != other.size) {
         return size - other.size
