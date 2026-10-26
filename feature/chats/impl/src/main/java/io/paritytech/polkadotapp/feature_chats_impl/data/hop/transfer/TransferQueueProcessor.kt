@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.WithRetryState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -28,6 +29,7 @@ class TransferQueueProcessor @Inject constructor(
 
     suspend fun <T : WithRetryState> processPendingConcurrently(queue: ConcurrentTransferQueue<T>) = coroutineScope {
         val inFlight: MutableSet<T> = ConcurrentHashMap.newKeySet()
+        val slots = Semaphore(queue.maxInFlight)
         val wake = Channel<Unit>(Channel.CONFLATED)
 
         val changesWatcher = launch {
@@ -35,26 +37,29 @@ class TransferQueueProcessor @Inject constructor(
         }
 
         while (true) {
-            while (inFlight.size < queue.maxInFlight) {
-                val item = queue.nextPending(excluding = inFlight.toList()) ?: break
+            slots.acquire()
+            val item = queue.nextPending(excluding = inFlight.toList())
 
-                queue.markInProgress(item)
-                inFlight.add(item)
+            if (item == null) {
+                slots.release()
+                if (inFlight.isEmpty()) break
 
-                launch {
-                    try {
-                        process(queue, item)
-                    } finally {
-                        inFlight.remove(item)
-                        wake.trySend(Unit)
-                    }
-                }
+                withTimeoutOrNull(waitUntil(queue.nextBackoffEndAt())) { wake.receive() }
+                continue
             }
 
-            if (inFlight.isEmpty()) break
+            queue.markInProgress(item)
+            inFlight.add(item)
 
-            val wait = if (inFlight.size < queue.maxInFlight) waitUntil(queue.nextBackoffEndAt()) else Duration.INFINITE
-            withTimeoutOrNull(wait) { wake.receive() }
+            launch {
+                try {
+                    process(queue, item)
+                } finally {
+                    inFlight.remove(item)
+                    slots.release()
+                    wake.trySend(Unit)
+                }
+            }
         }
 
         changesWatcher.cancel()
