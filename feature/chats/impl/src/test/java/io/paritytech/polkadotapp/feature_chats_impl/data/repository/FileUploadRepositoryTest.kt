@@ -34,7 +34,7 @@ class FileUploadRepositoryTest {
     }
 
     @Test
-    fun `uploads left in progress are released in the table when the repository releases them`() = runBlocking<Unit> {
+    fun `the dao releases in-progress uploads when the repository is released`() = runBlocking<Unit> {
         repository.releaseInProgress()
 
         verifyInProgressReleased()

@@ -79,27 +79,48 @@ class FileUploadDaoTest {
 
         val first = dao.claimNextDue(NOW)
         val second = dao.claimNextDue(NOW)
+        val third = dao.claimNextDue(NOW)
 
         assertEquals(listOf("a", "b"), listOf(first?.messageId, second?.messageId))
-        assertNull(dao.claimNextDue(NOW))
+        assertNull(third)
     }
 
     @Test
-    fun anUploadLeftInProgressIsNotClaimedUntilReleased() = runBlocking<Unit> {
+    fun anUploadLeftInProgressIsNotClaimed() = runBlocking<Unit> {
         givenUpload("a", status = FileUploadLocal.Status.IN_PROGRESS)
 
-        assertNull(dao.claimNextDue(NOW))
+        val claimed = dao.claimNextDue(NOW)
 
+        assertNull(claimed)
+    }
+
+    @Test
+    fun anUploadLeftInProgressIsClaimedOnceReleased() = runBlocking<Unit> {
+        givenUpload("a", status = FileUploadLocal.Status.IN_PROGRESS)
         dao.releaseInProgress()
 
-        assertEquals("a", dao.claimNextDue(NOW)?.messageId)
+        val claimed = dao.claimNextDue(NOW)
+
+        assertEquals("a", claimed?.messageId)
+    }
+
+    @Test
+    fun aFinishedUploadIsNeverClaimed() = runBlocking<Unit> {
+        givenUpload("done", status = FileUploadLocal.Status.DONE)
+        givenUpload("failed", status = FileUploadLocal.Status.FAILED)
+
+        val claimed = dao.claimNextDue(NOW)
+
+        assertNull(claimed)
     }
 
     @Test
     fun anUploadWaitingOutItsBackoffIsNotClaimed() = runBlocking<Unit> {
         givenUpload("a", nextAttemptAt = NOW + 1)
 
-        assertNull(dao.claimNextDue(NOW))
+        val claimed = dao.claimNextDue(NOW)
+
+        assertNull(claimed)
     }
 
     @Test

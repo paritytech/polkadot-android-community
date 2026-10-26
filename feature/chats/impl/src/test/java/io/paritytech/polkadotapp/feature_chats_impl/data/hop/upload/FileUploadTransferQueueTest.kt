@@ -33,7 +33,7 @@ class FileUploadTransferQueueTest {
     }
 
     @Test
-    fun `uploads left in progress are released in the store when the queue releases them`() = runBlocking<Unit> {
+    fun `the repository releases in-progress uploads when the queue is released`() = runBlocking<Unit> {
         queue().releaseInProgress()
 
         verifyInProgressReleased()

@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload
 
-import io.novasama.substrate_sdk_android.extensions.fromHex
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.NODE_B
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.THREE_CHUNK_FILE_SIZE
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.chunkSlices
@@ -19,38 +18,19 @@ class HopFileUploaderNodeTest {
     }
 
     @Test
-    fun `an upload resumes on its stored node when it was interrupted after its second failure`() = runBlocking<Unit> {
+    fun `an upload opens its session on its stored node when it starts`() = runBlocking<Unit> {
         withThreeChunkFile()
 
-        uploads.upload(interruptedAfterRepeatedFailures())
+        uploads.upload(uploadOnNodeBWithoutStoredChunks())
 
         uploads.verifySessionOpenedOn(NODE_B)
     }
 
     @Test
-    fun `an upload resumes its stored chunks when it was interrupted after its second failure`() = runBlocking<Unit> {
+    fun `the message names the stored node when the upload finishes`() = runBlocking<Unit> {
         withThreeChunkFile()
 
-        uploads.upload(interruptedAfterRepeatedFailures())
-
-        uploads.verifyStreamedFrom(1)
-        assertEquals(3, uploads.submitCount)
-    }
-
-    @Test
-    fun `an upload lists its stored and new hashes when it resumes its stored chunks`() = runBlocking<Unit> {
-        withThreeChunkFile()
-
-        uploads.upload(interruptedAfterRepeatedFailures())
-
-        uploads.assertRootListsHashes(listOf(STORED_HASH_0.fromHex(), uploads.returnedHash(0), uploads.returnedHash(1)))
-    }
-
-    @Test
-    fun `the message names the stored node when the upload resumes`() = runBlocking<Unit> {
-        withThreeChunkFile()
-
-        uploads.upload(interruptedAfterRepeatedFailures())
+        uploads.upload(uploadOnNodeBWithoutStoredChunks())
 
         assertEquals(NODE_B, uploads.sentAttachment().nodeUrl)
     }
@@ -59,7 +39,7 @@ class HopFileUploaderNodeTest {
     fun `an upload submits every chunk when it has no stored chunks`() = runBlocking<Unit> {
         withThreeChunkFile()
 
-        uploads.upload(movedAfterRepeatedFailures())
+        uploads.upload(uploadOnNodeBWithoutStoredChunks())
 
         uploads.verifyStreamedFrom(0)
         assertEquals(4, uploads.submitCount)
@@ -69,9 +49,19 @@ class HopFileUploaderNodeTest {
     fun `an upload counts its progress from the first chunk when it has no stored chunks`() = runBlocking<Unit> {
         withThreeChunkFile()
 
-        uploads.upload(movedAfterRepeatedFailures())
+        uploads.upload(uploadOnNodeBWithoutStoredChunks())
 
         assertEquals(1, uploads.firstRecordedProgress())
+    }
+
+    @Test
+    fun `an upload lists only the new hashes when it has no stored chunks`() = runBlocking<Unit> {
+        withThreeChunkFile()
+        val chunkCount = patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices().size
+
+        uploads.upload(uploadOnNodeBWithoutStoredChunks())
+
+        uploads.assertRootListsHashes(List(chunkCount) { uploads.returnedHash(it) })
     }
 
     private suspend fun withThreeChunkFile() {
@@ -82,22 +72,9 @@ class HopFileUploaderNodeTest {
         uploads.withVideoChunks(fromChunk = 1, patternBytes(THREE_CHUNK_FILE_SIZE).chunkSlices().drop(1))
     }
 
-    private fun interruptedAfterRepeatedFailures() = fileUpload(
+    private fun uploadOnNodeBWithoutStoredChunks() = fileUpload(
         uri = uploads.fileUri,
         mimeType = VIDEO_MP4,
-        nodeUrl = NODE_B,
-        attemptCount = REPEATED_FAILURES,
-        uploadedChunkHashes = listOf(STORED_HASH_0)
+        nodeUrl = NODE_B
     )
-
-    private fun movedAfterRepeatedFailures() = fileUpload(
-        uri = uploads.fileUri,
-        mimeType = VIDEO_MP4,
-        nodeUrl = NODE_B,
-        attemptCount = REPEATED_FAILURES
-    )
-
-    private companion object {
-        const val REPEATED_FAILURES = 2
-    }
 }
