@@ -72,9 +72,11 @@ fun Modifier.pocketBalanceSharedElement(cardId: String): Modifier {
         this
     } else {
         with(sharedScope) {
-            this@pocketBalanceSharedElement.sharedElement(
+            this@pocketBalanceSharedElement.sharedBounds(
                 sharedContentState = rememberSharedContentState("pocket_balance_$cardId"),
                 animatedVisibilityScope = visibilityScope,
+                enter = pocketFadeIn(),
+                exit = pocketFadeOut(),
                 boundsTransform = PocketBoundsTransform
             )
         }
