@@ -39,6 +39,8 @@ dependencies {
     "safetynetApi"(libs.androidx.compose.ui.tooling)
 
     testApi(libs.androidx.compose.ui.test)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.runner)
