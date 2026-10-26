@@ -51,7 +51,7 @@ fun ProtectSensitiveScreen() {
             val originalDelegate = hostView.accessibilityDelegate
 
             hostView.filterTouchesWhenObscured = true
-            hostView.accessibilityDelegate = SensitiveAccessibilityEvents
+            hostView.accessibilityDelegate = SensitiveEventsAccessibilityDelegate
 
             onDispose {
                 hostView.filterTouchesWhenObscured = originalFilter
@@ -61,7 +61,7 @@ fun ProtectSensitiveScreen() {
     }
 }
 
-private object SensitiveAccessibilityEvents : View.AccessibilityDelegate() {
+private object SensitiveEventsAccessibilityDelegate : View.AccessibilityDelegate() {
     override fun onRequestSendAccessibilityEvent(host: ViewGroup, child: View, event: AccessibilityEvent): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             event.isAccessibilityDataSensitive = true
