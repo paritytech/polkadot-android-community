@@ -149,7 +149,7 @@ class TransferQueueProcessorConcurrencyTest {
         advanceTimeBy(LONG_WAIT)
         runCurrent()
 
-        assertTrue("nextPending calls: ${queue.nextPendingCalls}", queue.nextPendingCalls <= NEXT_PENDING_CALL_BOUND)
+        assertTrue("claim calls: ${queue.claimCalls}", queue.claimCalls <= CLAIM_CALL_BOUND)
         assertNoSpin(queue)
         assertStillInFlight(queue, "a")
         assertNotStarted(queue, "b")
@@ -166,7 +166,7 @@ class TransferQueueProcessorConcurrencyTest {
         advanceTimeBy(BACKOFF_DUE)
         runCurrent()
 
-        assertEquals(queue.returnedAt("a"), queue.firstNextPendingCallAtOrAfter(BACKOFF_DUE))
+        assertEquals(queue.returnedAt("a"), queue.firstClaimCallAtOrAfter(BACKOFF_DUE))
         assertEquals(RowStatus.DONE, queue.statusOf("a"))
         assertEquals(1, queue.inFlightCount)
         assertStarted(queue, "b")
@@ -270,7 +270,7 @@ class TransferQueueProcessorConcurrencyTest {
     }
 
     @Test
-    fun `a due upload starts when it became due between the pending query and the backoff query`() = runTest {
+    fun `a due upload starts when it became due between the claim and the backoff query`() = runTest {
         val queue = FakeConcurrentQueue(this)
         queue.backoffQueryLatency = BACKOFF_QUERY_LATENCY
         queue.addHanging("a")
@@ -388,7 +388,7 @@ class TransferQueueProcessorConcurrencyTest {
     }
 
     private fun assertNoQueriesOnceFull(queue: FakeConcurrentQueue) {
-        assertEquals("one pending query per slot filled", MAX_IN_FLIGHT, queue.nextPendingCalls)
+        assertEquals("one claim per slot filled", MAX_IN_FLIGHT, queue.claimCalls)
         assertEquals("no backoff query while every slot is busy", 0, queue.backoffQueryCalls)
     }
 
@@ -397,7 +397,7 @@ class TransferQueueProcessorConcurrencyTest {
     }
 
     private companion object {
-        const val NEXT_PENDING_CALL_BOUND = 5
+        const val CLAIM_CALL_BOUND = 5
         val BACKOFF_DUE = 30.seconds
         val DUE_MARGIN = 1.seconds
         val LONG_WAIT = 30.minutes

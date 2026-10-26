@@ -26,18 +26,21 @@ class FileUploadRepositoryTest {
     }
 
     @Test
-    fun `the pending query is due by the injected clock when it looks for the next upload`() = runBlocking<Unit> {
-        repository.getNextPending(excluding = emptyList())
+    fun `the claim is due by the injected clock when it takes the next upload`() = runBlocking<Unit> {
+        repository.claimNextDue()
 
-        verifyPendingQueriedAt(NOW_MILLIS)
+        verify(dao).claimNextDue(NOW_MILLIS)
+    }
+
+    @Test
+    fun `uploads left in progress are released in the table when the repository releases them`() = runBlocking<Unit> {
+        repository.releaseInProgress()
+
+        verify(dao).releaseInProgress()
     }
 
     private fun withPendingIdsInvalidated(vararg pendingIdsPerInvalidation: List<String>) {
         whenever(dao.observePendingIds()).thenReturn(flowOf(*pendingIdsPerInvalidation))
-    }
-
-    private suspend fun verifyPendingQueriedAt(nowMillis: Long) {
-        verify(dao).getNextPending(nowMillis, emptyList())
     }
 
     private companion object {

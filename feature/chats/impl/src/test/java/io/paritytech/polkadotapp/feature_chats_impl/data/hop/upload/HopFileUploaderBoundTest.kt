@@ -221,7 +221,6 @@ class HopFileUploaderBoundTest {
         attachmentFileStorage = storage,
         hopService = nodes.hopService(this),
         hopSigner = hopSigner,
-        hopNodeUrlProvider = hopNodeUrlProvider,
         fileUploadRepository = fileUploadRepository,
         messageAttachmentUpdater = messageAttachmentUpdater,
         attachmentMetaBuilder = attachmentMetaBuilder,
@@ -232,7 +231,6 @@ class HopFileUploaderBoundTest {
         attachmentFileStorage = attachmentFileStorage,
         hopService = hopService,
         hopSigner = hopSigner,
-        hopNodeUrlProvider = hopNodeUrlProvider,
         fileUploadRepository = fileUploadRepository,
         messageAttachmentUpdater = messageAttachmentUpdater,
         attachmentMetaBuilder = attachmentMetaBuilder,
@@ -258,7 +256,7 @@ class HopFileUploaderBoundTest {
         withFileBytes(attachmentFileStorage, fileUri, INLINE_FILE_SIZE)
         withSinglePendingRow(fileUpload(fileUri))
         withUploadSlots(uploadConcurrency, MAX_IN_FLIGHT)
-        val queue = FileUploadTransferQueue(fileUploadRepository, uploaderOverRealHopService(), uploadConcurrency)
+        val queue = FileUploadTransferQueue(fileUploadRepository, uploaderOverRealHopService(), hopNodeUrlProvider, uploadConcurrency)
         val processor = TransferQueueProcessor(HopTransferRetryPolicy(), FakeTimeProvider { testScheduler.currentTime })
 
         val pass = backgroundScope.launch { processor.processPendingConcurrently(queue) }
@@ -285,7 +283,7 @@ class HopFileUploaderBoundTest {
     }
 
     private suspend fun withSinglePendingRow(upload: FileUpload) {
-        whenever(fileUploadRepository.getNextPending(any())).thenReturn(upload, null)
+        whenever(fileUploadRepository.claimNextDue()).thenReturn(upload, null)
         whenever(fileUploadRepository.observeQueueChanges()).thenReturn(MutableSharedFlow())
         whenever(fileUploadRepository.getNextBackoffEndAt()).thenReturn(null)
     }
@@ -322,7 +320,7 @@ class HopFileUploaderBoundTest {
     private suspend fun assertRescheduledWithFirstBackoff(messageId: String) {
         val firstFailureAt: ArgumentCaptor<Instant> = ArgumentCaptor.forClass(Instant::class.java)
         val nextAttemptAt: ArgumentCaptor<Instant> = ArgumentCaptor.forClass(Instant::class.java)
-        verify(fileUploadRepository).scheduleRetry(eq(messageId), eq(1), capture(firstFailureAt), capture(nextAttemptAt))
+        verify(fileUploadRepository).scheduleRetry(eq(messageId), eq(NODE_A), eq(1), capture(firstFailureAt), capture(nextAttemptAt))
         assertEquals(FIRST_BACKOFF, nextAttemptAt.value - firstFailureAt.value)
     }
 

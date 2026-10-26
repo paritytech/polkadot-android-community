@@ -8,7 +8,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -28,7 +27,9 @@ class TransferQueueProcessor @Inject constructor(
     }
 
     suspend fun <T : WithRetryState> processPendingConcurrently(queue: ConcurrentTransferQueue<T>) = coroutineScope {
-        val inFlight: MutableSet<T> = ConcurrentHashMap.newKeySet()
+        // Upload work is unique, so no other pass is running: a row still in progress was left by one that died mid-attempt.
+        queue.releaseInProgress()
+
         val slots = Semaphore(queue.maxInFlight)
         val wake = Channel<Unit>(Channel.CONFLATED)
 
@@ -38,24 +39,20 @@ class TransferQueueProcessor @Inject constructor(
 
         while (true) {
             slots.acquire()
-            val item = queue.nextPending(excluding = inFlight.toList())
+            val item = queue.claimNextDue()
 
             if (item == null) {
                 slots.release()
-                if (inFlight.isEmpty()) break
+                if (slots.availablePermits == queue.maxInFlight) break
 
                 withTimeoutOrNull(waitUntil(queue.nextBackoffEndAt())) { wake.receive() }
                 continue
             }
 
-            queue.markInProgress(item)
-            inFlight.add(item)
-
             launch {
                 try {
                     process(queue, item)
                 } finally {
-                    inFlight.remove(item)
                     slots.release()
                     wake.trySend(Unit)
                 }

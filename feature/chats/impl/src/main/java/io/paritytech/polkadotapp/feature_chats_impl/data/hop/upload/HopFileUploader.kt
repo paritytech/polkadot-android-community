@@ -12,7 +12,6 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.Attachment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
 import io.paritytech.polkadotapp.feature_chats_impl.data.AttachmentMetaBuilder
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.ChatMessageAttachmentUpdater
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopNodeUrlProvider
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopService
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.auth.HopSigner
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.model.HopChunkedPayload
@@ -37,7 +36,6 @@ class HopFileUploader @Inject constructor(
     private val attachmentFileStorage: AttachmentFileStorage,
     private val hopService: HopService,
     private val hopSigner: HopSigner,
-    private val hopNodeUrlProvider: HopNodeUrlProvider,
     private val fileUploadRepository: FileUploadRepository,
     private val messageAttachmentUpdater: ChatMessageAttachmentUpdater,
     private val attachmentMetaBuilder: AttachmentMetaBuilder,
@@ -48,23 +46,16 @@ class HopFileUploader @Inject constructor(
     suspend fun upload(upload: FileUpload) {
         hopSigner.ensureCanSubmit()
 
-        val nodeUrl = attemptNodeUrl(upload)
-        val uploadedChunkHashes = if (nodeUrl == upload.nodeUrl) {
-            upload.progress.uploadedChunkHashes
-        } else {
-            fileUploadRepository.moveToNode(upload.messageId, nodeUrl)
-            emptyList()
-        }
         val content = readContent(upload.meta)
 
-        hopService.withSession(nodeUrl) {
+        hopService.withSession(upload.nodeUrl) {
             val identifier = if (content is UploadContent.InMemory && content.size.inWholeBytes <= HopService.INLINE_MAX_BYTES) {
                 fileUploadRepository.updateFileInfo(upload.messageId, content.size, totalChunks = 1)
                 submitInlineRoot(content.bytes, upload.ticket)
             } else {
                 val totalChunks = determineNumberOfChunks(content.size)
                 fileUploadRepository.updateFileInfo(upload.messageId, content.size, totalChunks)
-                val chunkHashes = uploadChunks(upload, uploadedChunkHashes, content, totalChunks)
+                val chunkHashes = uploadChunks(upload, content, totalChunks)
                 submitChunkedRoot(content.size.inWholeBytes.toULong(), chunkHashes, upload.ticket)
             }
 
@@ -74,17 +65,8 @@ class HopFileUploader @Inject constructor(
                 size = content.size
             )
 
-            updateMessage(upload, nodeUrl, identifier, attachmentMeta)
+            updateMessage(upload, identifier, attachmentMeta)
         }
-    }
-
-    private suspend fun attemptNodeUrl(upload: FileUpload): String {
-        val failures = upload.retryState.attemptCount
-        val shouldSwitchNode = failures > 0 && failures % FAILURES_BEFORE_NODE_SWITCH == 0 &&
-            upload.progress.status == FileUpload.Status.PENDING
-        if (!shouldSwitchNode) return upload.nodeUrl
-
-        return hopNodeUrlProvider.pickForRetry(failedNodeUrl = upload.nodeUrl)
     }
 
     private suspend fun readContent(meta: FileUpload.Meta): UploadContent {
@@ -123,11 +105,10 @@ class HopFileUploader @Inject constructor(
 
     private suspend fun HopService.Session.uploadChunks(
         upload: FileUpload,
-        uploadedChunkHashes: List<String>,
         content: UploadContent,
         totalChunks: Int
     ): List<ByteArray> {
-        val allChunkHashes = uploadedChunkHashes.map { it.fromHex() }.toMutableList()
+        val allChunkHashes = upload.progress.uploadedChunkHashes.map { it.fromHex() }.toMutableList()
 
         if (allChunkHashes.size >= totalChunks) return allChunkHashes
 
@@ -156,12 +137,12 @@ class HopFileUploader @Inject constructor(
         is UploadContent.InMemory -> bytes.chunkedSequence(HopService.CHUNK_SIZE_BYTES).drop(fromChunk).asFlow()
     }
 
-    private suspend fun updateMessage(upload: FileUpload, nodeUrl: String, metadataHash: ByteArray, meta: Attachment.Meta) {
+    private suspend fun updateMessage(upload: FileUpload, metadataHash: ByteArray, meta: Attachment.Meta) {
         val attachment = Attachment.Hosted(
             uri = upload.meta.uri,
             identifier = metadataHash.toDataByteArray(),
             ticket = upload.ticket,
-            nodeUrl = nodeUrl,
+            nodeUrl = upload.nodeUrl,
             meta = meta
         )
 
@@ -184,7 +165,6 @@ class HopFileUploader @Inject constructor(
 
     companion object {
         private val HOP_REQUEST_TIMEOUT = 60.seconds
-        private const val FAILURES_BEFORE_NODE_SWITCH = 2
 
         fun determineNumberOfChunks(fileSize: InformationSize): Int {
             return ceil(fileSize.inWholeBytes.toDouble() / HopService.CHUNK_SIZE_BYTES).toInt()
