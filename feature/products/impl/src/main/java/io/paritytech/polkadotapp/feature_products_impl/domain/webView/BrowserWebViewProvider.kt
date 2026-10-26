@@ -3,6 +3,8 @@ package io.paritytech.polkadotapp.feature_products_impl.domain.webView
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
@@ -25,6 +27,7 @@ import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.UrlDerived
 import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.navigation.NavigationPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Visible WebView provider for SPA browser and Explore environments.
@@ -47,6 +50,7 @@ class BrowserWebViewProvider @AssistedInject constructor(
     @Assisted private val navigationPolicy: NavigationPolicy,
     @Assisted private val allowIframes: Boolean,
     @Assisted private val scope: CoroutineScope,
+    @Assisted("waitForInitialTheme") private val waitForInitialTheme: Boolean,
 ) : WebViewProvider(dispatchers), PageLifecycleSource {
     @AssistedFactory
     interface Factory {
@@ -54,7 +58,8 @@ class BrowserWebViewProvider @AssistedInject constructor(
             initialUrl: String,
             navigationPolicy: NavigationPolicy,
             allowIframes: Boolean,
-            scope: CoroutineScope
+            scope: CoroutineScope,
+            @Assisted("waitForInitialTheme") waitForInitialTheme: Boolean = false,
         ): BrowserWebViewProvider
     }
 
@@ -77,9 +82,18 @@ class BrowserWebViewProvider @AssistedInject constructor(
         onTitleReceived = null,
     )
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     override suspend fun createWebView(): WebView {
         return WebView(context).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            if (waitForInitialTheme) {
+                alpha = 0f
+                // WebView takes touches even when disabled, so a hidden page is shielded by consuming them.
+                setOnTouchListener { _, _ -> true }
+                isFocusable = false
+                isFocusableInTouchMode = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            }
             // This is needed so webView has a proper initial viewport height when the page renders. With overflow: hidden and height: 100%, if the WebView's layout height isn't resolved yet, the
             //  content box collapses to 0px
             layoutParams = ViewGroup.LayoutParams(
@@ -113,6 +127,27 @@ class BrowserWebViewProvider @AssistedInject constructor(
         accessWebView { it.loadUrl(initialUrl) }
     }
 
+    override fun onInitialThemeDelivered() {
+        if (!waitForInitialTheme) return
+        getWebViewOrNull()?.let { view -> view.post { revealAfterRendering(view) } }
+    }
+
+    private fun revealAfterRendering(view: WebView) {
+        if (getWebViewOrNull() !== view || view.alpha == 1f) return
+        view.postVisualStateCallback(0L, object : WebView.VisualStateCallback() {
+            override fun onComplete(requestId: Long) = reveal(view)
+        })
+    }
+
+    private fun reveal(view: WebView) {
+        if (getWebViewOrNull() !== view || view.alpha == 1f) return
+        view.alpha = 1f
+        view.setOnTouchListener(null)
+        view.isFocusable = true
+        view.isFocusableInTouchMode = true
+        view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+    }
+
     private inner class InternalWebViewClient(
         private val innerClient: WebViewClient,
     ) : WebViewClient() {
@@ -137,6 +172,9 @@ class BrowserWebViewProvider @AssistedInject constructor(
         override fun onPageFinished(view: WebView, url: String?) {
             innerClient.onPageFinished(view, url)
             notifyOnPageFinished()
+            if (waitForInitialTheme) {
+                view.postDelayed({ reveal(view) }, THEME_READY_FALLBACK.inWholeMilliseconds)
+            }
         }
 
         override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
@@ -144,5 +182,9 @@ class BrowserWebViewProvider @AssistedInject constructor(
             notifyRenderProcessGone()
             return true
         }
+    }
+
+    private companion object {
+        val THEME_READY_FALLBACK = 2.seconds
     }
 }

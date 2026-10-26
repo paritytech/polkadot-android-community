@@ -49,14 +49,17 @@ class SplitCoinStrategy(
     )
 
     context(diagnostics: StalenessReportCollector)
-    override suspend fun schedule(params: TransferSubmissionParams): Result<ScheduledTransfer> =
+    override suspend fun schedule(
+        params: TransferSubmissionParams,
+        reservationMode: CoinReservationMode,
+    ): Result<ScheduledTransfer> =
         diagnostics.markRegion(RCommon.string.coinage_stall_preparing_transfer) {
             val transaction = coinageTransactionFactory.newTransaction()
 
             val outputs = transaction.mintSplitOutputs().getOrElse { return Result.failure(it) }
             val assets = transaction.build()
 
-            transactionService.preCommitHandoff(assets.handedOff).map { handoffCommit ->
+            transactionService.reserveAssets(assets.handedOff, reservationMode).map { handoffCommit ->
                 ScheduledTransfer(
                     entries = (exactCoins + outputs.recipient).toMemoEntries(),
                     handoffCommit = handoffCommit,

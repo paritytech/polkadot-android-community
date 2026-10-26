@@ -17,6 +17,7 @@ android {
 
         buildConfigField("String", "TESTNET_ENVIRONMENT", "\"TESTNET\"")
         buildConfigField("boolean", "COINAGE_DEBUG_FEATURES", "true")
+        buildConfigField("boolean", "COINAGE_DEBUG_TOOLS", "true")
         buildConfigField("boolean", "TESTNET_FUND_ENABLED", "true")
         buildConfigField("boolean", "SAMPLE_BOT", "true")
         buildConfigField("boolean", "SAFETY_MODE", "false")
@@ -30,18 +31,22 @@ android {
             buildConfigField("boolean", "TAB_BAR_CONNECTIVITY_INDICATOR", "true")
             buildConfigField("String", "TESTNET_ENVIRONMENT", "\"PRODUCTION\"")
             buildConfigField("boolean", "COINAGE_DEBUG_FEATURES", "false")
+            buildConfigField("boolean", "COINAGE_DEBUG_TOOLS", "false")
             buildConfigField("boolean", "TESTNET_FUND_ENABLED", "false")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
         }
         getByName("nightly") {
             buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
+            // Nightly starts as a copy of debug, so BuildConfig.DEBUG cannot tell them apart.
+            buildConfigField("boolean", "COINAGE_DEBUG_TOOLS", "false")
         }
         getByName("safetynet") {
             buildConfigField("boolean", "SAFETY_MODE", "true")
             buildConfigField("boolean", "TAB_BAR_CONNECTIVITY_INDICATOR", "true")
             buildConfigField("String", "TESTNET_ENVIRONMENT", "\"NIGHTLY\"")
             buildConfigField("boolean", "SAMPLE_BOT", "false")
+            buildConfigField("boolean", "COINAGE_DEBUG_TOOLS", "false")
         }
     }
 }
