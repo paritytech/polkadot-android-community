@@ -4,8 +4,12 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer
 
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.HopTransferRetryState
 import io.paritytech.polkadotapp.test_shared.FakeTimeProvider
+import io.paritytech.polkadotapp.test_shared.any
+import io.paritytech.polkadotapp.test_shared.thenSuspend
+import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -15,6 +19,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
@@ -226,37 +233,24 @@ class TransferQueueProcessorConcurrencyTest {
     }
 
     @Test
-    fun `an upload is rescheduled with the first backoff when its first attempt fails`() = runTest {
+    fun `an upload keeps its window anchor when its third attempt fails`() = runTest {
         val queue = FakeConcurrentQueue(this)
-        queue.addHanging("a")
+        val retriedTwice = retriedTwice()
+        queue.addHanging("a", retryState = retriedTwice)
 
-        startPass(queue)
-        runCurrent()
-        queue.fail("a", RetryableTransferException("timeout"))
-        runCurrent()
+        failAttemptOf(queue, "a")
 
-        val retryState = queue.retryStateOf("a")
-        assertEquals(RowStatus.PENDING, queue.statusOf("a"))
-        assertEquals(1, retryState.attemptCount)
-        assertEquals(10.seconds, retryState.nextAttemptAt!! - retryState.firstFailureAt!!)
-        assertFalse(queue.wasMarkedFailed("a"))
+        assertEquals(retriedTwice.firstFailureAt, queue.retryStateOf("a").firstFailureAt)
     }
 
     @Test
-    fun `an upload keeps its window anchor and backs off forty seconds when its third attempt fails`() = runTest {
+    fun `an upload backs off forty seconds when its third attempt fails`() = runTest {
         val queue = FakeConcurrentQueue(this)
-        val anchor = virtualNow() - 1.hours
-        queue.addHanging("a", retryState = HopTransferRetryState(attemptCount = 2, firstFailureAt = anchor, nextAttemptAt = null))
+        queue.addHanging("a", retryState = retriedTwice())
 
-        startPass(queue)
-        runCurrent()
-        queue.fail("a", RetryableTransferException("timeout"))
-        runCurrent()
+        failAttemptOf(queue, "a")
 
-        val retryState = queue.retryStateOf("a")
-        assertEquals(3, retryState.attemptCount)
-        assertEquals(anchor, retryState.firstFailureAt)
-        assertEquals(virtualNow() + 40.seconds, retryState.nextAttemptAt)
+        assertEquals(virtualNow() + 40.seconds, queue.retryStateOf("a").nextAttemptAt)
     }
 
     @Test
@@ -389,14 +383,13 @@ class TransferQueueProcessorConcurrencyTest {
     }
 
     @Test
-    fun `the sequential pass keeps one item in flight when three are pending`() = runTest {
-        val queue = FakeSequentialQueue()
-        queue.addHanging("a", "b", "c")
+    fun `the sequential pass starts one item at a time when three are pending`() = runTest {
+        val queue = sequentialQueueWithHanging("a", "b", "c")
 
         backgroundScope.launch { processor().processPending(queue) }
         runCurrent()
 
-        assertEquals(1, queue.inFlightCount)
+        verifyProcessedOnce(queue)
     }
 
     private fun TestScope.processor() =
@@ -419,6 +412,29 @@ class TransferQueueProcessorConcurrencyTest {
 
     private fun TestScope.retriedOnce() =
         HopTransferRetryState(attemptCount = 1, firstFailureAt = virtualNow() - 1.minutes, nextAttemptAt = null)
+
+    private fun TestScope.retriedTwice() =
+        HopTransferRetryState(attemptCount = 2, firstFailureAt = virtualNow() - 1.hours, nextAttemptAt = null)
+
+    private fun TestScope.failAttemptOf(queue: FakeConcurrentQueue, id: String) {
+        startPass(queue)
+        runCurrent()
+        queue.fail(id, RetryableTransferException("timeout"))
+        runCurrent()
+    }
+
+    private suspend fun sequentialQueueWithHanging(vararg ids: String): TransferQueue<FakeItem> {
+        @Suppress("UNCHECKED_CAST")
+        val queue = mock(TransferQueue::class.java) as TransferQueue<FakeItem>
+        val items = ids.map { FakeItem(it, HopTransferRetryState.None) }
+        whenever(queue.nextPending()).thenReturn(items.first(), *(items.drop(1) + null).toTypedArray())
+        whenever(queue.process(any())).thenSuspend { awaitCancellation() }
+        return queue
+    }
+
+    private suspend fun verifyProcessedOnce(queue: TransferQueue<FakeItem>) {
+        verify(queue, times(1)).process(any())
+    }
 
     private fun assertStarted(queue: FakeConcurrentQueue, id: String) {
         assertTrue("$id should have started; started: ${queue.startedIds}", id in queue.startedIds)

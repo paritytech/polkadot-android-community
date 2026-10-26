@@ -9,7 +9,7 @@ class CompressImagesTest {
 
     @Test
     fun `applies when the file is a JPEG`() {
-        assertTrue(compressImages.appliesTo("image/jpeg"))
+        assertTrue(compressImages.appliesTo(IMAGE_JPEG))
     }
 
     @Test
@@ -24,7 +24,7 @@ class CompressImagesTest {
 
     @Test
     fun `does not apply when the file is a video`() {
-        assertFalse(compressImages.appliesTo("video/mp4"))
+        assertFalse(compressImages.appliesTo(VIDEO_MP4))
     }
 
     @Test

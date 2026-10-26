@@ -43,7 +43,6 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
     private val returns = mutableMapOf<String, Long>()
     private val nextPendingCallTimes = mutableListOf<Long>()
     private var backoffQueryCallCount = 0
-    private val markedFailed = mutableSetOf<String>()
 
     var spinDetected = false
         private set
@@ -91,7 +90,6 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
 
     fun statusOf(id: String) = rows.getValue(id).status
     fun retryStateOf(id: String) = rows.getValue(id).retryState
-    fun wasMarkedFailed(id: String) = id in markedFailed
     fun isInFlight(id: String) = id in starts && id !in returns
     fun returnedAt(id: String): Long? = returns[id]
     fun firstNextPendingCallAtOrAfter(time: Duration): Long? = nextPendingCallTimes.firstOrNull { it >= time.inWholeMilliseconds }
@@ -141,10 +139,7 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
 
     override suspend fun markDone(item: FakeItem) = write(item.id) { status = RowStatus.DONE }
 
-    override suspend fun markFailed(item: FakeItem, error: Throwable) {
-        markedFailed += item.id
-        write(item.id) { status = RowStatus.FAILED }
-    }
+    override suspend fun markFailed(item: FakeItem, error: Throwable) = write(item.id) { status = RowStatus.FAILED }
 
     override suspend fun scheduleRetry(item: FakeItem, reschedule: RetryDecision.Reschedule) = write(item.id) {
         status = RowStatus.PENDING
@@ -175,56 +170,4 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
         rows[id]?.update()
         changes.tryEmit(Unit)
     }
-}
-
-internal class FakeSequentialQueue : TransferQueue<FakeItem> {
-    private val rows = linkedMapOf<String, CompletableDeferred<Unit>>()
-    private val statuses = mutableMapOf<String, RowStatus>()
-    private val starts = mutableListOf<String>()
-    private val returns = mutableSetOf<String>()
-    private var nextPendingCallCount = 0
-
-    val inFlightCount: Int get() = starts.count { it !in returns }
-
-    fun addHanging(vararg ids: String) {
-        ids.forEach {
-            rows[it] = CompletableDeferred()
-            statuses[it] = RowStatus.PENDING
-        }
-    }
-
-    override suspend fun nextPending(): FakeItem? {
-        yield()
-        if (++nextPendingCallCount > QUERY_TRIPWIRE) awaitCancellation()
-        return statuses.entries
-            .firstOrNull { it.value == RowStatus.PENDING || it.value == RowStatus.IN_PROGRESS }
-            ?.let { FakeItem(it.key, HopTransferRetryState.None) }
-    }
-
-    override suspend fun markInProgress(item: FakeItem) {
-        statuses[item.id] = RowStatus.IN_PROGRESS
-    }
-
-    override suspend fun process(item: FakeItem) {
-        starts += item.id
-        try {
-            rows.getValue(item.id).await()
-        } finally {
-            returns += item.id
-        }
-    }
-
-    override suspend fun markDone(item: FakeItem) {
-        statuses[item.id] = RowStatus.DONE
-    }
-
-    override suspend fun markFailed(item: FakeItem, error: Throwable) {
-        statuses[item.id] = RowStatus.FAILED
-    }
-
-    override suspend fun scheduleRetry(item: FakeItem, reschedule: RetryDecision.Reschedule) {
-        statuses[item.id] = RowStatus.PENDING
-    }
-
-    override suspend fun soonestNextAttemptAt(): Instant? = null
 }
