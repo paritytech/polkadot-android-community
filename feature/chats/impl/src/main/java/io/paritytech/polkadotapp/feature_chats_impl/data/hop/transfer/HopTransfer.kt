@@ -1,9 +1,11 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer
 
-enum class HopTransfer(val workId: String) {
-    UPLOAD("HopFileUpload"),
-    DOWNLOAD("HopFileDownload"),
-    COMPACTION_EXPANSION("HopCompactionExpansion");
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionWorker
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.download.FileDownloadWorker
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadWorker
 
-    val wakeUpWorkId: String get() = "${workId}WakeUp"
+enum class HopTransfer(val workId: String) {
+    UPLOAD(FileUploadWorker.WORK_ID),
+    DOWNLOAD(FileDownloadWorker.WORK_ID),
+    COMPACTION_EXPANSION(CompactionExpansionWorker.WORK_ID)
 }

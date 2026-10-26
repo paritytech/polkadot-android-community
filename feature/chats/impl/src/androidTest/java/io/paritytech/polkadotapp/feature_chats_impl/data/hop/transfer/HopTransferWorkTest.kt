@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.Configuration
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.Worker
@@ -13,12 +15,15 @@ import androidx.work.testing.TestDriver
 import androidx.work.testing.WorkManagerTestInitHelper
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 @RunWith(AndroidJUnit4::class)
 class HopTransferWorkTest {
@@ -56,7 +61,7 @@ class HopTransferWorkTest {
         enqueueQuietTransfer<PassWorker>(context, HopTransfer.UPLOAD.workId)
         runQueuedWork(HopTransfer.UPLOAD.workId)
 
-        assertEquals(listOf(WorkInfo.State.ENQUEUED), statesOf(HopTransfer.UPLOAD.wakeUpWorkId))
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), statesOf(HopTransferWakeUpWorker.workIdFor(HopTransfer.UPLOAD)))
     }
 
     @Test
@@ -75,8 +80,38 @@ class HopTransferWorkTest {
 
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, executeAt = null)
 
-        assertEquals(listOf(WorkInfo.State.CANCELLED), statesOf(HopTransfer.UPLOAD.wakeUpWorkId))
+        assertEquals(listOf(WorkInfo.State.CANCELLED), statesOf(HopTransferWakeUpWorker.workIdFor(HopTransfer.UPLOAD)))
     }
+
+    @Test
+    fun aTransferGetsAPassWhenTheWaitingPassIsDelayed() = runBlocking<Unit> {
+        enqueueDelayedPass(PASS_WORK_ID)
+
+        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID)
+        runQueuedWork(PASS_WORK_ID)
+
+        assertEquals(1, finishedPasses(PASS_WORK_ID))
+    }
+
+    @Test
+    fun theWakeUpMovesToTheSoonerDeadlineWhenItIsScheduledAgain() = runBlocking<Unit> {
+        scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
+
+        scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.minutes)
+
+        assertTrue(pendingWakeUp(HopTransfer.UPLOAD).initialDelayMillis <= 1.minutes.inWholeMilliseconds)
+    }
+
+    private fun enqueueDelayedPass(workId: String) {
+        val request = OneTimeWorkRequestBuilder<PassWorker>()
+            .setInitialDelay(1, TimeUnit.HOURS)
+            .build()
+
+        workManager.enqueueUniqueWork(workId, ExistingWorkPolicy.REPLACE, request).result.get()
+    }
+
+    private fun pendingWakeUp(transfer: HopTransfer): WorkInfo =
+        workManager.getWorkInfosForUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer)).get().single { it.state == WorkInfo.State.ENQUEUED }
 
     private fun runQueuedWork(workId: String) {
         val started = mutableSetOf<UUID>()

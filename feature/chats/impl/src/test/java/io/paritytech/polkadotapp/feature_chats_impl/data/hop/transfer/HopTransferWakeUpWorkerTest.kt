@@ -22,30 +22,65 @@ class HopTransferWakeUpWorkerTest {
 
     @Test
     fun `the wake-up asks for an upload pass when it was scheduled for uploads`() = runBlocking<Unit> {
+        withUploadPassQueued()
+
         wakeUpWith(HopTransferWakeUpWorker.inputFor(HopTransfer.UPLOAD)).doWork()
 
-        verify(uploadStarter).startUploading()
+        verifyUploadPassRequested()
     }
 
     @Test
     fun `the wake-up asks for a download pass when it was scheduled for downloads`() = runBlocking<Unit> {
+        withDownloadPassQueued()
+
         wakeUpWith(HopTransferWakeUpWorker.inputFor(HopTransfer.DOWNLOAD)).doWork()
 
-        verify(downloadStarter).startDownloading()
+        verifyDownloadPassRequested()
     }
 
     @Test
     fun `the wake-up asks for an expansion pass when it was scheduled for compaction expansion`() = runBlocking<Unit> {
+        withExpansionPassQueued()
+
         wakeUpWith(HopTransferWakeUpWorker.inputFor(HopTransfer.COMPACTION_EXPANSION)).doWork()
 
-        verify(compactionExpansionStarter).startExpansion()
+        verifyExpansionPassRequested()
     }
 
     @Test
     fun `the wake-up asks for no other pass when it was scheduled for uploads`() = runBlocking<Unit> {
+        withUploadPassQueued()
+
         wakeUpWith(HopTransferWakeUpWorker.inputFor(HopTransfer.UPLOAD)).doWork()
 
         verifyNoDownloadOrExpansionPass()
+    }
+
+    @Test
+    fun `the wake-up succeeds when its pass is queued`() = runBlocking<Unit> {
+        withUploadPassQueued()
+
+        val result = wakeUpWith(HopTransferWakeUpWorker.inputFor(HopTransfer.UPLOAD)).doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+    }
+
+    @Test
+    fun `the wake-up retries when its pass could not be queued`() = runBlocking<Unit> {
+        withUploadPassFailing()
+
+        val result = wakeUpWith(HopTransferWakeUpWorker.inputFor(HopTransfer.UPLOAD)).doWork()
+
+        assertEquals(ListenableWorker.Result.retry(), result)
+    }
+
+    @Test
+    fun `the wake-up fails when its pass still could not be queued on its last retry`() = runBlocking<Unit> {
+        withUploadPassFailing()
+
+        val result = wakeUpWith(HopTransferWakeUpWorker.inputFor(HopTransfer.UPLOAD), runAttemptCount = HopTransferWakeUpWorker.MAX_RETRIES).doWork()
+
+        assertEquals(ListenableWorker.Result.failure(), result)
     }
 
     @Test
@@ -55,9 +90,26 @@ class HopTransferWakeUpWorkerTest {
         assertEquals(ListenableWorker.Result.failure(), result)
     }
 
-    private fun wakeUpWith(input: Data): HopTransferWakeUpWorker {
+    private suspend fun withUploadPassQueued() {
+        whenever(uploadStarter.startUploading()).thenReturn(Result.success(Unit))
+    }
+
+    private suspend fun withUploadPassFailing() {
+        whenever(uploadStarter.startUploading()).thenReturn(Result.failure(IllegalStateException("work database unavailable")))
+    }
+
+    private suspend fun withDownloadPassQueued() {
+        whenever(downloadStarter.startDownloading()).thenReturn(Result.success(Unit))
+    }
+
+    private suspend fun withExpansionPassQueued() {
+        whenever(compactionExpansionStarter.startExpansion()).thenReturn(Result.success(Unit))
+    }
+
+    private fun wakeUpWith(input: Data, runAttemptCount: Int = 0): HopTransferWakeUpWorker {
         val parameters: WorkerParameters = mock(WorkerParameters::class.java)
         whenever(parameters.inputData).thenReturn(input)
+        whenever(parameters.runAttemptCount).thenReturn(runAttemptCount)
 
         return HopTransferWakeUpWorker(
             appContext = mock(Context::class.java),
@@ -66,6 +118,18 @@ class HopTransferWakeUpWorkerTest {
             downloadStarter = downloadStarter,
             compactionExpansionStarter = compactionExpansionStarter
         )
+    }
+
+    private suspend fun verifyUploadPassRequested() {
+        verify(uploadStarter).startUploading()
+    }
+
+    private suspend fun verifyDownloadPassRequested() {
+        verify(downloadStarter).startDownloading()
+    }
+
+    private suspend fun verifyExpansionPassRequested() {
+        verify(compactionExpansionStarter).startExpansion()
     }
 
     private suspend fun verifyNoDownloadOrExpansionPass() {

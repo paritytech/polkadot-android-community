@@ -7,7 +7,5 @@ import javax.inject.Inject
 class FileUploadStarter @Inject constructor(
     @param:ApplicationContext private val appContext: Context
 ) {
-    suspend fun startUploading() {
-        FileUploadWorker.startUploadingWork(appContext)
-    }
+    suspend fun startUploading(): Result<Unit> = FileUploadWorker.startUploadingWork(appContext)
 }

@@ -29,6 +29,8 @@ class CompactionExpansionWorker @AssistedInject constructor(
     }
 
     companion object {
-        suspend fun startExpansionWork(context: Context) = enqueueQuietTransfer<CompactionExpansionWorker>(context, HopTransfer.COMPACTION_EXPANSION.workId)
+        const val WORK_ID = "HopCompactionExpansion"
+
+        suspend fun startExpansionWork(context: Context) = enqueueQuietTransfer<CompactionExpansionWorker>(context, WORK_ID)
     }
 }

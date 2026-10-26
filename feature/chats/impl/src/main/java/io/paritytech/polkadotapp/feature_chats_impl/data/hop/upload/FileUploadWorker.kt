@@ -43,8 +43,9 @@ class FileUploadWorker @AssistedInject constructor(
     )
 
     companion object {
+        const val WORK_ID = "HopFileUpload"
         private const val NOTIFICATION_ID = 1002
 
-        suspend fun startUploadingWork(context: Context) = enqueueExpeditedTransfer<FileUploadWorker>(context, HopTransfer.UPLOAD.workId)
+        suspend fun startUploadingWork(context: Context) = enqueueExpeditedTransfer<FileUploadWorker>(context, WORK_ID)
     }
 }

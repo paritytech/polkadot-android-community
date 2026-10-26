@@ -19,52 +19,61 @@ import androidx.work.WorkManager
 import androidx.work.await
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 import kotlin.time.Instant
 import io.paritytech.polkadotapp.common.R as RCommon
 
-internal suspend inline fun <reified W : ListenableWorker> enqueueExpeditedTransfer(context: Context, workId: String) {
+internal suspend inline fun <reified W : ListenableWorker> enqueueExpeditedTransfer(context: Context, workId: String): Result<Unit> {
     val request = OneTimeWorkRequestBuilder<W>()
         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
         .setConstraints(networkConnected())
         .build()
 
-    enqueueTransferPass(context, workId, request)
+    return enqueueTransferPass(context, workId, request)
 }
 
-internal suspend inline fun <reified W : ListenableWorker> enqueueQuietTransfer(context: Context, workId: String) {
+internal suspend inline fun <reified W : ListenableWorker> enqueueQuietTransfer(context: Context, workId: String): Result<Unit> {
     val request = OneTimeWorkRequestBuilder<W>()
         .setConstraints(networkConnected())
         .build()
 
-    enqueueTransferPass(context, workId, request)
+    return enqueueTransferPass(context, workId, request)
 }
 
 private val passQueueing = Mutex()
 
-// Appended, never replaced: a running pass must not be cut off, and a row queued while it exits still needs the next pass.
-// The read and the append share one lock so that a burst of triggers adds one pass, not one each.
-internal suspend fun enqueueTransferPass(context: Context, workId: String, request: OneTimeWorkRequest) {
-    val workManager = WorkManager.getInstance(context)
+// The read and the enqueue share one lock so that a burst of triggers adds one pass, not one each.
+internal suspend fun enqueueTransferPass(context: Context, workId: String, request: OneTimeWorkRequest): Result<Unit> {
+    return runCancellableCatching {
+        // The trigger's row is already stored, so a caller that leaves must not take its pass with it.
+        withContext(NonCancellable) {
+            passQueueing.withLock {
+                val workManager = WorkManager.getInstance(context)
+                val policy = passPolicy(workManager.getWorkInfosForUniqueWorkFlow(workId).first(), Clock.System.now())
 
-    runCancellableCatching {
-        passQueueing.withLock {
-            val states = workManager.getWorkInfosForUniqueWorkFlow(workId).first().map { it.state }
-
-            if (needsNewPass(states)) {
-                workManager.enqueueUniqueWork(workId, ExistingWorkPolicy.APPEND_OR_REPLACE, request).await()
+                if (policy != null) {
+                    workManager.enqueueUniqueWork(workId, policy, request).await()
+                }
             }
         }
     }.logFailure("Failed to queue a $workId pass")
 }
 
-// A pass that has not started yet picks up everything queued before it runs.
-internal fun needsNewPass(states: Collection<WorkInfo.State>): Boolean {
-    return states.none { it == WorkInfo.State.ENQUEUED || it == WorkInfo.State.BLOCKED }
+// A pass still waiting out a delay means none is running, so replacing it cannot cut a pass off.
+internal fun passPolicy(passes: Collection<WorkInfo>, now: Instant): ExistingWorkPolicy? {
+    val waiting = passes.filter { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
+
+    return when {
+        waiting.isEmpty() -> ExistingWorkPolicy.APPEND_OR_REPLACE
+        waiting.any { it.state == WorkInfo.State.ENQUEUED && it.nextScheduleTimeMillis > now.toEpochMilliseconds() } -> ExistingWorkPolicy.REPLACE
+        else -> null
+    }
 }
 
 // Under its own name, so a pending backoff never holds back the pass a fresh transfer asks for.
@@ -72,7 +81,7 @@ internal fun scheduleTransferWakeUp(context: Context, transfer: HopTransfer, exe
     val workManager = WorkManager.getInstance(context)
 
     if (executeAt == null) {
-        workManager.cancelUniqueWork(transfer.wakeUpWorkId)
+        workManager.cancelUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer))
     } else {
         val delay = executeAt - Clock.System.now()
         val request = OneTimeWorkRequestBuilder<HopTransferWakeUpWorker>()
@@ -81,7 +90,7 @@ internal fun scheduleTransferWakeUp(context: Context, transfer: HopTransfer, exe
             .setInputData(HopTransferWakeUpWorker.inputFor(transfer))
             .build()
 
-        workManager.enqueueUniqueWork(transfer.wakeUpWorkId, ExistingWorkPolicy.REPLACE, request)
+        workManager.enqueueUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer), ExistingWorkPolicy.REPLACE, request)
     }
 }
 

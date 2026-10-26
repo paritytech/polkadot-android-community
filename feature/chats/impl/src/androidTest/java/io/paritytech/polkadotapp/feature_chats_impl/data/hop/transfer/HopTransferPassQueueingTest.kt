@@ -13,6 +13,8 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -79,6 +81,39 @@ class HopTransferPassQueueingTest {
         awaitState(next, WorkInfo.State.SUCCEEDED)
     }
 
+    @Test
+    fun anExpeditedTransferQueuedDuringARunningPassGetsOneMorePass() = runBlocking<Unit> {
+        startHeldPass()
+
+        enqueueExpeditedTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+
+        assertEquals(1, passesQueuedBehindTheRunningOne())
+    }
+
+    @Test
+    fun aTransferGetsAPassThatRunsWhenTheEarlierPassFailed() = runBlocking<Unit> {
+        enqueueQuietTransfer<FailingPassWorker>(context, PASS_WORK_ID)
+        awaitState(startQueuedPass(), WorkInfo.State.FAILED)
+
+        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+        HoldingPassWorker.release.countDown()
+        val next = startQueuedPass()
+
+        awaitState(next, WorkInfo.State.SUCCEEDED)
+    }
+
+    @Test
+    fun aTransferGetsAPassWhenItsCallerIsCancelledBeforeTheEnqueue() = runBlocking<Unit> {
+        startHeldPass()
+
+        launch {
+            coroutineContext.job.cancel()
+            enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+        }.join()
+
+        assertEquals(1, passesQueuedBehindTheRunningOne())
+    }
+
     private suspend fun startHeldPass(): UUID {
         enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
         val pass = startQueuedPass()
@@ -113,6 +148,10 @@ class HopTransferPassQueueingTest {
             @Volatile
             lateinit var release: CountDownLatch
         }
+    }
+
+    class FailingPassWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
+        override fun doWork(): Result = Result.failure()
     }
 
     private companion object {
