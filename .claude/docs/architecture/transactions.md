@@ -38,6 +38,7 @@ Classic signed extrinsics + a growing family of custom origins (People-Lite, AsP
 12. **`major`** — A `TxCompletionOracle`'s `LedgerView` never contains `PENDING_SUBMISSION` rows: they have no attempt in flight and cannot have produced an effect.
 13. **`major`** — Work common to one policy's transactions of one group (pinned blocks, proofs, per-extrinsic tokens) is done once per `prepareSubmission` call, not per transaction.
 14. **`major`** — When a new identity-proof origin is added, wrap its extension in `SetTransactionExtensionOrigin` and expose it via the matching `*Origins` factory (e.g. `CoinageTransactionOrigins`). Composition, not inheritance from scratch.
+15. **`blocking`** — A signed `Revive.call` checks `ReviveContractApi.isAccountMapped` for its origin before the dry-run. A dry-run maps the origin for the length of the simulation, so it succeeds for an unmapped account whose real call the pallet rejects.
 
 ## Seams
 

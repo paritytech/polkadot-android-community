@@ -14,6 +14,8 @@ dependencies {
     implementation(project(":feature:account:api"))
     implementation(project(":feature:members:api"))
     implementation(project(":feature:people:api"))
+    implementation(project(":feature:pgas:api"))
+    implementation(project(":feature:balances:api"))
     implementation(project(":feature:transactions:api"))
     implementation(project(":feature:revive:api"))
     implementation(project(":feature:dotns:api"))

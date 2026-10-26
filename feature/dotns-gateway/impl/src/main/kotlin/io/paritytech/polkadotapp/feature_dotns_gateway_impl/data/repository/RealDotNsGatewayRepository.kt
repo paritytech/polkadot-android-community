@@ -22,6 +22,8 @@ import io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.api.registerNam
 import io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.config.DotNsGatewayConfig
 import io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.config.DotNsGatewayConfigProvider
 import io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.contract.PopContractCoder
+import io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.queue.DotNsReservationQueueClearer
+import io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.queue.DotNsReservationQueueReader
 import io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.signer.origins.DotNsGatewayOrigins
 import io.paritytech.polkadotapp.feature_revive_api.NameHash
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
@@ -35,6 +37,8 @@ import javax.inject.Inject
 class RealDotNsGatewayRepository @Inject constructor(
     @param:LocalSourceQualifier private val localStorageSource: StorageDataSource,
     private val reviveContractApi: ReviveContractApi,
+    private val queueReader: DotNsReservationQueueReader,
+    private val queueClearer: DotNsReservationQueueClearer,
     private val configProvider: DotNsGatewayConfigProvider,
     private val tldProvider: DotNsTldProvider,
     private val extrinsicService: ExtrinsicService,
@@ -83,16 +87,22 @@ class RealDotNsGatewayRepository @Inject constructor(
     }
 
     override suspend fun registerName(who: AccountId, label: String, link: DotNsLink): Result<Unit> {
-        return extrinsicService.submitExtrinsicAndAwaitExecution(
-            chain = chainRegistry.getChain(knownChains.assetHub),
-            origin = dotNsGatewayOrigins.asPersonRegistration(who, label, link)
-        ) {
-            dotNsGatewayCalls.registerName(
-                who = who,
-                label = label,
-                link = link
-            )
-        }
+        val chain = chainRegistry.getChain(knownChains.assetHub)
+
+        return configProvider.getConfig()
+            .flatMap { config -> queueClearer.prepareClaim(chain, who, label, config) }
+            .flatMap {
+                extrinsicService.submitExtrinsicAndAwaitExecution(
+                    chain = chain,
+                    origin = dotNsGatewayOrigins.asPersonRegistration(who, label, link)
+                ) {
+                    dotNsGatewayCalls.registerName(
+                        who = who,
+                        label = label,
+                        link = link
+                    )
+                }
+            }
             .flattenExecutionFailure()
             .coerceToUnit()
     }
@@ -114,19 +124,11 @@ class RealDotNsGatewayRepository @Inject constructor(
         accountId: AccountId,
         config: DotNsGatewayConfig
     ): Result<DotNsBaseNameAvailability> {
-        val input = PopContractCoder.encodeIsReservedForClaim(baseLabel)
-
-        return reviveContractApi.callReadOnly(
-            chainId = knownChains.assetHub,
-            contract = config.popControllerAddress,
-            input = input.toDataByteArray()
-        ).mapCatching { output ->
-            val reservation = PopContractCoder.decodeIsReservedForClaim(output.value)
-                ?: error("Malformed isReservedForClaim output for $baseLabel")
-
+        return queueReader.read(baseLabel, config).map { queue ->
+            val holder = queue.firstActiveHolder
             when {
-                !reservation.reserved -> DotNsBaseNameAvailability.Free
-                reservation.holder.toDataByteArray() == accountId.toEvmAccountId() -> DotNsBaseNameAvailability.ReservedByUs
+                holder == null -> DotNsBaseNameAvailability.Free
+                holder.contentEquals(accountId.toEvmAccountId().value) -> DotNsBaseNameAvailability.ReservedByUs
                 else -> DotNsBaseNameAvailability.TakenByOther
             }
         }

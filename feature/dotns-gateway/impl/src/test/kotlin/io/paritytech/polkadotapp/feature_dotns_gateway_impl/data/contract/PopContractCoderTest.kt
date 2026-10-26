@@ -5,25 +5,34 @@ package io.paritytech.polkadotapp.feature_dotns_gateway_impl.data.contract
 import io.novasama.substrate_sdk_android.extensions.fromHex
 import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.TypeReference
 import org.web3j.abi.datatypes.Address
-import org.web3j.abi.datatypes.Bool
 import org.web3j.abi.datatypes.DynamicBytes
 import org.web3j.abi.datatypes.Function
 import org.web3j.abi.datatypes.Type
+import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.abi.datatypes.generated.Uint64
+import java.math.BigInteger
 
 class PopContractCoderTest {
     @Test
-    fun `encodeIsReservedForClaim uses keccak-derived selector`() {
-        val encoded = PopContractCoder.encodeIsReservedForClaim("alice")
+    fun `reservation queue reads use keccak-derived selectors and the label hash`() {
+        val labelHash = PopContractCoder.reservationLabelHash("alice")
+        val meta = PopContractCoder.encodeReservationMeta(labelHash)
+        val entry = PopContractCoder.encodeReservationEntry(labelHash, BigInteger.valueOf(3))
 
-        assertArrayEquals(selectorOf("isReservedForClaim(string)"), encoded.copyOfRange(0, 4))
+        assertArrayEquals(Keccak.Digest256().digest("alice".toByteArray()), labelHash)
+        assertArrayEquals(selectorOf("reservationMeta(bytes32)"), meta.copyOfRange(0, 4))
+        assertArrayEquals(labelHash, meta.copyOfRange(4, 36))
+        assertArrayEquals(selectorOf("reservationDuration()"), PopContractCoder.encodeReservationDuration())
+        assertArrayEquals(selectorOf("reservationEntry(bytes32,uint64)"), entry.copyOfRange(0, 4))
+        assertArrayEquals(labelHash, entry.copyOfRange(4, 36))
+        assertEquals(BigInteger.valueOf(3), BigInteger(1, entry.copyOfRange(36, 68)))
     }
 
     @Test
@@ -36,31 +45,42 @@ class PopContractCoderTest {
     }
 
     @Test
-    fun `decodeIsReservedForClaim round-trips reserved holder`() {
-        val holderHex = "11".repeat(20)
-        val output = abiEncodeReturnValues(
-            listOf(Bool(true), Address("0x$holderHex")),
-            listOf(object : TypeReference<Bool>() {}, object : TypeReference<Address>() {})
-        )
+    fun `expireReservation and the step limit use keccak-derived selectors`() {
+        val expire = PopContractCoder.encodeExpireReservation("alice")
+        val output = abiEncodeReturnValues(listOf(Uint256(4)), listOf(object : TypeReference<Uint256>() {}))
 
-        val decoded = PopContractCoder.decodeIsReservedForClaim(output)
-
-        assertNotNull(decoded)
-        assertTrue(decoded!!.reserved)
-        assertArrayEquals(holderHex.fromHex(), decoded.holder)
+        assertArrayEquals(selectorOf("expireReservation(string)"), expire.copyOfRange(0, 4))
+        assertArrayEquals(selectorOf("MAX_QUEUE_STEPS_PER_CALL()"), PopContractCoder.encodeMaxQueueStepsPerCall())
+        assertEquals(BigInteger.valueOf(4), PopContractCoder.decodeMaxQueueStepsPerCall(output))
     }
 
     @Test
-    fun `decodeIsReservedForClaim round-trips not reserved`() {
+    fun `decodeReservationMeta round-trips the queue bounds`() {
         val output = abiEncodeReturnValues(
-            listOf(Bool(false), Address("0x" + "00".repeat(20))),
-            listOf(object : TypeReference<Bool>() {}, object : TypeReference<Address>() {})
+            listOf(Uint64(4), Uint64(9)),
+            listOf(object : TypeReference<Uint64>() {}, object : TypeReference<Uint64>() {})
         )
 
-        val decoded = PopContractCoder.decodeIsReservedForClaim(output)
+        val decoded = PopContractCoder.decodeReservationMeta(output)
 
         assertNotNull(decoded)
-        assertFalse(decoded!!.reserved)
+        assertEquals(BigInteger.valueOf(4), decoded!!.head)
+        assertEquals(BigInteger.valueOf(9), decoded.tail)
+    }
+
+    @Test
+    fun `decodeReservationEntry round-trips owner and join time`() {
+        val ownerHex = "11".repeat(20)
+        val output = abiEncodeReturnValues(
+            listOf(Address("0x$ownerHex"), Uint64(1_700_000_000)),
+            listOf(object : TypeReference<Address>() {}, object : TypeReference<Uint64>() {})
+        )
+
+        val decoded = PopContractCoder.decodeReservationEntry(output)
+
+        assertNotNull(decoded)
+        assertArrayEquals(ownerHex.fromHex(), decoded!!.owner)
+        assertEquals(BigInteger.valueOf(1_700_000_000), decoded.joinedAt)
     }
 
     @Test

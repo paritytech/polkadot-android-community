@@ -112,6 +112,7 @@ Walk this checklist for any file path that touches an architectural seam. Cite t
 - **blocking** — `AsyncDurableSubmissionPolicy.canRetry` retrying `DISPATCH_FAILED` / `REJECTED` failures without a bound (`architecture/transactions.md` rule 11).
 - **blocking** — A policy rebuild that consumes or mints anything other than the assets registered for its row.
 - **major** — `canRetry` reading the chain; work shared by a bucket repeated per transaction in `prepareSubmission`.
+- **blocking** — A signed `Revive.call` dry-run without an `isAccountMapped` check first (`architecture/transactions.md` rule 15).
 
 ## Chain integration (`architecture/chain-integration.md`)
 
