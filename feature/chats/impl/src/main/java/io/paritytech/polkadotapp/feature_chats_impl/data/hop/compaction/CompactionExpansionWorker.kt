@@ -8,9 +8,10 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferQueueProcessor
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueDelayedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueQuietTransfer
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.scheduleTransferWakeUp
 
 @HiltWorker
 class CompactionExpansionWorker @AssistedInject constructor(
@@ -22,16 +23,12 @@ class CompactionExpansionWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val processed = runCancellableCatching { transferQueueProcessor.processPending(transferQueue) }
 
-        transferQueue.soonestNextAttemptAt()?.let { soonest ->
-            enqueueDelayedTransfer<CompactionExpansionWorker>(applicationContext, WORK_ID, soonest)
-        }
+        scheduleTransferWakeUp(applicationContext, HopTransfer.COMPACTION_EXPANSION, transferQueue.soonestNextAttemptAt())
 
         return processed.toWorkerResult(retryOnFailure = true)
     }
 
     companion object {
-        private const val WORK_ID = "HopCompactionExpansion"
-
-        fun startExpansionWork(context: Context) = enqueueQuietTransfer<CompactionExpansionWorker>(context, WORK_ID)
+        suspend fun startExpansionWork(context: Context) = enqueueQuietTransfer<CompactionExpansionWorker>(context, HopTransfer.COMPACTION_EXPANSION.workId)
     }
 }

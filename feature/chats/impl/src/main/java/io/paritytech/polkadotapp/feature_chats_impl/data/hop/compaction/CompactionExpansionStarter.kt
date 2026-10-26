@@ -7,7 +7,7 @@ import javax.inject.Inject
 class CompactionExpansionStarter @Inject constructor(
     @param:ApplicationContext private val appContext: Context
 ) {
-    fun startExpansion() {
+    suspend fun startExpansion() {
         CompactionExpansionWorker.startExpansionWork(appContext)
     }
 }

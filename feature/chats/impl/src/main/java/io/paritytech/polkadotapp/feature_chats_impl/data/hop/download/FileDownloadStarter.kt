@@ -7,7 +7,7 @@ import javax.inject.Inject
 class FileDownloadStarter @Inject constructor(
     @param:ApplicationContext private val appContext: Context
 ) {
-    fun startDownloading() {
+    suspend fun startDownloading() {
         FileDownloadWorker.startDownloadingWork(appContext)
     }
 }

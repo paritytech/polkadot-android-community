@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionStarter
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.download.FileDownloadStarter
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadStarter
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class HopTransferResumeInitializer @Inject constructor(
@@ -15,8 +16,10 @@ class HopTransferResumeInitializer @Inject constructor(
 ) : AppInitializer {
     context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
-        downloadStarter.startDownloading()
-        uploadStarter.startUploading()
-        compactionExpansionStarter.startExpansion()
+        scope.launch {
+            downloadStarter.startDownloading()
+            uploadStarter.startUploading()
+            compactionExpansionStarter.startExpansion()
+        }
     }
 }

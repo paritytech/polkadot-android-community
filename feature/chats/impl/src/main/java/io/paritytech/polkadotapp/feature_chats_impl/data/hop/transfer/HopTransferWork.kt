@@ -11,58 +11,83 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.ListenableWorker
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.await
+import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 import kotlin.time.Instant
 import io.paritytech.polkadotapp.common.R as RCommon
 
-// KEEP: a new trigger must not preempt a running transfer pass — the loop picks up newly queued items itself.
-internal inline fun <reified W : ListenableWorker> enqueueExpeditedTransfer(context: Context, workId: String) {
+internal suspend inline fun <reified W : ListenableWorker> enqueueExpeditedTransfer(context: Context, workId: String) {
     val request = OneTimeWorkRequestBuilder<W>()
         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-        .setConstraints(
-            Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-        )
+        .setConstraints(networkConnected())
         .build()
 
-    WorkManager.getInstance(context)
-        .enqueueUniqueWork(workId, ExistingWorkPolicy.KEEP, request)
+    enqueueTransferPass(context, workId, request)
 }
 
-// KEEP: same non-preemption rule as the expedited variant; quiet transfers never surface a notification.
-internal inline fun <reified W : ListenableWorker> enqueueQuietTransfer(context: Context, workId: String) {
+internal suspend inline fun <reified W : ListenableWorker> enqueueQuietTransfer(context: Context, workId: String) {
     val request = OneTimeWorkRequestBuilder<W>()
-        .setConstraints(
-            Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-        )
+        .setConstraints(networkConnected())
         .build()
 
-    WorkManager.getInstance(context)
-        .enqueueUniqueWork(workId, ExistingWorkPolicy.KEEP, request)
+    enqueueTransferPass(context, workId, request)
 }
 
-// REPLACE: only the finishing pass schedules this, re-targeting the wake-up to the soonest backoff deadline.
-internal inline fun <reified W : ListenableWorker> enqueueDelayedTransfer(context: Context, workId: String, executeAt: Instant) {
-    val delay = executeAt - Clock.System.now()
-    val request = OneTimeWorkRequestBuilder<W>()
-        .setInitialDelay(delay.inWholeMilliseconds.coerceAtLeast(0), TimeUnit.MILLISECONDS)
-        .setConstraints(
-            Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-        )
-        .build()
+private val passQueueing = Mutex()
 
-    WorkManager.getInstance(context)
-        .enqueueUniqueWork(workId, ExistingWorkPolicy.REPLACE, request)
+// Appended, never replaced: a running pass must not be cut off, and a row queued while it exits still needs the next pass.
+// The read and the append share one lock so that a burst of triggers adds one pass, not one each.
+internal suspend fun enqueueTransferPass(context: Context, workId: String, request: OneTimeWorkRequest) {
+    val workManager = WorkManager.getInstance(context)
+
+    runCancellableCatching {
+        passQueueing.withLock {
+            val states = workManager.getWorkInfosForUniqueWorkFlow(workId).first().map { it.state }
+
+            if (needsNewPass(states)) {
+                workManager.enqueueUniqueWork(workId, ExistingWorkPolicy.APPEND_OR_REPLACE, request).await()
+            }
+        }
+    }.logFailure("Failed to queue a $workId pass")
 }
+
+// A pass that has not started yet picks up everything queued before it runs.
+internal fun needsNewPass(states: Collection<WorkInfo.State>): Boolean {
+    return states.none { it == WorkInfo.State.ENQUEUED || it == WorkInfo.State.BLOCKED }
+}
+
+// Under its own name, so a pending backoff never holds back the pass a fresh transfer asks for.
+internal fun scheduleTransferWakeUp(context: Context, transfer: HopTransfer, executeAt: Instant?) {
+    val workManager = WorkManager.getInstance(context)
+
+    if (executeAt == null) {
+        workManager.cancelUniqueWork(transfer.wakeUpWorkId)
+    } else {
+        val delay = executeAt - Clock.System.now()
+        val request = OneTimeWorkRequestBuilder<HopTransferWakeUpWorker>()
+            .setInitialDelay(delay.inWholeMilliseconds.coerceAtLeast(0), TimeUnit.MILLISECONDS)
+            .setConstraints(networkConnected())
+            .setInputData(HopTransferWakeUpWorker.inputFor(transfer))
+            .build()
+
+        workManager.enqueueUniqueWork(transfer.wakeUpWorkId, ExistingWorkPolicy.REPLACE, request)
+    }
+}
+
+internal fun networkConnected(): Constraints = Constraints.Builder()
+    .setRequiredNetworkType(NetworkType.CONNECTED)
+    .build()
 
 internal fun hopTransferForegroundInfo(
     context: Context,
