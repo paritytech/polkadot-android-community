@@ -65,14 +65,14 @@ fun Modifier.pocketCardSharedElement(index: Int): Modifier {
 }
 
 @Composable
-fun Modifier.pocketBalanceSharedElement(cardId: String): Modifier {
+fun Modifier.pocketBalanceSharedBounds(cardId: String): Modifier {
     val sharedScope = LocalSharedTransitionScope.current
     val visibilityScope = LocalNavAnimatedVisibilityScope.current
     return if (sharedScope == null || visibilityScope == null) {
         this
     } else {
         with(sharedScope) {
-            this@pocketBalanceSharedElement.sharedBounds(
+            this@pocketBalanceSharedBounds.sharedBounds(
                 sharedContentState = rememberSharedContentState("pocket_balance_$cardId"),
                 animatedVisibilityScope = visibilityScope,
                 enter = pocketFadeIn(),

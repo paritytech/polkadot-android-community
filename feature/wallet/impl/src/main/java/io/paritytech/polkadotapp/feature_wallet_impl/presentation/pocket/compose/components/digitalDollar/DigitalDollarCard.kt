@@ -38,7 +38,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.PocketCardColors
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.leather.WalletLeatherRenderer
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.leather.WalletLeatherSurface
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketBalanceSharedElement
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketBalanceSharedBounds
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.DigitalDollarBalanceStatus
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -138,11 +138,11 @@ private fun BalanceAmount(
     style: TextStyle,
     isHidden: Boolean
 ) {
-    val sharedElement = if (isHidden) Modifier.alpha(0f) else Modifier.pocketBalanceSharedElement(cardId)
+    val sharedBounds = if (isHidden) Modifier.alpha(0f) else Modifier.pocketBalanceSharedBounds(cardId)
 
     when (amounts) {
         is LoadingState.Loaded -> NovaText(
-            modifier = sharedElement,
+            modifier = sharedBounds,
             text = LocalTokenAmountFormatter.current.formatFiatSigned(amounts.data.balance, withSymbol = true)
                 .withCurrencyTickerStyle(style),
             maxLines = 1,
@@ -151,7 +151,7 @@ private fun BalanceAmount(
         )
 
         else -> Shimmer(
-            modifier = sharedElement.size(width = AmountShimmerSizes.WIDTH, height = AmountShimmerSizes.HEIGHT),
+            modifier = sharedBounds.size(width = AmountShimmerSizes.WIDTH, height = AmountShimmerSizes.HEIGHT),
             shape = PolkadotTheme.shapes.small
         )
     }
