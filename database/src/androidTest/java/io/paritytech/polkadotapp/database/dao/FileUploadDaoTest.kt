@@ -9,6 +9,9 @@ import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.database.model.ChatRoomLocal
 import io.paritytech.polkadotapp.database.model.FileUploadLocal
 import io.paritytech.polkadotapp.database.model.TransferRetryStateLocal
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -44,11 +47,29 @@ class FileUploadDaoTest {
     fun claimingAnUploadMarksItInProgress() = runBlocking<Unit> {
         givenUpload("a")
 
+        dao.claimNextDue(NOW)
+
+        assertEquals(FileUploadLocal.Status.IN_PROGRESS, statusOf("a"))
+    }
+
+    @Test
+    fun claimingAnUploadReturnsItInProgress() = runBlocking<Unit> {
+        givenUpload("a")
+
         val claimed = dao.claimNextDue(NOW)
 
         assertEquals("a", claimed?.messageId)
         assertEquals(FileUploadLocal.Status.IN_PROGRESS, claimed?.status)
-        assertEquals(FileUploadLocal.Status.IN_PROGRESS, statusOf("a"))
+    }
+
+    @Test
+    fun concurrentClaimsNeverTakeTheSameUpload() = runBlocking<Unit> {
+        val ids = List(CONCURRENT_CLAIMS) { "upload-$it" }
+        ids.forEach { givenUpload(it) }
+
+        val claimed = List(CONCURRENT_CLAIMS) { async(Dispatchers.IO) { dao.claimNextDue(NOW)?.messageId } }.awaitAll()
+
+        assertEquals(ids.toSet(), claimed.toSet())
     }
 
     @Test
@@ -87,11 +108,8 @@ class FileUploadDaoTest {
 
         dao.releaseInProgress()
 
-        val released = dao.get("a")!!
-        assertEquals(FileUploadLocal.Status.PENDING, released.status)
-        assertEquals(NODE_A, released.nodeUrl)
-        assertEquals(HASHES, released.chunkHashes)
-        assertEquals(HASHES.split(",").size, released.uploadedChunks)
+        assertEquals(FileUploadLocal.Status.PENDING, statusOf("a"))
+        assertResumesWithChunks("a", NODE_A)
     }
 
     @Test
@@ -111,11 +129,8 @@ class FileUploadDaoTest {
 
         scheduleRetry("a", nodeUrl = NODE_A)
 
-        val retried = dao.get("a")!!
-        assertEquals(FileUploadLocal.Status.PENDING, retried.status)
-        assertEquals(NODE_A, retried.nodeUrl)
-        assertEquals(HASHES, retried.chunkHashes)
-        assertEquals(HASHES.split(",").size, retried.uploadedChunks)
+        assertEquals(FileUploadLocal.Status.PENDING, statusOf("a"))
+        assertResumesWithChunks("a", NODE_A)
     }
 
     @Test
@@ -124,11 +139,8 @@ class FileUploadDaoTest {
 
         scheduleRetry("a", nodeUrl = NODE_B)
 
-        val retried = dao.get("a")!!
-        assertEquals(FileUploadLocal.Status.PENDING, retried.status)
-        assertEquals(NODE_B, retried.nodeUrl)
-        assertNull(retried.chunkHashes)
-        assertEquals(0, retried.uploadedChunks)
+        assertEquals(FileUploadLocal.Status.PENDING, statusOf("a"))
+        assertStartsOverOn("a", NODE_B)
     }
 
     private suspend fun scheduleRetry(messageId: String, nodeUrl: String) {
@@ -136,6 +148,20 @@ class FileUploadDaoTest {
     }
 
     private suspend fun statusOf(messageId: String) = dao.get(messageId)?.status
+
+    private suspend fun assertResumesWithChunks(messageId: String, nodeUrl: String) {
+        val upload = requireNotNull(dao.get(messageId))
+        assertEquals(nodeUrl, upload.nodeUrl)
+        assertEquals(HASHES, upload.chunkHashes)
+        assertEquals(HASHES.split(",").size, upload.uploadedChunks)
+    }
+
+    private suspend fun assertStartsOverOn(messageId: String, nodeUrl: String) {
+        val upload = requireNotNull(dao.get(messageId))
+        assertEquals(nodeUrl, upload.nodeUrl)
+        assertNull(upload.chunkHashes)
+        assertEquals(0, upload.uploadedChunks)
+    }
 
     private suspend fun givenUpload(
         messageId: String,
@@ -184,6 +210,7 @@ class FileUploadDaoTest {
 
     private companion object {
         const val NOW = 1_000_000L
+        const val CONCURRENT_CLAIMS = 20
         const val NODE_A = "wss://node-a"
         const val NODE_B = "wss://node-b"
         const val HASHES = "0xaa,0xbb"

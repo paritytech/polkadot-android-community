@@ -41,8 +41,6 @@ private const val HASH_SIZE = 32
 val STORED_HASH_0 = ByteArray(HASH_SIZE) { 0x70 }.toHexString(withPrefix = true)
 val STORED_HASH_1 = ByteArray(HASH_SIZE) { 0x71 }.toHexString(withPrefix = true)
 val STORED_HASH_2 = ByteArray(HASH_SIZE) { 0x72 }.toHexString(withPrefix = true)
-val STALE_HASH_0 = ByteArray(HASH_SIZE) { 0x60 }.toHexString(withPrefix = true)
-val STALE_HASH_1 = ByteArray(HASH_SIZE) { 0x61 }.toHexString(withPrefix = true)
 
 class MockedSessionUploads {
     val fileUri: Uri = mock(Uri::class.java)

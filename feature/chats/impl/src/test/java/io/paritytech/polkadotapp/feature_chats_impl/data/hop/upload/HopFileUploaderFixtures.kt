@@ -38,7 +38,6 @@ fun fileUpload(
     mimeType: String = IMAGE_JPEG,
     nodeUrl: String = NODE_A,
     attemptCount: Int = 0,
-    status: FileUpload.Status = FileUpload.Status.PENDING,
     uploadedChunkHashes: List<String> = emptyList()
 ) = FileUpload(
     messageId = messageId,
@@ -48,7 +47,7 @@ fun fileUpload(
     size = FileUpload.Size.NotMeasured,
     meta = FileUpload.Meta(uri = uri, mimeType = mimeType),
     progress = FileUpload.Progress(
-        status = status,
+        status = FileUpload.Status.PENDING,
         totalChunks = 0,
         uploadedChunks = uploadedChunkHashes.size,
         uploadedChunkHashes = uploadedChunkHashes,

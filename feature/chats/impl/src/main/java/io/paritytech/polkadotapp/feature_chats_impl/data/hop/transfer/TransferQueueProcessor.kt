@@ -27,7 +27,7 @@ class TransferQueueProcessor @Inject constructor(
     }
 
     suspend fun <T : WithRetryState> processPendingConcurrently(queue: ConcurrentTransferQueue<T>) = coroutineScope {
-        // Upload work is unique, so no other pass is running: a row still in progress was left by one that died mid-attempt.
+        // Callers run one pass per queue at a time (unique work), so a row still in progress was left by a pass that died or was stopped.
         queue.releaseInProgress()
 
         val slots = Semaphore(queue.maxInFlight)

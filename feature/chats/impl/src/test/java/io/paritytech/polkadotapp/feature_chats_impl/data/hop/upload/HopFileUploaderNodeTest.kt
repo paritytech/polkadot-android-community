@@ -19,7 +19,7 @@ class HopFileUploaderNodeTest {
     }
 
     @Test
-    fun `an upload interrupted after its second failure resumes on its stored node`() = runBlocking<Unit> {
+    fun `an upload resumes on its stored node when it was interrupted after its second failure`() = runBlocking<Unit> {
         withThreeChunkFile()
 
         uploads.upload(interruptedAfterRepeatedFailures())
@@ -28,7 +28,7 @@ class HopFileUploaderNodeTest {
     }
 
     @Test
-    fun `an upload interrupted after its second failure resumes its stored chunks`() = runBlocking<Unit> {
+    fun `an upload resumes its stored chunks when it was interrupted after its second failure`() = runBlocking<Unit> {
         withThreeChunkFile()
 
         uploads.upload(interruptedAfterRepeatedFailures())

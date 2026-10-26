@@ -36,7 +36,7 @@ class FileUploadTransferQueueTest {
     fun `uploads left in progress are released in the store when the queue releases them`() = runBlocking<Unit> {
         queue().releaseInProgress()
 
-        verify(repository).releaseInProgress()
+        verifyInProgressReleased()
     }
 
     @Test
@@ -75,7 +75,7 @@ class FileUploadTransferQueueTest {
 
     @Test
     fun `a retry stays on its node when no other node can be picked`() = runBlocking<Unit> {
-        whenever(hopNodeUrlProvider.pickForRetry(NODE_A)).thenThrowUnsafe(IllegalStateException("No Hop node URLs available"))
+        withNoRetryNode(failed = NODE_A)
 
         queue().scheduleRetry(fileUpload(fileUri, nodeUrl = NODE_A, attemptCount = 1), retryAfter(failures = 2))
 
@@ -93,6 +93,10 @@ class FileUploadTransferQueueTest {
         whenever(hopNodeUrlProvider.pickForRetry(failed)).thenReturn(picked)
     }
 
+    private suspend fun withNoRetryNode(failed: String) {
+        whenever(hopNodeUrlProvider.pickForRetry(failed)).thenThrowUnsafe(IllegalStateException("No Hop node URLs available"))
+    }
+
     private fun retryAfter(failures: Int) = RetryDecision.Reschedule(
         attemptCount = failures,
         firstFailureAt = FIRST_FAILURE_AT,
@@ -101,6 +105,10 @@ class FileUploadTransferQueueTest {
 
     private suspend fun verifyRetryScheduledOn(nodeUrl: String, failures: Int) {
         verify(repository).scheduleRetry(MESSAGE_ID, nodeUrl, failures, FIRST_FAILURE_AT, NEXT_ATTEMPT_AT)
+    }
+
+    private suspend fun verifyInProgressReleased() {
+        verify(repository).releaseInProgress()
     }
 
     private suspend fun verifyNeverAskedForAnotherNode() {
