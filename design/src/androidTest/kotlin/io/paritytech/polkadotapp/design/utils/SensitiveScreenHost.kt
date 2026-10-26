@@ -37,9 +37,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.paritytech.polkadotapp.design.components.bottomsheet.NovaModalBottomSheet
 import io.paritytech.polkadotapp.design.components.mnemonic.MnemonicWord
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
-import org.junit.Assume.assumeFalse
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -145,7 +145,7 @@ internal class SensitiveScreenHost {
     }
 
     fun nonToolClient(): UiAutomation = instrumentation.getUiAutomation(FLAG_NOT_ACCESSIBILITY_TOOL).also { client ->
-        assumeFalse("this device ignores FLAG_NOT_ACCESSIBILITY_TOOL", client.serviceInfo.isAccessibilityTool)
+        assertFalse("this device ignores FLAG_NOT_ACCESSIBILITY_TOOL", client.serviceInfo.isAccessibilityTool)
     }
 
     fun windowTexts(client: UiAutomation): List<String> {
