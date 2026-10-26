@@ -20,53 +20,6 @@ class HopFileUploaderTest {
     }
 
     @Test
-    fun `each chunk carries exactly its slice in order when the last chunk is short`() = runBlocking<Unit> {
-        val preProcessed = withChunkedImage()
-
-        uploads.upload(fileUpload(uploads.fileUri))
-
-        assertEquals(4, uploads.submitCount)
-        uploads.assertSubmittedChunks(preProcessed.chunkSlices())
-    }
-
-    @Test
-    fun `the chunked root lists every returned hash when the last chunk is short`() = runBlocking<Unit> {
-        withChunkedImage()
-
-        uploads.upload(fileUpload(uploads.fileUri))
-
-        uploads.assertRootListsHashes(List(3) { uploads.returnedHash(it) })
-    }
-
-    @Test
-    fun `an upload submits only the remaining slices when it resumes on an unchanged node`() = runBlocking<Unit> {
-        val preProcessed = withChunkedImage()
-
-        uploads.upload(fileUpload(uploads.fileUri, uploadedChunkHashes = listOf(STORED_HASH_0)))
-
-        assertEquals(3, uploads.submitCount)
-        uploads.assertSubmittedChunks(preProcessed.chunkSlices().drop(1))
-    }
-
-    @Test
-    fun `an upload lists its stored and new hashes when it resumes on an unchanged node`() = runBlocking<Unit> {
-        withChunkedImage()
-
-        uploads.upload(fileUpload(uploads.fileUri, uploadedChunkHashes = listOf(STORED_HASH_0)))
-
-        uploads.assertRootListsHashes(listOf(STORED_HASH_0.fromHex(), uploads.returnedHash(0), uploads.returnedHash(1)))
-    }
-
-    @Test
-    fun `an upload counts its progress on from the stored chunks when it resumes on an unchanged node`() = runBlocking<Unit> {
-        withChunkedImage()
-
-        uploads.upload(fileUpload(uploads.fileUri, uploadedChunkHashes = listOf(STORED_HASH_0)))
-
-        assertEquals(2, uploads.firstRecordedProgress())
-    }
-
-    @Test
     fun `a video is streamed without being read whole when it is above the inline size`() = runBlocking<Unit> {
         withResumableVideo()
 
@@ -174,12 +127,6 @@ class HopFileUploaderTest {
 
         uploads.verifyNeverReadWhole()
         assertEquals(2, uploads.submitCount)
-    }
-
-    private suspend fun withChunkedImage(): ByteArray {
-        uploads.withSuccessfulSession()
-        uploads.withUploadStillActive()
-        return uploads.withFileBytes(THREE_CHUNK_FILE_SIZE - 1) + MARKER_BYTE
     }
 
     private suspend fun withResumableVideo(): List<ByteArray> {

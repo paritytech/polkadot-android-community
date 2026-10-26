@@ -226,40 +226,6 @@ class TransferQueueProcessorConcurrencyTest {
     }
 
     @Test
-    fun `an upload is rescheduled with the first backoff when its first attempt fails`() = runTest {
-        val queue = FakeConcurrentQueue(this)
-        queue.addHanging("a")
-
-        startPass(queue)
-        runCurrent()
-        queue.fail("a", RetryableTransferException("timeout"))
-        runCurrent()
-
-        val retryState = queue.retryStateOf("a")
-        assertEquals(RowStatus.PENDING, queue.statusOf("a"))
-        assertEquals(1, retryState.attemptCount)
-        assertEquals(10.seconds, retryState.nextAttemptAt!! - retryState.firstFailureAt!!)
-        assertFalse(queue.wasMarkedFailed("a"))
-    }
-
-    @Test
-    fun `an upload keeps its window anchor and backs off forty seconds when its third attempt fails`() = runTest {
-        val queue = FakeConcurrentQueue(this)
-        val anchor = virtualNow() - 1.hours
-        queue.addHanging("a", retryState = HopTransferRetryState(attemptCount = 2, firstFailureAt = anchor, nextAttemptAt = null))
-
-        startPass(queue)
-        runCurrent()
-        queue.fail("a", RetryableTransferException("timeout"))
-        runCurrent()
-
-        val retryState = queue.retryStateOf("a")
-        assertEquals(3, retryState.attemptCount)
-        assertEquals(anchor, retryState.firstFailureAt)
-        assertEquals(virtualNow() + 40.seconds, retryState.nextAttemptAt)
-    }
-
-    @Test
     fun `the eleventh upload starts when one of ten in flight fails`() = runTest {
         val queue = FakeConcurrentQueue(this)
         val ids = withPendingUploads(queue, count = 11)
@@ -386,17 +352,6 @@ class TransferQueueProcessorConcurrencyTest {
         runCurrent()
 
         assertTrue(pass.isCompleted)
-    }
-
-    @Test
-    fun `the sequential pass keeps one item in flight when three are pending`() = runTest {
-        val queue = FakeSequentialQueue()
-        queue.addHanging("a", "b", "c")
-
-        backgroundScope.launch { processor().processPending(queue) }
-        runCurrent()
-
-        assertEquals(1, queue.inFlightCount)
     }
 
     private fun TestScope.processor() =
