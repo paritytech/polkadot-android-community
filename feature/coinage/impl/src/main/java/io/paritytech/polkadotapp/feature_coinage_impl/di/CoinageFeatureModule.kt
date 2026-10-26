@@ -9,6 +9,7 @@ import dagger.multibindings.IntoMap
 import io.paritytech.polkadotapp.chains.network.updaters.system.UpdateSystemFactory
 import io.paritytech.polkadotapp.common.data.storage.SingleValueStorageFactory
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
+import io.paritytech.polkadotapp.feature_coinage_api.data.installation.CoinageCurrentInstallationRepository
 import io.paritytech.polkadotapp.feature_coinage_api.data.updaters.CoinageUpdateSystem
 import io.paritytech.polkadotapp.feature_coinage_api.domain.CoinsInteractor
 import io.paritytech.polkadotapp.feature_coinage_api.domain.RecyclerVouchersInteractor
@@ -221,6 +222,11 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindCoinageInstallationRepository(impl: RealCoinageInstallationRepository): CoinageInstallationRepository
+
+    @Binds
+    fun bindCoinageCurrentInstallationRepository(
+        impl: RealCoinageInstallationRepository
+    ): CoinageCurrentInstallationRepository
 
     @Binds
     @Singleton

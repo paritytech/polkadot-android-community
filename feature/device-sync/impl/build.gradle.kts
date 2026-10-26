@@ -18,6 +18,7 @@ dependencies {
     implementation(project(":feature:chats:transport-protocol"))
     implementation(project(":feature:statement-store:api"))
     implementation(project(":feature:account:api"))
+    implementation(project(":feature:coinage:api"))
     implementation(project(":tools:media-connection:api"))
     implementation(project(":chains"))
 
