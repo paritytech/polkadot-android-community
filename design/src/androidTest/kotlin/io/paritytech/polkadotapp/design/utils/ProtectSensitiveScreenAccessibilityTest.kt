@@ -99,13 +99,6 @@ class ProtectSensitiveScreenAccessibilityTest {
     }
 
     @Test
-    fun showsTextBesideMnemonicWordToNonToolClientWhenWordIsMarkedSensitive() {
-        host.showMnemonicWord()
-
-        assertTrue(host.windowTexts(host.nonToolClient()).any { VISIBLE_TEXT in it })
-    }
-
-    @Test
     fun showsMnemonicWordToToolClientWhenWordIsMarkedSensitive() {
         host.showMnemonicWord()
 

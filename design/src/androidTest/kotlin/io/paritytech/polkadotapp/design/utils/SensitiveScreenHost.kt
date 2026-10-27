@@ -187,7 +187,7 @@ internal class SensitiveScreenHost {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(TARGET_HEIGHT_DP.dp)
+                .height(TARGET_HEIGHT)
                 .onGloballyPositioned { coordinates ->
                     target.localView = localView
                     target.centre = coordinates.boundsInWindow().center
@@ -237,19 +237,26 @@ internal class SensitiveScreenHost {
             pressure = 1f
             size = 1f
         }
+        val pointers = arrayOf(properties)
+        val metaState = 0
+        val buttonState = 0
+        val xPrecision = 1f
+        val yPrecision = 1f
+        val deviceId = 0
+        val edgeFlags = 0
         return MotionEvent.obtain(
             downTime,
             SystemClock.uptimeMillis(),
             action,
-            1,
-            arrayOf(properties),
+            pointers.size,
+            pointers,
             arrayOf(coords),
-            0,
-            0,
-            1f,
-            1f,
-            0,
-            0,
+            metaState,
+            buttonState,
+            xPrecision,
+            yPrecision,
+            deviceId,
+            edgeFlags,
             InputDevice.SOURCE_TOUCHSCREEN,
             flags,
         )
@@ -272,7 +279,7 @@ internal class SensitiveScreenHost {
         const val SECRET = "harbor velvet"
         const val VISIBLE_TEXT = "Recovery phrase"
         private const val CHANGED_SECRET = "meadow signal"
-        private const val TARGET_HEIGHT_DP = 120
+        private val TARGET_HEIGHT = 120.dp
         private val SETTLE_TIMEOUT = 30.seconds
         private val POLL_INTERVAL = 50.milliseconds
         private val CONNECTION_SETTLE = 3.seconds
