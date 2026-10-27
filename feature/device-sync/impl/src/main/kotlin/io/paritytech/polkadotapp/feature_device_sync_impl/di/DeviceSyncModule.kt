@@ -8,14 +8,22 @@ import dagger.multibindings.IntoSet
 import io.paritytech.polkadotapp.common.presentation.AppInitializer
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.DeviceSyncCoordinator
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.transfer.DeviceTransferRequestListener
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.transfer.DeviceTransferRequestPublisher
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.ActiveInstallationRecordRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.RealActiveInstallationRecordRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.device.DeviceInfoProvider
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.device.RealDeviceInfoProvider
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.DeviceTransferProcessedRequestStorage
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.DeviceTransferRequestRepository
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.RealDeviceTransferProcessedRequestStorage
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.RealDeviceTransferRequestRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.RealDeviceSyncCoordinator
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.activeInstallation.RealActiveInstallationManager
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.DeviceTransferKeyScheduleProvider
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.RealDeviceTransferKeyScheduleProvider
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.discovery.RealDeviceTransferRequestListener
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.discovery.RealDeviceTransferRequestPublisher
 import io.paritytech.polkadotapp.feature_device_sync_impl.presentation.initialization.ActiveInstallationInitializer
 import io.paritytech.polkadotapp.feature_device_sync_impl.presentation.initialization.DeviceSyncInitializer
 
@@ -40,6 +48,20 @@ internal interface DeviceSyncModule {
 
     @Binds
     fun bindDeviceInfoProvider(impl: RealDeviceInfoProvider): DeviceInfoProvider
+
+    @Binds
+    fun bindDeviceTransferRequestRepository(impl: RealDeviceTransferRequestRepository): DeviceTransferRequestRepository
+
+    @Binds
+    fun bindDeviceTransferProcessedRequestStorage(
+        impl: RealDeviceTransferProcessedRequestStorage
+    ): DeviceTransferProcessedRequestStorage
+
+    @Binds
+    fun bindDeviceTransferRequestListener(impl: RealDeviceTransferRequestListener): DeviceTransferRequestListener
+
+    @Binds
+    fun bindDeviceTransferRequestPublisher(impl: RealDeviceTransferRequestPublisher): DeviceTransferRequestPublisher
 
     @Binds
     @IntoSet

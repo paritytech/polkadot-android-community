@@ -1,5 +1,8 @@
 package io.paritytech.polkadotapp.feature_statement_store_api.domain.models
 
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
 private const val U32_MAX: ULong = 0xFFFF_FFFFuL
 
 object StatementExpiry {
@@ -18,4 +21,11 @@ object StatementExpiry {
 
     /** Monotonic successor to [prev], floored at the current wall-clock priority (mirrors iOS `incrementedExpiry`). */
     fun nextAfter(prev: ULong): ULong = maxOf(prev + 1uL, createForCurrentTimestamp())
+
+    fun createExpiringIn(lifetime: Duration): ULong {
+        val expiresAtSeconds = System.currentTimeMillis().milliseconds.inWholeSeconds + lifetime.inWholeSeconds
+        return expiresAtSeconds.toULong() shl 32
+    }
+
+    fun nextExpiringIn(prev: ULong, lifetime: Duration): ULong = maxOf(prev + 1uL, createExpiringIn(lifetime))
 }
