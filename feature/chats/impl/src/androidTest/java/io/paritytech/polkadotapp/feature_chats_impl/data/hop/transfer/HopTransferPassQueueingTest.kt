@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit
 @RunWith(AndroidJUnit4::class)
 class HopTransferPassQueueingTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val passLocks = HopTransferPassLocks()
 
     private lateinit var workManager: WorkManager
     private lateinit var testDriver: TestDriver
@@ -55,7 +56,7 @@ class HopTransferPassQueueingTest {
     fun aTransferQueuedDuringARunningPassGetsOneMorePass() = runBlocking<Unit> {
         startHeldPass()
 
-        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID, passLocks)
 
         assertEquals(1, passesQueuedBehindTheRunningOne())
     }
@@ -64,7 +65,7 @@ class HopTransferPassQueueingTest {
     fun aBurstOfTransfersDuringARunningPassQueuesOnePass() = runBlocking<Unit> {
         startHeldPass()
 
-        List(BURST) { async(Dispatchers.IO) { enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID) } }.awaitAll()
+        List(BURST) { async(Dispatchers.IO) { enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID, passLocks) } }.awaitAll()
 
         assertEquals(1, passesQueuedBehindTheRunningOne())
     }
@@ -72,7 +73,7 @@ class HopTransferPassQueueingTest {
     @Test
     fun thePassQueuedDuringARunningPassRunsWhenThatPassFinishes() = runBlocking<Unit> {
         val held = startHeldPass()
-        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID, passLocks)
 
         HoldingPassWorker.release.countDown()
         awaitState(held, WorkInfo.State.SUCCEEDED)
@@ -85,17 +86,17 @@ class HopTransferPassQueueingTest {
     fun anExpeditedTransferQueuedDuringARunningPassGetsOneMorePass() = runBlocking<Unit> {
         startHeldPass()
 
-        enqueueExpeditedTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+        enqueueExpeditedTransfer<HoldingPassWorker>(context, PASS_WORK_ID, passLocks)
 
         assertEquals(1, passesQueuedBehindTheRunningOne())
     }
 
     @Test
     fun aTransferGetsAPassThatRunsWhenTheEarlierPassFailed() = runBlocking<Unit> {
-        enqueueQuietTransfer<FailingPassWorker>(context, PASS_WORK_ID)
+        enqueueQuietTransfer<FailingPassWorker>(context, PASS_WORK_ID, passLocks)
         awaitState(startQueuedPass(), WorkInfo.State.FAILED)
 
-        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID, passLocks)
         HoldingPassWorker.release.countDown()
         val next = startQueuedPass()
 
@@ -108,14 +109,14 @@ class HopTransferPassQueueingTest {
 
         launch {
             coroutineContext.job.cancel()
-            enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+            enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID, passLocks)
         }.join()
 
         assertEquals(1, passesQueuedBehindTheRunningOne())
     }
 
     private suspend fun startHeldPass(): UUID {
-        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID)
+        enqueueQuietTransfer<HoldingPassWorker>(context, PASS_WORK_ID, passLocks)
         val pass = startQueuedPass()
         awaitState(pass, WorkInfo.State.RUNNING)
         return pass

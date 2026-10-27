@@ -10,8 +10,8 @@ import dagger.assisted.AssistedInject
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransfer
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransferPassLocks
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferQueueProcessor
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueExpeditedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.hopTransferForegroundInfo
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.scheduleTransferWakeUp
 import timber.log.Timber
@@ -22,13 +22,16 @@ class FileUploadWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted parameters: WorkerParameters,
     private val transferQueueProcessor: TransferQueueProcessor,
-    private val transferQueue: FileUploadTransferQueue
+    private val transferQueue: FileUploadTransferQueue,
+    private val passLocks: HopTransferPassLocks
 ) : CoroutineWorker(appContext, parameters) {
     override suspend fun doWork(): Result {
         runCancellableCatching { setForeground(getForegroundInfo()) }
             .onFailure { Timber.d(it, "Failed to promote upload worker to foreground; continuing as background work") }
 
-        val processed = runCancellableCatching { transferQueueProcessor.processPending(transferQueue) }
+        val processed = passLocks.runPass(HopTransfer.UPLOAD) {
+            runCancellableCatching { transferQueueProcessor.processPending(transferQueue) }
+        }
 
         scheduleTransferWakeUp(applicationContext, HopTransfer.UPLOAD, transferQueue.soonestNextAttemptAt())
 
@@ -45,7 +48,5 @@ class FileUploadWorker @AssistedInject constructor(
     companion object {
         const val WORK_ID = "HopFileUpload"
         private const val NOTIFICATION_ID = 1002
-
-        suspend fun startUploadingWork(context: Context) = enqueueExpeditedTransfer<FileUploadWorker>(context, WORK_ID)
     }
 }

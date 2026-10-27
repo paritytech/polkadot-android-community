@@ -28,6 +28,7 @@ import kotlin.time.Duration.Companion.minutes
 @RunWith(AndroidJUnit4::class)
 class HopTransferWorkTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val passLocks = HopTransferPassLocks()
 
     private lateinit var workManager: WorkManager
     private lateinit var testDriver: TestDriver
@@ -48,7 +49,7 @@ class HopTransferWorkTest {
     fun aTransferGetsAPassWhileABackoffWakeUpIsPending() = runBlocking<Unit> {
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
 
-        enqueueQuietTransfer<PassWorker>(context, HopTransfer.UPLOAD.workId)
+        enqueueQuietTransfer<PassWorker>(context, HopTransfer.UPLOAD.workId, passLocks)
         runQueuedWork(HopTransfer.UPLOAD.workId)
 
         assertEquals(1, finishedPasses(HopTransfer.UPLOAD.workId))
@@ -58,7 +59,7 @@ class HopTransferWorkTest {
     fun theBackoffWakeUpStaysScheduledWhenATransferGetsAPass() = runBlocking<Unit> {
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
 
-        enqueueQuietTransfer<PassWorker>(context, HopTransfer.UPLOAD.workId)
+        enqueueQuietTransfer<PassWorker>(context, HopTransfer.UPLOAD.workId, passLocks)
         runQueuedWork(HopTransfer.UPLOAD.workId)
 
         assertEquals(listOf(WorkInfo.State.ENQUEUED), statesOf(HopTransferWakeUpWorker.workIdFor(HopTransfer.UPLOAD)))
@@ -66,8 +67,8 @@ class HopTransferWorkTest {
 
     @Test
     fun aPassIsNotQueuedWhenOneIsAlreadyWaitingToStart() = runBlocking<Unit> {
-        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID)
-        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID)
+        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID, passLocks)
+        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID, passLocks)
 
         runQueuedWork(PASS_WORK_ID)
 
@@ -87,7 +88,7 @@ class HopTransferWorkTest {
     fun aTransferGetsAPassWhenTheWaitingPassIsDelayed() = runBlocking<Unit> {
         enqueueDelayedPass(PASS_WORK_ID)
 
-        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID)
+        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID, passLocks)
         runQueuedWork(PASS_WORK_ID)
 
         assertEquals(1, finishedPasses(PASS_WORK_ID))

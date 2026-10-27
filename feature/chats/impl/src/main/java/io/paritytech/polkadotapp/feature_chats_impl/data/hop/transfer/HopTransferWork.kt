@@ -21,39 +21,48 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 import kotlin.time.Instant
 import io.paritytech.polkadotapp.common.R as RCommon
 
-internal suspend inline fun <reified W : ListenableWorker> enqueueExpeditedTransfer(context: Context, workId: String): Result<Unit> {
+internal suspend inline fun <reified W : ListenableWorker> enqueueExpeditedTransfer(
+    context: Context,
+    workId: String,
+    passLocks: HopTransferPassLocks
+): Result<Unit> {
     val request = OneTimeWorkRequestBuilder<W>()
         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
         .setConstraints(networkConnected())
         .build()
 
-    return enqueueTransferPass(context, workId, request)
+    return enqueueTransferPass(context, workId, request, passLocks)
 }
 
-internal suspend inline fun <reified W : ListenableWorker> enqueueQuietTransfer(context: Context, workId: String): Result<Unit> {
+internal suspend inline fun <reified W : ListenableWorker> enqueueQuietTransfer(
+    context: Context,
+    workId: String,
+    passLocks: HopTransferPassLocks
+): Result<Unit> {
     val request = OneTimeWorkRequestBuilder<W>()
         .setConstraints(networkConnected())
         .build()
 
-    return enqueueTransferPass(context, workId, request)
+    return enqueueTransferPass(context, workId, request, passLocks)
 }
 
-private val passQueueing = Mutex()
-
 // The read and the enqueue share one lock so that a burst of triggers adds one pass, not one each.
-internal suspend fun enqueueTransferPass(context: Context, workId: String, request: OneTimeWorkRequest): Result<Unit> {
+internal suspend fun enqueueTransferPass(
+    context: Context,
+    workId: String,
+    request: OneTimeWorkRequest,
+    passLocks: HopTransferPassLocks
+): Result<Unit> {
     return runCancellableCatching {
         // The trigger's row is already stored, so a caller that leaves must not take its pass with it.
         withContext(NonCancellable) {
-            passQueueing.withLock {
+            passLocks.whileQueueing {
                 val workManager = WorkManager.getInstance(context)
                 val policy = passPolicy(workManager.getWorkInfosForUniqueWorkFlow(workId).first(), Clock.System.now())
 
@@ -65,7 +74,7 @@ internal suspend fun enqueueTransferPass(context: Context, workId: String, reque
     }.logFailure("Failed to queue a $workId pass")
 }
 
-// A pass still waiting out a delay means none is running, so replacing it cannot cut a pass off.
+// Replacing a delayed pass is safe: one still unwinding from a stop is waited out by HopTransferPassLocks.runPass.
 internal fun passPolicy(passes: Collection<WorkInfo>, now: Instant): ExistingWorkPolicy? {
     val waiting = passes.filter { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
 
