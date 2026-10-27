@@ -89,6 +89,7 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
     }
 
     fun statusOf(id: String) = rows.getValue(id).status
+    fun retryStateOf(id: String) = rows.getValue(id).retryState
     fun isInFlight(id: String) = id in starts && id !in returns
     fun returnedAt(id: String): Long? = returns[id]
     fun firstNextPendingCallAtOrAfter(time: Duration): Long? = nextPendingCallTimes.firstOrNull { it >= time.inWholeMilliseconds }
