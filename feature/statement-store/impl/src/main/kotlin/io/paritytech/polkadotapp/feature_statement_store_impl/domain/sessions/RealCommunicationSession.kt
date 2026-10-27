@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.Encod
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.IncomingRequestResponsePolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionIdParams
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.createSessionIdParams
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.defaultExpiry
@@ -40,6 +41,7 @@ class RealCommunicationSession(
     private val maxStatementSize: InformationSize,
     private val compactor: MessageCompactor?,
     private val responsePolicy: IncomingRequestResponsePolicy,
+    private val statementLifetime: StatementLifetime,
     scope: CoroutineScope
 ) : CommunicationSession, CoroutineScope by scope {
     private val outgoingSessionIdParams: SessionIdParams = createSessionIdParams(localAccount, remoteAccount)
@@ -48,7 +50,7 @@ class RealCommunicationSession(
     override val incomingSessionId = deriveCommunicationTopic(sender = remoteAccount, receiver = localAccount, encryption)
 
     private val stateMachine = StateMachine(
-        initialState = Initialization(emptyList(), maxStatementSize, canCompact = compactor != null),
+        initialState = Initialization(emptyList(), maxStatementSize, canCompact = compactor != null, statementLifetime),
         coroutineScope = this
     )
 
@@ -130,7 +132,7 @@ class RealCommunicationSession(
                     eventsFlow.emit(CommunicationSessionEvent.SentMessagesNotFound)
                 }
 
-                val lastUsedExpiry = outgoingEvents.defaultExpiry()
+                val lastUsedExpiry = outgoingEvents.defaultExpiry(statementLifetime)
                 val outgoingPendingRequest = restoreOutgoingPendingRequest(outgoingEvents, incomingEvents)
                 val incomingRequests = restoreIncomingRequests(outgoingEvents, incomingEvents)
 

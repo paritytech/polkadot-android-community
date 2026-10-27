@@ -28,4 +28,9 @@ object StatementExpiry {
     }
 
     fun nextExpiringIn(prev: ULong, lifetime: Duration): ULong = maxOf(prev + 1uL, createExpiringIn(lifetime))
+
+    fun nextAfter(prev: ULong, lifetime: StatementLifetime): ULong = when (lifetime) {
+        StatementLifetime.Permanent -> nextAfter(prev)
+        is StatementLifetime.Limited -> nextExpiringIn(prev, lifetime.duration)
+    }
 }

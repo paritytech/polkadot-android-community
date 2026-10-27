@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationStateEvent
@@ -16,6 +17,7 @@ data class Active(
     private val expiry: ULong,
     override val maxStatementSize: InformationSize,
     override val canCompact: Boolean,
+    override val statementLifetime: StatementLifetime,
     private val isCompacting: Boolean,
 ) : CommunicationState() {
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
@@ -116,7 +118,7 @@ data class Active(
             is CommunicationStateEvent.RequestReceived -> {
                 if (event.request.requestId in incomingRequests) return
 
-                val newExpiry = StatementExpiry.nextAfter(expiry)
+                val newExpiry = StatementExpiry.nextAfter(expiry, statementLifetime)
 
                 transition.emitState(
                     copy(
@@ -174,7 +176,7 @@ data class Active(
 
             is CommunicationStateEvent.InvalidateSession -> {
                 transition.emitSideEffect(CommunicationSideEffect.StopPolling)
-                transition.emitState(Initialization(pendingMessages, maxStatementSize, canCompact))
+                transition.emitState(Initialization(pendingMessages, maxStatementSize, canCompact, statementLifetime))
                 transition.emitSideEffect(CommunicationSideEffect.FetchInitialData)
             }
         }
@@ -238,7 +240,7 @@ data class Active(
 
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
     private suspend fun submitSplitAsRequest(split: MessagesSplit) {
-        val newExpiry = StatementExpiry.nextAfter(expiry)
+        val newExpiry = StatementExpiry.nextAfter(expiry, statementLifetime)
 
         val request = StatementTransportEvent.Request(
             requestId = generateNewRequestId(),
@@ -262,7 +264,7 @@ data class Active(
 
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
     private suspend fun submitSplitAndContinueCompacting(split: MessagesSplit, messagesToCompact: List<EncodedMessage>) {
-        val newExpiry = StatementExpiry.nextAfter(expiry)
+        val newExpiry = StatementExpiry.nextAfter(expiry, statementLifetime)
 
         val request = StatementTransportEvent.Request(
             requestId = generateNewRequestId(),

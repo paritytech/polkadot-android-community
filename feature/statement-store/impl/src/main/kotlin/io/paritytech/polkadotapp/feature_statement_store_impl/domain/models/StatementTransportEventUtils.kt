@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.models
 
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 
 fun List<StatementTransportEvent>.getRequest(): StatementTransportEvent.Request? {
     return this.filterIsInstance<StatementTransportEvent.Request>().firstOrNull()
@@ -22,7 +23,7 @@ fun List<StatementTransportEvent>.hasResponse(): Boolean {
     return this.any { it is StatementTransportEvent.Response }
 }
 
-fun List<StatementTransportEvent>.defaultExpiry(): ULong {
+fun List<StatementTransportEvent>.defaultExpiry(lifetime: StatementLifetime): ULong {
     val lastExpiry = maxOfOrNull { it.expiry } ?: 0uL
-    return StatementExpiry.nextAfter(lastExpiry)
+    return StatementExpiry.nextAfter(lastExpiry, lifetime)
 }

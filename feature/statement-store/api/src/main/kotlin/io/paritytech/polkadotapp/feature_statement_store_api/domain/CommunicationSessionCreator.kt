@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDe
 import io.paritytech.polkadotapp.feature_statement_store_api.data.encryption.CommunicationEncryption
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.IncomingRequestResponsePolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -40,6 +41,7 @@ interface CommunicationSessionCreator {
         maxStatementSize: InformationSize,
         compactor: MessageCompactor? = null,
         responsePolicy: IncomingRequestResponsePolicy = IncomingRequestResponsePolicy.Always,
+        statementLifetime: StatementLifetime = StatementLifetime.Permanent,
     ): CommunicationSession
 
     /**

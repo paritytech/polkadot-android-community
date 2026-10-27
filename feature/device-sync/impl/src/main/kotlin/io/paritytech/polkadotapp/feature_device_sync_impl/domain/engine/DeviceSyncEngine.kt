@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.common.utils.compareTo
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.storage.SyncUpdateIdProvider
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.session.OwnDeviceSession
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SessionSyncSignalingTransport
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SyncPeerChannelSignaling
 import io.paritytech.polkadotapp.feature_sso_api.domain.OwnDevicesJournal
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerChannel
@@ -83,7 +84,7 @@ class DeviceSyncEngine(
 
     private suspend fun connectionLoop() {
         val signaling = SyncPeerChannelSignaling(
-            communicationSession = session.communicationSession,
+            transport = SessionSyncSignalingTransport(session.communicationSession),
             scope = scope,
             onOfferIdDetermined = { ownDevicesJournal.saveLastSyncOfferId(peerStatementAccountId, it) },
         )
