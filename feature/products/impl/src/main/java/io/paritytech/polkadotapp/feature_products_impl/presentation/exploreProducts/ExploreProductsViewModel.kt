@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -71,7 +72,7 @@ class ExploreProductsViewModel @Inject constructor(
         session.value.dataOrNull?.resumeConnections()
     }
 
-    fun onProductSelected(productId: ProductId) {
+    private fun onProductSelected(productId: ProductId) {
         launch { router.openSpaBrowser(SpaBrowserPayload.ByProductId(productId.value)) }
     }
 
@@ -80,7 +81,7 @@ class ExploreProductsViewModel @Inject constructor(
 
         return combine(opening, setupErrorFloor()) { result, floorPassed ->
             result.takeIf { floorPassed || it.exceptionOrNull() !is ExploreLoadError.SetupFailed }
-        }.filterNotNull()
+        }.filterNotNull().distinctUntilChanged()
     }
 
     private fun setupErrorFloor(): Flow<Boolean> = flow {

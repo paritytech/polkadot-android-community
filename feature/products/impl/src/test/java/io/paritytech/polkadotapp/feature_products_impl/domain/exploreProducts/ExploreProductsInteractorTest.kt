@@ -228,9 +228,16 @@ class ExploreProductsInteractorTest {
         withRemoteConfigSynced()
         withProductResolved(appHost = PRODUCT_HOST)
         withContentResolved()
+        val navigationStarted = CompletableDeferred<Unit>()
+        withInitializeWaitingFor(navigationStarted)
         val (diagnostics, region) = recordingDiagnostics()
 
         collectAttempt(afterRetry = false, diagnostics = diagnostics) {
+            verifyRegionOpen(region)
+
+            navigationStarted.complete(Unit)
+            settle()
+
             verifyOneRegionEnded(diagnostics, region)
         }
     }
@@ -375,6 +382,10 @@ class ExploreProductsInteractorTest {
         val region: StalenessRegionHandle = mock()
         whenever(diagnostics.startRegion(any())).thenReturn(region)
         return diagnostics to region
+    }
+
+    private fun verifyRegionOpen(region: StalenessRegionHandle) {
+        verify(region, never()).end()
     }
 
     private fun verifyOneRegionEnded(diagnostics: StalenessReportCollector, region: StalenessRegionHandle) {

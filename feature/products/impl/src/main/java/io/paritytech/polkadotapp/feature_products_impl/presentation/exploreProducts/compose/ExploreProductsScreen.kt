@@ -29,13 +29,14 @@ import io.paritytech.polkadotapp.design.components.topbar.TopBarTitleSize
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreLoadError
 import io.paritytech.polkadotapp.feature_products_impl.presentation.exploreProducts.ExploreProductsContent
+import io.paritytech.polkadotapp.feature_products_impl.presentation.exploreProducts.ExploreProductsContract
 import io.paritytech.polkadotapp.feature_products_impl.presentation.exploreProducts.ExploreProductsViewModel
 import io.paritytech.polkadotapp.feature_products_impl.presentation.exploreProducts.compose.components.ExploreProductsSetupError
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 fun ExploreProductsScreen() {
-    val viewModel = hiltViewModel<ExploreProductsViewModel>()
+    val viewModel: ExploreProductsContract = hiltViewModel<ExploreProductsViewModel>()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.resumeConnections() }
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { viewModel.pauseConnections() }

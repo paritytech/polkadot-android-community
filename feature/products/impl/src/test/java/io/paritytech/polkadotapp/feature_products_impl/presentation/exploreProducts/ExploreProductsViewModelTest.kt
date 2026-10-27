@@ -209,6 +209,18 @@ class ExploreProductsViewModelTest {
     }
 
     @Test
+    fun `resume after load resumes the loaded page`() = runTest(mainDispatcher) {
+        withLoadedPage()
+        withFirstAttempt(flow { emitSuccessAndStay() })
+        val viewModel = createViewModel()
+        runCurrent()
+
+        viewModel.resumeConnections()
+
+        verifyConnectionsResumed()
+    }
+
+    @Test
     fun `a setup failure after retry waits for the minimum loading time again`() = runTest(mainDispatcher) {
         withFirstAttempt(failingWith(setupFailure))
         withRetryAttempt(failingWith(setupFailure))
@@ -266,6 +278,10 @@ class ExploreProductsViewModelTest {
 
     private fun verifyConnectionsPaused() {
         verify(provider).pauseConnections()
+    }
+
+    private fun verifyConnectionsResumed() {
+        verify(provider).resumeConnections()
     }
 
     private fun verifyConnectionsNotPaused() {
