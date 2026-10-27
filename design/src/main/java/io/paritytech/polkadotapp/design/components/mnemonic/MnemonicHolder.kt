@@ -11,8 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.semantics.isSensitiveData
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -99,9 +97,7 @@ fun MnemonicWord(
         enabled = enabled
     ) {
         NovaText(
-            modifier = Modifier
-                .padding(PolkadotTheme.spacings.small)
-                .semantics { isSensitiveData = true },
+            modifier = Modifier.padding(PolkadotTheme.spacings.small),
             text = buildAnnotatedString {
                 if (index != null) {
                     withStyle(
