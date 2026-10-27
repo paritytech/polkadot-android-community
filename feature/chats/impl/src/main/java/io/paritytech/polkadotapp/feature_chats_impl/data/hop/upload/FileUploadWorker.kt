@@ -30,10 +30,10 @@ class FileUploadWorker @AssistedInject constructor(
             .onFailure { Timber.d(it, "Failed to promote upload worker to foreground; continuing as background work") }
 
         val processed = passLocks.runPass(HopTransfer.UPLOAD) {
-            runCancellableCatching { transferQueueProcessor.processPending(transferQueue) }
+            runCancellableCatching { transferQueueProcessor.processPendingConcurrently(transferQueue) }
         }
 
-        scheduleTransferWakeUp(applicationContext, HopTransfer.UPLOAD, transferQueue.soonestNextAttemptAt())
+        scheduleTransferWakeUp(applicationContext, HopTransfer.UPLOAD, transferQueue.nextBackoffEndAt())
 
         return processed.toWorkerResult(retryOnFailure = true)
     }

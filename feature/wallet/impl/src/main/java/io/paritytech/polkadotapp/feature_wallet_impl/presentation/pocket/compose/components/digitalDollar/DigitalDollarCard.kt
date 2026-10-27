@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.common.presentation.compose.withCurrencyTickerStyle
@@ -37,7 +38,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.PocketCardColors
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.leather.WalletLeatherRenderer
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.components.digitalDollar.leather.WalletLeatherSurface
-import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketBalanceSharedElement
+import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.pocketBalanceSharedBounds
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.DigitalDollarBalanceStatus
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.models.PocketCardUiModel
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -73,7 +74,9 @@ fun DigitalDollarCard(
                     )
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(LogoHeight),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
@@ -88,11 +91,14 @@ fun DigitalDollarCard(
                         )
                     }
 
-                    BalanceAmount(
-                        amounts = card.amounts,
-                        cardId = card.id,
-                        isHidden = isExpanded
-                    )
+                    Box(modifier = Modifier.wrapContentHeight(unbounded = true)) {
+                        BalanceAmount(
+                            amounts = card.amounts,
+                            cardId = card.id,
+                            style = PolkadotTheme.typography.headline.small,
+                            isHidden = isExpanded
+                        )
+                    }
                 }
 
                 if (isExpanded) {
@@ -115,6 +121,7 @@ fun DigitalDollarCard(
                         BalanceAmount(
                             amounts = card.amounts,
                             cardId = card.id,
+                            style = PolkadotTheme.typography.headline.medium,
                             isHidden = false
                         )
                     }
@@ -128,22 +135,23 @@ fun DigitalDollarCard(
 private fun BalanceAmount(
     amounts: LoadingState<PocketCardUiModel.DigitalDollar.Amounts>,
     cardId: String,
+    style: TextStyle,
     isHidden: Boolean
 ) {
-    val sharedElement = if (isHidden) Modifier.alpha(0f) else Modifier.pocketBalanceSharedElement(cardId)
+    val sharedBounds = if (isHidden) Modifier.alpha(0f) else Modifier.pocketBalanceSharedBounds(cardId)
 
     when (amounts) {
         is LoadingState.Loaded -> NovaText(
-            modifier = sharedElement,
+            modifier = sharedBounds,
             text = LocalTokenAmountFormatter.current.formatFiatSigned(amounts.data.balance, withSymbol = true)
-                .withCurrencyTickerStyle(PolkadotTheme.typography.headline.medium),
+                .withCurrencyTickerStyle(style),
             maxLines = 1,
-            style = PolkadotTheme.typography.headline.medium,
+            style = style,
             color = PolkadotTheme.colors.fg.staticWhite
         )
 
         else -> Shimmer(
-            modifier = sharedElement.size(width = AmountShimmerSizes.WIDTH, height = AmountShimmerSizes.HEIGHT),
+            modifier = sharedBounds.size(width = AmountShimmerSizes.WIDTH, height = AmountShimmerSizes.HEIGHT),
             shape = PolkadotTheme.shapes.small
         )
     }
@@ -212,7 +220,7 @@ private object AmountShimmerSizes {
     val HEIGHT = 28.dp
 }
 
-private val LogoHeight = 36.dp
+private val LogoHeight = 32.dp
 
 @Preview
 @Composable
