@@ -10,8 +10,8 @@ import dagger.assisted.AssistedInject
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransfer
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransferPassLocks
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferQueueProcessor
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueExpeditedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.hopTransferForegroundInfo
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.scheduleTransferWakeUp
 import timber.log.Timber
@@ -22,18 +22,19 @@ class FileUploadWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted parameters: WorkerParameters,
     private val transferQueueProcessor: TransferQueueProcessor,
-    private val transferQueue: FileUploadTransferQueue,
-    private val passLocks: HopTransferPassLocks
+    private val transferQueue: FileUploadTransferQueue
 ) : CoroutineWorker(appContext, parameters) {
     override suspend fun doWork(): Result {
         runCancellableCatching { setForeground(getForegroundInfo()) }
             .onFailure { Timber.d(it, "Failed to promote upload worker to foreground; continuing as background work") }
 
-        val processed = passLocks.runPass(HopTransfer.UPLOAD) {
-            runCancellableCatching { transferQueueProcessor.processPendingConcurrently(transferQueue) }
-        }
+        val processed = runCancellableCatching {
+            transferQueueProcessor.processPendingConcurrently(transferQueue)
 
-        scheduleTransferWakeUp(applicationContext, HopTransfer.UPLOAD, transferQueue.nextBackoffEndAt())
+            transferQueue.nextBackoffEndAt()?.let { backoffEnd ->
+                scheduleTransferWakeUp(applicationContext, HopTransfer.UPLOAD, backoffEnd)
+            }
+        }
 
         return processed.toWorkerResult(retryOnFailure = true)
     }
@@ -46,7 +47,9 @@ class FileUploadWorker @AssistedInject constructor(
     )
 
     companion object {
-        const val WORK_ID = "HopFileUpload"
+        private const val WORK_ID = "HopFileUpload"
         private const val NOTIFICATION_ID = 1002
+
+        fun startUploadingWork(context: Context) = enqueueExpeditedTransfer<FileUploadWorker>(context, WORK_ID)
     }
 }

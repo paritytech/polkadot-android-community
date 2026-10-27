@@ -4,23 +4,20 @@ import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.Configuration
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.ListenableWorker
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import androidx.work.Worker
-import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestDriver
 import androidx.work.testing.WorkManagerTestInitHelper
-import kotlinx.coroutines.runBlocking
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionWorker
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.download.FileDownloadWorker
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadWorker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.UUID
-import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -28,7 +25,6 @@ import kotlin.time.Duration.Companion.minutes
 @RunWith(AndroidJUnit4::class)
 class HopTransferWorkTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val passLocks = HopTransferPassLocks()
 
     private lateinit var workManager: WorkManager
     private lateinit var testDriver: TestDriver
@@ -46,56 +42,52 @@ class HopTransferWorkTest {
     }
 
     @Test
-    fun aTransferGetsAPassWhileABackoffWakeUpIsPending() = runBlocking<Unit> {
+    fun aNewUploadIsQueuedWithoutDelayWhileABackoffWakeUpIsPending() {
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
 
-        enqueueQuietTransfer<PassWorker>(context, HopTransfer.UPLOAD.workId, passLocks)
-        runQueuedWork(HopTransfer.UPLOAD.workId)
+        FileUploadWorker.startUploadingWork(context)
 
-        assertEquals(1, finishedPasses(HopTransfer.UPLOAD.workId))
+        assertEquals(0L, passesOf<FileUploadWorker>().single().initialDelayMillis)
     }
 
     @Test
-    fun theBackoffWakeUpStaysScheduledWhenATransferGetsAPass() = runBlocking<Unit> {
+    fun theBackoffWakeUpStaysScheduledWhenANewUploadIsQueued() {
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
 
-        enqueueQuietTransfer<PassWorker>(context, HopTransfer.UPLOAD.workId, passLocks)
-        runQueuedWork(HopTransfer.UPLOAD.workId)
+        FileUploadWorker.startUploadingWork(context)
 
-        assertEquals(listOf(WorkInfo.State.ENQUEUED), statesOf(HopTransferWakeUpWorker.workIdFor(HopTransfer.UPLOAD)))
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), wakeUpStates(HopTransfer.UPLOAD))
     }
 
     @Test
-    fun aPassIsNotQueuedWhenOneIsAlreadyWaitingToStart() = runBlocking<Unit> {
-        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID, passLocks)
-        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID, passLocks)
-
-        runQueuedWork(PASS_WORK_ID)
-
-        assertEquals(1, finishedPasses(PASS_WORK_ID))
-    }
-
-    @Test
-    fun theWakeUpIsCancelledWhenNothingIsWaitingOutABackoff() = runBlocking<Unit> {
+    fun anUploadPassIsQueuedWhenTheBackoffWakeUpFires() {
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
 
-        scheduleTransferWakeUp(context, HopTransfer.UPLOAD, executeAt = null)
+        testDriver.setInitialDelayMet(pendingWakeUp(HopTransfer.UPLOAD).id)
 
-        assertEquals(listOf(WorkInfo.State.CANCELLED), statesOf(HopTransferWakeUpWorker.workIdFor(HopTransfer.UPLOAD)))
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), passesOf<FileUploadWorker>().map { it.state })
     }
 
     @Test
-    fun aTransferGetsAPassWhenTheWaitingPassIsDelayed() = runBlocking<Unit> {
-        enqueueDelayedPass(PASS_WORK_ID)
+    fun aDownloadPassIsQueuedWhenTheBackoffWakeUpFires() {
+        scheduleTransferWakeUp(context, HopTransfer.DOWNLOAD, Clock.System.now() + 1.hours)
 
-        enqueueQuietTransfer<PassWorker>(context, PASS_WORK_ID, passLocks)
-        runQueuedWork(PASS_WORK_ID)
+        testDriver.setInitialDelayMet(pendingWakeUp(HopTransfer.DOWNLOAD).id)
 
-        assertEquals(1, finishedPasses(PASS_WORK_ID))
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), passesOf<FileDownloadWorker>().map { it.state })
     }
 
     @Test
-    fun theWakeUpMovesToTheSoonerDeadlineWhenItIsScheduledAgain() = runBlocking<Unit> {
+    fun anExpansionPassIsQueuedWhenTheBackoffWakeUpFires() {
+        scheduleTransferWakeUp(context, HopTransfer.COMPACTION_EXPANSION, Clock.System.now() + 1.hours)
+
+        testDriver.setInitialDelayMet(pendingWakeUp(HopTransfer.COMPACTION_EXPANSION).id)
+
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), passesOf<CompactionExpansionWorker>().map { it.state })
+    }
+
+    @Test
+    fun theWakeUpMovesToTheSoonerDeadlineWhenItIsScheduledAgain() {
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
 
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.minutes)
@@ -103,39 +95,11 @@ class HopTransferWorkTest {
         assertTrue(pendingWakeUp(HopTransfer.UPLOAD).initialDelayMillis <= 1.minutes.inWholeMilliseconds)
     }
 
-    private fun enqueueDelayedPass(workId: String) {
-        val request = OneTimeWorkRequestBuilder<PassWorker>()
-            .setInitialDelay(1, TimeUnit.HOURS)
-            .build()
-
-        workManager.enqueueUniqueWork(workId, ExistingWorkPolicy.REPLACE, request).result.get()
-    }
+    private inline fun <reified W : ListenableWorker> passesOf(): List<WorkInfo> = workManager.getWorkInfosByTag(W::class.java.name).get()
 
     private fun pendingWakeUp(transfer: HopTransfer): WorkInfo =
         workManager.getWorkInfosForUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer)).get().single { it.state == WorkInfo.State.ENQUEUED }
 
-    private fun runQueuedWork(workId: String) {
-        val started = mutableSetOf<UUID>()
-
-        while (true) {
-            val next = workManager.getWorkInfosForUniqueWork(workId).get()
-                .firstOrNull { it.state == WorkInfo.State.ENQUEUED && it.id !in started }
-                ?: break
-
-            started += next.id
-            testDriver.setAllConstraintsMet(next.id)
-        }
-    }
-
-    private fun finishedPasses(workId: String): Int = statesOf(workId).count { it == WorkInfo.State.SUCCEEDED }
-
-    private fun statesOf(workId: String): List<WorkInfo.State> = workManager.getWorkInfosForUniqueWork(workId).get().map { it.state }
-
-    class PassWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
-        override fun doWork(): Result = Result.success()
-    }
-
-    private companion object {
-        const val PASS_WORK_ID = "TestTransferPass"
-    }
+    private fun wakeUpStates(transfer: HopTransfer): List<WorkInfo.State> =
+        workManager.getWorkInfosForUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer)).get().map { it.state }
 }
