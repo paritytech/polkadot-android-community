@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Attachment
 import io.paritytech.polkadotapp.feature_chats_impl.data.AttachmentMetaBuilder
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.ChatMessageAttachmentUpdater
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopNodeUrlProvider
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopService
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.anyChatId
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.auth.HopSigner
@@ -23,7 +22,6 @@ import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.test_shared.anyInt
 import io.paritytech.polkadotapp.test_shared.capture
 import io.paritytech.polkadotapp.test_shared.eq
-import io.paritytech.polkadotapp.test_shared.thenThrowUnsafe
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -43,8 +41,6 @@ private const val HASH_SIZE = 32
 val STORED_HASH_0 = ByteArray(HASH_SIZE) { 0x70 }.toHexString(withPrefix = true)
 val STORED_HASH_1 = ByteArray(HASH_SIZE) { 0x71 }.toHexString(withPrefix = true)
 val STORED_HASH_2 = ByteArray(HASH_SIZE) { 0x72 }.toHexString(withPrefix = true)
-val STALE_HASH_0 = ByteArray(HASH_SIZE) { 0x60 }.toHexString(withPrefix = true)
-val STALE_HASH_1 = ByteArray(HASH_SIZE) { 0x61 }.toHexString(withPrefix = true)
 
 class MockedSessionUploads {
     val fileUri: Uri = mock(Uri::class.java)
@@ -53,7 +49,6 @@ class MockedSessionUploads {
     private val hopService: HopService = mock(HopService::class.java)
     private val session: HopService.Session = mock(HopService.Session::class.java)
     private val hopSigner: HopSigner = mock(HopSigner::class.java)
-    private val hopNodeUrlProvider: HopNodeUrlProvider = mock(HopNodeUrlProvider::class.java)
     private val fileUploadRepository: FileUploadRepository = mock(FileUploadRepository::class.java)
     private val messageAttachmentUpdater: ChatMessageAttachmentUpdater = mock(ChatMessageAttachmentUpdater::class.java)
     private val attachmentMetaBuilder: AttachmentMetaBuilder = mock(AttachmentMetaBuilder::class.java)
@@ -66,7 +61,6 @@ class MockedSessionUploads {
         attachmentFileStorage = attachmentFileStorage,
         hopService = hopService,
         hopSigner = hopSigner,
-        hopNodeUrlProvider = hopNodeUrlProvider,
         fileUploadRepository = fileUploadRepository,
         messageAttachmentUpdater = messageAttachmentUpdater,
         attachmentMetaBuilder = attachmentMetaBuilder,
@@ -111,37 +105,8 @@ class MockedSessionUploads {
 
     suspend fun withUploadStillActive() = withUploadStillActive(fileUploadRepository)
 
-    suspend fun withRetryNode(failed: String, picked: String) {
-        whenever(hopNodeUrlProvider.pickForRetry(failed)).thenReturn(picked)
-    }
-
-    suspend fun withNoRetryNode(failed: String) {
-        whenever(hopNodeUrlProvider.pickForRetry(failed)).thenThrowUnsafe(IllegalStateException("No Hop node URLs available"))
-    }
-
     suspend fun verifySessionOpenedOn(nodeUrl: String) {
         verify(hopService).withSession<Any?>(eq(nodeUrl), any())
-    }
-
-    suspend fun verifySessionNeverOpenedOn(nodeUrl: String) {
-        verify(hopService, never()).withSession<Any?>(eq(nodeUrl), any())
-    }
-
-    suspend fun verifyNoSessionOpened() {
-        verify(hopService, never()).withSession<Any?>(any(), any())
-    }
-
-    suspend fun verifyMovedTo(nodeUrl: String) {
-        verify(fileUploadRepository).moveToNode(MESSAGE_ID, nodeUrl)
-    }
-
-    suspend fun verifyNeverMovedToAnotherNode() {
-        verify(fileUploadRepository, never()).moveToNode(any(), any())
-    }
-
-    suspend fun verifyNeverAskedForAnotherNode() {
-        verify(hopNodeUrlProvider, never()).pickForRetry(any())
-        verifyNeverMovedToAnotherNode()
     }
 
     fun verifyStreamedFrom(chunk: Int) {

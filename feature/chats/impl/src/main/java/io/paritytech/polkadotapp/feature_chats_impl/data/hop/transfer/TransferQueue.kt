@@ -5,7 +5,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
 interface TransferItemLifecycle<T : WithRetryState> {
-    suspend fun markInProgress(item: T)
     suspend fun process(item: T)
     suspend fun markDone(item: T)
     suspend fun markFailed(item: T, error: Throwable)
@@ -15,13 +14,17 @@ interface TransferItemLifecycle<T : WithRetryState> {
 interface TransferQueue<T : WithRetryState> : TransferItemLifecycle<T> {
     suspend fun nextPending(): T?
 
+    suspend fun markInProgress(item: T)
+
     suspend fun soonestNextAttemptAt(): Instant?
 }
 
 interface ConcurrentTransferQueue<T : WithRetryState> : TransferItemLifecycle<T> {
     val maxInFlight: Int
 
-    suspend fun nextPending(excluding: Collection<T>): T?
+    suspend fun claimNextDue(): T?
+
+    suspend fun releaseInProgress()
 
     fun queueChanges(): Flow<Unit>
 

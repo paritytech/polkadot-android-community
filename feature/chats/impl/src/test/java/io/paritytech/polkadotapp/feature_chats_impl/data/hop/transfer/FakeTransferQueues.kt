@@ -41,13 +41,13 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
     private val changes = MutableSharedFlow<Unit>(extraBufferCapacity = Int.MAX_VALUE)
     private val starts = mutableListOf<String>()
     private val returns = mutableMapOf<String, Long>()
-    private val nextPendingCallTimes = mutableListOf<Long>()
+    private val claimCallTimes = mutableListOf<Long>()
     private var backoffQueryCallCount = 0
 
     var spinDetected = false
         private set
 
-    val nextPendingCalls: Int get() = nextPendingCallTimes.size
+    val claimCalls: Int get() = claimCallTimes.size
     val backoffQueryCalls: Int get() = backoffQueryCallCount
     val startedIds: List<String> get() = starts.toList()
     val inFlightCount: Int get() = starts.count { it !in returns }
@@ -92,21 +92,25 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
     fun retryStateOf(id: String) = rows.getValue(id).retryState
     fun isInFlight(id: String) = id in starts && id !in returns
     fun returnedAt(id: String): Long? = returns[id]
-    fun firstNextPendingCallAtOrAfter(time: Duration): Long? = nextPendingCallTimes.firstOrNull { it >= time.inWholeMilliseconds }
+    fun firstClaimCallAtOrAfter(time: Duration): Long? = claimCallTimes.firstOrNull { it >= time.inWholeMilliseconds }
 
-    override suspend fun nextPending(excluding: Collection<FakeItem>): FakeItem? {
+    override suspend fun claimNextDue(): FakeItem? {
         yield()
-        nextPendingCallTimes += now
-        tripIfSpinning(nextPendingCallTimes.size)
+        claimCallTimes += now
+        tripIfSpinning(claimCallTimes.size)
 
-        val excludedIds = excluding.map { it.id }.toSet()
-
-        return rows.values
-            .filter { it.status == RowStatus.PENDING || it.status == RowStatus.IN_PROGRESS }
+        val row = rows.values
+            .filter { it.status == RowStatus.PENDING }
             .filter { it.nextAttemptAtVirtualMs == null || it.nextAttemptAtVirtualMs!! <= now }
-            .filter { it.id !in excludedIds }
             .minByOrNull { it.createdAt }
-            ?.let { FakeItem(it.id, it.retryState) }
+            ?: return null
+
+        row.status = RowStatus.IN_PROGRESS
+        return FakeItem(row.id, row.retryState)
+    }
+
+    override suspend fun releaseInProgress() {
+        rows.values.filter { it.status == RowStatus.IN_PROGRESS }.forEach { it.status = RowStatus.PENDING }
     }
 
     override fun queueChanges(): Flow<Unit> = changes
@@ -122,8 +126,6 @@ internal class FakeConcurrentQueue(private val scope: TestScope) : ConcurrentTra
             .minOrNull()
             ?.let(Instant::fromEpochMilliseconds)
     }
-
-    override suspend fun markInProgress(item: FakeItem) = write(item.id) { status = RowStatus.IN_PROGRESS }
 
     override suspend fun process(item: FakeItem) {
         starts += item.id

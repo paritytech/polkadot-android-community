@@ -28,8 +28,12 @@ class FileUploadRepository @Inject constructor(
         dao.insert(upload.toLocal())
     }
 
-    suspend fun getNextPending(excluding: Collection<ChatMessageId>): FileUpload? {
-        return dao.getNextPending(timeProvider.now().toEpochMilliseconds(), excluding.toList())?.toDomain()
+    suspend fun claimNextDue(): FileUpload? {
+        return dao.claimNextDue(timeProvider.now().toEpochMilliseconds())?.toDomain()
+    }
+
+    suspend fun releaseInProgress() {
+        dao.releaseInProgress()
     }
 
     fun observeQueueChanges(): Flow<Unit> {
@@ -38,11 +42,12 @@ class FileUploadRepository @Inject constructor(
 
     suspend fun scheduleRetry(
         messageId: ChatMessageId,
+        nodeUrl: String,
         attemptCount: Int,
         firstFailureAt: Instant,
         nextAttemptAt: Instant
     ) {
-        dao.scheduleRetry(messageId, attemptCount, firstFailureAt.toEpochMilliseconds(), nextAttemptAt.toEpochMilliseconds())
+        dao.scheduleRetry(messageId, nodeUrl, attemptCount, firstFailureAt.toEpochMilliseconds(), nextAttemptAt.toEpochMilliseconds())
     }
 
     suspend fun getNextBackoffEndAt(): Instant? {
@@ -53,20 +58,12 @@ class FileUploadRepository @Inject constructor(
         return dao.isInProgress(messageId)
     }
 
-    suspend fun markInProgress(messageId: ChatMessageId) {
-        dao.markInProgress(messageId)
-    }
-
     suspend fun updateFileInfo(messageId: ChatMessageId, fileSize: InformationSize, totalChunks: Int) {
         dao.updateFileInfo(messageId, fileSize.inWholeBytes, totalChunks)
     }
 
     suspend fun updateProgress(messageId: ChatMessageId, uploadedChunks: Int, chunkHashes: List<String>) {
         dao.updateProgress(messageId, uploadedChunks, chunkHashes.joinToString(","))
-    }
-
-    suspend fun moveToNode(messageId: ChatMessageId, nodeUrl: String) {
-        dao.moveToNode(messageId, nodeUrl)
     }
 
     suspend fun markDone(messageId: ChatMessageId) {
