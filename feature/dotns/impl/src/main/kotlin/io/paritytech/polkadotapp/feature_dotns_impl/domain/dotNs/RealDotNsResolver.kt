@@ -7,9 +7,13 @@ import io.paritytech.polkadotapp.common.data.memory.MapCache
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.logSuccess
+import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.mapNotNull
 import io.paritytech.polkadotapp.common.utils.requireNotNull
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsLoadProgress
+import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolutionError
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
 import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.DotNsContractApi
 import io.paritytech.polkadotapp.feature_dotns_impl.data.ipfs.CarFetcher
@@ -22,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 private typealias DomainName = String
@@ -32,6 +37,7 @@ internal class RealDotNsResolver @Inject constructor(
     private val carFetcher: CarFetcher,
     private val contentStorage: DotNsContentStorage,
     private val contentHashOverrides: ContentHashOverrides,
+    private val fileUriProvider: FileUriProvider,
     private val dispatchers: CoroutineDispatchers
 ) : DotNsResolver, CoroutineScope {
     override val coroutineContext = dispatchers.io + SupervisorJob()
@@ -43,7 +49,7 @@ internal class RealDotNsResolver @Inject constructor(
 
         resolveContentHash(domainName)
             .logFailure("failed to resolve content hash for $domainName")
-            .requireNotNull { IllegalStateException("Domain $domainName is not registered or has no content") }
+            .requireNotNull { DotNsResolutionError.NotFound(domainName) }
             .flatMap { contentHash -> resolveContentHash(domainName, contentHash) }
             .logFailure("failed to resolve $domainName")
             // A domain with nothing registered behind it never reaches the download that reports its
@@ -57,6 +63,10 @@ internal class RealDotNsResolver @Inject constructor(
     //  acknowledge and update to a newer version when available.
     override suspend fun resolveToLocalUri(dotNsName: String): Result<Uri> = withContext(dispatchers.computation) {
         localDomainsCache.getOrCompute(dotNsName)
+    }
+
+    override suspend fun invalidate(dotNsName: String) {
+        localDomainsCache.remove(dotNsName)
     }
 
     private suspend fun resolveContentHash(domainName: DomainName): Result<ContentHash?> {
@@ -76,7 +86,7 @@ internal class RealDotNsResolver @Inject constructor(
         if (existingDir != null) {
             Timber.d("content $contentHashHex already cached on disk for $dotNsName")
             progressRegistry.markCompleted(dotNsName)
-            return Result.success(Uri.fromFile(existingDir))
+            return Result.success(fileUriProvider.fromFile(existingDir))
         }
 
         Timber.d("content $contentHashHex not cached — fetching CAR for $dotNsName")
@@ -85,21 +95,34 @@ internal class RealDotNsResolver @Inject constructor(
             contentHash = contentHash,
             onProgress = { downloaded, total -> progressRegistry.markDownloadProgress(dotNsName, downloaded, total) }
         )
-            .mapCatching { carFile ->
+            .flatMap { carFile ->
                 progressRegistry.markUnpacking(dotNsName)
-                try {
-                    contentStorage.saveContentStreaming(contentHashHex) { writer ->
-                        CarParser.unpack(carFile) { path, content -> writer.write(path, content) }
-                    }
-                    Timber.d("saved content $contentHashHex for $dotNsName")
-                    Uri.fromFile(contentStorage.getContentDirectory(contentHashHex)!!)
-                } finally {
-                    carFile.delete()
-                }
+                saveContent(contentHashHex, carFile)
             }
+            .logSuccess("saved content $contentHashHex for $dotNsName")
+            .flatMap { savedContentUri(dotNsName, contentHashHex) }
             .onSuccess { progressRegistry.markCompleted(dotNsName) }
             .onFailure { progressRegistry.markFailed(dotNsName, it) }
             .logFailure("failed to parse CAR for $contentHashHex")
+    }
+
+    private suspend fun saveContent(contentHashHex: ContentHash, carFile: File): Result<Unit> {
+        return try {
+            runCancellableCatching {
+                contentStorage.saveContentStreaming(contentHashHex) { writer ->
+                    CarParser.unpack(carFile) { path, content -> writer.write(path, content) }
+                }
+            }.mapError { DotNsResolutionError.ContentDamaged(it) }
+        } finally {
+            carFile.delete()
+        }
+    }
+
+    private fun savedContentUri(dotNsName: String, contentHashHex: ContentHash): Result<Uri> {
+        val directory = contentStorage.getContentDirectory(contentHashHex)
+            ?: return Result.failure(DotNsResolutionError.NotFound(dotNsName))
+
+        return Result.success(fileUriProvider.fromFile(directory))
     }
 
     override fun getProgressByDomain(dotNsName: String): Flow<DotNsLoadProgress> {

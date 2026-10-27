@@ -43,12 +43,15 @@
     <string name="common_error_server">Our servers are having trouble. Try again in a few minutes.</string>
     <string name="common_error_signing_failed">Couldn\'t sign the transaction. Try again.</string>
     <string name="common_error_integrity">Device integrity verification failed</string>
+    <string name="common_error_try_later">Please try again later</string>
+    <string name="common_error_url_title">URL error</string>
 
     <string name="common_proceed">Proceed</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_continue">Continue</string>
     <string name="common_ok">OK</string>
     <string name="common_retry">Retry</string>
+    <string name="common_skip">Skip</string>
     <string name="common_done">Done</string>
     <string name="common_close">Close</string>
     <string name="common_quit">Quit</string>
@@ -276,6 +279,15 @@
     <string name="spa_browser_page_no_app_surface">This product doesn\'t have an app on this device.</string>
     <string name="product_resolution_error_malformed_manifest">This product published a manifest this app can\'t read. Contact the product\'s developer.</string>
     <string name="product_resolution_error_unknown">Couldn\'t load this product.</string>
+
+    <string name="explore_products_load_failed">Data loading failed. Would you like to retry?</string>
+    <string name="product_load_not_found_title">App not found</string>
+    <string name="product_load_not_found_message">This name isn\'t registered on chain, or its content is no longer available.</string>
+    <string name="product_load_unreachable_title">Can\'t reach the app</string>
+    <string name="product_load_unreachable_message">Check your internet connection and try again.</string>
+    <string name="product_load_damaged_title">App couldn\'t be opened</string>
+    <string name="product_load_damaged_message">Its content is damaged or not supported by this version of the app.</string>
+
     <string name="debug_menu_enable_retro_mode">Enable retro mode</string>
     <string name="debug_menu_disable_retro_mode">Disable retro mode</string>
     <string name="debug_menu_randomize_account">Randomize account (Test Dev Reset)</string>
@@ -395,6 +407,7 @@
     <string name="wallet_stall_sending">Sending your payment</string>
     <string name="wallet_stall_delivering">Delivering payment to recipient</string>
     <string name="wallet_stall_awaiting_claim">Waiting for the recipient to receive the payment</string>
+    <string name="explore_products_stall_opening">Opening Browse</string>
     <string name="pair_request_link_action">Link</string>
     <string name="pair_request_cancel_action">Cancel</string>
     <string name="pair_request_close_action">Close</string>

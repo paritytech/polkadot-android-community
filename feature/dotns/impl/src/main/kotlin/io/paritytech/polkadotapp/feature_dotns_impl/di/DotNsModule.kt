@@ -22,7 +22,9 @@ import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.DotNsTldStorage
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.RealDotNsContentStorage
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.RealDotNsTldStorage
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.SharedPrefsContentHashOverrides
+import io.paritytech.polkadotapp.feature_dotns_impl.domain.dotNs.FileUriProvider
 import io.paritytech.polkadotapp.feature_dotns_impl.domain.dotNs.RealDotNsResolver
+import io.paritytech.polkadotapp.feature_dotns_impl.domain.dotNs.RealFileUriProvider
 import io.paritytech.polkadotapp.feature_dotns_impl.domain.tld.RealDotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_impl.presentation.DotNsTldInitializer
 import javax.inject.Singleton
@@ -33,6 +35,9 @@ internal interface DotNsModule {
     @Binds
     @Singleton
     fun bindDotNsResolver(impl: RealDotNsResolver): DotNsResolver
+
+    @Binds
+    fun bindFileUriProvider(impl: RealFileUriProvider): FileUriProvider
 
     @Binds
     @Singleton

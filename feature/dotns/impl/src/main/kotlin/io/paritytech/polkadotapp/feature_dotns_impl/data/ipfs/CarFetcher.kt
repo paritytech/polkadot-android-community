@@ -3,8 +3,6 @@ package io.paritytech.polkadotapp.feature_dotns_impl.data.ipfs
 import java.io.File
 
 interface CarFetcher {
-    suspend fun fetchCar(contentHash: ByteArray): Result<ByteArray>
-
     /**
      * Streams the CAR archive to a temporary file instead of buffering it in memory, for archives
      * too large to hold on the heap. The caller owns the returned file and must delete it once the
