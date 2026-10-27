@@ -47,7 +47,7 @@ class HopTransferWorkTest {
 
         FileUploadWorker.startUploadingWork(context)
 
-        assertEquals(0L, passesOf<FileUploadWorker>().single().initialDelayMillis)
+        assertEquals(0L, workTaggedWith<FileUploadWorker>().single().initialDelayMillis)
     }
 
     @Test
@@ -65,7 +65,7 @@ class HopTransferWorkTest {
 
         testDriver.setInitialDelayMet(pendingWakeUp(HopTransfer.UPLOAD).id)
 
-        assertEquals(listOf(WorkInfo.State.ENQUEUED), passesOf<FileUploadWorker>().map { it.state })
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), workTaggedWith<FileUploadWorker>().map { it.state })
     }
 
     @Test
@@ -74,7 +74,7 @@ class HopTransferWorkTest {
 
         testDriver.setInitialDelayMet(pendingWakeUp(HopTransfer.DOWNLOAD).id)
 
-        assertEquals(listOf(WorkInfo.State.ENQUEUED), passesOf<FileDownloadWorker>().map { it.state })
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), workTaggedWith<FileDownloadWorker>().map { it.state })
     }
 
     @Test
@@ -83,23 +83,32 @@ class HopTransferWorkTest {
 
         testDriver.setInitialDelayMet(pendingWakeUp(HopTransfer.COMPACTION_EXPANSION).id)
 
-        assertEquals(listOf(WorkInfo.State.ENQUEUED), passesOf<CompactionExpansionWorker>().map { it.state })
+        assertEquals(listOf(WorkInfo.State.ENQUEUED), workTaggedWith<CompactionExpansionWorker>().map { it.state })
     }
 
     @Test
-    fun theWakeUpMovesToTheSoonerDeadlineWhenItIsScheduledAgain() {
-        scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
-
+    fun theWakeUpTakesTheLatestDeadlineWhenItIsScheduledAgain() {
         scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.minutes)
 
-        assertTrue(pendingWakeUp(HopTransfer.UPLOAD).initialDelayMillis <= 1.minutes.inWholeMilliseconds)
+        scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.hours)
+
+        assertTrue(pendingWakeUp(HopTransfer.UPLOAD).initialDelayMillis > 1.minutes.inWholeMilliseconds)
     }
 
-    private inline fun <reified W : ListenableWorker> passesOf(): List<WorkInfo> = workManager.getWorkInfosByTag(W::class.java.name).get()
+    @Test
+    fun anUploadWakeUpStaysScheduledWhenADownloadWakeUpIsScheduled() {
+        scheduleTransferWakeUp(context, HopTransfer.UPLOAD, Clock.System.now() + 1.minutes)
+
+        scheduleTransferWakeUp(context, HopTransfer.DOWNLOAD, Clock.System.now() + 1.hours)
+
+        assertEquals(2, workTaggedWith<HopTransferWakeUpWorker>().count { it.state == WorkInfo.State.ENQUEUED })
+    }
+
+    private inline fun <reified W : ListenableWorker> workTaggedWith(): List<WorkInfo> = workManager.getWorkInfosByTag(W::class.java.name).get()
 
     private fun pendingWakeUp(transfer: HopTransfer): WorkInfo =
-        workManager.getWorkInfosForUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer)).get().single { it.state == WorkInfo.State.ENQUEUED }
+        workManager.getWorkInfosForUniqueWork(transfer.wakeUpWorkId).get().single { it.state == WorkInfo.State.ENQUEUED }
 
     private fun wakeUpStates(transfer: HopTransfer): List<WorkInfo.State> =
-        workManager.getWorkInfosForUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer)).get().map { it.state }
+        workManager.getWorkInfosForUniqueWork(transfer.wakeUpWorkId).get().map { it.state }
 }

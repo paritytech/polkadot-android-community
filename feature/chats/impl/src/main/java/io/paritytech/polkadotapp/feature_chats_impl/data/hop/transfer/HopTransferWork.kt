@@ -57,7 +57,7 @@ internal fun scheduleTransferWakeUp(context: Context, transfer: HopTransfer, exe
         .build()
 
     WorkManager.getInstance(context)
-        .enqueueUniqueWork(HopTransferWakeUpWorker.workIdFor(transfer), ExistingWorkPolicy.REPLACE, request)
+        .enqueueUniqueWork(transfer.wakeUpWorkId, ExistingWorkPolicy.REPLACE, request)
 }
 
 internal fun hopTransferForegroundInfo(

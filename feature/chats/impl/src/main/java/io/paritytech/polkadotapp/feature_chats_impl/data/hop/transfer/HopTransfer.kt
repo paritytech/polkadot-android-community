@@ -1,7 +1,7 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer
 
-enum class HopTransfer {
-    UPLOAD,
-    DOWNLOAD,
-    COMPACTION_EXPANSION
+enum class HopTransfer(val wakeUpWorkId: String) {
+    UPLOAD("HopFileUploadWakeUp"),
+    DOWNLOAD("HopFileDownloadWakeUp"),
+    COMPACTION_EXPANSION("HopCompactionExpansionWakeUp")
 }
