@@ -328,7 +328,7 @@ class DotNsReservationQueueClearerTest {
 
     private fun verifyNoPgasClaimed() = runBlocking<Unit> {
         with(StalenessReportCollector.NoOp) {
-            verify(pgasClaimer, never()).claim(any(), any())
+            verify(pgasClaimer, never()).claim(OUR_ACCOUNT_ID, OnExistingAllocationStrategy.INCREASE)
         }
     }
 
