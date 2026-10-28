@@ -30,7 +30,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.compose.animation.LocalCardTilt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -50,8 +53,10 @@ internal fun WalletLeatherSurface(modifier: Modifier = Modifier) {
         snapshotFlow { tilt.value }.collect { light.aim(handX = it.x, handY = -it.y) }
     }
 
+    LaunchedEffect(assets) { WalletLeatherSnapshot.showPictureUntilLit(assets) }
+
     Box(modifier = modifier) {
-        // A lit frame, so a not-yet-drawn surface or the shared-element overlay never shows the page through.
+        // The picture or a lit frame, so a not-yet-drawn surface or the shared-element overlay never shows the page through.
         WalletLeatherSnapshot.latest?.let { frame ->
             Image(
                 modifier = Modifier.matchParentSize(),
@@ -81,6 +86,18 @@ internal object WalletLeatherSnapshot {
 
     private val main = Handler(Looper.getMainLooper())
     private val seeded = AtomicBoolean(false)
+
+    suspend fun showPictureUntilLit(assets: AssetManager) = showIfStillEmpty(
+        shown = { latest },
+        load = {
+            withContext(Dispatchers.IO) {
+                runCatching { WalletLeatherRenderer.picture(assets).asImageBitmap() }
+                    .logFailure("WalletLeather: could not decode the card picture")
+                    .getOrNull()
+            }
+        },
+        show = { latest = it }
+    )
 
     fun seed(width: Int, height: Int) {
         if (width > 0 && height > 0 && seeded.compareAndSet(false, true)) capture(width, height)
@@ -351,4 +368,12 @@ private class WalletLeatherLoop(
 
         const val SNAPSHOT_DELAY_MILLIS = 500L
     }
+}
+
+internal suspend fun showIfStillEmpty(shown: () -> ImageBitmap?, load: suspend () -> ImageBitmap?, show: (ImageBitmap) -> Unit) {
+    if (shown() != null) return
+
+    val loaded = load() ?: return
+
+    if (shown() == null) show(loaded)
 }
