@@ -4,18 +4,15 @@ import android.net.Uri
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.childScope
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapError
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolver
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
-import io.paritytech.polkadotapp.feature_products_api.model.ResolvedProduct
 import io.paritytech.polkadotapp.feature_products_api.model.toUrl
 import io.paritytech.polkadotapp.feature_products_impl.domain.browser.ExploreSession
 import io.paritytech.polkadotapp.feature_products_impl.domain.browser.ExploreSessionFactory
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiSession
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.BrowserWebViewProvider
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.appServingHost
@@ -62,7 +59,6 @@ class ExploreProductsInteractor @Inject constructor(
         onProductSelected: (ProductId) -> Unit,
     ): Result<BrowserWebViewProvider> = diagnostics.markRegion(RCommon.string.explore_products_stall_opening) {
         exploreProductsService.getExploreProductId()
-            .logFailure("Failed to resolve explore url")
             .flatMap { productId ->
                 runCatching { exploreSessionFactory.create(productId.toUrl(), scope, onProductSelected) }
                     .map { session -> productId to session }
@@ -73,34 +69,22 @@ class ExploreProductsInteractor @Inject constructor(
 
     private suspend fun setUp(productId: ProductId, session: ExploreSession, afterRetry: Boolean): Result<BrowserWebViewProvider> {
         return syncRemoteConfig()
-            .flatMap { resolveProduct(productId) }
+            .flatMap { withContext(dispatchers.computation) { resolveProductUseCase.resolve(productId) } }
             .flatMap { resolved -> loadContent(resolved.appServingHost(fallback = productId.value), afterRetry) }
-            .flatMap { initialize(session.hostApiSession) }
+            .flatMap { runCancellableCatching { session.hostApiSession.initialize() } }
             .map { session.provider }
+            .mapError { ExploreLoadError.SetupFailed(it) }
     }
 
     private suspend fun syncRemoteConfig(): Result<Unit> {
-        val synced = withTimeoutOrNull(REMOTE_CONFIG_SYNC_LIMIT) { remoteConfigService.sync() }
+        return withTimeoutOrNull(REMOTE_CONFIG_SYNC_LIMIT) { remoteConfigService.sync() }
             ?: Result.failure(TimeoutException("No remote config sync within $REMOTE_CONFIG_SYNC_LIMIT"))
-
-        return synced.mapError { ExploreLoadError.SetupFailed(ExploreSetupFailure.UNREACHABLE, it) }
-    }
-
-    private suspend fun resolveProduct(productId: ProductId): Result<ResolvedProduct> {
-        return withContext(dispatchers.computation) { resolveProductUseCase.resolve(productId) }
-            .mapError { ExploreLoadError.SetupFailed(classifyProductFailure(it), it) }
     }
 
     private suspend fun loadContent(servingHost: String, afterRetry: Boolean): Result<Uri> {
         if (afterRetry) dotNsResolver.invalidate(servingHost)
 
-        return dotNsResolver.resolveToLocalUri(servingHost)
-            .mapError { ExploreLoadError.SetupFailed(classifyContentFailure(it), it) }
-    }
-
-    private suspend fun initialize(hostApiSession: HostApiSession): Result<Unit> {
-        return runCancellableCatching { hostApiSession.initialize() }
-            .mapError { ExploreLoadError.SetupFailed(ExploreSetupFailure.UNKNOWN, it) }
+        return runCancellableCatching { dotNsResolver.resolveToLocalUri(servingHost) }.flatMap { it }
     }
 
     private companion object {

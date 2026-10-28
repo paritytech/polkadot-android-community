@@ -5,13 +5,11 @@ import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTld
 import io.paritytech.polkadotapp.feature_dotns_impl.data.repository.NetworkSuffixRepository
 import io.paritytech.polkadotapp.feature_dotns_impl.data.storage.DotNsTldStorage
 import io.paritytech.polkadotapp.test_shared.assertFailureOf
+import io.paritytech.polkadotapp.test_shared.testDispatchers
 import io.paritytech.polkadotapp.test_shared.thenSuspend
 import io.paritytech.polkadotapp.test_shared.whenever
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -26,10 +24,12 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import java.util.concurrent.TimeoutException
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 private val PASEO = DotNsTld.parse("paseo")!!
+private val READ_LIMIT = 30.seconds
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class RealDotNsTldProviderTest {
     private val networkSuffixRepository: NetworkSuffixRepository = mock(NetworkSuffixRepository::class.java)
     private val storage = FakeDotNsTldStorage()
@@ -95,75 +95,46 @@ class RealDotNsTldProviderTest {
     }
 
     @Test
-    fun `a network suffix read that never answers fails at the limit and not before`() = runTest {
+    fun `a network suffix read that never answers fails at 30 seconds and not before`() = runTest {
         withUnansweredRead()
+        val provider = providerOnTestClock()
 
-        val read = startReading()
-        advanceTimeBy(READ_LIMIT_MS - 1)
+        val read = async { provider.getTld() }
+        advanceTimeBy(READ_LIMIT - 1.milliseconds)
+        assertFalse(read.isCompleted)
+        advanceTimeBy(1.milliseconds)
         runCurrent()
-        assertFalse("pending until the limit", read.isCompleted)
+        assertTrue(read.isCompleted)
 
-        advanceTimeBy(1)
-        runCurrent()
-        assertTrue("failed at the limit", read.isCompleted)
         assertFailureOf<TimeoutException>(read.await())
-        assertNull(storage.stored)
     }
 
     @Test
-    fun `a read after a timed-out one asks the chain again`() = runTest {
-        withUnansweredReadThen(PASEO)
+    fun `the next read after a timed-out one asks the chain again`() = runTest {
+        withUnansweredReadThenSuffix(PASEO)
+        val provider = providerOnTestClock()
+        provider.getTld()
 
-        val timedOut = startReading()
-        advanceTimeBy(READ_LIMIT_MS)
-        runCurrent()
-        assertTrue("first read gave up at the limit", timedOut.isCompleted)
-        assertFailureOf<TimeoutException>(timedOut.await())
+        val result = provider.getTld()
 
-        assertEquals(PASEO, provider.getTld().getOrThrow())
-        verifySuffixRead(times = 2)
+        assertEquals(PASEO, result.getOrNull())
+        verifyChainReads(count = 2)
     }
 
-    @Test
-    fun `a caller queued behind a stuck read gets its own read once that one times out`() = runTest {
-        withUnansweredReadThenSlowAnswer(PASEO, answerAfterMs = QUEUED_READ_MS)
-
-        startReading()
-        advanceTimeBy(QUEUED_CALLER_AT_MS)
-        val queued = startReading()
-        advanceTimeBy(READ_LIMIT_MS - QUEUED_CALLER_AT_MS - 1)
-        runCurrent()
-        assertFalse("queued caller waits behind the stuck read", queued.isCompleted)
-
-        advanceTimeBy(1 + QUEUED_READ_MS)
-        runCurrent()
-        assertTrue("queued caller's own read answered", queued.isCompleted)
-        assertEquals(PASEO, queued.await().getOrThrow())
-    }
-
-    private fun TestScope.startReading(): Deferred<Result<DotNsTld>> = backgroundScope.async { provider.getTld() }
+    private fun TestScope.providerOnTestClock() = RealDotNsTldProvider(
+        networkSuffixRepository = networkSuffixRepository,
+        tldStorage = storage,
+        dispatchers = testDispatchers(),
+    )
 
     private suspend fun withUnansweredRead() {
         whenever(networkSuffixRepository.networkSuffix()).thenSuspend { awaitCancellation() }
     }
 
-    private suspend fun withUnansweredReadThen(tld: DotNsTld) {
+    private suspend fun withUnansweredReadThenSuffix(tld: DotNsTld) {
         whenever(networkSuffixRepository.networkSuffix())
             .thenSuspend { awaitCancellation() }
             .thenReturn(Result.success(tld))
-    }
-
-    private suspend fun withUnansweredReadThenSlowAnswer(tld: DotNsTld, answerAfterMs: Long) {
-        whenever(networkSuffixRepository.networkSuffix())
-            .thenSuspend { awaitCancellation() }
-            .thenSuspend {
-                delay(answerAfterMs)
-                Result.success(tld)
-            }
-    }
-
-    private suspend fun verifySuffixRead(times: Int) {
-        verify(networkSuffixRepository, times(times)).networkSuffix()
     }
 
     private suspend fun withReportedSuffix(tld: DotNsTld?) {
@@ -174,10 +145,8 @@ class RealDotNsTldProviderTest {
         whenever(networkSuffixRepository.networkSuffix()).thenReturn(Result.failure(IllegalStateException("rpc down")))
     }
 
-    private companion object {
-        const val READ_LIMIT_MS = 30_000L
-        const val QUEUED_CALLER_AT_MS = 5_000L
-        const val QUEUED_READ_MS = 10_000L
+    private suspend fun verifyChainReads(count: Int) {
+        verify(networkSuffixRepository, times(count)).networkSuffix()
     }
 
     private class FakeDotNsTldStorage : DotNsTldStorage {

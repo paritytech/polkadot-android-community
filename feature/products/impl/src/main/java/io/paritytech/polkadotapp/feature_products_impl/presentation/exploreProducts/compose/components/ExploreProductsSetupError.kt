@@ -16,13 +16,11 @@ import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreSetupFailure
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
 fun ExploreProductsSetupError(
     modifier: Modifier = Modifier,
-    kind: ExploreSetupFailure,
     onRetry: () -> Unit,
 ) {
     Column(
@@ -31,14 +29,14 @@ fun ExploreProductsSetupError(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         NovaText(
-            text = kind.title(),
+            text = stringResource(RCommon.string.common_error_general_title),
             style = PolkadotTheme.typography.headline.small,
             color = PolkadotTheme.colors.fg.primary,
             textAlign = TextAlign.Center,
         )
         VerticalSpacer { small }
         NovaText(
-            text = kind.message(),
+            text = stringResource(RCommon.string.common_error_try_later),
             style = PolkadotTheme.typography.paragraph.large,
             color = PolkadotTheme.colors.fg.secondary,
             textAlign = TextAlign.Center,
@@ -52,68 +50,17 @@ fun ExploreProductsSetupError(
     }
 }
 
+@Preview
 @Composable
-private fun ExploreSetupFailure.title(): String {
-    return when (this) {
-        ExploreSetupFailure.NOT_FOUND -> stringResource(RCommon.string.product_load_not_found_title)
-        ExploreSetupFailure.UNREACHABLE -> stringResource(RCommon.string.product_load_unreachable_title)
-        ExploreSetupFailure.DAMAGED -> stringResource(RCommon.string.product_load_damaged_title)
-        ExploreSetupFailure.CONNECTION -> stringResource(RCommon.string.common_error_url_title)
-        ExploreSetupFailure.UNKNOWN -> stringResource(RCommon.string.common_error_general_title)
-    }
-}
-
-@Composable
-private fun ExploreSetupFailure.message(): String {
-    return when (this) {
-        ExploreSetupFailure.NOT_FOUND -> stringResource(RCommon.string.product_load_not_found_message)
-        ExploreSetupFailure.UNREACHABLE -> stringResource(RCommon.string.product_load_unreachable_message)
-        ExploreSetupFailure.DAMAGED -> stringResource(RCommon.string.product_load_damaged_message)
-        ExploreSetupFailure.CONNECTION, ExploreSetupFailure.UNKNOWN -> stringResource(RCommon.string.common_error_try_later)
-    }
-}
-
-@Composable
-private fun SetupErrorPreview(kind: ExploreSetupFailure) {
+private fun ExploreProductsSetupErrorPreview() {
     PolkadotTheme {
         PolkadotSurface {
             ExploreProductsSetupError(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = PolkadotTheme.spacings.extraLarge),
-                kind = kind,
                 onRetry = {},
             )
         }
     }
-}
-
-@Preview
-@Composable
-private fun NotFoundPreview() {
-    SetupErrorPreview(ExploreSetupFailure.NOT_FOUND)
-}
-
-@Preview
-@Composable
-private fun UnreachablePreview() {
-    SetupErrorPreview(ExploreSetupFailure.UNREACHABLE)
-}
-
-@Preview
-@Composable
-private fun DamagedPreview() {
-    SetupErrorPreview(ExploreSetupFailure.DAMAGED)
-}
-
-@Preview
-@Composable
-private fun ConnectionPreview() {
-    SetupErrorPreview(ExploreSetupFailure.CONNECTION)
-}
-
-@Preview
-@Composable
-private fun UnknownPreview() {
-    SetupErrorPreview(ExploreSetupFailure.UNKNOWN)
 }

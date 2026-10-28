@@ -8,12 +8,10 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolutionError
 import io.paritytech.polkadotapp.feature_dotns_impl.data.config.DotNsConfigProvider
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractReverted
 import io.paritytech.polkadotapp.test_shared.any
-import io.paritytech.polkadotapp.test_shared.assertFailureOf
 import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
@@ -109,32 +107,6 @@ class RealDotNsContractApiTest {
         assertTrue(contractApi.getMetadata(NAME, MANIFEST_KEY).isFailure)
     }
 
-    @Test
-    fun `a failed content hash read fails as registry unreachable`() = runBlocking<Unit> {
-        stubConfig()
-        stubCallFailing(REGISTRY)
-
-        assertFailureOf<DotNsResolutionError.RegistryUnreachable>(contractApi.resolveContentHash(NAME))
-    }
-
-    @Test
-    fun `a content hash without the ipfs prefix fails as an invalid content hash`() = runBlocking<Unit> {
-        stubConfig()
-        stubRegistryResolver(null)
-        stubRawContentHash(FIXED_RESOLVER, SWARM_CONTENT_HASH)
-
-        assertFailureOf<DotNsResolutionError.InvalidContentHash>(contractApi.resolveContentHash(NAME))
-    }
-
-    @Test
-    fun `a contract answer that does not decode fails as not found`() = runBlocking<Unit> {
-        stubConfig()
-        stubRegistryResolver(null)
-        stubOutput(FIXED_RESOLVER, TRUNCATED_DYNAMIC_BYTES)
-
-        assertFailureOf<DotNsResolutionError.NotFound>(contractApi.resolveContentHash(NAME))
-    }
-
     private fun stubConfig() = runBlocking {
         whenever(chainRegistry.knownChains).thenReturn(
             KnownChains(people = "", assetHub = CHAIN_ID, bulletIn = "", hydration = null)
@@ -154,25 +126,13 @@ class RealDotNsContractApiTest {
             .thenReturn(Result.success(output.toDataByteArray()))
     }
 
-    private fun stubContentHash(resolver: AccountId, contentHash: ByteArray) = stubRawContentHash(resolver, EIP_1577_IPFS_PREFIX + contentHash)
-
-    private fun stubRawContentHash(resolver: AccountId, eip1577ContentHash: ByteArray) = runBlocking {
+    private fun stubContentHash(resolver: AccountId, contentHash: ByteArray) = runBlocking {
         val output = abiEncodeReturnValues(
-            listOf(DynamicBytes(eip1577ContentHash)),
+            listOf(DynamicBytes(EIP_1577_IPFS_PREFIX + contentHash)),
             listOf(object : TypeReference<DynamicBytes>() {})
         )
         whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(resolver), any(), isNull()))
             .thenReturn(Result.success(output.toDataByteArray()))
-    }
-
-    private fun stubOutput(resolver: AccountId, output: ByteArray) = runBlocking {
-        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(resolver), any(), isNull()))
-            .thenReturn(Result.success(output.toDataByteArray()))
-    }
-
-    private fun stubCallFailing(contract: AccountId) = runBlocking {
-        whenever(reviveContractApi.callReadOnly(eq(CHAIN_ID), eq(contract), any(), isNull()))
-            .thenReturn(Result.failure(IllegalStateException("node unreachable")))
     }
 
     private fun stubEmptyOutput(resolver: AccountId) = runBlocking {
@@ -198,8 +158,6 @@ class RealDotNsContractApiTest {
         const val MANIFEST_KEY = "manifest"
         val EIP_1577_IPFS_PREFIX = byteArrayOf(0xe3.toByte(), 0x01)
         val CONTENT_HASH = "01701220".fromHex() + ByteArray(32) { 3 }
-        val SWARM_CONTENT_HASH = "e40101fa011b20".fromHex() + ByteArray(32) { 4 }
-        val TRUNCATED_DYNAMIC_BYTES = ByteArray(31) + byteArrayOf(0x20) + ByteArray(31) + byteArrayOf(0x40)
         val FIXED_RESOLVER: AccountId = ByteArray(20) { 5 }.toDataByteArray()
         val REGISTRY: AccountId = ByteArray(20) { 6 }.toDataByteArray()
         val NAME_RESOLVER: AccountId = ByteArray(20) { 7 }.toDataByteArray()

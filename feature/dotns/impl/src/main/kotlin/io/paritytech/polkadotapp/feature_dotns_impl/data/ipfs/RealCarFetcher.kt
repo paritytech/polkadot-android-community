@@ -3,10 +3,7 @@ package io.paritytech.polkadotapp.feature_dotns_impl.data.ipfs
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.mapError
-import io.paritytech.polkadotapp.common.utils.mapErrorInstance
 import io.paritytech.polkadotapp.common.utils.readNBytesCompat
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolutionError
 import io.paritytech.polkadotapp.feature_dotns_impl.di.DotNsHttpClient
 import io.paritytech.polkadotapp.tools_car_parser.CarParser
 import io.paritytech.polkadotapp.tools_ipfs_api.Cids
@@ -16,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.ResponseBody
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
@@ -39,70 +35,87 @@ class RealCarFetcher @Inject constructor(
     @param:DotNsHttpClient private val httpClient: OkHttpClient,
     private val ipfsContentLookup: IpfsContentLookup
 ) : CarFetcher {
+    override suspend fun fetchCar(contentHash: ByteArray): Result<ByteArray> {
+        return withContext(Dispatchers.IO) {
+            Cids.castCatching(contentHash)
+                .flatMap { cid -> ipfsContentLookup.getIpfsLinkFor(cid) }
+                .mapCatching { baseUrl ->
+                    // Phase 1: Fetch raw (no format override)
+                    val rawBytes = fetch(baseUrl)
+
+                    if (CarParser.looksLikeCarArchive(rawBytes)) {
+                        // Legacy: CID is an uploaded CAR file — use directly
+                        rawBytes
+                    } else {
+                        // New: CID is a directory — re-fetch with ?format=car
+                        fetch("$baseUrl?format=car", accept = "application/vnd.ipld.car")
+                    }
+                }
+        }
+    }
+
     override suspend fun fetchCarToFile(
         contentHash: ByteArray,
         onProgress: (downloaded: Long, total: Long?) -> Unit
     ): Result<File> {
         return withContext(Dispatchers.IO) {
-            gatewayUrlFor(contentHash).flatMap { baseUrl ->
-                fetchToFile(baseUrl, onProgress = onProgress).flatMap { rawFile ->
-                    runCatching { looksLikeCarArchive(rawFile) }.flatMap { isCarArchive ->
-                        if (isCarArchive) {
-                            Result.success(rawFile)
-                        } else {
-                            rawFile.delete()
-                            fetchToFile("$baseUrl?format=car", accept = CAR_MEDIA_TYPE, onProgress = onProgress)
-                        }
+            Cids.castCatching(contentHash)
+                .flatMap { cid -> ipfsContentLookup.getIpfsLinkFor(cid) }
+                .mapCatching { baseUrl ->
+                    // Phase 1: raw fetch — a legacy CID points directly at an uploaded CAR file.
+                    val rawFile = fetchToFile(baseUrl, onProgress = onProgress)
+
+                    if (looksLikeCarArchive(rawFile)) {
+                        rawFile
+                    } else {
+                        // New format: the CID is a directory — re-fetch it exported as a CAR archive.
+                        rawFile.delete()
+                        fetchToFile("$baseUrl?format=car", accept = CAR_MEDIA_TYPE, onProgress = onProgress)
                     }
                 }
-            }
         }
     }
 
-    private suspend fun gatewayUrlFor(contentHash: ByteArray): Result<String> {
-        return Cids.castCatching(contentHash)
-            .mapError { DotNsResolutionError.InvalidContentHash(it) }
-            .flatMap { cid -> ipfsContentLookup.getIpfsLinkFor(cid) }
+    private fun fetch(url: String, accept: String? = null): ByteArray {
+        val requestBuilder = Request.Builder().url(url)
+        if (accept != null) {
+            requestBuilder.header("Accept", accept)
+        }
+
+        return httpClient.newCall(requestBuilder.build()).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("IPFS fetch failed: HTTP ${response.code} for $url")
+            }
+            response.body.bytes()
+        }
     }
 
     private fun fetchToFile(
         url: String,
         accept: String? = null,
         onProgress: (downloaded: Long, total: Long?) -> Unit
-    ): Result<File> {
-        return runCatching { httpClient.newCall(buildRequest(url, accept)).execute() }
-            .flatMap { response ->
-                response.use {
-                    if (it.isSuccessful) {
-                        runCatching { it.body.saveToTempFile(onProgress) }
-                    } else {
-                        Result.failure(DotNsResolutionError.GatewayRejected(it.code))
-                    }
-                }
-            }
-            .mapErrorInstance<File, IOException> { DotNsResolutionError.GatewayUnreachable(it) }
-    }
-
-    private fun buildRequest(url: String, accept: String?): Request {
+    ): File {
         val requestBuilder = Request.Builder().url(url)
         if (accept != null) {
             requestBuilder.header("Accept", accept)
         }
 
-        return requestBuilder.build()
-    }
-
-    private fun ResponseBody.saveToTempFile(onProgress: (downloaded: Long, total: Long?) -> Unit): File {
-        val total = contentLength()
-        val tempFile = File.createTempFile(TEMP_CAR_PREFIX, TEMP_CAR_SUFFIX, context.cacheDir)
-        try {
-            byteStream().use { input ->
-                tempFile.outputStream().use { output -> input.copyReporting(output, total, onProgress) }
+        return httpClient.newCall(requestBuilder.build()).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("IPFS fetch failed: HTTP ${response.code} for $url")
             }
-            return tempFile
-        } catch (e: Throwable) {
-            tempFile.delete()
-            throw e
+
+            val total = response.body.contentLength()
+            val tempFile = File.createTempFile(TEMP_CAR_PREFIX, TEMP_CAR_SUFFIX, context.cacheDir)
+            try {
+                response.body.byteStream().use { input ->
+                    tempFile.outputStream().use { output -> input.copyReporting(output, total, onProgress) }
+                }
+                tempFile
+            } catch (e: Throwable) {
+                tempFile.delete()
+                throw e
+            }
         }
     }
 

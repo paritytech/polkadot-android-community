@@ -113,12 +113,11 @@ private fun ExploreProductsScreenInternal(
                     )
                     ExploreProductsContent.Skipped -> Unit
                 }
-                is LoadingState.Error -> when (val error = state.exception) {
+                is LoadingState.Error -> when (state.exception) {
                     is ExploreLoadError.SetupFailed -> ExploreProductsSetupError(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = PolkadotTheme.spacings.extraLarge),
-                        kind = error.kind,
                         onRetry = onRetry,
                     )
                     else -> Unit

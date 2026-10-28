@@ -1,16 +1,11 @@
 package io.paritytech.polkadotapp.feature_dotns_impl.data.contract
 
-import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
-import io.paritytech.polkadotapp.common.utils.flatMapNotNull
 import io.paritytech.polkadotapp.common.utils.flatRecover
-import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.common.utils.mapError
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsResolutionError
 import io.paritytech.polkadotapp.feature_dotns_impl.data.config.DotNsConfigProvider
 import io.paritytech.polkadotapp.feature_dotns_impl.data.contract.abi.EvmContractCaller
 import io.paritytech.polkadotapp.feature_revive_api.NameHash
@@ -29,17 +24,10 @@ class RealDotNsContractApi @Inject constructor(
 
         return dotNsConfigProvider.getDotNsConfig()
             .flatMap { config -> readContentHash(config, dotNsName, callData) }
-            .mapError { DotNsResolutionError.RegistryUnreachable(it) }
-            .flatMap { outputBytes -> decodeContentHash(dotNsName, outputBytes) }
-            .flatMapNotNull(::stripEip1577Prefix)
-    }
-
-    private fun decodeContentHash(dotNsName: String, outputBytes: ByteArray): Result<ByteArray?> {
-        if (outputBytes.isEmpty()) return Result.success(null)
-
-        return runCatching { EvmContractCaller.decodeContentHash(outputBytes) }
-            .logFailure("undecodable content hash answer for $dotNsName")
-            .mapError { DotNsResolutionError.NotFound(dotNsName) }
+            .map { outputBytes ->
+                val contentHash = if (outputBytes.isEmpty()) null else EvmContractCaller.decodeContentHash(outputBytes)
+                contentHash?.let(::stripEip1577Prefix)
+            }
     }
 
     // A name's own resolver serves its records and need not carry a content hash - the hash then
@@ -119,19 +107,15 @@ class RealDotNsContractApi @Inject constructor(
      * identify the storage system. IPFS namespace (0xe3) is uvarint-encoded as 2 bytes: `e3 01`.
      * The remaining bytes are the raw CID.
      */
-    private fun stripEip1577Prefix(contentHash: ByteArray): Result<ByteArray> {
-        if (contentHash.size <= EIP_1577_IPFS_PREFIX.size) return invalidContentHash("Content hash too short")
+    private fun stripEip1577Prefix(contentHash: ByteArray): ByteArray {
+        require(contentHash.size > EIP_1577_IPFS_PREFIX.size) { "Content hash too short" }
 
         val prefix = contentHash.copyOfRange(0, EIP_1577_IPFS_PREFIX.size)
-        if (!prefix.contentEquals(EIP_1577_IPFS_PREFIX)) {
-            return invalidContentHash("Unsupported EIP-1577 prefix: ${prefix.toHexString(withPrefix = true)}")
+        require(prefix.contentEquals(EIP_1577_IPFS_PREFIX)) {
+            "Unsupported EIP-1577 prefix: 0x${prefix.joinToString("") { "%02x".format(it) }}"
         }
 
-        return Result.success(contentHash.copyOfRange(EIP_1577_IPFS_PREFIX.size, contentHash.size))
-    }
-
-    private fun invalidContentHash(reason: String): Result<ByteArray> {
-        return Result.failure(DotNsResolutionError.InvalidContentHash(IllegalArgumentException(reason)))
+        return contentHash.copyOfRange(EIP_1577_IPFS_PREFIX.size, contentHash.size)
     }
 
     companion object {
