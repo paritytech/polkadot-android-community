@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeFragment
-import io.paritytech.polkadotapp.design.utils.ProtectSensitiveScreen
+import io.paritytech.polkadotapp.design.utils.SensitiveScreenEffect
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productPermissions.compose.ProductPermissionsScreen
 
 @AndroidEntryPoint
@@ -13,7 +13,7 @@ class ProductPermissionsFragment : BaseComposeFragment<ProductPermissionsViewMod
 
     @Composable
     override fun Screen() {
-        ProtectSensitiveScreen()
+        SensitiveScreenEffect()
         ProductPermissionsScreen(viewModel)
     }
 }

@@ -7,7 +7,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeBottomSheet
-import io.paritytech.polkadotapp.design.utils.ProtectSensitiveScreen
+import io.paritytech.polkadotapp.design.utils.SensitiveScreenEffect
 import io.paritytech.polkadotapp.feature_products_impl.presentation.paymentRequest.compose.PaymentRequestScreen
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
@@ -28,7 +28,7 @@ class PaymentRequestBottomSheet : BaseComposeBottomSheet<PaymentRequestViewModel
 
     @Composable
     override fun Screen() {
-        ProtectSensitiveScreen()
+        SensitiveScreenEffect()
         CompositionLocalProvider(
             LocalTokenAmountFormatter provides tokenAmountFormatter
         ) {

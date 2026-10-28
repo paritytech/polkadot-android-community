@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeFragment
-import io.paritytech.polkadotapp.design.utils.ProtectSensitiveScreen
+import io.paritytech.polkadotapp.design.utils.SensitiveScreenEffect
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.confirm.compose.ConfirmMnemonicScreen
 
 @AndroidEntryPoint
@@ -13,7 +13,7 @@ class ConfirmMnemonicFragment : BaseComposeFragment<ConfirmMnemonicViewModel>() 
 
     @Composable
     override fun Screen() {
-        ProtectSensitiveScreen()
+        SensitiveScreenEffect()
         ConfirmMnemonicScreen(viewModel)
     }
 }

@@ -49,7 +49,7 @@ fun LockScreenOrientation() {
 private const val UNPROTECTED_SCREEN_MESSAGE = "LocalView parent is not a ViewGroup, the screen is not protected"
 
 @Composable
-fun ProtectSensitiveScreen() {
+fun SensitiveScreenEffect() {
     // AndroidComposeView never runs onFilterTouchEventForSecurity, so the flag goes on the view above it.
     val hostView = LocalView.current.parent as? ViewGroup
 

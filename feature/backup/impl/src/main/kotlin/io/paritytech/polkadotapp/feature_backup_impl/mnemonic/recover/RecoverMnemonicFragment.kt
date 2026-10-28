@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeFragment
-import io.paritytech.polkadotapp.design.utils.ProtectSensitiveScreen
+import io.paritytech.polkadotapp.design.utils.SensitiveScreenEffect
 import io.paritytech.polkadotapp.feature_backup_impl.mnemonic.recover.compose.RecoverMnemonicScreen
 
 @AndroidEntryPoint
@@ -13,7 +13,7 @@ class RecoverMnemonicFragment : BaseComposeFragment<RecoverMnemonicViewModel>() 
 
     @Composable
     override fun Screen() {
-        ProtectSensitiveScreen()
+        SensitiveScreenEffect()
         RecoverMnemonicScreen(viewModel)
     }
 }

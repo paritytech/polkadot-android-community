@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.fragment.app.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import io.paritytech.polkadotapp.common.presentation.screens.BaseComposeBottomSheet
-import io.paritytech.polkadotapp.design.utils.ProtectSensitiveScreen
+import io.paritytech.polkadotapp.design.utils.SensitiveScreenEffect
 import io.paritytech.polkadotapp.feature_sso_impl.presentation.pairRequest.compose.PairRequestScreen
 
 @AndroidEntryPoint
@@ -13,7 +13,7 @@ class PairRequestBottomSheet : BaseComposeBottomSheet<PairRequestViewModel>() {
 
     @Composable
     override fun Screen() {
-        ProtectSensitiveScreen()
+        SensitiveScreenEffect()
         PairRequestScreen(viewModel)
     }
 }
