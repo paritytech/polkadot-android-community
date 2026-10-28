@@ -50,7 +50,7 @@ internal fun WalletLeatherSurface(modifier: Modifier = Modifier) {
     }
 
     Box(modifier = modifier) {
-        // The last lit frame, so a not-yet-drawn surface or the shared-element overlay never shows the page through.
+        // A lit frame, so a not-yet-drawn surface or the shared-element overlay never shows the page through.
         WalletLeatherSnapshot.latest?.let { frame ->
             Image(
                 modifier = Modifier.matchParentSize(),
@@ -74,17 +74,16 @@ internal fun WalletLeatherSurface(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * The most recent frame a wallet surface drew once its light came to rest, shared by every card on screen.
- * Read back once per settle, not per frame, so it costs nothing while the light moves.
- */
 internal object WalletLeatherSnapshot {
     var latest by mutableStateOf<ImageBitmap?>(null)
         private set
 
     private val main = Handler(Looper.getMainLooper())
+    private val firstFrame = FirstFrameSeed(::capture)
 
-    /** On the GL thread, right after a frame that will stay on screen. */
+    fun seed(width: Int, height: Int) = firstFrame.offer(width, height)
+
+    // On the GL thread, while the frame is still in the back buffer.
     fun capture(width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
 
@@ -267,6 +266,8 @@ private class WalletLeatherLoop(
 
         if (resized || (moved && due)) {
             renderer.draw(width, height, valueX, valueY)
+            // A hand-held phone keeps the light moving, so a settle capture may never come.
+            WalletLeatherSnapshot.seed(width, height)
             EGL14.eglSwapBuffers(display, eglSurface)
             drawnWidth = width
             drawnHeight = height
