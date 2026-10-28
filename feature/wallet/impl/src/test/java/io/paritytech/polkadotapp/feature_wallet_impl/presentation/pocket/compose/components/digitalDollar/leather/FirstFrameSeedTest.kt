@@ -14,52 +14,61 @@ import kotlin.concurrent.thread
 class FirstFrameSeedTest {
     @Suppress("UNCHECKED_CAST")
     private val capture = mock(Function2::class.java) as (Int, Int) -> Unit
+
     private val seed = FirstFrameSeed(capture)
 
     @Test
     fun `captures the frame when it is the first sized one`() {
-        seed.offer(990, 618)
+        seed.offer(WIDTH, HEIGHT)
 
-        verifyCapturedOnly(990, 618)
+        verifyCapturedOnly(WIDTH, HEIGHT)
     }
 
     @Test
     fun `does not capture when a frame was already captured`() {
-        seed.offer(990, 618)
-        seed.offer(1080, 674)
+        seed.offer(WIDTH, HEIGHT)
+        seed.offer(OTHER_WIDTH, OTHER_HEIGHT)
 
-        verifyCapturedOnly(990, 618)
+        verifyCapturedOnly(WIDTH, HEIGHT)
     }
 
     @Test
-    fun `captures the next frame when the first one had no size`() {
-        seed.offer(0, 0)
-        seed.offer(990, 618)
+    fun `captures the next frame when the first one had no width`() {
+        seed.offer(0, HEIGHT)
+        seed.offer(WIDTH, HEIGHT)
 
-        verifyCapturedOnly(990, 618)
+        verifyCapturedOnly(WIDTH, HEIGHT)
+    }
+
+    @Test
+    fun `captures the next frame when the first one had no height`() {
+        seed.offer(WIDTH, 0)
+        seed.offer(WIDTH, HEIGHT)
+
+        verifyCapturedOnly(WIDTH, HEIGHT)
     }
 
     @Test
     fun `captures once when two surfaces offer at the same time`() {
-        val firstCapturing = CountDownLatch(1)
-        val secondOffered = CountDownLatch(1)
-        withCaptureHeldUntil(secondOffered, signalling = firstCapturing)
+        offerOtherWhileFirstCaptureIsHeld()
 
-        val first = thread { seed.offer(990, 618) }
-        assertTrue(firstCapturing.await(WAIT_SECONDS, TimeUnit.SECONDS))
-        seed.offer(1080, 674)
-        secondOffered.countDown()
-        first.join(TimeUnit.SECONDS.toMillis(WAIT_SECONDS))
-
-        verifyCapturedOnly(990, 618)
+        verifyCapturedOnly(WIDTH, HEIGHT)
     }
 
-    private fun withCaptureHeldUntil(release: CountDownLatch, signalling: CountDownLatch) {
+    private fun offerOtherWhileFirstCaptureIsHeld() {
+        val firstCapturing = CountDownLatch(1)
+        val otherOffered = CountDownLatch(1)
         whenever(capture(anyInt(), anyInt())).thenAnswer {
-            signalling.countDown()
-            release.await(WAIT_SECONDS, TimeUnit.SECONDS)
+            firstCapturing.countDown()
+            otherOffered.await(WAIT_SECONDS, TimeUnit.SECONDS)
             Unit
         }
+
+        val first = thread { seed.offer(WIDTH, HEIGHT) }
+        assertTrue("the first offer never reached capture", firstCapturing.await(WAIT_SECONDS, TimeUnit.SECONDS))
+        seed.offer(OTHER_WIDTH, OTHER_HEIGHT)
+        otherOffered.countDown()
+        first.join(TimeUnit.SECONDS.toMillis(WAIT_SECONDS))
     }
 
     private fun verifyCapturedOnly(width: Int, height: Int) {
@@ -68,6 +77,10 @@ class FirstFrameSeedTest {
     }
 
     private companion object {
+        const val WIDTH = 990
+        const val HEIGHT = 618
+        const val OTHER_WIDTH = 1080
+        const val OTHER_HEIGHT = 674
         const val WAIT_SECONDS = 2L
     }
 }
