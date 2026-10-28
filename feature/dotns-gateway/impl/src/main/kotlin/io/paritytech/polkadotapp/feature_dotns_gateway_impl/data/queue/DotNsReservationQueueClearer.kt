@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.WeightV2
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.Fraction
 import io.paritytech.polkadotapp.common.utils.Fraction.Companion.percents
@@ -22,7 +23,9 @@ import io.paritytech.polkadotapp.feature_people_api.domain.useCase.ActivePeopleC
 import io.paritytech.polkadotapp.feature_pgas_api.domain.OnExistingAllocationStrategy
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasChainAssetProvider
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasClaimer
+import io.paritytech.polkadotapp.feature_revive_api.EvmAccountId
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
+import io.paritytech.polkadotapp.feature_revive_api.ReviveStorageDepositUnfunded
 import io.paritytech.polkadotapp.feature_revive_api.calls.call
 import io.paritytech.polkadotapp.feature_revive_api.calls.revive
 import io.paritytech.polkadotapp.feature_revive_api.toEvmAccountId
@@ -77,30 +80,77 @@ class DotNsReservationQueueClearer @Inject constructor(
         }
     }
 
+    // The account pays the fee and the storage deposit in PGAS. A PGAS claim funds an account that is short, and it
+    // creates an account the chain has never seen, which maps it. A claim spends one of the day's slots and fixes
+    // nothing else, so any other failure stops before one is spent.
     private suspend fun expireReservation(chain: Chain, who: AccountId, label: String, config: DotNsGatewayConfig): Result<Unit> {
         val input = PopContractCoder.encodeExpireReservation(label).toDataByteArray()
 
         return walletOrigin(chain, who).flatMap { origin ->
-            requireMapped(chain, who).flatMap { reviveContractApi.dryRun(chain.id, who, config.popControllerAddress, input) }.flatMap { dryRun ->
-                val storageDepositLimit = dryRun.storageDeposit.withMargin()
-                val formExtrinsic: FormExtrinsic = {
-                    revive.call(
-                        dest = config.popControllerAddress,
-                        weightLimit = dryRun.weightRequired.withMargin(),
-                        storageDepositLimit = storageDepositLimit,
-                        data = input
-                    )
-                }
+            val clear = QueueClear(chain, origin, who, config.popControllerAddress, input)
 
-                extrinsicService.estimateFee(chain, origin, formExtrinsic = formExtrinsic)
-                    .flatMap { fee -> ensurePgasCovers(who, storageDepositLimit.intoBalance() + fee.amount) }
-                    .flatMap { extrinsicService.submitExtrinsicAndAwaitExecution(chain, origin, formExtrinsic = formExtrinsic).flattenExecutionFailure() }
+            reviveContractApi.isAccountMapped(chain.id, who).flatMap { mapped ->
+                pgasBalance(who).flatMap { held ->
+                    // An account that already holds PGAS exists, and a claim does not map an existing account.
+                    if (!mapped && held > Balance.ZERO) {
+                        Result.failure(DotNsQueueClearAccountUnmappedError())
+                    } else {
+                        price(clear).flatMap { priced ->
+                            if (mapped && priced.limits.funded && held >= priced.cost) Result.success(priced) else fundAndReprice(clear)
+                        }
+                    }
+                }
+            }.flatMap { priced ->
+                extrinsicService.submitExtrinsicAndAwaitExecution(chain, origin, formExtrinsic = priced.formExtrinsic)
+                    .flattenExecutionFailure()
                     .coerceToUnit()
             }
         }
     }
 
-    // A dry-run maps the origin for the length of the simulation, so only storage tells whether a real call would pass.
+    private suspend fun fundAndReprice(clear: QueueClear): Result<PricedClear> {
+        return claimPgas(clear.who)
+            .flatMap { requireMapped(clear.chain, clear.who) }
+            .flatMap { price(clear) }
+            .flatMap { priced ->
+                pgasBalance(clear.who).flatMap { topped ->
+                    if (priced.limits.funded && topped >= priced.cost) {
+                        Result.success(priced)
+                    } else {
+                        Result.failure(DotNsQueueClearPgasShortError(priced.cost, topped))
+                    }
+                }
+            }
+    }
+
+    private suspend fun price(clear: QueueClear): Result<PricedClear> {
+        return dryRunLimits(clear).flatMap { limits ->
+            val formExtrinsic: FormExtrinsic = {
+                revive.call(
+                    dest = clear.controller,
+                    weightLimit = limits.weightRequired.withMargin(),
+                    storageDepositLimit = limits.storageDepositLimit,
+                    data = clear.input
+                )
+            }
+
+            extrinsicService.estimateFee(clear.chain, clear.origin, formExtrinsic = formExtrinsic).map { fee ->
+                PricedClear(limits, formExtrinsic, cost = limits.storageDepositLimit.intoBalance() + fee.amount)
+            }
+        }
+    }
+
+    private suspend fun dryRunLimits(clear: QueueClear): Result<ClearLimits> {
+        val dryRun = reviveContractApi.dryRun(clear.chain.id, clear.who, clear.controller, clear.input)
+        val unfunded = dryRun.exceptionOrNull() as? ReviveStorageDepositUnfunded
+
+        return if (unfunded != null) {
+            Result.success(ClearLimits(unfunded.weightRequired, unfunded.storageDeposit.withMargin(), funded = false))
+        } else {
+            dryRun.map { ClearLimits(it.weightRequired, it.storageDeposit.withMargin(), funded = true) }
+        }
+    }
+
     private suspend fun requireMapped(chain: Chain, who: AccountId): Result<Unit> {
         return reviveContractApi.isAccountMapped(chain.id, who).flatMap { mapped ->
             if (mapped) Result.success(Unit) else Result.failure(DotNsQueueClearAccountUnmappedError())
@@ -110,18 +160,6 @@ class DotNsReservationQueueClearer @Inject constructor(
     private suspend fun walletOrigin(chain: Chain, who: AccountId): Result<TransactionOrigin> {
         return runCancellableCatching { accountRepository.getWalletAccount() }.flatMap { wallet ->
             if (wallet.accountIdIn(chain) == who) Result.success(wallet.asSignedOrigin()) else Result.failure(DotNsClaimantNotWalletError())
-        }
-    }
-
-    private suspend fun ensurePgasCovers(account: AccountId, required: Balance): Result<Unit> {
-        return pgasBalance(account).flatMap { held ->
-            if (held >= required) {
-                Result.success(Unit)
-            } else {
-                claimPgas(account)
-                    .flatMap { pgasBalance(account) }
-                    .flatMap { topped -> if (topped >= required) Result.success(Unit) else Result.failure(DotNsQueueClearPgasShortError(required, topped)) }
-            }
         }
     }
 
@@ -150,3 +188,15 @@ class DotNsReservationQueueClearer @Inject constructor(
         val PGAS_CLAIM_TIMEOUT = 2.minutes
     }
 }
+
+private class QueueClear(
+    val chain: Chain,
+    val origin: TransactionOrigin,
+    val who: AccountId,
+    val controller: EvmAccountId,
+    val input: DataByteArray
+)
+
+private class ClearLimits(val weightRequired: WeightV2, val storageDepositLimit: BigInteger, val funded: Boolean)
+
+private class PricedClear(val limits: ClearLimits, val formExtrinsic: FormExtrinsic, val cost: Balance)

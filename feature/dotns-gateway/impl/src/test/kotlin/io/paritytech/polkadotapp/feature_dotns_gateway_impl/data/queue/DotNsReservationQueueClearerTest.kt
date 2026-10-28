@@ -21,7 +21,9 @@ import io.paritytech.polkadotapp.feature_pgas_api.domain.OnExistingAllocationStr
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasChainAssetProvider
 import io.paritytech.polkadotapp.feature_pgas_api.domain.PgasClaimer
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
+import io.paritytech.polkadotapp.feature_revive_api.ReviveContractReverted
 import io.paritytech.polkadotapp.feature_revive_api.ReviveDryRun
+import io.paritytech.polkadotapp.feature_revive_api.ReviveStorageDepositUnfunded
 import io.paritytech.polkadotapp.feature_revive_api.toEvmAccountId
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicDispatch
 import io.paritytech.polkadotapp.feature_transactions.api.data.ExtrinsicExecutionResult
@@ -128,17 +130,96 @@ class DotNsReservationQueueClearerTest {
         verifyNothingSubmitted()
     }
 
+    // A PGAS claim maps only an account it creates, and an account holding PGAS already exists.
     @Test
-    fun `does not clear from a wallet account without a Revive mapping`() = runBlocking<Unit> {
+    fun `does not clear from an existing wallet account without a Revive mapping`() = runBlocking<Unit> {
         withQueue(holder = OUR_HOLDER, deadInFront = 5)
         withMaxQueueStepsPerCall(BigInteger.valueOf(4))
         withWalletAccount(OUR_ACCOUNT_ID)
-        withClearingCost(mapped = false)
+        withClearingCost(mapped = listOf(false))
+        withPgasBalances(BigInteger.valueOf(1_000))
 
         val result = prepareClaim()
 
         assertTrue("expected DotNsQueueClearAccountUnmappedError but was ${result.exceptionOrNull()}", result.exceptionOrNull() is DotNsQueueClearAccountUnmappedError)
         verifyNotDryRun()
+        verifyNoPgasClaimed()
+        verifyNothingSubmitted()
+    }
+
+    // The chain maps an account when it creates it, and a PGAS claim creates one it has never seen.
+    @Test
+    fun `claims PGAS first for a wallet account the chain has never seen`() = runBlocking<Unit> {
+        withQueue(holder = OUR_HOLDER, deadInFront = 5)
+        withMaxQueueStepsPerCall(BigInteger.valueOf(4))
+        withWalletAccount(OUR_ACCOUNT_ID)
+        withClearingCost(mapped = listOf(false, true))
+        withPgasBalances(BigInteger.ZERO, BigInteger.valueOf(1_000))
+        withSuccessfulPgasClaim()
+        withSuccessfulSubmission()
+
+        assertSuccess(prepareClaim())
+        verifyPgasClaimed()
+        verifyClearingSubmitted()
+    }
+
+    @Test
+    fun `claims PGAS when the dry-run cannot fund the storage deposit`() = runBlocking<Unit> {
+        withQueue(holder = OUR_HOLDER, deadInFront = 5)
+        withMaxQueueStepsPerCall(BigInteger.valueOf(4))
+        withWalletAccount(OUR_ACCOUNT_ID)
+        withClearingCost(dryRuns = listOf(UNFUNDED_DRY_RUN, FUNDED_DRY_RUN))
+        withPgasBalances(BigInteger.valueOf(1_000))
+        withSuccessfulPgasClaim()
+        withSuccessfulSubmission()
+
+        assertSuccess(prepareClaim())
+        verifyPgasClaimed()
+        verifyClearingSubmitted()
+    }
+
+    @Test
+    fun `does not submit when the dry-run after a claim still cannot fund the deposit`() = runBlocking<Unit> {
+        withQueue(holder = OUR_HOLDER, deadInFront = 5)
+        withMaxQueueStepsPerCall(BigInteger.valueOf(4))
+        withWalletAccount(OUR_ACCOUNT_ID)
+        withClearingCost(dryRuns = listOf(UNFUNDED_DRY_RUN))
+        withPgasBalances(BigInteger.valueOf(1_000))
+        withSuccessfulPgasClaim()
+
+        val result = prepareClaim()
+
+        assertTrue("expected DotNsQueueClearPgasShortError but was ${result.exceptionOrNull()}", result.exceptionOrNull() is DotNsQueueClearPgasShortError)
+        verifyNothingSubmitted()
+    }
+
+    // A claim spends one of the day's slots, and funds fix only a deposit the account cannot pay.
+    @Test
+    fun `does not claim PGAS when the dry-run fails for another reason`() = runBlocking<Unit> {
+        withQueue(holder = OUR_HOLDER, deadInFront = 5)
+        withMaxQueueStepsPerCall(BigInteger.valueOf(4))
+        withWalletAccount(OUR_ACCOUNT_ID)
+        withClearingCost(dryRuns = listOf(Result.failure(ReviveContractReverted(DataByteArray.empty()))))
+        withPgasBalances(BigInteger.ZERO)
+
+        assertTrue(prepareClaim().exceptionOrNull() is ReviveContractReverted)
+        verifyNoPgasClaimed()
+        verifyNothingSubmitted()
+    }
+
+    @Test
+    fun `counts the storage deposit in the PGAS the clearing needs`() = runBlocking<Unit> {
+        withQueue(holder = OUR_HOLDER, deadInFront = 5)
+        withMaxQueueStepsPerCall(BigInteger.valueOf(4))
+        withWalletAccount(OUR_ACCOUNT_ID)
+        withClearingCost(dryRuns = listOf(dryRun(deposit = BigInteger.valueOf(1_000))))
+        withPgasBalances(BigInteger.valueOf(1_000), BigInteger.valueOf(1_000))
+        withSuccessfulPgasClaim()
+
+        val result = prepareClaim()
+
+        assertTrue("expected DotNsQueueClearPgasShortError but was ${result.exceptionOrNull()}", result.exceptionOrNull() is DotNsQueueClearPgasShortError)
+        verifyPgasClaimed()
         verifyNothingSubmitted()
     }
 
@@ -189,18 +270,14 @@ class DotNsReservationQueueClearerTest {
         whenever(accountRepository.getWalletAccount()).thenReturn(wallet)
     }
 
-    private fun withClearingCost(mapped: Boolean = true) = runBlocking {
+    private fun withClearingCost(
+        mapped: List<Boolean> = listOf(true),
+        dryRuns: List<Result<ReviveDryRun>> = listOf(FUNDED_DRY_RUN)
+    ) = runBlocking {
         whenever(chain.id).thenReturn(CHAIN_ID)
-        whenever(reviveContractApi.isAccountMapped(CHAIN_ID, OUR_ACCOUNT_ID)).thenReturn(Result.success(mapped))
-        whenever(reviveContractApi.dryRun(eq(CHAIN_ID), eq(OUR_ACCOUNT_ID), eq(CONTROLLER), any())).thenReturn(
-            Result.success(
-                ReviveDryRun(
-                    data = DataByteArray.empty(),
-                    weightRequired = WeightV2(refTime = BigInteger.valueOf(100), proofSize = BigInteger.valueOf(10)),
-                    storageDeposit = BigInteger.ZERO
-                )
-            )
-        )
+        val mappedResults = mapped.map { Result.success(it) }
+        whenever(reviveContractApi.isAccountMapped(CHAIN_ID, OUR_ACCOUNT_ID)).thenReturn(mappedResults.first(), *mappedResults.drop(1).toTypedArray())
+        whenever(reviveContractApi.dryRun(eq(CHAIN_ID), eq(OUR_ACCOUNT_ID), eq(CONTROLLER), any())).thenReturn(dryRuns.first(), *dryRuns.drop(1).toTypedArray())
         val fee: AccountFee = mock()
         whenever(fee.amount).thenReturn(BigInteger.valueOf(500).intoBalance())
         whenever(extrinsicService.estimateFee(any(), any(), any(), any())).thenReturn(Result.success(fee))
@@ -249,6 +326,12 @@ class DotNsReservationQueueClearerTest {
         verify(extrinsicService).submitExtrinsicAndAwaitExecution(any(), any(), any(), any(), any())
     }
 
+    private fun verifyNoPgasClaimed() = runBlocking<Unit> {
+        with(StalenessReportCollector.NoOp) {
+            verify(pgasClaimer, never()).claim(any(), any())
+        }
+    }
+
     private fun verifyPgasClaimed() = runBlocking<Unit> {
         with(StalenessReportCollector.NoOp) {
             verify(pgasClaimer).claim(OUR_ACCOUNT_ID, OnExistingAllocationStrategy.INCREASE)
@@ -267,5 +350,11 @@ class DotNsReservationQueueClearerTest {
         val OTHER_HOLDER: ByteArray = ByteArray(20) { 9 }
         val CONTROLLER: DataByteArray = ByteArray(20) { 4 }.toDataByteArray()
         val CONFIG = DotNsGatewayConfig(popControllerAddress = CONTROLLER, popResolverAddress = ByteArray(20) { 5 }.toDataByteArray())
+        val WEIGHT = WeightV2(refTime = BigInteger.valueOf(100), proofSize = BigInteger.valueOf(10))
+        val FUNDED_DRY_RUN: Result<ReviveDryRun> = dryRun(deposit = BigInteger.ZERO)
+        val UNFUNDED_DRY_RUN: Result<ReviveDryRun> = Result.failure(ReviveStorageDepositUnfunded(WEIGHT, BigInteger.valueOf(100)))
+
+        fun dryRun(deposit: BigInteger): Result<ReviveDryRun> =
+            Result.success(ReviveDryRun(data = DataByteArray.empty(), weightRequired = WEIGHT, storageDeposit = deposit))
     }
 }

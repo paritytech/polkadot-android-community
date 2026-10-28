@@ -19,6 +19,7 @@ class ReviveContractResult(
 class ReviveDryRunResult(
     val weightRequired: WeightV2,
     val storageDeposit: ReviveStorageDeposit,
+    val maxStorageDeposit: ReviveStorageDeposit,
     val result: ScaleResult<ExecReturnValue, DynamicDispatchError>,
 )
 

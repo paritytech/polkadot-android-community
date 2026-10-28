@@ -6,8 +6,10 @@ import io.paritytech.polkadotapp.chains.call.call
 import io.paritytech.polkadotapp.chains.di.RemoteSourceQualifier
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
 import io.paritytech.polkadotapp.chains.network.binding.BlockHash
+import io.paritytech.polkadotapp.chains.network.binding.DispatchError
 import io.paritytech.polkadotapp.chains.network.binding.DynamicDispatchError
 import io.paritytech.polkadotapp.chains.network.binding.ScaleResult
+import io.paritytech.polkadotapp.chains.network.binding.ScaleResultError
 import io.paritytech.polkadotapp.chains.network.binding.WeightV2
 import io.paritytech.polkadotapp.chains.network.binding.mapError
 import io.paritytech.polkadotapp.chains.network.binding.toDispatchError
@@ -25,6 +27,7 @@ import io.paritytech.polkadotapp.feature_revive_api.EvmAccountId
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractApi
 import io.paritytech.polkadotapp.feature_revive_api.ReviveContractReverted
 import io.paritytech.polkadotapp.feature_revive_api.ReviveDryRun
+import io.paritytech.polkadotapp.feature_revive_api.ReviveStorageDepositUnfunded
 import io.paritytech.polkadotapp.feature_revive_api.toEvmAccountId
 import java.math.BigInteger
 import javax.inject.Inject
@@ -69,13 +72,18 @@ class RealReviveContractApi @Inject constructor(
 
             runtimeCallsApi to dryRun
         }.flatMap { (runtimeCallsApi, dryRun) ->
-            dryRun.result.toReturnValue(runtimeCallsApi).map { output ->
-                ReviveDryRun(
-                    data = output.data,
-                    weightRequired = dryRun.weightRequired,
-                    storageDeposit = dryRun.storageDeposit.charged(),
-                )
-            }
+            // A call that refunds after charging still needs its peak charge as the limit.
+            val storageDeposit = maxOf(dryRun.storageDeposit.charged(), dryRun.maxStorageDeposit.charged())
+
+            dryRun.result.toReturnValue(runtimeCallsApi).fold(
+                onSuccess = { output ->
+                    Result.success(ReviveDryRun(data = output.data, weightRequired = dryRun.weightRequired, storageDeposit = storageDeposit))
+                },
+                onFailure = { error ->
+                    val unfunded = error.isUnfundedStorageDeposit()
+                    Result.failure(if (unfunded) ReviveStorageDepositUnfunded(dryRun.weightRequired, storageDeposit) else error)
+                }
+            )
         }
     }
 
@@ -105,6 +113,11 @@ class RealReviveContractApi @Inject constructor(
         "input_data" to input,
     )
 
+    private fun Throwable.isUnfundedStorageDeposit(): Boolean {
+        val dispatchError = (this as? ScaleResultError)?.content as? DispatchError.Module ?: return false
+        return dispatchError.module.name == REVIVE_PALLET && dispatchError.error.name == STORAGE_DEPOSIT_NOT_ENOUGH_FUNDS
+    }
+
     private fun ReviveStorageDeposit.charged(): BigInteger = when (this) {
         is ReviveStorageDeposit.Charge -> value
         is ReviveStorageDeposit.Refund -> BigInteger.ZERO
@@ -117,5 +130,7 @@ class RealReviveContractApi @Inject constructor(
     private companion object {
         const val REVIVE_API = "ReviveApi"
         const val CALL_METHOD = "call"
+        const val REVIVE_PALLET = "Revive"
+        const val STORAGE_DEPOSIT_NOT_ENOUGH_FUNDS = "StorageDepositNotEnoughFunds"
     }
 }

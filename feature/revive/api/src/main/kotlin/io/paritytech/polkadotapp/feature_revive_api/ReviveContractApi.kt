@@ -15,12 +15,19 @@ typealias EvmAccountId = DataByteArray
 data class ReviveDryRun(
     val data: DataByteArray,
     val weightRequired: WeightV2,
-    /** The deposit the call would charge; zero when it would only refund. */
+    /** The deposit the call needs at its peak, which is its storage deposit limit; zero when it only refunds. */
     val storageDeposit: BigInteger,
 )
 
 /** The contract ran and reverted; [data] is what it returned as the reason. */
 class ReviveContractReverted(val data: DataByteArray) : Exception("Contract call reverted")
+
+/**
+ * The origin cannot fund the call's storage deposit. The pallet still reports the limits, and they are the ones a
+ * real call needs once the origin holds enough.
+ */
+class ReviveStorageDepositUnfunded(val weightRequired: WeightV2, val storageDeposit: BigInteger) :
+    Exception("The origin cannot fund the call's storage deposit")
 
 interface ReviveContractApi {
     /**
@@ -35,7 +42,8 @@ interface ReviveContractApi {
     ): Result<DataByteArray>
 
     /**
-     * Simulates [input] as [origin] would send it. A revert fails with [ReviveContractReverted].
+     * Simulates [input] as [origin] would send it. A revert fails with [ReviveContractReverted], and an origin that
+     * cannot fund the storage deposit with [ReviveStorageDepositUnfunded].
      *
      * The origin matters: limits simulated from any other account describe a different call.
      */
