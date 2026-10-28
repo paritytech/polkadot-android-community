@@ -98,6 +98,9 @@ interface FileDownloadDao {
     @Query("SELECT EXISTS(SELECT 1 FROM file_downloads WHERE messageId = :messageId AND status = 'IN_PROGRESS')")
     suspend fun isInProgress(messageId: String): Boolean
 
+    @Query("SELECT EXISTS(SELECT 1 FROM file_downloads WHERE messageId = :messageId AND status IN ('PENDING', 'IN_PROGRESS'))")
+    suspend fun isPendingOrInProgress(messageId: String): Boolean
+
     @Query("UPDATE file_downloads SET status = 'CANCELLED' WHERE messageId = :messageId")
     suspend fun markCancelled(messageId: String)
 

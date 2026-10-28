@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.common.utils.childScope
 import io.paritytech.polkadotapp.common.utils.compareTo
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.storage.SyncUpdateIdProvider
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileTransfer
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.session.OwnDeviceSession
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SyncPeerChannelSignaling
 import io.paritytech.polkadotapp.feature_sso_api.domain.OwnDevicesJournal
@@ -46,6 +47,7 @@ class DeviceSyncEngine(
     private val collector: SyncEntityCollector,
     private val applier: SyncEntityApplier,
     private val localSyncTrigger: LocalSyncTrigger,
+    private val fileTransferFactory: SyncFileTransfer.Factory,
     private val scope: CoroutineScope,
 ) {
     private companion object {
@@ -142,7 +144,11 @@ class DeviceSyncEngine(
         when (channel.awaitOpenOutcome()) {
             OpenOutcome.OPENED -> {
                 Timber.i("DeviceSyncEngine: data channel up with ${session.peer.id}")
-                runner.run(channel)
+                val fileTransfer = fileTransferFactory.create(channel.dataTransport, session.peer.id)
+                raceUntilFirst(
+                    { runner.run(channel) },
+                    { fileTransfer.run() },
+                )
             }
 
             OpenOutcome.TERMINAL ->
