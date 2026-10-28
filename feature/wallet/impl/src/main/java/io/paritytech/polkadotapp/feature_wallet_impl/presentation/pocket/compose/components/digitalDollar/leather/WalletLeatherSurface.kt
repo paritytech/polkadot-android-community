@@ -35,6 +35,7 @@ import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.exp
 
@@ -79,9 +80,11 @@ internal object WalletLeatherSnapshot {
         private set
 
     private val main = Handler(Looper.getMainLooper())
-    private val firstFrame = FirstFrameSeed(::capture)
+    private val seeded = AtomicBoolean(false)
 
-    fun seed(width: Int, height: Int) = firstFrame.offer(width, height)
+    fun seed(width: Int, height: Int) {
+        if (width > 0 && height > 0 && seeded.compareAndSet(false, true)) capture(width, height)
+    }
 
     // On the GL thread, while the frame is still in the back buffer.
     fun capture(width: Int, height: Int) {
