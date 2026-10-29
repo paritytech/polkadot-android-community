@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 71,
-    "identityHash": "ceb25ef79755aeafe1deb488944d6f3c",
+    "identityHash": "08a18e56699e92a560e75c722cefcb74",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -3114,7 +3114,7 @@
       },
       {
         "tableName": "chat_seen_states",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `peerSeenOrder` INTEGER NOT NULL, PRIMARY KEY(`contactAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `peerSeenOrder` INTEGER NOT NULL, `deliveredSeenMessageId` TEXT, PRIMARY KEY(`contactAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "contactAccountId",
@@ -3127,6 +3127,11 @@
             "columnName": "peerSeenOrder",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "deliveredSeenMessageId",
+            "columnName": "deliveredSeenMessageId",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -3152,7 +3157,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ceb25ef79755aeafe1deb488944d6f3c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '08a18e56699e92a560e75c722cefcb74')"
     ]
   }
 }

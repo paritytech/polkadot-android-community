@@ -60,7 +60,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import javax.inject.Inject
-import javax.inject.Provider
 import javax.inject.Singleton
 
 private data class SessionCreatorWithAccount(
@@ -115,7 +114,7 @@ internal class RealContactChatSessionManager @Inject constructor(
     private val proverFactory: StatementStoreMessageProver.Factory,
     private val chatSigners: ContactChatSigners,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
-    private val seenMessageHandlerProvider: Provider<SeenMessageHandler>,
+    private val seenMessageHandler: SeenMessageHandler,
     dispatchers: CoroutineDispatchers
 ) : ContactChatSessionManager, ContactChatSessionRestarter, CoroutineScope, ChatSessionCallbacks {
     companion object {
@@ -295,7 +294,7 @@ internal class RealContactChatSessionManager @Inject constructor(
             syncContactUsernameUseCase = syncContactUsernameUseCase,
             incomingChatMessageProcessor = incomingChatMessageProcessor,
             notificationPayloadEncoder = notificationPayloadEncoder,
-            seenMessageHandler = seenMessageHandlerProvider.get(),
+            seenMessageHandler = seenMessageHandler,
         )
 
         syncIncomingPushId(chatSession, contact)

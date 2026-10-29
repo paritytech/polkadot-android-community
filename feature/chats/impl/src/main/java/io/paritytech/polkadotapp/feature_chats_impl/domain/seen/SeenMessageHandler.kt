@@ -6,7 +6,6 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatActiveTracker
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.decodeSeenMessageId
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedSeenMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
@@ -31,9 +30,6 @@ class SeenMessageHandler @Inject constructor(
     private val chatSeenRepository: ChatSeenRepository,
     private val chatActiveTracker: ChatActiveTracker,
 ) {
-    @Volatile
-    private var deliveredSeenMessageId: ChatMessageId? = null
-
     suspend fun saveReceived(messages: List<EncodedMessage>, contactAccountId: AccountId) {
         val contact = contactsRepository.getContact(contactAccountId) ?: return
         if (contact.isBlocked) return
@@ -45,8 +41,11 @@ class SeenMessageHandler @Inject constructor(
         }
     }
 
-    fun saveDelivered(messages: List<EncodedMessage>) {
-        messages.mapNotNull { it.decodeSeenMessageId() }.lastOrNull()?.let { deliveredSeenMessageId = it }
+    suspend fun saveDelivered(messages: List<EncodedMessage>, contactAccountId: AccountId) {
+        val messageId = messages.mapNotNull { it.decodeSeenMessageId() }.lastOrNull() ?: return
+
+        runCancellableCatching { chatSeenRepository.saveDeliveredSeen(ChatId.fromContact(contactAccountId), messageId) }
+            .logFailure("Failed to save a delivered seen message to $contactAccountId")
     }
 
     fun sendSeenMessages(contactAccountId: AccountId, send: (EncodedMessage) -> Unit): Flow<*> {
@@ -69,7 +68,9 @@ class SeenMessageHandler @Inject constructor(
         val contact = contactsRepository.getContact(contactAccountId) ?: return null
         if (!contact.isActiveChat()) return null
 
-        val message = chatSeenRepository.subscribeLastReadIncomingMessage(ChatId.fromContact(contactAccountId)).first()
-        return message?.takeIf { !it.id.equals(deliveredSeenMessageId, ignoreCase = true) }
+        val chatId = ChatId.fromContact(contactAccountId)
+        val message = chatSeenRepository.subscribeLastReadIncomingMessage(chatId).first() ?: return null
+        val deliveredMessageId = chatSeenRepository.getDeliveredSeenMessageId(chatId)
+        return message.takeIf { !it.id.equals(deliveredMessageId, ignoreCase = true) }
     }
 }

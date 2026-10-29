@@ -24,6 +24,10 @@ private val DISPLAYABLE_MESSAGE_TYPES = listOf(
 interface ChatSeenRepository {
     suspend fun saveReceivedSeen(chatId: ChatId, messageId: ChatMessageId)
 
+    suspend fun saveDeliveredSeen(chatId: ChatId, messageId: ChatMessageId)
+
+    suspend fun getDeliveredSeenMessageId(chatId: ChatId): ChatMessageId?
+
     fun subscribeLastReadIncomingMessage(chatId: ChatId): Flow<LastReadMessage?>
 
     fun subscribeSeenOutgoingMessageIds(chatId: ChatId): Flow<Set<ChatMessageId>>
@@ -36,6 +40,14 @@ class RealChatSeenRepository @Inject constructor(
         val order = dao.getOutgoingOrder(chatId.toLocal(), messageId) ?: return
 
         dao.raisePeerSeenOrder(chatId.toLocal(), order)
+    }
+
+    override suspend fun saveDeliveredSeen(chatId: ChatId, messageId: ChatMessageId) {
+        dao.saveDeliveredSeenMessageId(chatId.toLocal(), messageId)
+    }
+
+    override suspend fun getDeliveredSeenMessageId(chatId: ChatId): ChatMessageId? {
+        return dao.getDeliveredSeenMessageId(chatId.toLocal())
     }
 
     override fun subscribeLastReadIncomingMessage(chatId: ChatId): Flow<LastReadMessage?> {

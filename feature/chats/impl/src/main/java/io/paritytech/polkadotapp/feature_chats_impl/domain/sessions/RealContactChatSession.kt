@@ -234,7 +234,7 @@ class RealContactChatSession(
     private suspend fun handleResponseReceived(
         messages: List<EncodedMessage>
     ) {
-        seenMessageHandler.saveDelivered(messages)
+        seenMessageHandler.saveDelivered(messages, contact.accountId)
 
         for (encodedMessage in messages) {
             val versionedMessage = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue

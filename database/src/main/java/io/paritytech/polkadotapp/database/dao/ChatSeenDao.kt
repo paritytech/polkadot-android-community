@@ -12,11 +12,30 @@ abstract class ChatSeenDao {
 
     @Query(
         """
-        INSERT OR REPLACE INTO chat_seen_states (contactAccountId, peerSeenOrder)
-        VALUES (:contactAccountId, MAX(:order, COALESCE((SELECT peerSeenOrder FROM chat_seen_states WHERE contactAccountId = :contactAccountId), 0)))
+        INSERT OR REPLACE INTO chat_seen_states (contactAccountId, peerSeenOrder, deliveredSeenMessageId)
+        VALUES (
+            :contactAccountId,
+            MAX(:order, COALESCE((SELECT peerSeenOrder FROM chat_seen_states WHERE contactAccountId = :contactAccountId), 0)),
+            (SELECT deliveredSeenMessageId FROM chat_seen_states WHERE contactAccountId = :contactAccountId)
+        )
         """
     )
     abstract suspend fun raisePeerSeenOrder(contactAccountId: ByteArray, order: Long)
+
+    @Query(
+        """
+        INSERT OR REPLACE INTO chat_seen_states (contactAccountId, peerSeenOrder, deliveredSeenMessageId)
+        VALUES (
+            :contactAccountId,
+            COALESCE((SELECT peerSeenOrder FROM chat_seen_states WHERE contactAccountId = :contactAccountId), 0),
+            :messageId
+        )
+        """
+    )
+    abstract suspend fun saveDeliveredSeenMessageId(contactAccountId: ByteArray, messageId: String)
+
+    @Query("SELECT deliveredSeenMessageId FROM chat_seen_states WHERE contactAccountId = :contactAccountId")
+    abstract suspend fun getDeliveredSeenMessageId(contactAccountId: ByteArray): String?
 
     @Query(
         """
