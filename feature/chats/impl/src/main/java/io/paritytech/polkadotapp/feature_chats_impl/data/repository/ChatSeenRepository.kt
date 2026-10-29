@@ -1,19 +1,17 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.repository
 
-import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.Timestamp
 import io.paritytech.polkadotapp.database.dao.ChatSeenDao
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocal
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.LastSeenIncomingMessage
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.MessagePosition
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenWatermarkState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-private val COUNTED_MESSAGE_TYPES = listOf(
+private val DISPLAYABLE_MESSAGE_TYPES = listOf(
     ChatMessageLocal.Type.TEXT,
     ChatMessageLocal.Type.RICH_TEXT,
     ChatMessageLocal.Type.PAYMENT,
@@ -25,19 +23,17 @@ private val COUNTED_MESSAGE_TYPES = listOf(
 )
 
 interface ChatSeenRepository {
-    suspend fun getOutgoingSortOrder(chatId: ChatId, messageId: ChatMessageId): Long?
+    suspend fun getOutgoingOrder(chatId: ChatId, messageId: ChatMessageId): Long?
 
-    suspend fun getLatestPostedOutgoingSortOrder(chatId: ChatId, upTo: Timestamp): Long?
+    suspend fun getOutgoingOrderAtOrBefore(chatId: ChatId, timestamp: Timestamp): Long?
 
-    suspend fun raisePeerSeenSortOrder(contactAccountId: AccountId, sortOrder: Long)
+    suspend fun raisePeerSeenOrder(chatId: ChatId, order: Long)
 
-    suspend fun getIncomingSortOrder(chatId: ChatId, messageId: ChatMessageId): Long?
+    fun subscribeSeenWatermarkState(chatId: ChatId): Flow<SeenWatermarkState?>
 
-    fun subscribeLastSeenIncomingMessage(chatId: ChatId): Flow<LastSeenIncomingMessage?>
+    suspend fun getIncomingOrder(chatId: ChatId, messageId: ChatMessageId): Long?
 
-    suspend fun getLastSentSeen(contactAccountId: AccountId): MessagePosition?
-
-    suspend fun raiseLastSentSeen(contactAccountId: AccountId, position: MessagePosition)
+    suspend fun raiseLastSentSeen(chatId: ChatId, order: Long, timestamp: Timestamp)
 
     fun subscribeSeenOutgoingMessageIds(chatId: ChatId): Flow<Set<ChatMessageId>>
 }
@@ -45,36 +41,40 @@ interface ChatSeenRepository {
 class RealChatSeenRepository @Inject constructor(
     private val dao: ChatSeenDao,
 ) : ChatSeenRepository {
-    override suspend fun getOutgoingSortOrder(chatId: ChatId, messageId: ChatMessageId): Long? {
-        return dao.getOutgoingSortOrder(chatId.toLocal(), messageId)
+    override suspend fun getOutgoingOrder(chatId: ChatId, messageId: ChatMessageId): Long? {
+        return dao.getOutgoingOrder(chatId.toLocal(), messageId)
     }
 
-    override suspend fun getLatestPostedOutgoingSortOrder(chatId: ChatId, upTo: Timestamp): Long? {
-        return dao.getLatestPostedOutgoingSortOrder(chatId.toLocal(), upTo)
+    override suspend fun getOutgoingOrderAtOrBefore(chatId: ChatId, timestamp: Timestamp): Long? {
+        return dao.getOutgoingOrderAtOrBefore(chatId.toLocal(), timestamp)
     }
 
-    override suspend fun raisePeerSeenSortOrder(contactAccountId: AccountId, sortOrder: Long) {
-        dao.raisePeerSeenSortOrder(contactAccountId.value, sortOrder)
+    override suspend fun raisePeerSeenOrder(chatId: ChatId, order: Long) {
+        dao.raisePeerSeenOrder(chatId.toLocal(), order)
     }
 
-    override suspend fun getIncomingSortOrder(chatId: ChatId, messageId: ChatMessageId): Long? {
-        return dao.getIncomingSortOrder(chatId.toLocal(), messageId)
-    }
+    override fun subscribeSeenWatermarkState(chatId: ChatId): Flow<SeenWatermarkState?> {
+        return dao.subscribeSeenWatermarkCandidate(chatId.toLocal(), DISPLAYABLE_MESSAGE_TYPES).map { candidate ->
+            candidate?.let {
+                val seenState = dao.getSeenState(chatId.toLocal())
 
-    override fun subscribeLastSeenIncomingMessage(chatId: ChatId): Flow<LastSeenIncomingMessage?> {
-        return dao.subscribeLastSeenIncomingMessage(chatId.toLocal(), COUNTED_MESSAGE_TYPES).map { message ->
-            message?.let { LastSeenIncomingMessage(it.id, MessagePosition(it.sortOrder, it.timestamp)) }
+                SeenWatermarkState(
+                    messageId = it.id,
+                    order = it.sortOrder,
+                    timestamp = it.timestamp,
+                    lastSentOrder = seenState?.lastSentSeenOrder ?: 0,
+                    lastSentTimestamp = seenState?.lastSentSeenTimestamp ?: 0,
+                )
+            }
         }
     }
 
-    override suspend fun getLastSentSeen(contactAccountId: AccountId): MessagePosition? {
-        return dao.getSeenState(contactAccountId.value)?.let {
-            MessagePosition(it.lastSentSeenSortOrder, it.lastSentSeenTimestamp)
-        }
+    override suspend fun getIncomingOrder(chatId: ChatId, messageId: ChatMessageId): Long? {
+        return dao.getIncomingOrder(chatId.toLocal(), messageId)
     }
 
-    override suspend fun raiseLastSentSeen(contactAccountId: AccountId, position: MessagePosition) {
-        dao.raiseLastSentSeen(contactAccountId.value, position.sortOrder, position.timestamp)
+    override suspend fun raiseLastSentSeen(chatId: ChatId, order: Long, timestamp: Timestamp) {
+        dao.raiseLastSentSeen(chatId.toLocal(), order, timestamp)
     }
 
     override fun subscribeSeenOutgoingMessageIds(chatId: ChatId): Flow<Set<ChatMessageId>> {

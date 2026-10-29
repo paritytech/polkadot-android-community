@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 71,
-    "identityHash": "214d6a8964c384e77bfc60ca63f787da",
+    "identityHash": "90252ed7ff334d628ee94da0f33c1e01",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -3114,7 +3114,7 @@
       },
       {
         "tableName": "chat_seen_states",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `peerSeenSortOrder` INTEGER NOT NULL, `lastSentSeenSortOrder` INTEGER NOT NULL, `lastSentSeenTimestamp` INTEGER NOT NULL, PRIMARY KEY(`contactAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `peerSeenOrder` INTEGER NOT NULL, `lastSentSeenOrder` INTEGER NOT NULL, `lastSentSeenTimestamp` INTEGER NOT NULL, PRIMARY KEY(`contactAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "contactAccountId",
@@ -3123,14 +3123,14 @@
             "notNull": true
           },
           {
-            "fieldPath": "peerSeenSortOrder",
-            "columnName": "peerSeenSortOrder",
+            "fieldPath": "peerSeenOrder",
+            "columnName": "peerSeenOrder",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "lastSentSeenSortOrder",
-            "columnName": "lastSentSeenSortOrder",
+            "fieldPath": "lastSentSeenOrder",
+            "columnName": "lastSentSeenOrder",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -3164,7 +3164,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '214d6a8964c384e77bfc60ca63f787da')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '90252ed7ff334d628ee94da0f33c1e01')"
     ]
   }
 }
