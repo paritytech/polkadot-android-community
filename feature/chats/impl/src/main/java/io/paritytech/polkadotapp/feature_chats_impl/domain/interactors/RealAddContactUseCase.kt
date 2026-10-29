@@ -75,7 +75,7 @@ class RealAddContactUseCase @Inject constructor(
         )
 
         Timber.i("addContact: recording chat request to ${contact.accountId} for background delivery")
-        createPendingContactChat(contact, newOutgoingChatRequest(), welcomeMessage)
+        createPendingContactChat(contact, newOutgoingChatRequest(contact.accountId), welcomeMessage)
     }
 
     override suspend fun addAlreadyEstablishedContactsById(accountIds: List<AccountId>): Result<Unit> {

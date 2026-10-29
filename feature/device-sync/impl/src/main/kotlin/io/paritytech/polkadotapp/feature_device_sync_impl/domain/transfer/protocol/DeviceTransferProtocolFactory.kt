@@ -22,7 +22,7 @@ class DeviceTransferProtocolFactory @Inject constructor(
 
     suspend fun createSender(): Result<DeviceTransferSender> = runCancellableCatching {
         val snapshot = collector.collect(Instant.fromEpochMilliseconds(0))
-            .filter { it is SyncEntityScale.ChatsAdded || it is SyncEntityScale.Messages }
+            .filterNot { it is SyncEntityScale.Devices || it is SyncEntityScale.ChatsRemoved }
         val timePoint = timeProvider.now().toEpochMilliseconds().toULong()
         val updates = chunker.chunk(snapshot).mapIndexed { index, entities ->
             SyncUpdateScale(id = (index + 1).toUInt(), entities = entities, timePoint = timePoint)

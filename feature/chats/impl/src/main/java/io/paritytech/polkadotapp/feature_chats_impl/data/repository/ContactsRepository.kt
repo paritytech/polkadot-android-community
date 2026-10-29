@@ -29,6 +29,10 @@ interface ContactsRepository {
     /** Established contacts (`establishedAt != null && > after`). Used for device-sync. */
     suspend fun getEstablishedAfter(after: Instant): List<Contact>
 
+    suspend fun getBlockedContacts(): List<Contact>
+
+    suspend fun getBlockChangedAfter(after: Instant): List<Contact>
+
     fun subscribeContacts(): Flow<List<Contact>>
     fun subscribeContact(accountId: AccountId): Flow<Contact?>
 
@@ -113,6 +117,14 @@ class RealContactsRepository @Inject constructor(
         return dao.getEstablishedAfter(after.toEpochMilliseconds()).map { it.toDomain() }
     }
 
+    override suspend fun getBlockedContacts(): List<Contact> {
+        return dao.getBlocked().map { it.toDomain() }
+    }
+
+    override suspend fun getBlockChangedAfter(after: Instant): List<Contact> {
+        return dao.getBlockChangedAfter(after.toEpochMilliseconds()).map { it.toDomain() }
+    }
+
     override fun subscribeContacts(): Flow<List<Contact>> {
         return dao.subscribeAll()
             .map { contacts -> contacts.map { it.toDomain() } }
@@ -172,7 +184,7 @@ class RealContactsRepository @Inject constructor(
     }
 
     override suspend fun setBlocked(accountId: AccountId, isBlocked: Boolean) {
-        dao.updateIsBlocked(accountId.value, isBlocked)
+        dao.updateIsBlocked(accountId.value, isBlocked, changedAt = System.currentTimeMillis())
     }
 
     override fun subscribeBlockedContacts(): Flow<List<Contact>> {

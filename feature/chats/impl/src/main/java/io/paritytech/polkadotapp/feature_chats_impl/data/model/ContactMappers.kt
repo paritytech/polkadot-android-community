@@ -59,6 +59,7 @@ fun Contact.toLocal(): ContactLocal {
         pendingDevicesFanOut = pendingDevicesFanOut,
         addedAt = addedAt.toEpochMilliseconds(),
         establishedAt = establishedAt?.toEpochMilliseconds(),
+        blockChangedAt = null,
     )
 }
 

@@ -18,7 +18,9 @@ private const val CONTACT_WITH_REQUEST_COLUMNS = """
             chat_requests.status as request_status,
             chat_requests.deliveryStatus as request_deliveryStatus,
             chat_requests.deliveredVia as request_deliveredVia,
-            chat_requests.lastDeliveredPeriod as request_lastDeliveredPeriod
+            chat_requests.lastDeliveredPeriod as request_lastDeliveredPeriod,
+            chat_requests.peerAccountId as request_peerAccountId,
+            chat_requests.statusChangedAt as request_statusChangedAt
 """
 
 @Dao
@@ -49,6 +51,12 @@ abstract class ContactDao {
 
     @Query("SELECT * FROM contacts WHERE isBlocked = 1")
     abstract fun subscribeBlocked(): Flow<List<ContactLocal>>
+
+    @Query("SELECT * FROM contacts WHERE isBlocked = 1")
+    abstract suspend fun getBlocked(): List<ContactLocal>
+
+    @Query("SELECT * FROM contacts WHERE blockChangedAt > :after")
+    abstract suspend fun getBlockChangedAfter(after: Long): List<ContactLocal>
 
     @Query("SELECT EXISTS (SELECT 1 FROM contacts WHERE isBlocked = 1)")
     abstract fun subscribeHasBlockedContacts(): Flow<Boolean>
@@ -82,8 +90,8 @@ abstract class ContactDao {
     @Query("UPDATE contacts SET isPeerLeft = :isLeft WHERE accountId = :accountId")
     abstract suspend fun updatePeerLeft(accountId: ByteArray, isLeft: Boolean)
 
-    @Query("UPDATE contacts SET isBlocked = :isBlocked WHERE accountId = :accountId")
-    abstract suspend fun updateIsBlocked(accountId: ByteArray, isBlocked: Boolean)
+    @Query("UPDATE contacts SET isBlocked = :isBlocked, blockChangedAt = :changedAt WHERE accountId = :accountId")
+    abstract suspend fun updateIsBlocked(accountId: ByteArray, isBlocked: Boolean, changedAt: Long)
 
     @Query("UPDATE contacts SET voipPushToken = :voipPushToken WHERE accountId = :accountId")
     abstract suspend fun updateVoipPushToken(accountId: ByteArray, voipPushToken: ByteArray)
