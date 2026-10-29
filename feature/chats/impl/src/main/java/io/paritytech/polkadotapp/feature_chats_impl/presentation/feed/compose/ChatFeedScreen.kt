@@ -322,7 +322,7 @@ private fun ChatFeedPreview() {
                                     direction = ChatMessageUiModel.Direction.OUTGOING,
                                     text = "Hi there!",
                                     timestamp = 1625247600000,
-                                    status = ChatMessageUiModel.Status.READ,
+                                    status = ChatMessageUiModel.Status.SEEN,
                                     reactions = persistentListOf(),
                                     origin = ChatMessageOrigin.User,
                                     replyPreview = null,

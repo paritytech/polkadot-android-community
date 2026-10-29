@@ -41,6 +41,7 @@ import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.Versione
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VideoFileMeta
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.DeviceInfo
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
+import java.util.UUID
 
 fun ChatMessage.toEncodedMessage(): Result<EncodedMessage> {
     return toStatementStoreMessage()
@@ -68,6 +69,22 @@ fun EncodedMessage.decodeChatMessageStatement(): Result<ChatMessageStatement> {
 fun EncodedMessage.isDeviceChatAccepted(): Boolean {
     val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return false
     return versioned.message.content is ChatMessageStatementContent.DeviceChatAccepted
+}
+
+fun EncodedMessage.decodeSeenContent(): ChatMessageStatementContent.Seen? {
+    val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return null
+    return versioned.message.content as? ChatMessageStatementContent.Seen
+}
+
+fun EncodedMessage.isSeen(): Boolean = decodeSeenContent() != null
+
+fun ChatMessageStatementContent.Seen.toEncodedMessage(): Result<EncodedMessage> {
+    val message = ChatMessageStatement(
+        id = UUID.randomUUID().toString(),
+        timestamp = System.currentTimeMillis().toULong(),
+        versioned = VersionedChatMessage.V1(ChatMessageV1(this))
+    )
+    return BinaryScale.encodeToByteArrayCatching(message)
 }
 
 fun EncodedMessage.decodeAlwaysDecodableChatMessagePart(): Result<AlwaysDecodableChatMessagePart> {
@@ -212,6 +229,8 @@ internal fun ChatMessageStatementContent.toChatMessageContent(): ChatMessage.Con
             claimTicket = HopTicket.fromRaw(claimTicket),
             nodeUrl = node.toNodeUrl()
         )
+
+        is ChatMessageStatementContent.Seen -> error("Seen messages are filtered out before they become chat messages")
     }
 }
 

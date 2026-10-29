@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSession
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.*
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.decodeAlwaysDecodableChatMessagePart
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotificationPayloadEncoder
@@ -17,6 +18,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageR
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
@@ -51,6 +53,7 @@ class RealContactChatSession(
     private val syncContactUsernameUseCase: SyncContactUsernameUseCase,
     private val incomingChatMessageProcessor: IncomingChatMessageProcessor,
     private val notificationPayloadEncoder: ChatNotificationPayloadEncoder,
+    private val seenMessageSender: SeenMessageSender,
 ) : ContactChatSession, CoroutineScope by scope {
     private val mainCommunicationSession get() = communicationSessions.main
 
@@ -79,6 +82,7 @@ class RealContactChatSession(
 
         subscribeMessagesUpdates()
         subscribeUsernameUpdates()
+        subscribeSeenUpdates()
 
         launch { tryReparseUnsupportedMessages() }
     }
@@ -86,6 +90,11 @@ class RealContactChatSession(
     private fun subscribeUsernameUpdates() {
         syncContactUsernameUseCase.sync(contact.accountId)
             .logFailure("Failed to sync username for contact ${contact.accountId}")
+            .launchIn(this)
+    }
+
+    private fun subscribeSeenUpdates() {
+        seenMessageSender.sendOnAdvance(contact.accountId, mainCommunicationSession::sendMessage)
             .launchIn(this)
     }
 
@@ -199,6 +208,7 @@ class RealContactChatSession(
         for (unsupportedMessage in unsupportedMessages) {
             val rawContent = (unsupportedMessage.content as? ChatMessage.Content.Unsupported)?.rawContent
                 ?: continue
+            if (rawContent.isSeen()) continue
 
             val parsedMessage = rawContent.toChatMessage(
                 authorAccountId = mainCommunicationSession.remoteAccount.accountId,
@@ -222,7 +232,10 @@ class RealContactChatSession(
     private suspend fun handleResponseReceived(
         messages: List<EncodedMessage>
     ) {
-        for (encodedMessage in messages) {
+        val (seenMessages, chatMessages) = messages.partition { it.isSeen() }
+        seenMessageSender.recordDelivered(contact.accountId, seenMessages)
+
+        for (encodedMessage in chatMessages) {
             val versionedMessage = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messageId = versionedMessage.id,
@@ -237,7 +250,7 @@ class RealContactChatSession(
     private suspend fun handleMessagesSentSuccessfully(
         messages: List<EncodedMessage>
     ) {
-        for (encodedMessage in messages) {
+        for (encodedMessage in messages.filterNot { it.isSeen() }) {
             val messagePart = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messagePart.id,

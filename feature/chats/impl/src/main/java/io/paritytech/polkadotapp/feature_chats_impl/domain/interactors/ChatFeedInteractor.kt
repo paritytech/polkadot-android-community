@@ -47,6 +47,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadSt
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotificationPublisher
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileUploadRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getContactResult
@@ -103,6 +104,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private val hopNodeUrlProvider: HopNodeUrlProvider,
     private val chatSigners: ContactChatSigners,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
+    private val chatSeenRepository: ChatSeenRepository,
 ) {
     fun initiateCall(chatId: ChatId, callerName: String, withVideo: Boolean): InitiateCallResult {
         val activeCall = callStateTracker.getActiveCall()
@@ -180,6 +182,10 @@ class ChatFeedInteractor @Inject internal constructor(
     }
 
     fun subscribeMessages(chatId: ChatId) = chatEngine.subscribeMessagesFeed(chatId)
+
+    fun subscribeSeenMessageIds(chatId: ChatId): Flow<Set<ChatMessageId>> {
+        return chatSeenRepository.subscribeSeenOutgoingMessageIds(chatId).inBackground()
+    }
 
     suspend fun sendTextMessage(
         chatId: ChatId,

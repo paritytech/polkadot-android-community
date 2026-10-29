@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.onTokenContent
 import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionStarter
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.download.FileDownloadStarter
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessageOrUnsupported
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -31,6 +32,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileDownload
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.IncomingSeenProcessor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import timber.log.Timber
@@ -47,6 +49,7 @@ class IncomingChatMessageProcessor @Inject constructor(
     private val compactionExpansionStarter: CompactionExpansionStarter,
     private val fallbackUsernameGenerator: FallbackUsernameGenerator,
     private val chatSigners: ContactChatSigners,
+    private val incomingSeenProcessor: IncomingSeenProcessor,
 ) {
     suspend fun processRaw(
         contactAccountId: AccountId,
@@ -59,7 +62,10 @@ class IncomingChatMessageProcessor @Inject constructor(
             return
         }
 
-        val parsedMessages = rawMessages.mapNotNull { encodedMessage ->
+        val (seenMessages, chatMessages) = rawMessages.partition { it.isSeen() }
+        incomingSeenProcessor.process(contact, seenMessages)
+
+        val parsedMessages = chatMessages.mapNotNull { encodedMessage ->
             encodedMessage.toChatMessageOrUnsupported(
                 authorAccountId = contactAccountId,
                 contactAccountId = contactAccountId,

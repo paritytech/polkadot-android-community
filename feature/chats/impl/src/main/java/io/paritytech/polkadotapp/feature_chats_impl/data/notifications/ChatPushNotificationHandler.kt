@@ -23,6 +23,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.Incoming
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.StrippedChatPushContent
 import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionStarter
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessageOrUnsupported
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -144,7 +145,7 @@ internal class ChatPushNotificationHandler @Inject constructor(
 
         if (encodedMessages.isEmpty()) return
 
-        val chatMessages = encodedMessages.mapNotNull { encoded ->
+        val chatMessages = encodedMessages.filterNot { it.isSeen() }.mapNotNull { encoded ->
             encoded.toChatMessageOrUnsupported(
                 authorAccountId = contact.accountId,
                 contactAccountId = contact.accountId,

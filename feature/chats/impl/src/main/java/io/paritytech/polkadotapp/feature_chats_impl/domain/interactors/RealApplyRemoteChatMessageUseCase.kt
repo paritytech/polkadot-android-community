@@ -16,6 +16,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.onEdited
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.onReacted
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.onReactionRemoved
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.onTokenContent
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessageOrUnsupported
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.AlwaysFailCustomContentDecoder
@@ -47,6 +48,8 @@ class RealApplyRemoteChatMessageUseCase @Inject constructor(
         isOutgoing: Boolean,
         status: ChatMessage.Status,
     ) {
+        if (encoded.isSeen()) return
+
         val authorAccountId = if (isOutgoing) ourAccountId() else peerAccountId
         val chatMessage = encoded.toChatMessageOrUnsupported(
             authorAccountId = authorAccountId,
