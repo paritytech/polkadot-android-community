@@ -6,9 +6,9 @@ import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.ResourcesRepository
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.requireConsumerInfo
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.toDomain
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccountId
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import javax.inject.Inject
 
 interface IncomingChatRequestVerifier {

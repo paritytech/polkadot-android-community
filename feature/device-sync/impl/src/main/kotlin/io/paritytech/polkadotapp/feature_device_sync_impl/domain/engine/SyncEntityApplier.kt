@@ -35,6 +35,11 @@ class SyncEntityApplier @Inject constructor(
                     is SyncEntityScale.ChatsAdded -> applyChatsAdded(entity)
                     is SyncEntityScale.ChatsRemoved -> applyChatsRemoved(entity, removedAt = update.timePoint.toLong())
                     is SyncEntityScale.Messages -> applyMessages(entity)
+                    is SyncEntityScale.ChatsBlocked,
+                    is SyncEntityScale.IncomingRequestsAdded,
+                    is SyncEntityScale.IncomingRequestsStatusUpdated,
+                    is SyncEntityScale.OutgoingRequestsAdded,
+                    is SyncEntityScale.OutgoingRequestsStatusUpdated -> Unit
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error

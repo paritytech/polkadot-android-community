@@ -16,13 +16,13 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.IdentityProof
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.ChatRequestProver
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestMessage
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.IdentityProofScale
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTopic
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTransport
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.OutgoingChatRequestTopics
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.IdentityProofScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.StatementStoreMessageProver
 import java.util.UUID

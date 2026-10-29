@@ -4,6 +4,9 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.anno
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
 import io.paritytech.polkadotapp.common.domain.model.scale.X25519PublicKeyScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.LocalMessageScale
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -47,6 +50,26 @@ sealed interface SyncEntityScale {
     @Serializable
     @EnumIndex(3)
     class Messages(val messages: List<LocalMessageScale>) : SyncEntityScale
+
+    @Serializable
+    @EnumIndex(4)
+    class ChatsBlocked(val states: List<ChatBlockStateScale>) : SyncEntityScale
+
+    @Serializable
+    @EnumIndex(5)
+    class IncomingRequestsAdded(val requests: List<IncomingChatRequestScale>) : SyncEntityScale
+
+    @Serializable
+    @EnumIndex(6)
+    class IncomingRequestsStatusUpdated(val updates: List<IncomingRequestStatusUpdateScale>) : SyncEntityScale
+
+    @Serializable
+    @EnumIndex(7)
+    class OutgoingRequestsAdded(val requests: List<OutgoingChatRequestScale>) : SyncEntityScale
+
+    @Serializable
+    @EnumIndex(8)
+    class OutgoingRequestsStatusUpdated(val updates: List<OutgoingRequestStatusUpdateScale>) : SyncEntityScale
 }
 
 @Serializable
@@ -73,3 +96,67 @@ sealed interface ChatIdScale {
         val accountId: ByteArray,
     ) : ChatIdScale
 }
+
+@Serializable
+class ChatBlockStateScale(
+    val chatId: ChatIdScale,
+    val blocked: Boolean,
+)
+
+@Serializable
+enum class IncomingRequestStatusScale {
+    @EnumIndex(0)
+    PENDING,
+
+    @EnumIndex(1)
+    ACCEPTED,
+
+    @EnumIndex(2)
+    DECLINED,
+}
+
+@Serializable
+class IncomingChatRequestScale(
+    val requestId: String,
+    @FixedLength(32)
+    val peer: ByteArray,
+    val timestamp: ULong,
+    val status: IncomingRequestStatusScale,
+    val peerDevice: LocalDeviceScale?,
+    val pushToken: TokenContent?,
+    val welcomeMessage: RichTextContent?,
+)
+
+@Serializable
+class IncomingRequestStatusUpdateScale(
+    val requestId: String,
+    val status: IncomingRequestStatusScale,
+)
+
+@Serializable
+enum class OutgoingRequestStatusScale {
+    @EnumIndex(0)
+    PENDING,
+
+    @EnumIndex(1)
+    ACCEPTED,
+
+    @EnumIndex(2)
+    CANCELLED,
+}
+
+@Serializable
+class OutgoingChatRequestScale(
+    val requestId: String,
+    @FixedLength(32)
+    val peer: ByteArray,
+    val timestamp: ULong,
+    val status: OutgoingRequestStatusScale,
+    val content: VersionedRequestContent,
+)
+
+@Serializable
+class OutgoingRequestStatusUpdateScale(
+    val requestId: String,
+    val status: OutgoingRequestStatusScale,
+)
