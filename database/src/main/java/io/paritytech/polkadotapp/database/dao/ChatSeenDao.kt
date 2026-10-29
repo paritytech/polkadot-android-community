@@ -26,7 +26,7 @@ abstract class ChatSeenDao {
         LIMIT 1
         """
     )
-    abstract fun subscribeLastReadIncomingMessage(chatId: ByteArray, types: List<ChatMessageLocal.Type>): Flow<LastReadMessage?>
+    abstract fun subscribeLastReadIncomingMessage(chatId: ByteArray, types: List<ChatMessageLocal.Type>): Flow<LastReadMessageProjection?>
 
     @Query(
         """
@@ -37,7 +37,7 @@ abstract class ChatSeenDao {
     )
     abstract fun subscribeSeenOutgoingMessageIds(chatId: ByteArray): Flow<List<String>>
 
-    data class LastReadMessage(
+    data class LastReadMessageProjection(
         val id: String,
         val timestamp: Long
     )

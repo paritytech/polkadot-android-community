@@ -17,9 +17,11 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Attachment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageReactionContent
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastReadMessage
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.AlwaysDecodableChatMessagePart
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageReactionStatementContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageStatement
@@ -71,18 +73,23 @@ fun EncodedMessage.isDeviceChatAccepted(): Boolean {
     return versioned.message.content is ChatMessageStatementContent.DeviceChatAccepted
 }
 
-fun EncodedMessage.decodeSeenContent(): ChatMessageStatementContent.Seen? {
-    val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return null
-    return versioned.message.content as? ChatMessageStatementContent.Seen
+fun EncodedMessage.isCompactionCommit(): Boolean {
+    val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return false
+    return versioned.message.content is ChatMessageStatementContent.CompactionCommit
 }
 
-fun EncodedMessage.isSeen(): Boolean = decodeSeenContent() != null
+fun EncodedMessage.decodeSeenMessageId(): ChatMessageId? {
+    val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return null
+    return (versioned.message.content as? ChatMessageStatementContent.Seen)?.messageId
+}
 
-fun ChatMessageStatementContent.Seen.toEncodedMessage(): Result<EncodedMessage> {
+fun EncodedMessage.isSeen(): Boolean = decodeSeenMessageId() != null
+
+fun LastReadMessage.toEncodedSeenMessage(): Result<EncodedMessage> {
     val message = ChatMessageStatement(
         id = UUID.randomUUID().toString(),
         timestamp = System.currentTimeMillis().toULong(),
-        versioned = VersionedChatMessage.V1(ChatMessageV1(this))
+        versioned = VersionedChatMessage.V1(ChatMessageV1(ChatMessageStatementContent.Seen(id.lowercase(), timestamp.toULong())))
     )
     return BinaryScale.encodeToByteArrayCatching(message)
 }

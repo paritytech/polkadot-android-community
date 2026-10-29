@@ -4,8 +4,8 @@ import io.paritytech.polkadotapp.database.dao.ChatSeenDao
 import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastReadMessage
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocal
-import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageStatementContent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -22,9 +22,9 @@ private val DISPLAYABLE_MESSAGE_TYPES = listOf(
 )
 
 interface ChatSeenRepository {
-    suspend fun saveReceivedSeen(chatId: ChatId, seen: ChatMessageStatementContent.Seen)
+    suspend fun saveReceivedSeen(chatId: ChatId, messageId: ChatMessageId)
 
-    fun subscribeSeenToSend(chatId: ChatId): Flow<ChatMessageStatementContent.Seen?>
+    fun subscribeLastReadIncomingMessage(chatId: ChatId): Flow<LastReadMessage?>
 
     fun subscribeSeenOutgoingMessageIds(chatId: ChatId): Flow<Set<ChatMessageId>>
 }
@@ -32,15 +32,15 @@ interface ChatSeenRepository {
 class RealChatSeenRepository @Inject constructor(
     private val dao: ChatSeenDao,
 ) : ChatSeenRepository {
-    override suspend fun saveReceivedSeen(chatId: ChatId, seen: ChatMessageStatementContent.Seen) {
-        val order = dao.getOutgoingOrder(chatId.toLocal(), seen.messageId) ?: return
+    override suspend fun saveReceivedSeen(chatId: ChatId, messageId: ChatMessageId) {
+        val order = dao.getOutgoingOrder(chatId.toLocal(), messageId) ?: return
 
         dao.raisePeerSeenOrder(chatId.toLocal(), order)
     }
 
-    override fun subscribeSeenToSend(chatId: ChatId): Flow<ChatMessageStatementContent.Seen?> {
+    override fun subscribeLastReadIncomingMessage(chatId: ChatId): Flow<LastReadMessage?> {
         return dao.subscribeLastReadIncomingMessage(chatId.toLocal(), DISPLAYABLE_MESSAGE_TYPES).map { message ->
-            message?.let { ChatMessageStatementContent.Seen(it.id.lowercase(), it.timestamp.toULong()) }
+            message?.let { LastReadMessage(it.id, it.timestamp) }
         }
     }
 

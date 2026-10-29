@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSession
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.*
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.decodeAlwaysDecodableChatMessagePart
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isCompactionCommit
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedMessage
@@ -235,7 +236,7 @@ class RealContactChatSession(
     ) {
         seenMessageHandler.saveDelivered(messages)
 
-        for (encodedMessage in messages.filterNot { it.isSeen() }) {
+        for (encodedMessage in messages) {
             val versionedMessage = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messageId = versionedMessage.id,
@@ -250,7 +251,7 @@ class RealContactChatSession(
     private suspend fun handleMessagesSentSuccessfully(
         messages: List<EncodedMessage>
     ) {
-        for (encodedMessage in messages.filterNot { it.isSeen() }) {
+        for (encodedMessage in messages) {
             val messagePart = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messagePart.id,
@@ -260,16 +261,6 @@ class RealContactChatSession(
                 chatMessageRepository.propagateStatusToCompactedMessages(messagePart.id, ChatMessage.Status.IS_SENT)
             }
         }
-    }
-
-    private fun EncodedMessage.isCompactionCommit(): Boolean {
-        val message = toChatMessage(
-            authorAccountId = mainCommunicationSession.localAccount.accountId,
-            contactAccountId = mainCommunicationSession.remoteAccount.accountId,
-            messageStatus = ChatMessage.Status.NEW
-        ).getOrNull()
-
-        return message?.content is ChatMessage.Content.CompactionCommit
     }
 
     private suspend fun handleMessagesCompacted(compacted: EncodedMessage, originals: List<EncodedMessage>) {

@@ -23,7 +23,6 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.Incoming
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.StrippedChatPushContent
 import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionStarter
-import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessageOrUnsupported
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -42,10 +41,6 @@ import io.paritytech.polkadotapp.tools_push_notifications_api.PushNotificationHa
 import timber.log.Timber
 import javax.inject.Inject
 import io.paritytech.polkadotapp.common.R as RCommon
-
-// legacy fields
-private const val PUSH_ID = "pushId"
-private const val MESSAGE = "message"
 
 // v2 fields
 private const val SENDER_PUBKEY = "sender_pubkey"
@@ -145,7 +140,7 @@ internal class ChatPushNotificationHandler @Inject constructor(
 
         if (encodedMessages.isEmpty()) return
 
-        val chatMessages = encodedMessages.filterNot { it.isSeen() }.mapNotNull { encoded ->
+        val chatMessages = encodedMessages.mapNotNull { encoded ->
             encoded.toChatMessageOrUnsupported(
                 authorAccountId = contact.accountId,
                 contactAccountId = contact.accountId,
