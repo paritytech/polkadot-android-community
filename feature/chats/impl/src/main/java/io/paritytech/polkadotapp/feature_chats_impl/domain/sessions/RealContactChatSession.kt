@@ -18,8 +18,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageR
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenWatermarkDeliveryRecorder
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenWatermarkService
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageHandler
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
@@ -54,8 +53,7 @@ class RealContactChatSession(
     private val syncContactUsernameUseCase: SyncContactUsernameUseCase,
     private val incomingChatMessageProcessor: IncomingChatMessageProcessor,
     private val notificationPayloadEncoder: ChatNotificationPayloadEncoder,
-    private val seenWatermarkService: SeenWatermarkService,
-    private val seenWatermarkDeliveryRecorder: SeenWatermarkDeliveryRecorder,
+    private val seenMessageHandler: SeenMessageHandler,
 ) : ContactChatSession, CoroutineScope by scope {
     private val mainCommunicationSession get() = communicationSessions.main
 
@@ -84,7 +82,7 @@ class RealContactChatSession(
 
         subscribeMessagesUpdates()
         subscribeUsernameUpdates()
-        scheduleSeenWatermarks()
+        sendSeenMessages()
 
         launch { tryReparseUnsupportedMessages() }
     }
@@ -95,8 +93,8 @@ class RealContactChatSession(
             .launchIn(this)
     }
 
-    private fun scheduleSeenWatermarks() {
-        seenWatermarkService.scheduleWatermarks(contact.accountId, mainCommunicationSession::sendMessage)
+    private fun sendSeenMessages() {
+        seenMessageHandler.sendSeenMessages(contact.accountId, mainCommunicationSession::sendMessage)
             .launchIn(this)
     }
 
@@ -201,6 +199,7 @@ class RealContactChatSession(
     private suspend fun handleNewMessagesReceived(source: CommunicationSession, messages: List<EncodedMessage>) {
         Timber.d("handleNewMessagesReceived: ${messages.size} messages from ${contact.username}")
 
+        seenMessageHandler.saveReceived(messages, contact.accountId)
         incomingChatMessageProcessor.processRaw(source.remoteAccount.accountId, messages, ChatMessagePlacement.Latest)
     }
 
@@ -234,10 +233,9 @@ class RealContactChatSession(
     private suspend fun handleResponseReceived(
         messages: List<EncodedMessage>
     ) {
-        val (seenMessages, chatMessages) = messages.partition { it.isSeen() }
-        seenWatermarkDeliveryRecorder.recordDelivered(seenMessages, contact.accountId)
+        seenMessageHandler.saveDelivered(messages)
 
-        for (encodedMessage in chatMessages) {
+        for (encodedMessage in messages.filterNot { it.isSeen() }) {
             val versionedMessage = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messageId = versionedMessage.id,

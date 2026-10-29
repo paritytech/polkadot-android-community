@@ -18,6 +18,4 @@ import androidx.room.PrimaryKey
 class ChatSeenStateLocal(
     @PrimaryKey val contactAccountId: ByteArray,
     val peerSeenOrder: Long,
-    val lastSentSeenOrder: Long,
-    val lastSentSeenTimestamp: Long,
 )
