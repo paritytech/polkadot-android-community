@@ -11,7 +11,7 @@ import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMess
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import javax.inject.Inject
 
-class SeenWatermarkProcessor @Inject constructor(
+class SeenWatermarkUpdater @Inject constructor(
     private val chatSeenRepository: ChatSeenRepository,
 ) {
     suspend fun process(messages: List<EncodedMessage>, contact: Contact) {

@@ -32,7 +32,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileDownload
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenWatermarkProcessor
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenWatermarkUpdater
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import timber.log.Timber
@@ -49,7 +49,7 @@ class IncomingChatMessageProcessor @Inject constructor(
     private val compactionExpansionStarter: CompactionExpansionStarter,
     private val fallbackUsernameGenerator: FallbackUsernameGenerator,
     private val chatSigners: ContactChatSigners,
-    private val seenWatermarkProcessor: SeenWatermarkProcessor,
+    private val seenWatermarkUpdater: SeenWatermarkUpdater,
 ) {
     suspend fun processRaw(
         contactAccountId: AccountId,
@@ -63,7 +63,7 @@ class IncomingChatMessageProcessor @Inject constructor(
         }
 
         val (seenMessages, chatMessages) = rawMessages.partition { it.isSeen() }
-        seenWatermarkProcessor.process(seenMessages, contact)
+        seenWatermarkUpdater.process(seenMessages, contact)
 
         val parsedMessages = chatMessages.mapNotNull { encodedMessage ->
             encodedMessage.toChatMessageOrUnsupported(
