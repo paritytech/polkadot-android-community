@@ -53,6 +53,13 @@ interface ChatRequestTransport {
         statementProver: StatementStoreMessageProver,
     ): Result<Unit>
 
+    suspend fun submitChatRequestOnce(
+        topics: OutgoingChatRequestTopics,
+        request: ChatRequestDecrypted,
+        derivationDomain: SharedSecretDerivationDomain,
+        statementProver: StatementStoreMessageProver,
+    ): Result<Unit>
+
     /** Upper bound of the encoded statement [submitChatRequest] would submit for [request]. */
     suspend fun estimateStatementSize(
         topics: OutgoingChatRequestTopics,
@@ -118,10 +125,29 @@ class RealChatRequestTransport @Inject constructor(
         derivationDomain: SharedSecretDerivationDomain,
         statementProver: StatementStoreMessageProver,
     ): Result<Unit> {
+        return prepareStatement(topics, request, derivationDomain, statementProver)
+            .flatMap { statementStoreService.submitStatement(it) }
+    }
+
+    override suspend fun submitChatRequestOnce(
+        topics: OutgoingChatRequestTopics,
+        request: ChatRequestDecrypted,
+        derivationDomain: SharedSecretDerivationDomain,
+        statementProver: StatementStoreMessageProver,
+    ): Result<Unit> {
+        return prepareStatement(topics, request, derivationDomain, statementProver)
+            .flatMap { statementStoreService.submitStatementOnce(it) }
+    }
+
+    private suspend fun prepareStatement(
+        topics: OutgoingChatRequestTopics,
+        request: ChatRequestDecrypted,
+        derivationDomain: SharedSecretDerivationDomain,
+        statementProver: StatementStoreMessageProver,
+    ): Result<Statement> {
         return encryptAndEncodeStatementData(request, peerPublicKey = topics.session.peerChatKey)
             .mapCatching { createChatRequestStatementBody(it, topics, derivationDomain) }
             .mapCatching { statementProver.prepareSignedStatement(it) }
-            .flatMap { statementStoreService.submitStatement(it) }
     }
 
     override suspend fun estimateStatementSize(

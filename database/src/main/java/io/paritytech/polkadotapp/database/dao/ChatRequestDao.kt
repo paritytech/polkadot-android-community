@@ -38,6 +38,12 @@ interface ChatRequestDao {
         lastDeliveredPeriod: Long?,
     )
 
+    @Query("UPDATE chat_requests SET status = 'CANCELLING' WHERE id = :id AND direction = 'OUTGOING' AND status = 'PENDING'")
+    suspend fun markCancelling(id: String): Int
+
+    @Query("UPDATE chat_requests SET status = 'PENDING' WHERE id = :id AND status = 'CANCELLING'")
+    suspend fun revertCancelling(id: String)
+
     @Query("UPDATE chat_requests SET status = 'PENDING' WHERE status = 'CANCELLING'")
     suspend fun revertCancellingToPending()
 

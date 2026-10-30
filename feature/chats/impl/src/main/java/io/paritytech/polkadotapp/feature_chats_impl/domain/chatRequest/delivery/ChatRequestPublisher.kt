@@ -70,6 +70,10 @@ class ChatRequestPublisher @Inject constructor(
         }
     }
 
+    suspend fun awaitPublishing(requestId: ChatRequestId) {
+        publishLocks.getOrPut(requestId) { Mutex() }.withLock { }
+    }
+
     private suspend fun submitWhilePending(
         request: ChatRequest,
         payload: OutgoingChatRequestPayload,

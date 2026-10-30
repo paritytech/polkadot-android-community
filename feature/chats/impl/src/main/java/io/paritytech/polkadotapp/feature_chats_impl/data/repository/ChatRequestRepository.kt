@@ -25,6 +25,10 @@ interface ChatRequestRepository {
 
     suspend fun updateDelivery(id: String, delivery: ChatRequest.Delivery)
 
+    suspend fun markCancelling(id: String): Boolean
+
+    suspend fun revertCancelling(id: String)
+
     suspend fun revertCancellingToPending()
 
     suspend fun delete(id: String)
@@ -67,6 +71,14 @@ class RealChatRequestRepository @Inject constructor(
             deliveredVia = delivery.toLocalVia(),
             lastDeliveredPeriod = delivery.toLocalPeriod(),
         )
+    }
+
+    override suspend fun markCancelling(id: String): Boolean {
+        return chatRequestDao.markCancelling(id) > 0
+    }
+
+    override suspend fun revertCancelling(id: String) {
+        chatRequestDao.revertCancelling(id)
     }
 
     override suspend fun revertCancellingToPending() {
