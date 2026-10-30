@@ -9,10 +9,11 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferQueueProcessor
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueDelayedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueExpeditedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.hopTransferForegroundInfo
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.scheduleTransferWakeUp
 import timber.log.Timber
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -31,7 +32,7 @@ class FileUploadWorker @AssistedInject constructor(
             transferQueueProcessor.processPendingConcurrently(transferQueue)
 
             transferQueue.nextBackoffEndAt()?.let { backoffEnd ->
-                enqueueDelayedTransfer<FileUploadWorker>(applicationContext, WORK_ID, backoffEnd)
+                scheduleTransferWakeUp(applicationContext, HopTransfer.UPLOAD, backoffEnd)
             }
         }
 
