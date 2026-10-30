@@ -59,6 +59,10 @@ internal class RealDotNsResolver @Inject constructor(
         localDomainsCache.getOrCompute(dotNsName)
     }
 
+    override suspend fun invalidate(dotNsName: String) {
+        localDomainsCache.remove(dotNsName)
+    }
+
     private suspend fun resolveContentHash(domainName: DomainName): Result<ContentHash?> {
         val override = contentHashOverrides.getContentHashOverride(domainName)
         if (override != null) return Result.success(override)

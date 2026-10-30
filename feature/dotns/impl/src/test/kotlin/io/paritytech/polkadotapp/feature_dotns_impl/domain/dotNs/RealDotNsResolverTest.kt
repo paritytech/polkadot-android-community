@@ -13,6 +13,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
 
 class RealDotNsResolverTest {
     private val contractApi: DotNsContractApi = mock()
@@ -49,6 +51,21 @@ class RealDotNsResolverTest {
         assertTrue(resolver.getProgressByDomain(domain).first() is DotNsLoadProgress.Failed)
     }
 
+    @Test
+    fun `a failed resolution stays cached until invalidate`() = runTest {
+        withNoOverride()
+        withChainUnreachable()
+        val resolver = resolver()
+        resolver.resolveToLocalUri(domain)
+        resolver.resolveToLocalUri(domain)
+        verifyContentHashReads(count = 1)
+
+        resolver.invalidate(domain)
+        resolver.resolveToLocalUri(domain)
+
+        verifyContentHashReads(count = 2)
+    }
+
     private fun TestScope.resolver() = RealDotNsResolver(
         contractApi = contractApi,
         carFetcher = carFetcher,
@@ -56,4 +73,16 @@ class RealDotNsResolverTest {
         contentHashOverrides = contentHashOverrides,
         dispatchers = testDispatchers(),
     )
+
+    private fun withNoOverride() {
+        whenever(contentHashOverrides.getContentHashOverride(domain)).thenReturn(null)
+    }
+
+    private suspend fun withChainUnreachable() {
+        whenever(contractApi.resolveContentHash(domain)).thenReturn(Result.failure(IllegalStateException("no node")))
+    }
+
+    private suspend fun verifyContentHashReads(count: Int) {
+        verify(contractApi, times(count)).resolveContentHash(domain)
+    }
 }

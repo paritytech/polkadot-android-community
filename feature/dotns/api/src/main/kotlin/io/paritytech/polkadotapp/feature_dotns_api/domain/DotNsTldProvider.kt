@@ -18,7 +18,7 @@ interface DotNsTldProvider {
      */
     fun currentTldOrNull(): DotNsTld?
 
-    /** Gets the settled TLD, allowing only one contract read at a time. Fails on transport errors. */
+    /** Gets the settled TLD, one network-suffix read at a time. Fails on transport errors and when a read times out. */
     suspend fun getTld(): Result<DotNsTld>
 }
 

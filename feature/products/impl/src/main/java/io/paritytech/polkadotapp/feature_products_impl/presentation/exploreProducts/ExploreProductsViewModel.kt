@@ -1,110 +1,96 @@
 package io.paritytech.polkadotapp.feature_products_impl.presentation.exploreProducts
 
-import androidx.core.net.toUri
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
+import io.paritytech.polkadotapp.common.presentation.loading.dataOrNull
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
-import io.paritytech.polkadotapp.common.utils.flowOf
-import io.paritytech.polkadotapp.common.utils.logFailure
-import io.paritytech.polkadotapp.common.utils.shareInBackground
-import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
+import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport
+import io.paritytech.polkadotapp.common.utils.withLoading
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
 import io.paritytech.polkadotapp.feature_products_api.presentation.SpaBrowserPayload
-import io.paritytech.polkadotapp.feature_products_impl.domain.bot.ProductsBotApiImpl
-import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiEnvironment
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostApiSession
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.HostCallGroupFactory
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.PageLoadInjection
-import io.paritytech.polkadotapp.feature_products_impl.domain.hostApi.navigation.NavigationPolicy
-import io.paritytech.polkadotapp.feature_products_impl.domain.jsRuntime.WebViewRuntime
-import io.paritytech.polkadotapp.feature_products_impl.domain.product.ProductRegistrar
-import io.paritytech.polkadotapp.feature_products_impl.domain.product.launchEnsureRegistered
+import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreLoadError
+import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsInteractor
 import io.paritytech.polkadotapp.feature_products_impl.domain.webView.BrowserWebViewProvider
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ExploreProductsViewModel @Inject constructor(
-    private val browserWebViewProviderFactory: BrowserWebViewProvider.Factory,
-    private val hostCallGroupFactory: HostCallGroupFactory,
-    private val sessionFactory: HostApiSession.Factory,
-    private val botApiFactory: ProductsBotApiImpl.Factory,
-    private val productRegistrar: ProductRegistrar,
+    private val interactor: ExploreProductsInteractor,
     private val router: ProductsRouter,
-    private val exploreProductsService: ExploreProductsService,
-    private val dotNsTldProvider: DotNsTldProvider,
-) : BaseViewModel() {
-    private data class SessionComponents(
-        val session: HostApiSession,
-        val provider: BrowserWebViewProvider,
-    )
+) : BaseViewModel(), ExploreProductsContract {
+    override val stalenessReport = StalenessReport(this)
 
-    private val componentsFlow = flowOf {
-        createComponents()
-    }.filterNotNull().shareInBackground()
+    private val retryCount = MutableStateFlow(0)
+    private val hostErrorSkipped = MutableStateFlow(false)
 
-    val webViewFlow = componentsFlow
-        .map { it.provider.getWebView() }
-        .stateIn(scope = this, started = SharingStarted.Eagerly, initialValue = null)
+    private val session: StateFlow<LoadingState<BrowserWebViewProvider>> = retryCount
+        .flatMapLatest { count -> attempt(afterRetry = count > 0).withLoading("ExploreProducts") }
+        .stateIn(this, SharingStarted.Eagerly, LoadingState.Loading)
 
-    init {
-        componentsFlow.onEach {
-            it.session.initialize()
-        }.launchIn(this)
+    override val state: StateFlow<LoadingState<ExploreProductsContent>> = combine(session, hostErrorSkipped) { loading, skipped ->
+        when (loading) {
+            LoadingState.Loading -> LoadingState.Loading
+            is LoadingState.Loaded -> LoadingState.Loaded(ExploreProductsContent.Page(loading.data.getWebView()))
+            is LoadingState.Error -> if (loading.exception is ExploreLoadError.HostUnresolved && skipped) {
+                LoadingState.Loaded(ExploreProductsContent.Skipped)
+            } else {
+                loading
+            }
+        }
+    }.stateIn(this, SharingStarted.Eagerly, LoadingState.Loading)
+
+    override fun onRetry() {
+        retryCount.update { it + 1 }
     }
 
-    fun onProductSelected(productId: ProductId) {
+    override fun onSkip() {
+        hostErrorSkipped.value = true
+    }
+
+    override fun pauseConnections() {
+        session.value.dataOrNull?.pauseConnections()
+    }
+
+    override fun resumeConnections() {
+        session.value.dataOrNull?.resumeConnections()
+    }
+
+    private fun onProductSelected(productId: ProductId) {
         launch { router.openSpaBrowser(SpaBrowserPayload.ByProductId(productId.value)) }
     }
 
-    fun pauseConnections() {
-        launch { componentsFlow.first().provider.pauseConnections() }
+    private fun attempt(afterRetry: Boolean): Flow<Result<BrowserWebViewProvider>> {
+        val opening = with(stalenessReport) { interactor.openExplore(afterRetry, ::onProductSelected) }
+
+        return combine(opening, setupErrorFloor()) { result, floorPassed ->
+            result.takeIf { floorPassed || it.exceptionOrNull() !is ExploreLoadError.SetupFailed }
+        }.filterNotNull().distinctUntilChanged()
     }
 
-    fun resumeConnections() {
-        launch { componentsFlow.first().provider.resumeConnections() }
+    private fun setupErrorFloor(): Flow<Boolean> = flow {
+        emit(false)
+        delay(SETUP_ERROR_MIN_LOADING)
+        emit(true)
     }
 
-    private suspend fun createComponents(): SessionComponents? {
-        val exploreUrl = exploreProductsService.getExploreUrl()
-            .logFailure("Failed to resolve explore url")
-            .getOrNull() ?: return null
-
-        val navigationPolicy = NavigationPolicy.CatalogNavigation(::onProductSelected, dotNsTldProvider)
-
-        val webViewProvider = browserWebViewProviderFactory.create(exploreUrl, navigationPolicy, allowIframes = false, viewModelScope)
-        webViewProvider.addOnPageStartedListener { url ->
-            dotNsTldProvider.currentTldOrNull()
-                ?.let { tld -> ProductId.fromUrl(url.toUri(), tld).getOrNull() }
-                ?.let { productRegistrar.launchEnsureRegistered(it) }
-        }
-        val productIdProvider = webViewProvider.callingProductIdProvider
-
-        val runtime = WebViewRuntime(webViewProvider)
-
-        val botApi = botApiFactory.create(productIdProvider)
-        val handlerGroups = hostCallGroupFactory.createShared(botApi, productIdProvider, navigationPolicy)
-
-        val environment = HostApiEnvironment(
-            injectionStrategy = PageLoadInjection(
-                pageLifecycleSource = webViewProvider,
-                coroutineScope = this,
-            ),
-            handlerGroups = handlerGroups,
-        )
-
-        val transport = runtime.createTransport()
-        val session = sessionFactory.create(environment, runtime, transport, this)
-
-        return SessionComponents(session, webViewProvider)
+    private companion object {
+        val SETUP_ERROR_MIN_LOADING = 500.milliseconds
     }
 }
