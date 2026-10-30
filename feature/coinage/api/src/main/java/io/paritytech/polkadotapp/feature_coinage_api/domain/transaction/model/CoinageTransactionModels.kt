@@ -48,6 +48,8 @@ sealed interface CoinageInput {
 
         /** A coin whose key a peer sent us: never a local asset, only an input of the claim. */
         data class Received(val publicKey: DataByteArray) : Coin
+
+        data class Reclaimed(val derivationIndex: CoinageKeyIndex) : Coin
     }
 
     data class Voucher(val ringVrfIndex: CoinageKeyIndex) : CoinageInput

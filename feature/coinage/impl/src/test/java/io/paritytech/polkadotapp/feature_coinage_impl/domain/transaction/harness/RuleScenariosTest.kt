@@ -114,6 +114,21 @@ class RuleScenariosTest {
     }
 
     @Test
+    fun `a reclaim spends a handed-off coin once and nothing that was never handed off`() = scenario {
+        mintCoinsOnChain(COIN_A, COIN_C, finality = FINALIZED)
+        service.preCommitHandoff(listOf(OwnAsset.Coin(testKey(COIN_A)))).getOrThrow().commit().getOrThrow()
+
+        assertTrue(registerReclaim(COIN_A, COIN_B).isSuccess)
+        assertEquals(PENDING, assetStateOf(COIN_A).consumerStatus)
+
+        val secondReclaim = registerReclaim(COIN_A, COIN_D)
+        assertTrue(secondReclaim.exceptionOrNull() is CoinageRegistrationError.InputAlreadyClaimed)
+
+        val reclaimOfOwnCoin = registerReclaim(COIN_C, COIN_D)
+        assertTrue(reclaimOfOwnCoin.exceptionOrNull() is CoinageRegistrationError.ReclaimedInputNotHandedOff)
+    }
+
+    @Test
     fun `ownCoinInputs declines while the input minter's own window is still open`() = scenario {
         disableFallbackTxSearch()
         mintCoinsOnChain(COIN_SEED, finality = FINALIZED)
