@@ -10,10 +10,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
+import io.paritytech.polkadotapp.design.components.button.default.PolkadotButtonSize
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.withBold
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Composable
@@ -26,13 +28,15 @@ internal fun WaitingForAcceptLabel(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                horizontal = PolkadotTheme.spacings.mediumIncreased,
-                vertical = PolkadotTheme.spacings.mediumIncreased
+                start = PolkadotTheme.spacings.mediumIncreased,
+                end = PolkadotTheme.spacings.mediumIncreased,
+                top = PolkadotTheme.spacings.mediumIncreased,
+                bottom = PolkadotTheme.spacings.large
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         NovaText(
-            text = stringResource(RCommon.string.chat_request_wait_accept_title, username),
+            text = stringResource(RCommon.string.chat_request_wait_accept_title, username).withBold(username),
             style = PolkadotTheme.typography.body.medium,
             color = PolkadotTheme.colors.fg.tertiary,
             textAlign = TextAlign.Center
@@ -43,7 +47,8 @@ internal fun WaitingForAcceptLabel(
         PolkadotTextButton(
             modifier = Modifier.fillMaxWidth(),
             text = stringResource(RCommon.string.chat_request_cancel_button),
-            style = PolkadotButtonStyle.secondary(),
+            style = PolkadotButtonStyle.destructive(),
+            size = PolkadotButtonSize.mediumIncreased(),
             onClick = onCancelRequest
         )
     }

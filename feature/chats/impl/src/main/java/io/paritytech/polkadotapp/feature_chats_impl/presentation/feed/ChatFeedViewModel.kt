@@ -144,14 +144,14 @@ class ChatFeedViewModel @Inject constructor(
         .distinctUntilChanged()
         .shareInBackground()
 
-    private val requestCancelled = chatInputStateType
-        .map { it is ChatUserInputState.ChatRequestCancelled }
+    private val keepsLastContent = chatInputStateType
+        .map { it is ChatUserInputState.AcceptChatRequest || it is ChatUserInputState.ChatRequestCancelled }
         .distinctUntilChanged()
 
     private var isClosing = false
 
     private val gatedDomainMessages = combine(
-        interactor.subscribeMessages(chatId).keptAfterRequestCancel { it.isNotEmpty() },
+        interactor.subscribeMessages(chatId).withLastContentKept { it.isNotEmpty() },
         animatesMessageReveal,
         revealedUpTo,
     ) { domainMessages, animates, revealed ->
@@ -182,7 +182,7 @@ class ChatFeedViewModel @Inject constructor(
     }.shareInBackground()
 
     override val chatDisplay = interactor.observeChatDisplay(openChatRequest)
-        .keptAfterRequestCancel { it.isSuccess }
+        .withLastContentKept { it.isSuccess }
         .mapResult { it.toUi() }
         .withLoading()
         .stateInBackground(initialValue = LoadingState.Loading)
@@ -803,13 +803,13 @@ class ChatFeedViewModel @Inject constructor(
         router.back()
     }
 
-    private fun <T> Flow<T>.keptAfterRequestCancel(hasContent: (T) -> Boolean): Flow<T> {
+    private fun <T> Flow<T>.withLastContentKept(hasContent: (T) -> Boolean): Flow<T> {
         val withLastContent = runningFold<T, Pair<T, T>?>(null) { previous, value ->
             value to (if (hasContent(value)) value else previous?.second ?: value)
         }.filterNotNull()
 
-        return combine(withLastContent, requestCancelled) { (latest, lastWithContent), cancelled ->
-            if (cancelled) lastWithContent else latest
+        return combine(withLastContent, keepsLastContent) { (latest, lastWithContent), keeps ->
+            if (keeps) lastWithContent else latest
         }
     }
 

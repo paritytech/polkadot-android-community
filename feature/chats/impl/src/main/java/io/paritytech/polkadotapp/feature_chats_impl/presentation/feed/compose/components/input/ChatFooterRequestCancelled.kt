@@ -20,11 +20,13 @@ internal fun ChatFooterRequestCancelled(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = PolkadotTheme.spacings.mediumIncreased,
-                vertical = PolkadotTheme.spacings.mediumIncreased
+                start = PolkadotTheme.spacings.mediumIncreased,
+                end = PolkadotTheme.spacings.mediumIncreased,
+                top = PolkadotTheme.spacings.mediumIncreased,
+                bottom = PolkadotTheme.spacings.large
             ),
         text = stringResource(RCommon.string.chat_request_cancelled_by_peer, username).withBold(username),
-        style = PolkadotTheme.typography.body.large,
+        style = PolkadotTheme.typography.body.medium,
         color = PolkadotTheme.colors.fg.tertiary,
         textAlign = TextAlign.Center
     )
