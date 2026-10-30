@@ -9,6 +9,8 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSession
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.*
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.decodeAlwaysDecodableChatMessagePart
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isCompactionCommit
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotificationPayloadEncoder
@@ -17,6 +19,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageR
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageHandler
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
@@ -51,6 +54,7 @@ class RealContactChatSession(
     private val syncContactUsernameUseCase: SyncContactUsernameUseCase,
     private val incomingChatMessageProcessor: IncomingChatMessageProcessor,
     private val notificationPayloadEncoder: ChatNotificationPayloadEncoder,
+    private val seenMessageHandler: SeenMessageHandler,
 ) : ContactChatSession, CoroutineScope by scope {
     private val mainCommunicationSession get() = communicationSessions.main
 
@@ -79,6 +83,7 @@ class RealContactChatSession(
 
         subscribeMessagesUpdates()
         subscribeUsernameUpdates()
+        sendSeenMessages()
 
         launch { tryReparseUnsupportedMessages() }
     }
@@ -86,6 +91,11 @@ class RealContactChatSession(
     private fun subscribeUsernameUpdates() {
         syncContactUsernameUseCase.sync(contact.accountId)
             .logFailure("Failed to sync username for contact ${contact.accountId}")
+            .launchIn(this)
+    }
+
+    private fun sendSeenMessages() {
+        seenMessageHandler.sendSeenMessages(contact.accountId, mainCommunicationSession::sendMessage)
             .launchIn(this)
     }
 
@@ -190,6 +200,7 @@ class RealContactChatSession(
     private suspend fun handleNewMessagesReceived(source: CommunicationSession, messages: List<EncodedMessage>) {
         Timber.d("handleNewMessagesReceived: ${messages.size} messages from ${contact.username}")
 
+        seenMessageHandler.saveReceived(messages, contact.accountId)
         incomingChatMessageProcessor.processRaw(source.remoteAccount.accountId, messages, ChatMessagePlacement.Latest)
     }
 
@@ -199,6 +210,7 @@ class RealContactChatSession(
         for (unsupportedMessage in unsupportedMessages) {
             val rawContent = (unsupportedMessage.content as? ChatMessage.Content.Unsupported)?.rawContent
                 ?: continue
+            if (rawContent.isSeen()) continue
 
             val parsedMessage = rawContent.toChatMessage(
                 authorAccountId = mainCommunicationSession.remoteAccount.accountId,
@@ -222,6 +234,8 @@ class RealContactChatSession(
     private suspend fun handleResponseReceived(
         messages: List<EncodedMessage>
     ) {
+        seenMessageHandler.saveDelivered(messages, contact.accountId)
+
         for (encodedMessage in messages) {
             val versionedMessage = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
@@ -247,16 +261,6 @@ class RealContactChatSession(
                 chatMessageRepository.propagateStatusToCompactedMessages(messagePart.id, ChatMessage.Status.IS_SENT)
             }
         }
-    }
-
-    private fun EncodedMessage.isCompactionCommit(): Boolean {
-        val message = toChatMessage(
-            authorAccountId = mainCommunicationSession.localAccount.accountId,
-            contactAccountId = mainCommunicationSession.remoteAccount.accountId,
-            messageStatus = ChatMessage.Status.NEW
-        ).getOrNull()
-
-        return message?.content is ChatMessage.Content.CompactionCommit
     }
 
     private suspend fun handleMessagesCompacted(compacted: EncodedMessage, originals: List<EncodedMessage>) {

@@ -33,6 +33,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.compaction.ChatMessag
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ContactWithDevicePresence
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.PushSubscriptionSynchronizer
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageHandler
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
@@ -113,6 +114,7 @@ internal class RealContactChatSessionManager @Inject constructor(
     private val proverFactory: StatementStoreMessageProver.Factory,
     private val chatSigners: ContactChatSigners,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
+    private val seenMessageHandler: SeenMessageHandler,
     dispatchers: CoroutineDispatchers
 ) : ContactChatSessionManager, ContactChatSessionRestarter, CoroutineScope, ChatSessionCallbacks {
     companion object {
@@ -292,6 +294,7 @@ internal class RealContactChatSessionManager @Inject constructor(
             syncContactUsernameUseCase = syncContactUsernameUseCase,
             incomingChatMessageProcessor = incomingChatMessageProcessor,
             notificationPayloadEncoder = notificationPayloadEncoder,
+            seenMessageHandler = seenMessageHandler,
         )
 
         syncIncomingPushId(chatSession, contact)

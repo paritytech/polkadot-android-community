@@ -159,12 +159,12 @@ class ChatFeedViewModel @Inject constructor(
             gatedDomainMessages.map { it.visibleMessages },
             callStateTracker.observeActiveCall().map { state -> state?.takeIf { it.chatId == chatId } }
         ),
-        reactions,
+        combineToPair(reactions, interactor.subscribeSeenMessageIds(chatId)),
         originDisplayResolver,
         revisions,
         customMessageRenderers
-    ) { (messages, activeCall), reactions, originDisplayResolver, revisionsMap, customMessageRenderers ->
-        messageUiMapper.map(messages, originDisplayResolver, reactions, revisionsMap, customMessageRenderers, activeCall)
+    ) { (messages, activeCall), (reactions, seenMessageIds), originDisplayResolver, revisionsMap, customMessageRenderers ->
+        messageUiMapper.map(messages, originDisplayResolver, reactions, revisionsMap, seenMessageIds, customMessageRenderers, activeCall)
     }.shareInBackground()
 
     override val chatDisplay = interactor.observeChatDisplay(openChatRequest)

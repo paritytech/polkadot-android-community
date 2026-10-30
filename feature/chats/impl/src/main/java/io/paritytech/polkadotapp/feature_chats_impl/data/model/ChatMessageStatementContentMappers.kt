@@ -17,9 +17,11 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Attachment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageReactionContent
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastReadMessage
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.AlwaysDecodableChatMessagePart
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageReactionStatementContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageStatement
@@ -41,6 +43,7 @@ import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.Versione
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VideoFileMeta
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.DeviceInfo
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
+import java.util.UUID
 
 fun ChatMessage.toEncodedMessage(): Result<EncodedMessage> {
     return toStatementStoreMessage()
@@ -68,6 +71,27 @@ fun EncodedMessage.decodeChatMessageStatement(): Result<ChatMessageStatement> {
 fun EncodedMessage.isDeviceChatAccepted(): Boolean {
     val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return false
     return versioned.message.content is ChatMessageStatementContent.DeviceChatAccepted
+}
+
+fun EncodedMessage.isCompactionCommit(): Boolean {
+    val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return false
+    return versioned.message.content is ChatMessageStatementContent.CompactionCommit
+}
+
+fun EncodedMessage.decodeSeenMessageId(): ChatMessageId? {
+    val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return null
+    return (versioned.message.content as? ChatMessageStatementContent.Seen)?.messageId
+}
+
+fun EncodedMessage.isSeen(): Boolean = decodeSeenMessageId() != null
+
+fun LastReadMessage.toEncodedSeenMessage(): Result<EncodedMessage> {
+    val message = ChatMessageStatement(
+        id = UUID.randomUUID().toString(),
+        timestamp = System.currentTimeMillis().toULong(),
+        versioned = VersionedChatMessage.V1(ChatMessageV1(ChatMessageStatementContent.Seen(id.lowercase(), timestamp.toULong())))
+    )
+    return BinaryScale.encodeToByteArrayCatching(message)
 }
 
 fun EncodedMessage.decodeAlwaysDecodableChatMessagePart(): Result<AlwaysDecodableChatMessagePart> {
@@ -212,6 +236,8 @@ internal fun ChatMessageStatementContent.toChatMessageContent(): ChatMessage.Con
             claimTicket = HopTicket.fromRaw(claimTicket),
             nodeUrl = node.toNodeUrl()
         )
+
+        is ChatMessageStatementContent.Seen -> error("Seen messages are filtered out before they become chat messages")
     }
 }
 

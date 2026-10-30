@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.onTokenContent
 import io.paritytech.polkadotapp.feature_chats_api.domain.username.FallbackUsernameGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.compaction.CompactionExpansionStarter
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.download.FileDownloadStarter
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessageOrUnsupported
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -59,7 +60,7 @@ class IncomingChatMessageProcessor @Inject constructor(
             return
         }
 
-        val parsedMessages = rawMessages.mapNotNull { encodedMessage ->
+        val parsedMessages = rawMessages.filterNot { it.isSeen() }.mapNotNull { encodedMessage ->
             encodedMessage.toChatMessageOrUnsupported(
                 authorAccountId = contactAccountId,
                 contactAccountId = contactAccountId,

@@ -42,10 +42,6 @@ import timber.log.Timber
 import javax.inject.Inject
 import io.paritytech.polkadotapp.common.R as RCommon
 
-// legacy fields
-private const val PUSH_ID = "pushId"
-private const val MESSAGE = "message"
-
 // v2 fields
 private const val SENDER_PUBKEY = "sender_pubkey"
 private const val STATEMENT_TOPIC = "statement_topic"
