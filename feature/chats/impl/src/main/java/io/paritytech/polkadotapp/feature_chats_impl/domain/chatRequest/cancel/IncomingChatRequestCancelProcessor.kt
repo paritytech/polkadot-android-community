@@ -58,7 +58,8 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
             ChatRequest.Status.PENDING -> contactsRepository.getContact(senderAccountId)?.pendingChatRequestId == request.id
             ChatRequest.Status.ACCEPTED -> chatAcceptanceRepository.get(senderAccountId)?.requestId == request.id
             ChatRequest.Status.DECLINED,
-            ChatRequest.Status.CANCELLED -> false
+            ChatRequest.Status.CANCELLED,
+            ChatRequest.Status.CANCELLING -> false
         }
     }
 

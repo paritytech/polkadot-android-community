@@ -25,6 +25,8 @@ interface ChatRequestRepository {
 
     suspend fun updateDelivery(id: String, delivery: ChatRequest.Delivery)
 
+    suspend fun revertCancellingToPending()
+
     suspend fun delete(id: String)
 
     suspend fun getLastSyncedDay(metaAccountId: Long): Long?
@@ -67,6 +69,10 @@ class RealChatRequestRepository @Inject constructor(
         )
     }
 
+    override suspend fun revertCancellingToPending() {
+        chatRequestDao.revertCancellingToPending()
+    }
+
     override suspend fun delete(id: String) {
         chatRequestDao.delete(id)
     }
@@ -90,6 +96,7 @@ class RealChatRequestRepository @Inject constructor(
             ChatRequest.Status.ACCEPTED -> ChatRequestLocal.Status.ACCEPTED
             ChatRequest.Status.DECLINED -> ChatRequestLocal.Status.DECLINED
             ChatRequest.Status.CANCELLED -> ChatRequestLocal.Status.CANCELLED
+            ChatRequest.Status.CANCELLING -> ChatRequestLocal.Status.CANCELLING
         }
     }
 }
