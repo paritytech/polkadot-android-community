@@ -89,6 +89,7 @@ class RealChatRequestRepository @Inject constructor(
             ChatRequest.Status.PENDING -> ChatRequestLocal.Status.PENDING
             ChatRequest.Status.ACCEPTED -> ChatRequestLocal.Status.ACCEPTED
             ChatRequest.Status.DECLINED -> ChatRequestLocal.Status.DECLINED
+            ChatRequest.Status.CANCELLED -> ChatRequestLocal.Status.CANCELLED
         }
     }
 }

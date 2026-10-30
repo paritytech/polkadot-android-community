@@ -33,6 +33,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepo
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.acceptance.ChatAcceptance
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.IncomingChatRequestCancelProcessor
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenPlatform
@@ -75,8 +76,12 @@ sealed class IncomingRequestProcessingResult {
     sealed class Ignored : IncomingRequestProcessingResult() {
         data object ChatRequestAlreadyProcessed : Ignored()
 
-        data object CancelNotHandled : Ignored()
+        data object ChatRequestCancelled : Ignored()
+
+        data object CancelNotApplicable : Ignored()
     }
+
+    data class RequestCancelled(val requestId: ChatRequestId) : IncomingRequestProcessingResult()
 
     /** New contact and request were created */
     data class NewContactCreated(val contact: Contact, val request: ChatRequest) : IncomingRequestProcessingResult()
@@ -104,7 +109,7 @@ interface IncomingChatRequestProcessor {
     suspend fun processIncomingRequestForOutgoingRequest(
         data: IncomingChatRequestData,
         contact: Contact
-    ): Result<IncomingRequestProcessingResult.AutoAccepted>
+    ): Result<IncomingRequestProcessingResult>
 
     suspend fun acceptIncomingRequest(contact: Contact): Result<Unit>
 
@@ -127,14 +132,20 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val knownChains: KnownChains,
     private val currentTimeContext: CurrentTimeContext,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
+    private val cancelProcessor: IncomingChatRequestCancelProcessor,
 ) : IncomingChatRequestProcessor {
     override suspend fun processIncomingRequest(
         data: IncomingChatRequestData
     ): Result<IncomingRequestProcessingResult> = runCatching {
         verifier.verify(data.request).getOrThrow()
         if (data.request.message.content is VersionedRequestContent.Cancel) {
-            return@runCatching IncomingRequestProcessingResult.Ignored.CancelNotHandled
+            return@runCatching cancelProcessor.process(
+                senderAccountId = data.request.peerIdentityAccountId(),
+                requestId = data.chatRequestId,
+                cancelTimestamp = data.request.message.timestamp.toLong(),
+            )
         }
+        if (isCancelled(data.chatRequestId)) return@runCatching IncomingRequestProcessingResult.Ignored.ChatRequestCancelled
 
         val senderAccountId = data.request.peerIdentityAccountId()
         val existingContact = contactsRepository.getContact(senderAccountId)
@@ -167,11 +178,17 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     override suspend fun processIncomingRequestForOutgoingRequest(
         data: IncomingChatRequestData,
         contact: Contact
-    ): Result<IncomingRequestProcessingResult.AutoAccepted> {
+    ): Result<IncomingRequestProcessingResult> {
         return runCatching {
+            if (isCancelled(data.chatRequestId)) return@runCatching IncomingRequestProcessingResult.Ignored.ChatRequestCancelled
+
             val existingRequest = chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestId!!)
             autoAcceptMutualRequest(contact, existingRequest, data)
         }
+    }
+
+    private suspend fun isCancelled(requestId: ChatRequestId): Boolean {
+        return chatRequestRepository.getById(requestId)?.status == ChatRequest.Status.CANCELLED
     }
 
     private suspend fun handleExistingContactWithRequest(
