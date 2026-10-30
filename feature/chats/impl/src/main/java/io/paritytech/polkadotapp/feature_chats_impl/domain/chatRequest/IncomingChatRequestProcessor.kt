@@ -64,6 +64,7 @@ private fun ChatRequestDecrypted.peerIdentityAccountId(): AccountId =
     when (val content = message.content) {
         is VersionedRequestContent.V1 -> proof.signerAccountId()
         is VersionedRequestContent.V2 -> content.content.identityProof.identityAccountId.toDataByteArray()
+        is VersionedRequestContent.Cancel -> content.content.identityProof.identityAccountId.toDataByteArray()
     }
 
 /**
@@ -73,6 +74,8 @@ sealed class IncomingRequestProcessingResult {
     /** Request was ignored (e.g., already exists with same or newer timestamp) */
     sealed class Ignored : IncomingRequestProcessingResult() {
         data object ChatRequestAlreadyProcessed : Ignored()
+
+        data object CancelNotHandled : Ignored()
     }
 
     /** New contact and request were created */
@@ -129,6 +132,10 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         data: IncomingChatRequestData
     ): Result<IncomingRequestProcessingResult> = runCatching {
         verifier.verify(data.request).getOrThrow()
+        if (data.request.message.content is VersionedRequestContent.Cancel) {
+            return@runCatching IncomingRequestProcessingResult.Ignored.CancelNotHandled
+        }
+
         val senderAccountId = data.request.peerIdentityAccountId()
         val existingContact = contactsRepository.getContact(senderAccountId)
 
@@ -451,6 +458,8 @@ class RealIncomingChatRequestProcessor @Inject constructor(
                 welcomeMessage = content.content.welcomeMessage,
                 peerDeviceEncPubKey = content.content.deviceEncPubKey.toDomain().getOrThrow(),
             )
+
+            is VersionedRequestContent.Cancel -> error("A chat request cancel carries no request content")
         }
     }
 

@@ -149,11 +149,13 @@ class RealChatRequestTransport @Inject constructor(
         topics: OutgoingChatRequestTopics,
         derivationDomain: SharedSecretDerivationDomain,
     ): Statement.Body {
+        val sessionTopic = topics.session.toStatementTopic(derivationDomain)
         val statementBody = Statement.Body(
+            channel = sessionTopic,
             expiry = StatementExpiry.createForCurrentTimestamp(),
             topic1 = topics.day.toStatementTopic(derivationDomain),
             topic2 = topics.full.toStatementTopic(derivationDomain),
-            topic3 = topics.session.toStatementTopic(derivationDomain),
+            topic3 = sessionTopic,
             data = statementData
         )
         return statementBody
