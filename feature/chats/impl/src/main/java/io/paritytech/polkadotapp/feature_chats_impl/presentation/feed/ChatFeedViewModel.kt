@@ -151,7 +151,7 @@ class ChatFeedViewModel @Inject constructor(
     private var isClosing = false
 
     private val gatedDomainMessages = combine(
-        interactor.subscribeMessages(chatId).withLastContentKept { it.isNotEmpty() },
+        interactor.subscribeMessages(chatId).withLastContentKept(keepsLastContent) { it.isNotEmpty() },
         animatesMessageReveal,
         revealedUpTo,
     ) { domainMessages, animates, revealed ->
@@ -182,7 +182,7 @@ class ChatFeedViewModel @Inject constructor(
     }.shareInBackground()
 
     override val chatDisplay = interactor.observeChatDisplay(openChatRequest)
-        .withLastContentKept { it.isSuccess }
+        .withLastContentKept(keepsLastContent) { it.isSuccess }
         .mapResult { it.toUi() }
         .withLoading()
         .stateInBackground(initialValue = LoadingState.Loading)
@@ -803,16 +803,6 @@ class ChatFeedViewModel @Inject constructor(
         router.back()
     }
 
-    private fun <T> Flow<T>.withLastContentKept(hasContent: (T) -> Boolean): Flow<T> {
-        val withLastContent = runningFold<T, Pair<T, T>?>(null) { previous, value ->
-            value to (if (hasContent(value)) value else previous?.second ?: value)
-        }.filterNotNull()
-
-        return combine(withLastContent, keepsLastContent) { (latest, lastWithContent), keeps ->
-            if (keeps) lastWithContent else latest
-        }
-    }
-
     private fun markNonDisplayableMessagesAsRead() = launchUnit {
         interactor.markNonDisplayableMessagesAsRead(chatId)
     }
@@ -832,6 +822,16 @@ class ChatFeedViewModel @Inject constructor(
 
     private fun MutableStateFlow<ChatSendMessageInputState>.updateInput(message: String) {
         update { it.copy(inputMessage = message.take(MAX_CHAT_MESSAGE_LENGTH)) }
+    }
+}
+
+private fun <T> Flow<T>.withLastContentKept(keepsLastContent: Flow<Boolean>, hasContent: (T) -> Boolean): Flow<T> {
+    val withLastContent = runningFold<T, Pair<T, T>?>(null) { previous, value ->
+        value to (if (hasContent(value)) value else previous?.second ?: value)
+    }.filterNotNull()
+
+    return combine(withLastContent, keepsLastContent) { (latest, lastWithContent), keeps ->
+        if (keeps) lastWithContent else latest
     }
 }
 
