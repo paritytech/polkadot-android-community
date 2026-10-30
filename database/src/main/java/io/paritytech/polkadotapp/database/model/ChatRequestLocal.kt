@@ -22,7 +22,9 @@ class ChatRequestLocal(
     enum class Status {
         PENDING,
         ACCEPTED,
-        DECLINED
+        DECLINED,
+        CANCELLED,
+        CANCELLING
     }
 
     enum class DeliveryStatus {

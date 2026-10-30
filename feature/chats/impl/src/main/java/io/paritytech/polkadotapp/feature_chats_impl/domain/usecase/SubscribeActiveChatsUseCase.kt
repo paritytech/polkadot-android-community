@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatExtensionId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatVariant
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactWithChatRequest
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasCancellingOutgoingRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasDeclinedIncomingRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasPendingIncomingRequest
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -68,6 +69,7 @@ class SubscribeActiveChatsUseCase @Inject constructor(
             .filter {
                 !it.hasPendingIncomingRequest() &&
                     !it.hasDeclinedIncomingRequest() &&
+                    !it.hasCancellingOutgoingRequest() &&
                     !it.contact.isBlocked
             }
             .associateBy { it.contact.accountId }

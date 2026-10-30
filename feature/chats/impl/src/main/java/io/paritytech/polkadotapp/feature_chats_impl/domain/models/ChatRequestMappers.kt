@@ -44,6 +44,8 @@ private fun ChatRequestLocal.Status.toDomain(): ChatRequest.Status {
         ChatRequestLocal.Status.PENDING -> ChatRequest.Status.PENDING
         ChatRequestLocal.Status.ACCEPTED -> ChatRequest.Status.ACCEPTED
         ChatRequestLocal.Status.DECLINED -> ChatRequest.Status.DECLINED
+        ChatRequestLocal.Status.CANCELLED -> ChatRequest.Status.CANCELLED
+        ChatRequestLocal.Status.CANCELLING -> ChatRequest.Status.CANCELLING
     }
 }
 
@@ -52,6 +54,8 @@ private fun ChatRequest.Status.toLocal(): ChatRequestLocal.Status {
         ChatRequest.Status.PENDING -> ChatRequestLocal.Status.PENDING
         ChatRequest.Status.ACCEPTED -> ChatRequestLocal.Status.ACCEPTED
         ChatRequest.Status.DECLINED -> ChatRequestLocal.Status.DECLINED
+        ChatRequest.Status.CANCELLED -> ChatRequestLocal.Status.CANCELLED
+        ChatRequest.Status.CANCELLING -> ChatRequestLocal.Status.CANCELLING
     }
 }
 
