@@ -79,6 +79,7 @@ private fun PocketScreenInternal(
         SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
+                LocalPocketScreenTransition provides transition,
                 LocalCardTilt provides cardTilt
             ) {
                 transition.AnimatedContent(
