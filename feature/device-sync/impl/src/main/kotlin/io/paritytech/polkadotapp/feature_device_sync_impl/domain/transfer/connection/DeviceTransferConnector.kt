@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.flowOf
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.DeviceTransferConstants
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.session.DeviceTransferRole
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.session.DeviceTransferSession
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
@@ -12,14 +13,11 @@ import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerChannelFa
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerConnectionLogger
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.MediaConfiguration
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.models.isTerminal
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import javax.inject.Inject
@@ -129,13 +127,6 @@ class DeviceTransferConnector @Inject constructor(
 
             merge(opened, failed).first()
         } ?: false
-    }
-
-    private suspend fun <T> raceFirst(vararg blocks: suspend () -> T): T = coroutineScope {
-        val racers = blocks.map { block -> async { block() } }
-        val winner = select { racers.forEach { racer -> racer.onAwait { it } } }
-        racers.forEach { it.cancel() }
-        winner
     }
 
     private enum class ConnectionAttempt {
