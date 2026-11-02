@@ -1,10 +1,14 @@
 package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.session
 
+import io.paritytech.polkadotapp.common.utils.childScope
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SyncPeerChannelSignaling
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import java.util.UUID
 
 class DeviceTransferSession(
+    val requestId: UUID,
+    val role: DeviceTransferRole,
     val signaling: SyncPeerChannelSignaling,
     private val transport: DeviceTransferSessionTransport,
     private val scope: CoroutineScope,
@@ -16,6 +20,8 @@ class DeviceTransferSession(
     suspend fun awaitRejection() {
         transport.awaitRejection()
     }
+
+    fun createChannelScope(): CoroutineScope = scope.childScope(supervised = true)
 
     fun dispose() {
         scope.cancel()

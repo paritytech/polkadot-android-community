@@ -32,13 +32,14 @@ class DeviceTransferSessionFactory @Inject constructor(
     ): Result<DeviceTransferSession> {
         return keyScheduleProvider.get().flatMap { keys ->
             presharedKeyEncryption(keys, requestId).flatMap { encryption ->
-                runCancellableCatching { createSession(keys, role, encryption, parentScope) }
+                runCancellableCatching { createSession(keys, requestId, role, encryption, parentScope) }
             }
         }
     }
 
     private suspend fun createSession(
         keys: DeviceTransferKeySchedule,
+        requestId: UUID,
         role: DeviceTransferRole,
         encryption: PresharedKeyEncryption,
         parentScope: CoroutineScope,
@@ -61,7 +62,7 @@ class DeviceTransferSessionFactory @Inject constructor(
         val transport = DeviceTransferSessionTransport(communicationSession, scope)
         val signaling = SyncPeerChannelSignaling(transport = transport, scope = scope, onOfferIdDetermined = {})
 
-        return DeviceTransferSession(signaling, transport, scope)
+        return DeviceTransferSession(requestId, role, signaling, transport, scope)
     }
 
     private fun presharedKeyEncryption(
