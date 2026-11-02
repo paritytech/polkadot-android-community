@@ -26,6 +26,7 @@ import io.paritytech.polkadotapp.feature_products_impl.data.repository.Persisted
 import io.paritytech.polkadotapp.feature_products_impl.data.repository.ProductRepository
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.ProductRegistrar
 import io.paritytech.polkadotapp.feature_products_impl.domain.product.gatewayUrlOf
+import io.paritytech.polkadotapp.feature_products_impl.domain.webView.BrowserWebViewProvider
 import io.paritytech.polkadotapp.tools_ipfs_api.IpfsContentLookup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -151,10 +152,12 @@ class RealProductSessionController @Inject constructor(
         persist(tab)
     }
 
-    // Focus the same-product tab (one per product), else open a new one from [url] (keeping its path).
+    // Focus the same-product tab (one per product), loading [url] into it when it names a page, else open a new
+    // one from [url] (keeping its path).
     private fun openTab(url: String) {
         val tld = dotNsTldProvider.currentTldOrNull()
         val existing = tabs.value.firstOrNull { productKey(it.url.value, tld) == productKey(url, tld) }
+        if (existing != null && loadsIntoOpenTab(existing.url.value, url)) existing.load(url)
         val tab = existing ?: Tab(nextId++, url).also { new -> tabs.update { it + new } }
         activate(tab)
     }
@@ -201,6 +204,7 @@ class RealProductSessionController @Inject constructor(
         var lastActive = 0L
 
         private var scope: CoroutineScope? = null
+        private var webViewProvider: BrowserWebViewProvider? = null
         val isLive: Boolean get() = scope != null
 
         // What the active-tab UI shows: reacts to this tab's own url/title/progress.
@@ -216,8 +220,16 @@ class RealProductSessionController @Inject constructor(
         fun sleep() {
             scope?.cancel()
             scope = null
+            webViewProvider = null
             webView.value = null
             loadProgress.value = DotNsLoadProgress.Idle
+        }
+
+        // A sleeping tab wakes up at [target]; a live one loads it into its WebView.
+        fun load(target: String) {
+            url.value = target
+            val provider = webViewProvider ?: return
+            scope?.launch { provider.getWebView().loadUrl(target) }
         }
 
         fun info(activeId: Long?, icons: Map<String, String>): Flow<TabInfo> =
@@ -237,6 +249,7 @@ class RealProductSessionController @Inject constructor(
                 scope = scope,
                 onDeeplink = { launchDeeplink(it, scope) },
             )
+            webViewProvider = provider
 
             provider.addOnPageStartedListener { url.value = it }
             provider.addOnPageFinishedListener {
