@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.data.encryption
 
 import io.paritytech.polkadotapp.common.data.encryption.MessageEncryption
 import io.paritytech.polkadotapp.common.data.encryption.chaCha20Poly1305
+import io.paritytech.polkadotapp.common.data.encryption.hkdfSha256
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.AeadKey
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
@@ -104,7 +105,7 @@ class MultiDeviceEnvelopeEncryption(
     }
 
     private suspend fun deriveEnvelopeKey(peerPublicKey: X25519PublicKey): AeadKey {
-        return hkdfSha256(deriveSharedSecretWith(peerPublicKey))
+        return hkdfSha256(deriveSharedSecretWith(peerPublicKey).bytes.value)
     }
 
     private suspend fun deriveSharedSecretWith(publicKey: X25519PublicKey) =

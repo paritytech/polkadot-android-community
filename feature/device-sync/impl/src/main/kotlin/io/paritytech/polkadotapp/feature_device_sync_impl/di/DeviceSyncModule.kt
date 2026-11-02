@@ -12,6 +12,8 @@ import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallatio
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.RealActiveInstallationRecordRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.device.DeviceInfoProvider
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.device.RealDeviceInfoProvider
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.DeviceTransferRequestRepository
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.RealDeviceTransferRequestRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.RealDeviceSyncCoordinator
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.activeInstallation.RealActiveInstallationManager
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.DeviceTransferKeyScheduleProvider
@@ -40,6 +42,9 @@ internal interface DeviceSyncModule {
 
     @Binds
     fun bindDeviceInfoProvider(impl: RealDeviceInfoProvider): DeviceInfoProvider
+
+    @Binds
+    fun bindDeviceTransferRequestRepository(impl: RealDeviceTransferRequestRepository): DeviceTransferRequestRepository
 
     @Binds
     @IntoSet
