@@ -45,6 +45,11 @@ fun List<SyncEntityScale>.itemCount(): Int = sumOf { entity ->
         is SyncEntityScale.ChatsAdded -> entity.chats.size
         is SyncEntityScale.ChatsRemoved -> entity.chats.size
         is SyncEntityScale.Messages -> entity.messages.size
+        is SyncEntityScale.ChatsBlocked -> entity.states.size
+        is SyncEntityScale.IncomingRequestsAdded -> entity.requests.size
+        is SyncEntityScale.IncomingRequestsStatusUpdated -> entity.updates.size
+        is SyncEntityScale.OutgoingRequestsAdded -> entity.requests.size
+        is SyncEntityScale.OutgoingRequestsStatusUpdated -> entity.updates.size
     }
 }
 
