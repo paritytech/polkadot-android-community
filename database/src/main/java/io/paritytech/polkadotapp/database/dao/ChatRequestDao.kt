@@ -21,8 +21,20 @@ interface ChatRequestDao {
     @Query("SELECT * FROM chat_requests WHERE id = :id")
     fun subscribeById(id: String): Flow<ChatRequestLocal?>
 
-    @Query("UPDATE chat_requests SET status = :status WHERE id = :id")
-    suspend fun updateStatus(id: String, status: Status)
+    @Query("SELECT * FROM chat_requests")
+    suspend fun getAll(): List<ChatRequestLocal>
+
+    @Query("SELECT * FROM chat_requests WHERE statusChangedAt > :after")
+    suspend fun getStatusChangedAfter(after: Long): List<ChatRequestLocal>
+
+    @Query("SELECT MAX(statusChangedAt) FROM chat_requests")
+    fun observeLastStatusChangedAt(): Flow<Long?>
+
+    @Query("UPDATE chat_requests SET status = :status, statusChangedAt = :changedAt WHERE id = :id")
+    suspend fun updateStatus(id: String, status: Status, changedAt: Long)
+
+    @Query("UPDATE chat_requests SET statusChangedAt = :changedAt WHERE id = :id")
+    suspend fun updateStatusChangedAt(id: String, changedAt: Long)
 
     @Query(
         """

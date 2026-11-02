@@ -1,11 +1,13 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.models
 
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.database.model.ChatRequestLocal
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 
 fun ChatRequestLocal.toDomain(): ChatRequest {
     return ChatRequest(
         welcomeMessageId = id,
+        peer = peerAccountId?.toDataByteArray(),
         timestamp = timestamp,
         direction = direction.toDomain(),
         status = status.toDomain(),
@@ -13,7 +15,7 @@ fun ChatRequestLocal.toDomain(): ChatRequest {
     )
 }
 
-fun ChatRequest.toLocal(): ChatRequestLocal {
+fun ChatRequest.toLocal(statusChangedAt: Long): ChatRequestLocal {
     return ChatRequestLocal(
         id = id,
         timestamp = timestamp,
@@ -22,6 +24,8 @@ fun ChatRequest.toLocal(): ChatRequestLocal {
         deliveryStatus = delivery.toLocalStatus(),
         deliveredVia = delivery.toLocalVia(),
         lastDeliveredPeriod = delivery.toLocalPeriod(),
+        peerAccountId = peer?.value,
+        statusChangedAt = statusChangedAt,
     )
 }
 

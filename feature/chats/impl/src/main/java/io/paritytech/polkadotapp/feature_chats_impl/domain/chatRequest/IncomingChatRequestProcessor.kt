@@ -294,6 +294,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private fun createNewChatRequest(incomingData: IncomingChatRequestData): ChatRequest {
         return ChatRequest(
             welcomeMessageId = incomingData.chatRequestId,
+            peer = incomingData.request.peerIdentityAccountId(),
             timestamp = incomingData.request.message.timestamp.toLong(),
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.PENDING,
@@ -324,6 +325,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
 
         val request = ChatRequest(
             welcomeMessageId = data.request.message.messageId,
+            peer = peerAccountId,
             timestamp = data.request.message.timestamp.toLong(),
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.PENDING,

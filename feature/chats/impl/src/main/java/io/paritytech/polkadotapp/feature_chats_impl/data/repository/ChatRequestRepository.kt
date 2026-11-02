@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_impl.data.repository
 
+import io.paritytech.polkadotapp.common.utils.mapToUnit
 import io.paritytech.polkadotapp.database.dao.ChatRequestDao
 import io.paritytech.polkadotapp.database.dao.ChatRequestSyncStateDao
 import io.paritytech.polkadotapp.database.model.ChatRequestLocal
@@ -11,8 +12,10 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocalPeriod
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocalStatus
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocalVia
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
+import kotlin.time.Instant
 
 interface ChatRequestRepository {
     suspend fun save(request: ChatRequest)
@@ -22,6 +25,14 @@ interface ChatRequestRepository {
     fun subscribeById(id: String): Flow<ChatRequest?>
 
     suspend fun updateStatus(id: String, status: ChatRequest.Status)
+
+    suspend fun recordCancellation(id: String)
+
+    suspend fun getAll(): List<ChatRequest>
+
+    suspend fun getStatusChangedAfter(after: Instant): List<ChatRequest>
+
+    fun observeStatusChanges(): Flow<Unit>
 
     suspend fun updateDelivery(id: String, delivery: ChatRequest.Delivery)
 
@@ -43,7 +54,7 @@ class RealChatRequestRepository @Inject constructor(
     private val syncStateDao: ChatRequestSyncStateDao
 ) : ChatRequestRepository {
     override suspend fun save(request: ChatRequest) {
-        chatRequestDao.upsert(request.toLocal())
+        chatRequestDao.upsert(request.toLocal(statusChangedAt = System.currentTimeMillis()))
     }
 
     override suspend fun getById(id: String): ChatRequest? {
@@ -55,7 +66,23 @@ class RealChatRequestRepository @Inject constructor(
     }
 
     override suspend fun updateStatus(id: String, status: ChatRequest.Status) {
-        chatRequestDao.updateStatus(id, status.toLocalStatus())
+        chatRequestDao.updateStatus(id, status.toLocalStatus(), changedAt = System.currentTimeMillis())
+    }
+
+    override suspend fun recordCancellation(id: String) {
+        chatRequestDao.updateStatusChangedAt(id, changedAt = System.currentTimeMillis())
+    }
+
+    override suspend fun getAll(): List<ChatRequest> {
+        return chatRequestDao.getAll().map { it.toDomain() }
+    }
+
+    override suspend fun getStatusChangedAfter(after: Instant): List<ChatRequest> {
+        return chatRequestDao.getStatusChangedAfter(after.toEpochMilliseconds()).map { it.toDomain() }
+    }
+
+    override fun observeStatusChanges(): Flow<Unit> {
+        return chatRequestDao.observeLastStatusChangedAt().distinctUntilChanged().mapToUnit()
     }
 
     override suspend fun updateDelivery(id: String, delivery: ChatRequest.Delivery) {

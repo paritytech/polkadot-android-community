@@ -22,6 +22,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.devices.OurDevicesProv
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.IncomingChatPushDecoder
 import io.paritytech.polkadotapp.feature_chats_api.domain.sessions.ContactChatSessionRefCounter
@@ -109,6 +110,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatReque
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealAddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealApplyRemoteChatMessageUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealChatRequestsListInteractor
+import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealChatStateSyncUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealRemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.middleware.CompoundExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
@@ -149,6 +151,9 @@ internal interface ChatsFeatureApiModule {
 
     @Binds
     fun bindApplyRemoteChatMessageUseCase(impl: RealApplyRemoteChatMessageUseCase): ApplyRemoteChatMessageUseCase
+
+    @Binds
+    fun bindChatStateSyncUseCase(impl: RealChatStateSyncUseCase): ChatStateSyncUseCase
 
     @Binds
     fun bindContactDevicesRepository(impl: RealContactDevicesRepository): ContactDevicesRepository

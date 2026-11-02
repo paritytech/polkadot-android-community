@@ -31,13 +31,13 @@ class SyncEntityCollector @Inject constructor(
     private val accountRepository: AccountRepository,
     private val applyRemoteChatMessageUseCase: ApplyRemoteChatMessageUseCase,
     private val syncFilter: DeviceSyncFilter,
+    private val chatStateCollector: ChatStateEntityCollector,
 ) {
     suspend fun collect(checkpoint: Instant): List<SyncEntityScale> = listOfNotNull(
         collectDevices(checkpoint),
         collectChatsAdded(checkpoint),
         collectChatsRemoved(checkpoint),
-        collectMessages(checkpoint),
-    )
+    ) + chatStateCollector.collect(checkpoint) + listOfNotNull(collectMessages(checkpoint))
 
     private suspend fun collectDevices(checkpoint: Instant): SyncEntityScale.Devices? {
         val checkpointMillis = checkpoint.toEpochMilliseconds()

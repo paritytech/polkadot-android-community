@@ -13,6 +13,8 @@ class ChatRequestLocal(
     @ColumnInfo(defaultValue = "DELIVERED") val deliveryStatus: DeliveryStatus,
     val deliveredVia: DeliveredVia?,
     val lastDeliveredPeriod: Long?,
+    val peerAccountId: ByteArray?,
+    val statusChangedAt: Long?,
 ) {
     enum class Direction {
         INCOMING,

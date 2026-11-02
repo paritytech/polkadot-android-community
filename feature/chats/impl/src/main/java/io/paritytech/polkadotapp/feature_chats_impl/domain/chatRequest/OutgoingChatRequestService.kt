@@ -36,9 +36,10 @@ class OutgoingChatRequestPayload(
     val welcomeMessage: ChatMessage.Content.RichText?,
 )
 
-fun newOutgoingChatRequest(): ChatRequest {
+fun newOutgoingChatRequest(peer: AccountId): ChatRequest {
     return ChatRequest(
         welcomeMessageId = UUID.randomUUID().toString(),
+        peer = peer,
         timestamp = System.currentTimeMillis(),
         direction = ChatRequest.Direction.OUTGOING,
         status = ChatRequest.Status.PENDING,
@@ -64,6 +65,8 @@ interface OutgoingChatRequestService {
     ): Result<Boolean>
 
     suspend fun isStoredBy(contact: Contact, signer: AccountId): Result<Boolean>
+
+    suspend fun composeRequestContent(payload: OutgoingChatRequestPayload): Result<VersionedRequestContent>
 }
 
 @Singleton
@@ -103,6 +106,12 @@ class RealOutgoingChatRequestService @Inject constructor(
         return identityAccountOf(contact).flatMap { identityAccount ->
             val session = constructChatRequestTopics(contact, identityAccount.defaultAccountId()).session
             chatRequestTransport.isChatRequestStored(session, contact.sharedSecretDerivationDomain, signer)
+        }
+    }
+
+    override suspend fun composeRequestContent(payload: OutgoingChatRequestPayload): Result<VersionedRequestContent> {
+        return identityAccountOf(payload.contact).flatMap { identityAccount ->
+            runCancellableCatching { constructRequestContent(identityAccount, payload) }
         }
     }
 
