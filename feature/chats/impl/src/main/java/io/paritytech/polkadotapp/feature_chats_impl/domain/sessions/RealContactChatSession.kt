@@ -10,7 +10,8 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSession
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.*
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.decodeAlwaysDecodableChatMessagePart
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.isCompactionCommit
-import io.paritytech.polkadotapp.feature_chats_impl.data.model.isSeen
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.isTransient
+import io.paritytech.polkadotapp.feature_chats_impl.data.model.partitionTransient
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toChatMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotificationPayloadEncoder
@@ -55,6 +56,7 @@ class RealContactChatSession(
     private val incomingChatMessageProcessor: IncomingChatMessageProcessor,
     private val notificationPayloadEncoder: ChatNotificationPayloadEncoder,
     private val seenMessageHandler: SeenMessageHandler,
+    private val transientMessageProcessor: TransientMessageProcessor,
 ) : ContactChatSession, CoroutineScope by scope {
     private val mainCommunicationSession get() = communicationSessions.main
 
@@ -200,7 +202,6 @@ class RealContactChatSession(
     private suspend fun handleNewMessagesReceived(source: CommunicationSession, messages: List<EncodedMessage>) {
         Timber.d("handleNewMessagesReceived: ${messages.size} messages from ${contact.username}")
 
-        seenMessageHandler.saveReceived(messages, contact.accountId)
         incomingChatMessageProcessor.processRaw(source.remoteAccount.accountId, messages, ChatMessagePlacement.Latest)
     }
 
@@ -210,7 +211,7 @@ class RealContactChatSession(
         for (unsupportedMessage in unsupportedMessages) {
             val rawContent = (unsupportedMessage.content as? ChatMessage.Content.Unsupported)?.rawContent
                 ?: continue
-            if (rawContent.isSeen()) continue
+            if (rawContent.isTransient()) continue
 
             val parsedMessage = rawContent.toChatMessage(
                 authorAccountId = mainCommunicationSession.remoteAccount.accountId,
@@ -234,9 +235,10 @@ class RealContactChatSession(
     private suspend fun handleResponseReceived(
         messages: List<EncodedMessage>
     ) {
-        seenMessageHandler.saveDelivered(messages, contact.accountId)
+        val (transientMessages, chatMessages) = messages.partitionTransient()
+        transientMessageProcessor.processDelivered(contact.accountId, transientMessages)
 
-        for (encodedMessage in messages) {
+        for (encodedMessage in chatMessages) {
             val versionedMessage = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messageId = versionedMessage.id,
@@ -251,7 +253,7 @@ class RealContactChatSession(
     private suspend fun handleMessagesSentSuccessfully(
         messages: List<EncodedMessage>
     ) {
-        for (encodedMessage in messages) {
+        for (encodedMessage in messages.filterNot { it.isTransient() }) {
             val messagePart = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messagePart.id,

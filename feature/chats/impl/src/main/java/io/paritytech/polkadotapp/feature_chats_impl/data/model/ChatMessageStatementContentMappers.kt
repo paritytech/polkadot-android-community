@@ -17,11 +17,11 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Attachment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageReactionContent
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.HopTicket
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastReadMessage
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.TransientMessage
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.AlwaysDecodableChatMessagePart
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageReactionStatementContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageStatement
@@ -78,12 +78,25 @@ fun EncodedMessage.isCompactionCommit(): Boolean {
     return versioned.message.content is ChatMessageStatementContent.CompactionCommit
 }
 
-fun EncodedMessage.decodeSeenMessageId(): ChatMessageId? {
+fun EncodedMessage.toTransientMessageOrNull(): TransientMessage? {
     val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return null
-    return (versioned.message.content as? ChatMessageStatementContent.Seen)?.messageId
+    return when (val content = versioned.message.content) {
+        is ChatMessageStatementContent.Seen -> TransientMessage.Seen(content.messageId)
+        else -> null
+    }
 }
 
-fun EncodedMessage.isSeen(): Boolean = decodeSeenMessageId() != null
+fun EncodedMessage.isTransient(): Boolean = toTransientMessageOrNull() != null
+
+fun List<EncodedMessage>.partitionTransient(): Pair<List<TransientMessage>, List<EncodedMessage>> {
+    val transientMessages = mutableListOf<TransientMessage>()
+    val chatMessages = mutableListOf<EncodedMessage>()
+    for (message in this) {
+        val transientMessage = message.toTransientMessageOrNull()
+        if (transientMessage != null) transientMessages += transientMessage else chatMessages += message
+    }
+    return transientMessages to chatMessages
+}
 
 fun LastReadMessage.toEncodedSeenMessage(): Result<EncodedMessage> {
     val message = ChatMessageStatement(

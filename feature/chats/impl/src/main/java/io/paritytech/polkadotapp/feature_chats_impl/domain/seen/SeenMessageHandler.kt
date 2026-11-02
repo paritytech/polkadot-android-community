@@ -6,7 +6,6 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatActiveTracker
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
-import io.paritytech.polkadotapp.feature_chats_impl.data.model.decodeSeenMessageId
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedSeenMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -16,6 +15,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.Encod
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.merge
@@ -30,27 +30,11 @@ class SeenMessageHandler @Inject constructor(
     private val chatSeenRepository: ChatSeenRepository,
     private val chatActiveTracker: ChatActiveTracker,
 ) {
-    suspend fun saveReceived(messages: List<EncodedMessage>, contactAccountId: AccountId) {
-        val contact = contactsRepository.getContact(contactAccountId) ?: return
-        if (contact.isBlocked) return
-
-        val chatId = ChatId.fromContact(contactAccountId)
-        messages.mapNotNull { it.decodeSeenMessageId() }.forEach { messageId ->
-            runCancellableCatching { chatSeenRepository.saveReceivedSeen(chatId, messageId) }
-                .logFailure("Failed to save a seen message from $contactAccountId")
-        }
-    }
-
-    suspend fun saveDelivered(messages: List<EncodedMessage>, contactAccountId: AccountId) {
-        val messageId = messages.mapNotNull { it.decodeSeenMessageId() }.lastOrNull() ?: return
-
-        runCancellableCatching { chatSeenRepository.saveDeliveredSeen(ChatId.fromContact(contactAccountId), messageId) }
-            .logFailure("Failed to save a delivered seen message to $contactAccountId")
-    }
-
     fun sendSeenMessages(contactAccountId: AccountId, send: (EncodedMessage) -> Unit): Flow<*> {
         val chatId = ChatId.fromContact(contactAccountId)
-        val lastReadChanges = chatSeenRepository.subscribeLastReadIncomingMessage(chatId).distinctUntilChangedBy { it?.id }
+        val lastReadChanges = chatSeenRepository.subscribeLastReadIncomingMessage(chatId)
+            .distinctUntilChangedBy { it?.id }
+            .drop(1) // the session restarts on every foreground, and that alone must not send a Seen
         val chatOpenings = chatActiveTracker.subscribe().filter { it == chatId }
 
         return merge(lastReadChanges, chatOpenings)

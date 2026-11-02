@@ -115,6 +115,7 @@ internal class RealContactChatSessionManager @Inject constructor(
     private val chatSigners: ContactChatSigners,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
     private val seenMessageHandler: SeenMessageHandler,
+    private val transientMessageProcessor: TransientMessageProcessor,
     dispatchers: CoroutineDispatchers
 ) : ContactChatSessionManager, ContactChatSessionRestarter, CoroutineScope, ChatSessionCallbacks {
     companion object {
@@ -295,6 +296,7 @@ internal class RealContactChatSessionManager @Inject constructor(
             incomingChatMessageProcessor = incomingChatMessageProcessor,
             notificationPayloadEncoder = notificationPayloadEncoder,
             seenMessageHandler = seenMessageHandler,
+            transientMessageProcessor = transientMessageProcessor,
         )
 
         syncIncomingPushId(chatSession, contact)
