@@ -128,7 +128,8 @@ class RealExecuteTopUpUseCase @Inject constructor(
  * while claiming is still going the rest can still arrive, so a shortfall reports as progress.
  */
 private fun CoinageTransferDetection.toStatus(expected: Balance): TopUpStatus = when (this) {
-    is CoinageTransferDetection.Detecting -> TopUpStatus.Detecting
+    is CoinageTransferDetection.Detecting,
+    is CoinageTransferDetection.Absent -> TopUpStatus.Detecting
 
     is CoinageTransferDetection.Claiming -> TopUpStatus.Claiming
 

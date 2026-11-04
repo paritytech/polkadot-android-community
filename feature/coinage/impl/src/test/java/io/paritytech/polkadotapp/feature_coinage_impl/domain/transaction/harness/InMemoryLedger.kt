@@ -328,9 +328,13 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
         }
 
         val handedOff = inputKeys.filterTo(mutableSetOf()) { it in store.handoffs }
-        inputs.firstOrNull { it.publicKey in handedOff }?.let {
+        inputs.firstOrNull { it.publicKey in handedOff && it.input !is CoinageInput.Coin.Reclaimed }?.let {
             return io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model
                 .CoinageRegistrationError.InputHandedOff(it.input)
+        }
+        inputs.firstOrNull { it.publicKey !in handedOff && it.input is CoinageInput.Coin.Reclaimed }?.let {
+            return io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model
+                .CoinageRegistrationError.ReclaimedInputNotHandedOff(it.input)
         }
 
         val claimed = store.filterClaimed(inputKeys) + inputKeys.duplicates()
@@ -499,6 +503,7 @@ private fun CoinageInput.kind() = when (this) {
 
 private fun CoinageInput.ownOrNull(): OwnAsset? = when (this) {
     is CoinageInput.Coin.Own -> OwnAsset.Coin(derivationIndex)
+    is CoinageInput.Coin.Reclaimed -> OwnAsset.Coin(derivationIndex)
     is CoinageInput.Coin.Received -> null
     is CoinageInput.Voucher -> OwnAsset.Voucher(ringVrfIndex)
 }
