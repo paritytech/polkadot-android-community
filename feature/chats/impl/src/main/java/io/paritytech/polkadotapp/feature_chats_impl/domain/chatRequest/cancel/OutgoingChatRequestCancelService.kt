@@ -15,6 +15,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.isCancellingOutgoing
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.pendingChatRequestIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
@@ -90,6 +91,8 @@ class OutgoingChatRequestCancelService @Inject constructor(
 
     private suspend fun publishCancel(contact: Contact, requestId: ChatRequestId): Result<Unit> {
         return runCancellableCatching { chatRequestRepository.getByIdOrThrow(requestId) }.flatMap { request ->
+            if (!request.isCancellingOutgoing()) return@flatMap Result.failure(OutgoingChatRequestNotPending(requestId))
+
             val period = request.delivery.renewalPeriod ?: return@flatMap Result.success(Unit)
 
             publishFromNotificationAccount(contact, request, period)
@@ -128,15 +131,30 @@ class OutgoingChatRequestCancelService @Inject constructor(
 
         runCancellableCatching {
             contactsRepository.withTransaction {
+                if (!canRemoveChat(requestId, chatId)) return@withTransaction false
+
                 chatMessageRepository.deleteAllChatMessages(chatId)
                 removeContactUseCase.removeContact(contactAccountId)
                 chatDraftRepository.deleteDraft(chatId)
                 chatRequestRepository.delete(requestId)
+                true
             }
         }
-            .flatMap { chatSigners.release(contactAccountId) }
-            .onSuccess { Timber.i("chatRequestCancel: request $requestId cancelled") }
+            .flatMap { removed ->
+                if (!removed) {
+                    Timber.i("chatRequestCancel: request $requestId was accepted and its chat has messages; keeping it")
+                    return@flatMap Result.success(Unit)
+                }
+
+                chatSigners.release(contactAccountId).onSuccess { Timber.i("chatRequestCancel: request $requestId cancelled") }
+            }
             .logFailure("Chat request $requestId was cancelled on the store but not removed locally")
+    }
+
+    private suspend fun canRemoveChat(requestId: ChatRequestId, chatId: ChatId): Boolean {
+        val request = chatRequestRepository.getById(requestId) ?: return false
+
+        return request.isCancellingOutgoing() || !chatMessageRepository.hasConversationMessages(chatId)
     }
 
     private suspend fun revert(requestId: ChatRequestId, error: Throwable) {
