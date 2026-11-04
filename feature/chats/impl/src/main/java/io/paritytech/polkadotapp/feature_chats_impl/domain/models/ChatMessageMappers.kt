@@ -71,7 +71,6 @@ fun ChatMessageLocal.toDomain(
         origin = origin.toDomain(),
         content = content.toDomain(customContentDecoder),
         status = status.toDomain(),
-        sortOrder = sortOrder,
         replyToMessageId = replyToMessageId
     )
 }

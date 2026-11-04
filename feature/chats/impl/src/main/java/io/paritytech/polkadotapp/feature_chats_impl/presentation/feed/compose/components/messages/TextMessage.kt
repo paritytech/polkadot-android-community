@@ -190,7 +190,7 @@ private fun MessagesPreview() {
                         id = "2",
                         text = "Hi! How are you doing today? 123",
                         direction = ChatMessageUiModel.Direction.INCOMING,
-                        status = ChatMessageUiModel.Status.SEEN,
+                        status = ChatMessageUiModel.Status.READ,
                         timestamp = System.currentTimeMillis(),
                         reactions = persistentListOf(
                             ChatMessageUiModel.Reaction(count = 3, emoji = "👍", reactedByUser = true),

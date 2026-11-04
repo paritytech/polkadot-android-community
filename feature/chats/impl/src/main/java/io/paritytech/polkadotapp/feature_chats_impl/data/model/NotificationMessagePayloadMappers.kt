@@ -62,8 +62,7 @@ private fun ChatMessageStatementContent.toStripped(): Result<StrippedChatMessage
             ChatMessageStatementContent.LeftChat,
             is ChatMessageStatementContent.DeviceAdded,
             is ChatMessageStatementContent.DeviceRemoved,
-            is ChatMessageStatementContent.CompactionCommit,
-            is ChatMessageStatementContent.Seen -> error("${this::class.simpleName} is not displayable as push")
+            is ChatMessageStatementContent.CompactionCommit -> error("${this::class.simpleName} is not displayable as push")
         }
     }
 }
