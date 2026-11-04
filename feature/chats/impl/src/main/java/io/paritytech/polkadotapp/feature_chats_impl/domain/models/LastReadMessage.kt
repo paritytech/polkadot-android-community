@@ -4,5 +4,6 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 
 data class LastReadMessage(
     val id: ChatMessageId,
+    val sortOrder: Long,
     val timestamp: Long,
 )

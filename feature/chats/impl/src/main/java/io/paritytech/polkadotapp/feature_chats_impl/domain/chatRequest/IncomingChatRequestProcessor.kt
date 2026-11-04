@@ -389,7 +389,8 @@ class RealIncomingChatRequestProcessor @Inject constructor(
             timestamp = data.request.message.timestamp.toLong(),
             content = ChatMessage.Content.ChatRequest(welcomeMessage),
             origin = ChatMessageOrigin.Contact(senderAccountId),
-            status = ChatMessage.Status.NEW
+            status = ChatMessage.Status.NEW,
+            sortOrder = null,
         )
         chatEngine.get().saveMessage(chatMessage)
     }

@@ -183,8 +183,8 @@ class ChatFeedInteractor @Inject internal constructor(
 
     fun subscribeMessages(chatId: ChatId) = chatEngine.subscribeMessagesFeed(chatId)
 
-    fun subscribeSeenMessageIds(chatId: ChatId): Flow<Set<ChatMessageId>> {
-        return chatSeenRepository.subscribeSeenOutgoingMessageIds(chatId).inBackground()
+    fun subscribePeerSeenOrder(chatId: ChatId): Flow<Long> {
+        return chatSeenRepository.subscribePeerSeenOrder(chatId).inBackground()
     }
 
     suspend fun sendTextMessage(

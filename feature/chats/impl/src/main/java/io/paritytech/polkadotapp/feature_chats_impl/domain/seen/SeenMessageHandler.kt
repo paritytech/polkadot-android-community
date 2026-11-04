@@ -4,16 +4,17 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
+import io.paritytech.polkadotapp.common.utils.throttleLatest
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatActiveTracker
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_impl.data.model.toEncodedSeenMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastReadMessage
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastSentSeen
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.isActiveChat
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
@@ -23,7 +24,7 @@ import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 
-private val SEND_DELAY = 1.seconds
+private val SEND_WINDOW = 1.seconds
 
 class SeenMessageHandler @Inject constructor(
     private val contactsRepository: ContactsRepository,
@@ -38,7 +39,7 @@ class SeenMessageHandler @Inject constructor(
         val chatOpenings = chatActiveTracker.subscribe().filter { it == chatId }
 
         return merge(lastReadChanges, chatOpenings)
-            .debounce(SEND_DELAY)
+            .throttleLatest(SEND_WINDOW)
             .onEach { sendIfNotDelivered(contactAccountId, send) }
     }
 
@@ -54,7 +55,13 @@ class SeenMessageHandler @Inject constructor(
 
         val chatId = ChatId.fromContact(contactAccountId)
         val message = chatSeenRepository.subscribeLastReadIncomingMessage(chatId).first() ?: return null
-        val deliveredMessageId = chatSeenRepository.getDeliveredSeenMessageId(chatId)
-        return message.takeIf { !it.id.equals(deliveredMessageId, ignoreCase = true) }
+        val lastSentSeen = chatSeenRepository.getLastSentSeen(chatId)
+        return message.takeIf { it.isNewerThan(lastSentSeen) }
+    }
+
+    private fun LastReadMessage.isNewerThan(lastSentSeen: LastSentSeen?): Boolean {
+        if (lastSentSeen == null) return true
+
+        return sortOrder > lastSentSeen.sortOrder || (sortOrder == lastSentSeen.sortOrder && timestamp > lastSentSeen.timestamp)
     }
 }

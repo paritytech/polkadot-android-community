@@ -81,7 +81,7 @@ fun EncodedMessage.isCompactionCommit(): Boolean {
 fun EncodedMessage.toTransientMessageOrNull(): TransientMessage? {
     val versioned = decodeChatMessageStatement().getOrNull()?.versioned as? VersionedChatMessage.V1 ?: return null
     return when (val content = versioned.message.content) {
-        is ChatMessageStatementContent.Seen -> TransientMessage.Seen(content.messageId)
+        is ChatMessageStatementContent.Seen -> TransientMessage.Seen(content.messageId, content.timestamp.toLong())
         else -> null
     }
 }
@@ -143,6 +143,7 @@ fun EncodedMessage.toUnsupportedChatMessage(
             origin = ChatMessageOrigin.fromContactChat(authorAccountId, contactAccountId),
             content = ChatMessage.Content.Unsupported(this),
             status = messageStatus,
+            sortOrder = null,
             chatId = ChatId.fromContact(contactAccountId)
         )
     }
@@ -284,6 +285,7 @@ private fun ChatMessageV1.toChatMessage(
         origin = ChatMessageOrigin.fromContactChat(authorAccountId, contactAccountId),
         content = content.toChatMessageContent(),
         status = messageStatus,
+        sortOrder = null,
         chatId = ChatId.fromContact(contactAccountId),
         replyToMessageId = extractedReplyId
     )

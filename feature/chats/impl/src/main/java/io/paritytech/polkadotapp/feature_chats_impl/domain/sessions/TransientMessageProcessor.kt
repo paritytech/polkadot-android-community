@@ -18,16 +18,19 @@ class TransientMessageProcessor @Inject constructor(
         val chatId = ChatId.fromContact(contact.accountId)
         for (message in messages) {
             when (message) {
-                is TransientMessage.Seen -> runCancellableCatching { chatSeenRepository.saveReceivedSeen(chatId, message.messageId) }
+                is TransientMessage.Seen -> runCancellableCatching { chatSeenRepository.saveReceivedSeen(chatId, message.messageId, message.timestamp) }
                     .logFailure("Failed to save a seen message from ${contact.accountId}")
             }
         }
     }
 
     suspend fun processDelivered(contactAccountId: AccountId, messages: List<TransientMessage>) {
-        val seen = messages.filterIsInstance<TransientMessage.Seen>().lastOrNull() ?: return
-
-        runCancellableCatching { chatSeenRepository.saveDeliveredSeen(ChatId.fromContact(contactAccountId), seen.messageId) }
-            .logFailure("Failed to save a delivered seen message to $contactAccountId")
+        val chatId = ChatId.fromContact(contactAccountId)
+        for (message in messages) {
+            when (message) {
+                is TransientMessage.Seen -> runCancellableCatching { chatSeenRepository.saveDeliveredSeen(chatId, message.messageId, message.timestamp) }
+                    .logFailure("Failed to save a delivered seen message to $contactAccountId")
+            }
+        }
     }
 }

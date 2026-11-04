@@ -42,7 +42,7 @@ class ChatMessageUiMapper @Inject constructor(
         originDisplayResolver: MessageOriginDisplayResolver,
         reactions: Map<ChatMessageId, List<ChatMessageReaction>>,
         revisions: Map<ChatMessageId, MessageRevision>,
-        seenMessageIds: Set<ChatMessageId>,
+        peerSeenOrder: Long,
         customMessageRenderers: Map<String, CustomChatMessageRenderer<*>> = emptyMap(),
         activeCall: ActiveCallState? = null
     ): ImmutableList<ChatMessageUiModel> {
@@ -74,7 +74,7 @@ class ChatMessageUiMapper @Inject constructor(
                 messageReactions = messageReactions,
                 customMessageRenderers = customMessageRenderers,
                 callContext = callContext,
-                isSeenByPeer = message.id in seenMessageIds
+                isSeenByPeer = message.isSeenByPeer(peerSeenOrder)
             )
         }.toImmutableList()
     }
@@ -312,6 +312,13 @@ class ChatMessageUiMapper @Inject constructor(
             allowedMenuActions = chatMenuActionsProvider.getMessageActions(message, userInputState).toImmutableList(),
         )
     }
+}
+
+private fun ChatMessage.isSeenByPeer(peerSeenOrder: Long): Boolean {
+    val sortOrder = sortOrder ?: return false
+    val isSentOrDelivered = status == ChatMessage.Status.IS_SENT || status == ChatMessage.Status.IS_READ
+
+    return origin.isUser() && isSentOrDelivered && sortOrder in 1..peerSeenOrder
 }
 
 private fun ChatMessage.Status.toUi(direction: ChatMessageUiModel.Direction): ChatMessageUiModel.Status {
