@@ -6,6 +6,7 @@ import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasPendingOutgoingRequest
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
+import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccountId
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -101,8 +102,13 @@ class RealIncomingChatRequestService @Inject constructor(
 
             val requestData = IncomingChatRequestData(request, metaAccount.id, contact.sharedSecretDerivationDomain)
 
-            processor.processIncomingRequestForOutgoingRequest(requestData, contact)
-                .logFailure("Failed to process request: $request")
+            if (request.message.content is VersionedRequestContent.Cancel) {
+                processor.processIncomingRequest(requestData)
+                    .logFailure("Failed to process request cancel: $request")
+            } else {
+                processor.processIncomingRequestForOutgoingRequest(requestData, contact)
+                    .logFailure("Failed to process request: $request")
+            }
         }
     }
 

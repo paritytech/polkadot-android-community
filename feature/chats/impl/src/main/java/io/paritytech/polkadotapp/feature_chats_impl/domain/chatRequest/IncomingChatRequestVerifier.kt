@@ -22,10 +22,13 @@ class RealIncomingChatRequestVerifier @Inject constructor(
     private val knownChains: KnownChains,
 ) : IncomingChatRequestVerifier {
     override suspend fun verify(request: ChatRequestDecrypted): Result<Unit> = runCatching {
-        val content = request.message.content
-        if (content !is VersionedRequestContent.V2) return@runCatching
+        val identityProof = when (val content = request.message.content) {
+            is VersionedRequestContent.V1 -> return@runCatching
+            is VersionedRequestContent.V2 -> content.content.identityProof
+            is VersionedRequestContent.Cancel -> content.content.identityProof
+        }
 
-        val proof = content.content.identityProof.toDomain()
+        val proof = identityProof.toDomain()
         val statementAccountId = request.proof.signerAccountId()
 
         val peerChatPubKey = resourcesRepository

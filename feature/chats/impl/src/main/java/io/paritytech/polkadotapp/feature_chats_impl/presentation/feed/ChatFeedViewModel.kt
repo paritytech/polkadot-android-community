@@ -74,17 +74,21 @@ import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.Tra
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
@@ -136,8 +140,18 @@ class ChatFeedViewModel @Inject constructor(
 
     private val revealedUpTo = MutableStateFlow<Timestamp?>(null)
 
+    private val chatInputStateType = interactor.subscribeUserInputState(openChatRequest)
+        .distinctUntilChanged()
+        .shareInBackground()
+
+    private val keepsLastContent = chatInputStateType
+        .map { it is ChatUserInputState.AcceptChatRequest || it is ChatUserInputState.ChatRequestCancelled }
+        .distinctUntilChanged()
+
+    private var isClosing = false
+
     private val gatedDomainMessages = combine(
-        interactor.subscribeMessages(chatId),
+        interactor.subscribeMessages(chatId).withLastContentKept(keepsLastContent) { it.isNotEmpty() },
         animatesMessageReveal,
         revealedUpTo,
     ) { domainMessages, animates, revealed ->
@@ -168,6 +182,7 @@ class ChatFeedViewModel @Inject constructor(
     }.shareInBackground()
 
     override val chatDisplay = interactor.observeChatDisplay(openChatRequest)
+        .withLastContentKept(keepsLastContent) { it.isSuccess }
         .mapResult { it.toUi() }
         .withLoading()
         .stateInBackground(initialValue = LoadingState.Loading)
@@ -178,10 +193,6 @@ class ChatFeedViewModel @Inject constructor(
 
     override val config = interactor.getChatConfig(openChatRequest)
         .stateInBackground(initialValue = ChatConfig.Default)
-
-    private val chatInputStateType = interactor.subscribeUserInputState(openChatRequest)
-        .distinctUntilChanged()
-        .shareInBackground()
 
     override val menuRenderer = flowOf {
         interactor.getMenuRendererForChat(chatId)
@@ -277,6 +288,7 @@ class ChatFeedViewModel @Inject constructor(
         markNonDisplayableMessagesAsRead()
         draftController.start()
         jumpToTargetMessageIfNeeded()
+        closeScreenWhenChatRemoved()
     }
 
     override fun onCleared() {
@@ -373,6 +385,8 @@ class ChatFeedViewModel @Inject constructor(
                 ChatUserInputState.IdentitySigningConsentRequired,
                 ChatUserInputState.Nothing,
                 ChatUserInputState.PeerLeft,
+                ChatUserInputState.ChatRequestCancelled,
+                ChatUserInputState.ChatRemoved,
                 ChatUserInputState.UserDeclinedChatRequest,
                 ChatUserInputState.WaitChatRequestApproval -> {
                     Timber.w("Unexpected chat input state received: $inputType")
@@ -404,7 +418,7 @@ class ChatFeedViewModel @Inject constructor(
 
     override fun onLeaveChatConfirm() = launchUnit {
         interactor.leaveChat(chatId)
-            .onSuccess { router.back() }
+            .onSuccess { closeScreen() }
             .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
@@ -415,7 +429,7 @@ class ChatFeedViewModel @Inject constructor(
 
     override fun onBlockUserConfirm() = launchUnit {
         interactor.blockUser(chatId)
-            .onSuccess { router.back() }
+            .onSuccess { closeScreen() }
             .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
@@ -548,11 +562,24 @@ class ChatFeedViewModel @Inject constructor(
         chatRequestAnswerProgress.value = ChatRequestAnswerProgress.Declining
 
         interactor.declineIncomingRequest(contactAccountId)
-            .onSuccess { router.back() }
+            .onSuccess { closeScreen() }
             .onFailure {
                 chatRequestAnswerProgress.value = ChatRequestAnswerProgress.None
                 showPresentationError(it.asChatRequestError().toPresentationError())
             }
+    }
+
+    override fun onCancelChatRequestClick() = launchUnit {
+        val username = chatDisplay.awaitLoaded().username
+        menuState.update { it.copy(isVisible = true, type = ChatMenuType.CancelRequestConfirmation(username)) }
+    }
+
+    override fun onCancelChatRequestConfirm() = launchUnit {
+        val contactAccountId = chatId.contactOrNull()?.contactAccountId ?: return@launchUnit
+
+        menuState.update { it.copy(isVisible = false) }
+        interactor.cancelOutgoingRequest(contactAccountId).logFailure("Failed to start cancelling the chat request")
+        closeScreen()
     }
 
     override fun onAttachClick() = launchUnit {
@@ -742,6 +769,8 @@ class ChatFeedViewModel @Inject constructor(
             is ChatUserInputState.AcceptChatRequest -> ChatInputUiState.AcceptChatRequest(answerProgress)
             is ChatUserInputState.Nothing, ChatUserInputState.UserDeclinedChatRequest -> ChatInputUiState.Hidden
             is ChatUserInputState.PeerLeft -> ChatInputUiState.PeerLeft
+            is ChatUserInputState.ChatRequestCancelled -> ChatInputUiState.ChatRequestCancelled
+            is ChatUserInputState.ChatRemoved -> ChatInputUiState.Hidden
             is ChatUserInputState.UnblockUser -> ChatInputUiState.UnblockUser
             is ChatUserInputState.IdentitySigningConsentRequired -> ChatInputUiState.IdentitySigningConsent
             is ChatUserInputState.WaitChatRequestApproval -> ChatInputUiState.WaitChatRequestApproval
@@ -758,6 +787,20 @@ class ChatFeedViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun closeScreenWhenChatRemoved() {
+        chatInputStateType
+            .filter { it is ChatUserInputState.ChatRemoved }
+            .onEach { closeScreen() }
+            .launchIn(this)
+    }
+
+    private fun closeScreen() {
+        if (isClosing) return
+        isClosing = true
+
+        router.back()
     }
 
     private fun markNonDisplayableMessagesAsRead() = launchUnit {
@@ -779,6 +822,16 @@ class ChatFeedViewModel @Inject constructor(
 
     private fun MutableStateFlow<ChatSendMessageInputState>.updateInput(message: String) {
         update { it.copy(inputMessage = message.take(MAX_CHAT_MESSAGE_LENGTH)) }
+    }
+}
+
+private fun <T> Flow<T>.withLastContentKept(keepsLastContent: Flow<Boolean>, hasContent: (T) -> Boolean): Flow<T> {
+    val withLastContent = runningFold<T, Pair<T, T>?>(null) { previous, value ->
+        value to (if (hasContent(value)) value else previous?.second ?: value)
+    }.filterNotNull()
+
+    return combine(withLastContent, keepsLastContent) { (latest, lastWithContent), keeps ->
+        if (keeps) lastWithContent else latest
     }
 }
 

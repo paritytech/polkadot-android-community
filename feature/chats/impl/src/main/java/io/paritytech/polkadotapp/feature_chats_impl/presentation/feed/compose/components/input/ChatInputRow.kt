@@ -74,6 +74,7 @@ internal fun ChatInputRow(
     onAttachClick: () -> Unit,
     onAcceptChatRequest: () -> Unit,
     onDeclineChatRequest: () -> Unit,
+    onCancelChatRequest: () -> Unit,
     onUnblockUserClick: () -> Unit,
     onAllowIdentitySigningClick: () -> Unit,
     onDeclineIdentitySigningClick: () -> Unit,
@@ -129,7 +130,7 @@ internal fun ChatInputRow(
                 }
 
                 is ChatInputUiState.WaitChatRequestApproval -> {
-                    WaitingForAcceptLabel(username = username)
+                    WaitingForAcceptLabel(username = username, onCancelRequest = onCancelChatRequest)
                 }
 
                 is ChatInputUiState.Hidden -> {
@@ -138,6 +139,10 @@ internal fun ChatInputRow(
 
                 ChatInputUiState.PeerLeft -> {
                     ChatFooterLeave(username = username)
+                }
+
+                ChatInputUiState.ChatRequestCancelled -> {
+                    ChatFooterRequestCancelled(username = username)
                 }
 
                 ChatInputUiState.UnblockUser -> {
@@ -168,12 +173,13 @@ private fun footerBackgroundBrush(state: ChatInputUiState): Brush = when (state)
     )
 
     is ChatInputUiState.AcceptChatRequest,
+    is ChatInputUiState.WaitChatRequestApproval,
+    is ChatInputUiState.ChatRequestCancelled,
     is ChatInputUiState.IdentitySigningConsent -> SolidColor(PolkadotTheme.colors.bg.surface.container)
 
     is ChatInputUiState.Hidden,
     is ChatInputUiState.PeerLeft,
-    is ChatInputUiState.UnblockUser,
-    is ChatInputUiState.WaitChatRequestApproval -> SolidColor(Color.Transparent)
+    is ChatInputUiState.UnblockUser -> SolidColor(Color.Transparent)
 }
 
 @Composable
@@ -385,6 +391,7 @@ private fun ChatInputRowPreview() {
             onAttachClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {}
@@ -424,6 +431,7 @@ private fun ChatInputRowPreview_WithReply() {
             onAttachClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {}
@@ -456,6 +464,7 @@ private fun ChatInputRowPreview_WithEdit() {
             onAttachClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {}
@@ -482,6 +491,7 @@ private fun ChatInputRowPreview_InviteToChat() {
             onAttachClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {}
@@ -505,6 +515,7 @@ private fun ChatInputRowPreview_AcceptRequest() {
             onAttachClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {}
@@ -528,6 +539,7 @@ private fun ChatInputRowPreview_WaitingForAccept() {
             onAttachClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {}
@@ -551,6 +563,7 @@ private fun ChatInputRowPreview_PeerLeft() {
             onAttachClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {}
@@ -573,6 +586,7 @@ private fun ChatInputRowPreview_UnblockUser() {
             onPayClick = { },
             onAcceptChatRequest = {},
             onDeclineChatRequest = {},
+            onCancelChatRequest = {},
             onUnblockUserClick = {},
             onAllowIdentitySigningClick = {},
             onDeclineIdentitySigningClick = {},
