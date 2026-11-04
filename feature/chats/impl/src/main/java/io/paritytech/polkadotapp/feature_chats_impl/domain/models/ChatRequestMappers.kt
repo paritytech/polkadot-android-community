@@ -15,7 +15,7 @@ fun ChatRequestLocal.toDomain(): ChatRequest {
     )
 }
 
-fun ChatRequest.toLocal(statusChangedAt: Long): ChatRequestLocal {
+fun ChatRequest.toLocal(statusChangedAt: Long?): ChatRequestLocal {
     return ChatRequestLocal(
         id = id,
         timestamp = timestamp,

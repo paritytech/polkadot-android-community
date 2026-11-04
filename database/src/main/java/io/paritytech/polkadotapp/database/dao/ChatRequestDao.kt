@@ -33,6 +33,9 @@ interface ChatRequestDao {
     @Query("UPDATE chat_requests SET status = :status, statusChangedAt = :changedAt WHERE id = :id")
     suspend fun updateStatus(id: String, status: Status, changedAt: Long)
 
+    @Query("UPDATE chat_requests SET status = :status WHERE id = :id")
+    suspend fun updateStatusFromSync(id: String, status: Status)
+
     @Query("UPDATE chat_requests SET statusChangedAt = :changedAt WHERE id = :id")
     suspend fun updateStatusChangedAt(id: String, changedAt: Long)
 

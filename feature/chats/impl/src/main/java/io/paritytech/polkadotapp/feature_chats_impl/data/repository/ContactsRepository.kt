@@ -33,6 +33,8 @@ interface ContactsRepository {
 
     suspend fun getBlockChangedAfter(after: Instant): List<Contact>
 
+    suspend fun setBlockedFromSync(accountId: AccountId, isBlocked: Boolean)
+
     fun subscribeContacts(): Flow<List<Contact>>
     fun subscribeContact(accountId: AccountId): Flow<Contact?>
 
@@ -185,6 +187,10 @@ class RealContactsRepository @Inject constructor(
 
     override suspend fun setBlocked(accountId: AccountId, isBlocked: Boolean) {
         dao.updateIsBlocked(accountId.value, isBlocked, changedAt = System.currentTimeMillis())
+    }
+
+    override suspend fun setBlockedFromSync(accountId: AccountId, isBlocked: Boolean) {
+        dao.updateIsBlockedFromSync(accountId.value, isBlocked)
     }
 
     override fun subscribeBlockedContacts(): Flow<List<Contact>> {

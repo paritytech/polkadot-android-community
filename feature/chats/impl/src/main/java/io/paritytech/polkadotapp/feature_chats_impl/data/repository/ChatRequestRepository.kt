@@ -20,11 +20,15 @@ import kotlin.time.Instant
 interface ChatRequestRepository {
     suspend fun save(request: ChatRequest)
 
+    suspend fun saveFromSync(request: ChatRequest)
+
     suspend fun getById(id: String): ChatRequest?
 
     fun subscribeById(id: String): Flow<ChatRequest?>
 
     suspend fun updateStatus(id: String, status: ChatRequest.Status)
+
+    suspend fun updateStatusFromSync(id: String, status: ChatRequest.Status)
 
     suspend fun recordCancellation(id: String)
 
@@ -57,6 +61,10 @@ class RealChatRequestRepository @Inject constructor(
         chatRequestDao.upsert(request.toLocal(statusChangedAt = System.currentTimeMillis()))
     }
 
+    override suspend fun saveFromSync(request: ChatRequest) {
+        chatRequestDao.upsert(request.toLocal(statusChangedAt = null))
+    }
+
     override suspend fun getById(id: String): ChatRequest? {
         return chatRequestDao.getById(id)?.toDomain()
     }
@@ -67,6 +75,10 @@ class RealChatRequestRepository @Inject constructor(
 
     override suspend fun updateStatus(id: String, status: ChatRequest.Status) {
         chatRequestDao.updateStatus(id, status.toLocalStatus(), changedAt = System.currentTimeMillis())
+    }
+
+    override suspend fun updateStatusFromSync(id: String, status: ChatRequest.Status) {
+        chatRequestDao.updateStatusFromSync(id, status.toLocalStatus())
     }
 
     override suspend fun recordCancellation(id: String) {

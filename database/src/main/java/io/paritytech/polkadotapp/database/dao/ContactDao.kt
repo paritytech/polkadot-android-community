@@ -93,6 +93,9 @@ abstract class ContactDao {
     @Query("UPDATE contacts SET isBlocked = :isBlocked, blockChangedAt = :changedAt WHERE accountId = :accountId")
     abstract suspend fun updateIsBlocked(accountId: ByteArray, isBlocked: Boolean, changedAt: Long)
 
+    @Query("UPDATE contacts SET isBlocked = :isBlocked WHERE accountId = :accountId")
+    abstract suspend fun updateIsBlockedFromSync(accountId: ByteArray, isBlocked: Boolean)
+
     @Query("UPDATE contacts SET voipPushToken = :voipPushToken WHERE accountId = :accountId")
     abstract suspend fun updateVoipPushToken(accountId: ByteArray, voipPushToken: ByteArray)
 
