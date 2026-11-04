@@ -58,6 +58,5 @@ class DeviceLifecycleMessageProcessorTest {
         origin = origin,
         content = ChatMessage.Content.DeviceChatAccepted(requestId = "old-request", device = acceptorDevice),
         status = ChatMessage.Status.NEW,
-        sortOrder = null,
     )
 }

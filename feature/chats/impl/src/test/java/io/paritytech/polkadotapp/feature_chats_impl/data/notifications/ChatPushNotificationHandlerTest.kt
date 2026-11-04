@@ -181,7 +181,6 @@ class ChatPushNotificationHandlerTest {
         origin = ChatMessageOrigin.Contact(contactAccountId),
         content = ChatMessage.Content.Text(id),
         status = ChatMessage.Status.NEW,
-        sortOrder = null,
     )
 
     private fun withDecodedPush(content: ChatPushContent) {
@@ -229,7 +228,6 @@ class ChatPushNotificationHandlerTest {
         origin = ChatMessageOrigin.Contact(contactAccountId),
         content = content,
         status = ChatMessage.Status.NEW,
-        sortOrder = null,
     )
 
     private companion object {

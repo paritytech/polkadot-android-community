@@ -42,7 +42,6 @@ class ChatMessageUiMapper @Inject constructor(
         originDisplayResolver: MessageOriginDisplayResolver,
         reactions: Map<ChatMessageId, List<ChatMessageReaction>>,
         revisions: Map<ChatMessageId, MessageRevision>,
-        peerSeenOrder: Long,
         customMessageRenderers: Map<String, CustomChatMessageRenderer<*>> = emptyMap(),
         activeCall: ActiveCallState? = null
     ): ImmutableList<ChatMessageUiModel> {
@@ -73,8 +72,7 @@ class ChatMessageUiMapper @Inject constructor(
                 originDisplayResolver = originDisplayResolver,
                 messageReactions = messageReactions,
                 customMessageRenderers = customMessageRenderers,
-                callContext = callContext,
-                isSeenByPeer = message.isSeenByPeer(peerSeenOrder)
+                callContext = callContext
             )
         }.toImmutableList()
     }
@@ -151,11 +149,10 @@ class ChatMessageUiMapper @Inject constructor(
         originDisplayResolver: MessageOriginDisplayResolver,
         messageReactions: ImmutableList<ChatMessageUiModel.Reaction>,
         customMessageRenderers: Map<String, CustomChatMessageRenderer<*>>,
-        callContext: CallResolutionContext,
-        isSeenByPeer: Boolean
+        callContext: CallResolutionContext
     ): ChatMessageUiModel? {
         val direction = direction.toUi()
-        val status = if (isSeenByPeer) ChatMessageUiModel.Status.SEEN else status.toUi(direction)
+        val status = status.toUi()
 
         return when (latestContent) {
             is ChatMessage.Content.Text -> mapText(
@@ -314,23 +311,13 @@ class ChatMessageUiMapper @Inject constructor(
     }
 }
 
-private fun ChatMessage.isSeenByPeer(peerSeenOrder: Long): Boolean {
-    val sortOrder = sortOrder ?: return false
-    val isSentOrDelivered = status == ChatMessage.Status.IS_SENT || status == ChatMessage.Status.IS_READ
-
-    return origin.isUser() && isSentOrDelivered && sortOrder in 1..peerSeenOrder
-}
-
-private fun ChatMessage.Status.toUi(direction: ChatMessageUiModel.Direction): ChatMessageUiModel.Status {
+private fun ChatMessage.Status.toUi(): ChatMessageUiModel.Status {
     return when (this) {
         ChatMessage.Status.PROCESSING,
         ChatMessage.Status.NEW -> ChatMessageUiModel.Status.PENDING
 
         ChatMessage.Status.IS_SENT -> ChatMessageUiModel.Status.SENT
-        ChatMessage.Status.IS_READ -> when (direction) {
-            ChatMessageUiModel.Direction.INCOMING -> ChatMessageUiModel.Status.SEEN
-            ChatMessageUiModel.Direction.OUTGOING -> ChatMessageUiModel.Status.DELIVERED
-        }
+        ChatMessage.Status.IS_READ -> ChatMessageUiModel.Status.READ
         ChatMessage.Status.DELIVERY_FAILED -> ChatMessageUiModel.Status.FAILED
     }
 }

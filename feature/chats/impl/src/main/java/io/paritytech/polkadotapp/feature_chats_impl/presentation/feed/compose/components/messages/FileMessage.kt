@@ -210,7 +210,7 @@ private fun FileMessagePreview() {
                         id = UUID.randomUUID().toString(),
                         timestamp = 0L,
                         direction = ChatMessageUiModel.Direction.OUTGOING,
-                        status = ChatMessageUiModel.Status.SEEN,
+                        status = ChatMessageUiModel.Status.READ,
                         fileName = "Long Document Name Very Very Long.pdf",
                         size = 1_250_000L.bytes,
                         thumbnailUri = null,

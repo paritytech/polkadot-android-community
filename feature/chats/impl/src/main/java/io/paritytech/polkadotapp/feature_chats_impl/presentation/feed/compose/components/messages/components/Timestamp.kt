@@ -99,9 +99,8 @@ private fun MessageTimestampContent(
                 modifier = Modifier.size(12.dp),
                 imageVector = when (message.status) {
                     ChatMessageUiModel.Status.PENDING -> MessageStatusPending
-                    ChatMessageUiModel.Status.SENT,
-                    ChatMessageUiModel.Status.DELIVERED -> MessageStatusSent
-                    ChatMessageUiModel.Status.SEEN -> MessageStatusRead
+                    ChatMessageUiModel.Status.SENT -> MessageStatusSent
+                    ChatMessageUiModel.Status.READ -> MessageStatusRead
                     ChatMessageUiModel.Status.FAILED -> MessageStatusFailed
                 },
                 tint = if (isFailed) PolkadotTheme.colors.fg.error else iconColor
@@ -144,7 +143,7 @@ private fun MessageTimestampPreview() {
                     id = "2",
                     text = "Hi! How are you doing today?",
                     direction = ChatMessageUiModel.Direction.OUTGOING,
-                    status = ChatMessageUiModel.Status.SEEN,
+                    status = ChatMessageUiModel.Status.READ,
                     timestamp = System.currentTimeMillis(),
                     reactions = persistentListOf(),
                     origin = ChatMessageOrigin.User,

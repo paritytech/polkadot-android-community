@@ -634,7 +634,6 @@ class CoinagePaymentProcessingExtensionTest {
             status = CoinagePayment.Status.Detecting,
         ),
         status = ChatMessage.Status.IS_SENT,
-        sortOrder = null,
     )
 
     /**

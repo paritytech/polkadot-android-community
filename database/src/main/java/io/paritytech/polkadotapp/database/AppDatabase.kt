@@ -25,7 +25,6 @@ import io.paritytech.polkadotapp.database.dao.ChatRequestDao
 import io.paritytech.polkadotapp.database.dao.ChatRequestSyncStateDao
 import io.paritytech.polkadotapp.database.dao.ChatRoomDao
 import io.paritytech.polkadotapp.database.dao.ChatSearchRecentDao
-import io.paritytech.polkadotapp.database.dao.ChatSeenDao
 import io.paritytech.polkadotapp.database.dao.CoinDao
 import io.paritytech.polkadotapp.database.dao.CoinageEntryDao
 import io.paritytech.polkadotapp.database.dao.CoinageInstallationDao
@@ -104,7 +103,6 @@ import io.paritytech.polkadotapp.database.model.ChatRequestLocal
 import io.paritytech.polkadotapp.database.model.ChatRequestSyncStateLocal
 import io.paritytech.polkadotapp.database.model.ChatRoomLocal
 import io.paritytech.polkadotapp.database.model.ChatSearchRecentLocal
-import io.paritytech.polkadotapp.database.model.ChatSeenStateLocal
 import io.paritytech.polkadotapp.database.model.CoinLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
@@ -146,7 +144,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 71,
+    version = 70,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -201,7 +199,6 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         ProductTopUpLocal::class,
         ChatAcceptanceLocal::class,
         ChatIdentitySigningConsentLocal::class,
-        ChatSeenStateLocal::class,
     ],
     autoMigrations = [
         // Add ChatMessageReactionLocal
@@ -288,7 +285,6 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 68, to = 69),
         // Add chat_acceptances, chat_identity_signing_consents and statement_store_slot_allocations.tag
         AutoMigration(from = 69, to = 70),
-        AutoMigration(from = 70, to = 71),
     ]
 )
 @TypeConverters(
@@ -434,6 +430,4 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chatAcceptanceDao(): ChatAcceptanceDao
 
     abstract fun chatIdentitySigningConsentDao(): ChatIdentitySigningConsentDao
-
-    abstract fun chatSeenDao(): ChatSeenDao
 }
