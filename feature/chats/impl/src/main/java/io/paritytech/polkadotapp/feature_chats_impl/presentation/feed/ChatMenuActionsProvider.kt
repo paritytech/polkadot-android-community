@@ -132,9 +132,7 @@ class ChatMenuActionsProvider @Inject constructor() {
                 add(ChatToolbarAction.AUDIO_CALL)
                 add(ChatToolbarAction.VIDEO_CALL)
             }
-            if (userInputState !is ChatUserInputState.ChatRequestCancelled) {
-                add(ChatToolbarAction.MENU)
-            }
+            add(ChatToolbarAction.MENU)
         }.toPersistentList()
     }
 

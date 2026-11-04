@@ -126,8 +126,6 @@ interface ChatMessageRepository {
     suspend fun getUnsupportedMessages(chatId: ChatId): List<ChatMessage>
     suspend fun deleteAllChatMessages(chatId: ChatId)
 
-    suspend fun hasConversationMessages(chatId: ChatId): Boolean
-
     suspend fun getMessageStatuses(messageIds: List<ChatMessageId>): Map<ChatMessageId, ChatMessage.Status>
 
     suspend fun commitCompaction(commitId: ChatMessageId, originalIds: List<ChatMessageId>)
@@ -387,10 +385,6 @@ class RealChatMessageRepository @Inject constructor(
 
     override suspend fun deleteAllChatMessages(chatId: ChatId) {
         chatMessageDao.deleteAllMessages(chatId.toLocal())
-    }
-
-    override suspend fun hasConversationMessages(chatId: ChatId): Boolean {
-        return chatMessageDao.hasConversationMessages(chatId.toLocal())
     }
 
     override suspend fun getMessageStatuses(messageIds: List<ChatMessageId>): Map<ChatMessageId, ChatMessage.Status> {

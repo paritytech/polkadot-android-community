@@ -13,10 +13,6 @@ fun ContactWithChatRequest.hasPendingOutgoingRequest(): Boolean {
     return pendingChatRequest != null && pendingChatRequest.isPendingOutgoing()
 }
 
-fun ContactWithChatRequest.hasCancellingOutgoingRequest(): Boolean {
-    return pendingChatRequest != null && pendingChatRequest.isCancellingOutgoing()
-}
-
 fun ContactWithChatRequest.hasDeclinedIncomingRequest(): Boolean {
     return pendingChatRequest != null && pendingChatRequest.userDeclinedIncomingRequest()
 }

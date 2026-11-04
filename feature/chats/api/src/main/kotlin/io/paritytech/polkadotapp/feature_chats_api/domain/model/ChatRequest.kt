@@ -17,9 +17,7 @@ data class ChatRequest(
     enum class Status {
         PENDING,
         ACCEPTED,
-        DECLINED,
-        CANCELLED,
-        CANCELLING
+        DECLINED
     }
 
     sealed interface Delivery {
@@ -60,9 +58,5 @@ fun ChatRequest.isPendingIncoming(): Boolean {
 }
 
 fun ChatRequest.isPendingOutgoing(): Boolean {
-    return isOutgoing() && (status == ChatRequest.Status.PENDING || status == ChatRequest.Status.CANCELLING)
-}
-
-fun ChatRequest.isCancellingOutgoing(): Boolean {
-    return isOutgoing() && status == ChatRequest.Status.CANCELLING
+    return isOutgoing() && status == ChatRequest.Status.PENDING
 }

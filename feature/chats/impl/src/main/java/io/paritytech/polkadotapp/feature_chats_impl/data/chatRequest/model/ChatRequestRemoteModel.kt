@@ -98,10 +98,6 @@ sealed class VersionedRequestContent {
             }
         }
     }
-
-    @Serializable
-    @EnumIndex(2)
-    class Cancel(val content: RequestContentCancel) : VersionedRequestContent()
 }
 
 @Serializable
@@ -116,11 +112,6 @@ class RequestContentV2(
     val deviceEncPubKey: X25519PublicKeyScale,
     val pushToken: TokenContent?,
     val welcomeMessage: RichTextContent?
-)
-
-@Serializable
-class RequestContentCancel(
-    val identityProof: IdentityProofScale,
 )
 
 @Serializable
