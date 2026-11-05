@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -149,9 +148,7 @@ private fun PaymentMessageContent(
             color = amountBoxColor
         ) {
             Column(
-                modifier = Modifier
-                    .widthIn(min = 154.dp)
-                    .padding(amountPadding),
+                modifier = Modifier.padding(amountPadding),
                 horizontalAlignment = Alignment.Start
             ) {
                 PaymentAmounts(
@@ -246,10 +243,10 @@ private fun PaymentStatusIndicator(
             is ChatMessageUiModel.CoinagePayment.Status.PartiallyClaimed -> {
                 if (isIncoming) {
                     icon = NovaIcons.ArrowUpward
-                    text = stringResource(RCommon.string.chat_payment_status_detected_on_chain_recipient)
+                    text = stringResource(RCommon.string.chat_payment_status_claiming_recipient)
                 } else {
                     icon = NovaIcons.Check
-                    text = stringResource(RCommon.string.chat_payment_status_detected_on_chain_sender)
+                    text = stringResource(RCommon.string.chat_payment_status_sent_sender)
                 }
                 color = baseStatusColor
             }

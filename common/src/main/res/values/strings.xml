@@ -675,8 +675,8 @@
     <string name="chat_message_payment_outgoing">You sent</string>
     <string name="chat_payment_status_detecting_sender">Sending…</string>
     <string name="chat_payment_status_detecting_recipient">Incoming…</string>
-    <string name="chat_payment_status_detected_on_chain_sender">Sent · not received yet</string>
-    <string name="chat_payment_status_detected_on_chain_recipient">Adding to your balance…</string>
+    <string name="chat_payment_status_sent_sender">Sent · not received yet</string>
+    <string name="chat_payment_status_claiming_recipient">Adding to your balance…</string>
     <string name="chat_payment_status_claimed_sender">Received by %1$s</string>
     <string name="chat_payment_status_claimed_recipient">Added to your balance</string>
     <string name="chat_payment_status_failed_sender">Not sent</string>
