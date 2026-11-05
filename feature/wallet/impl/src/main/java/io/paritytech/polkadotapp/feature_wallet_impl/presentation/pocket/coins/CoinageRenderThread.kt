@@ -247,7 +247,8 @@ class CoinageRenderThread(
             pixelWidth = width,
             pixelHeight = height,
             density = scale,
-            light = tilt.turn
+            light = tilt.turn,
+            set = set
         )
 
         EGL14.eglSwapBuffers(display, eglSurface)

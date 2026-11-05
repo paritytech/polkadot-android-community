@@ -2,9 +2,11 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins
 
 import android.content.Context
 import android.graphics.SurfaceTexture
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.TextureView
+import android.view.View
 import android.widget.FrameLayout
 
 /**
@@ -50,6 +52,12 @@ class CoinageCoinsView(context: Context) : FrameLayout(context), TextureView.Sur
     init {
         clipChildren = true
         texture.isOpaque = false
+        // The display's own rate, 120 on a fast panel: every stage between the wrist and the pixel quantises
+        // to a frame, and the light is meant to feel attached to the hand. Earlier releases have no per-view
+        // request and run at whatever the window gets.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            texture.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
+        }
         texture.surfaceTextureListener = this
         addView(texture, LayoutParams(LayoutParams.MATCH_PARENT, 0))
     }
