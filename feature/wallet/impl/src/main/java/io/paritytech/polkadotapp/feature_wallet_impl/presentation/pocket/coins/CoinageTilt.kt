@@ -5,6 +5,9 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.SystemClock
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -111,7 +114,19 @@ class CoinageTilt(context: Context) : SensorEventListener {
     private var previous: Pose? = null
     private var stillFor = 0.0
     private var lastReading = 0L
+    private var lastChange = 0L
+
+    @Volatile
+    private var readings: HandlerThread? = null
+
+    @Volatile
     private var target = Turn()
+
+    /** The reading that last moved the studio and no frame has drawn yet, while [probe] is on. */
+    @Volatile
+    private var pending: CoinageLatencyProbe.Sample? = null
+
+    var probe = false
 
     @Volatile
     var turn = Turn()
@@ -124,10 +139,18 @@ class CoinageTilt(context: Context) : SensorEventListener {
      */
     var onMove: (() -> Unit)? = null
 
+    /**
+     * Readings arrive on a thread of their own rather than the main one, so a busy UI frame never leaves
+     * them queued and ageing behind it.
+     */
     fun start() {
         val sensor = sensor ?: return
+        val thread = readings ?: HandlerThread("coinage-tilt").also {
+            it.start()
+            readings = it
+        }
 
-        sensors?.registerListener(this, sensor, INTERVAL_MICROSECONDS)
+        sensors?.registerListener(this, sensor, INTERVAL_MICROSECONDS, Handler(thread.looper))
     }
 
     /**
@@ -139,29 +162,50 @@ class CoinageTilt(context: Context) : SensorEventListener {
      */
     fun stop() {
         sensors?.unregisterListener(this)
+
+        val thread = readings
+        readings = null
+
+        // Reset on the readings thread, behind any reading already queued there, so none lands afterwards.
+        if (thread != null) {
+            Handler(thread.looper).post(::reset)
+            thread.quitSafely()
+        } else {
+            reset()
+        }
+    }
+
+    private fun reset() {
         neutral = null
         previous = null
         stillFor = 0.0
         lastReading = 0L
+        pending = null
     }
 
     /**
-     * Eases toward the latest turn. Returns whether the studio is still catching up, so a field at rest
-     * under a still hand goes back to sleep.
+     * Takes the latest reading outright: the fused gravity is steady enough not to shimmer, and the filter
+     * that chased it was a longer delay than the rest of the pipeline put together.
+     *
+     * Returns whether the studio is still moving. It counts as moving for [LINGER] after the last change,
+     * since readings come slower than frames and a hand mid-gesture should not put the loop to sleep between
+     * two of them.
      */
-    fun advance(seconds: Float): Boolean {
-        if (isSettled) return false
+    fun advance(now: Long): Boolean {
+        val next = target
 
-        val blend = minOf(seconds.toDouble() * SMOOTHING, 1.0)
+        if (distance(next, turn) > REST_BAND) {
+            turn = next
+            lastChange = now
 
-        turn = Turn(
-            x = turn.x + (target.x - turn.x) * blend,
-            y = turn.y + (target.y - turn.y) * blend,
-            z = turn.z + (target.z - turn.z) * blend
-        )
+            return true
+        }
 
-        return true
+        return now - lastChange < LINGER
     }
+
+    /** The reading the frame about to be drawn is the first to show, if any. */
+    fun takeSample(): CoinageLatencyProbe.Sample? = pending?.also { pending = null }
 
     override fun onSensorChanged(event: SensorEvent) {
         // The sampling period is only a hint, so the real gap decides how much of it counts as stillness.
@@ -173,6 +217,14 @@ class CoinageTilt(context: Context) : SensorEventListener {
         lastReading = event.timestamp
 
         absorb(Pose.ofSensor(event.values), elapsed)
+
+        if (probe && distance(target, turn) > REST_BAND) {
+            // Sensor time is on the boot clock; the frame timeline is on the monotonic one.
+            val now = System.nanoTime()
+            val boot = SystemClock.elapsedRealtimeNanos()
+
+            pending = CoinageLatencyProbe.Sample(sensed = event.timestamp - boot + now, delivered = now)
+        }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -207,21 +259,18 @@ class CoinageTilt(context: Context) : SensorEventListener {
         if (isWorthWaking) onMove?.invoke()
     }
 
-    /** Where the studio is against where it is heading, on whichever axis is furthest off. */
-    private val offset: Double
-        get() = maxOf(abs(target.x - turn.x), abs(target.y - turn.y), abs(target.z - turn.z))
+    private fun distance(a: Turn, b: Turn) = maxOf(abs(a.x - b.x), abs(a.y - b.y), abs(a.z - b.z))
 
-    /** Arrived: close enough that another frame would move nothing. */
-    private val isSettled: Boolean get() = offset <= REST_BAND
+    /** Where the studio is against where it is heading, on whichever axis is furthest off. */
+    private val offset: Double get() = distance(target, turn)
 
     /**
      * Far enough out to be worth a frame.
      *
-     * Deliberately much coarser than [isSettled]. Waking on the resting threshold meant waking on anything
+     * Deliberately much coarser than [REST_BAND]. Waking on the resting threshold meant waking on anything
      * at all: it works out to four hundredths of a degree of tilt, which is under the sensor's own noise
      * floor, so a phone merely held in a hand woke the renderer sixty times a second and redrew every coin
-     * for as long as the card was open. This is only the lighting — a degree of it is not visible — and
-     * once awake the studio still eases the whole way in, so a real movement is as smooth as it ever was.
+     * for as long as the card was open. Once awake, every reading past [REST_BAND] is drawn.
      */
     private val isWorthWaking: Boolean get() = offset > WAKE_BAND
 
@@ -263,15 +312,11 @@ class CoinageTilt(context: Context) : SensorEventListener {
          */
         const val DWELL = 0.4
 
-        /**
-         * Chases the device rather than tracking it exactly: raw attitude is noisy enough to make a specular
-         * highlight shimmer while the phone is held still. A 40 ms time constant: at 8 it was 125 ms, which put
-         * the highlight a third of a second behind the wrist.
-         */
-        const val SMOOTHING = 25.0
-
-        /** Arrived: under sensor noise, so a field at rest does not keep redrawing for it. */
+        /** Under sensor noise, so a field at rest does not keep redrawing for it. */
         private const val REST_BAND = 0.002
+
+        /** A few readings' worth, in nanoseconds. */
+        private const val LINGER = 100_000_000L
 
         /**
          * A degree of the phone's own tilt, converted into the studio's turn.

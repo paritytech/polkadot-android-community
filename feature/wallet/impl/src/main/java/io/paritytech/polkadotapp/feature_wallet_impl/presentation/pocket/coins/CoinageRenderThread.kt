@@ -7,23 +7,48 @@ import android.opengl.EGLConfig
 import android.opengl.EGLContext
 import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
+import android.opengl.GLES30
+import android.os.Handler
+import android.os.HandlerThread
+import android.view.Choreographer
 import io.paritytech.polkadotapp.common.utils.logFailure
 import timber.log.Timber
 
 /**
  * Owns the GL context and the frame loop for one surface.
  *
- * Drives itself rather than being ticked from outside: `eglSwapBuffers` blocks until the next vsync, so the
- * loop is paced by the display, and it parks the moment every spring and the light have settled. Motion
- * wakes it — a view that only sampled attitude inside its own draw would go to sleep and freeze the light.
+ * Each frame waits for a vsync from a Choreographer on a thread of its own. Swapping into a `TextureView`'s
+ * surface does not block — the texture drops frames it has no time to show — so a loop paced by the swap
+ * alone spun at over a thousand frames a second. Not the main thread's Choreographer: a busy UI frame would
+ * hold the coins back with it. The loop parks the moment every spring and the light have settled; motion
+ * wakes it, since a view that only sampled attitude inside its own draw would sleep and freeze the light.
+ *
+ * At most two frames are in flight: before drawing, it waits for the frame before last to finish on the GPU.
+ * A third only queues behind a slow GPU and shows the light a frame later. The wait is on this thread alone;
+ * nothing on the main thread ever waits for the GPU.
  */
 class CoinageRenderThread(
     context: Context,
     private val surface: SurfaceTexture,
+    private val probe: Boolean,
     private val report: (CoinageCoinsMetrics) -> Unit
 ) : Thread("coinage-render") {
     private val appContext = context.applicationContext
-    private val tilt = CoinageTilt(context)
+    private val tilt = CoinageTilt(context).also { it.probe = probe }
+    private val fences = LongArray(FRAMES_IN_FLIGHT)
+    private var fenceIndex = 0
+
+    private val vsyncThread = HandlerThread("coinage-vsync").also { it.start() }
+    private val vsyncHandler = Handler(vsyncThread.looper)
+    private var vsyncs = 0L
+    private var vsyncRequested = false
+    private val onVsync = Choreographer.FrameCallback {
+        synchronized(lock) {
+            vsyncs++
+            vsyncRequested = false
+            lock.notifyAll()
+        }
+    }
     private val field = CoinageCoinField()
 
     private val lock = Object()
@@ -68,6 +93,18 @@ class CoinageRenderThread(
     private var bundle: CoinageAssetBundle? = null
 
     private var lastFrame = 0L
+    private var lastSwap = 0L
+    private var sequence = 0L
+
+    /** The last swapped frame that first showed a reading, while the probe is on. */
+    @Volatile
+    var stampedFrame: CoinageLatencyProbe.Frame? = null
+        private set
+
+    /** Mean time between consecutive swaps while drawing continuously, in nanoseconds. */
+    @Volatile
+    var drawInterval = 0.0
+        private set
 
     /**
      * Only a width change re-aims the coins: both arrangements are laid out against the width alone, and
@@ -157,6 +194,7 @@ class CoinageRenderThread(
         }
 
         runCatching { join(SHUTDOWN_WAIT) }
+        vsyncThread.quitSafely()
     }
 
     override fun run() {
@@ -177,6 +215,7 @@ class CoinageRenderThread(
         } finally {
             tilt.stop()
             tilt.onMove = null
+            fences.forEach { if (it != 0L) GLES30.glDeleteSync(it) }
             renderer?.release()
             releaseEgl()
         }
@@ -186,6 +225,15 @@ class CoinageRenderThread(
         while (true) {
             synchronized(lock) {
                 while (running && (!awake || !isVisible)) lock.wait()
+
+                val seen = vsyncs
+
+                if (!vsyncRequested) {
+                    vsyncRequested = true
+                    vsyncHandler.post { Choreographer.getInstance().postFrameCallback(onVsync) }
+                }
+
+                while (running && vsyncs == seen) lock.wait()
 
                 if (!running) return
             }
@@ -233,11 +281,16 @@ class CoinageRenderThread(
 
         if (width <= 0 || height <= 0) return false
 
+        awaitFrameBeforeLast()
+
+        val drawn = System.nanoTime()
+        val sample = if (probe) tilt.takeSample() else null
+
         if (retarget) retarget(ready.designs) else if (follow) follow()
 
         for (tap in pending) tap.onResult(CoinageScene.coinAt(tap.x, tap.y, field, set))
 
-        val moved = advance()
+        val moved = advance(drawn)
         val batches = CoinageScene.batches(field, ready.designs, offset, set)
 
         ready.draw(
@@ -251,18 +304,44 @@ class CoinageRenderThread(
             set = set
         )
 
+        fences[fenceIndex] = GLES30.glFenceSync(GLES30.GL_SYNC_GPU_COMMANDS_COMPLETE, 0)
+        fenceIndex = (fenceIndex + 1) % FRAMES_IN_FLIGHT
+
         EGL14.eglSwapBuffers(display, eglSurface)
         drawnWindow = offset
 
+        if (probe) stamp(drawn, sample)
+
         return field.isMoving || moved
+    }
+
+    /** Sampled after the wait, so the frame takes the freshest reading there is. */
+    private fun awaitFrameBeforeLast() {
+        val fence = fences[fenceIndex]
+
+        if (fence == 0L) return
+
+        GLES30.glClientWaitSync(fence, GLES30.GL_SYNC_FLUSH_COMMANDS_BIT, FENCE_TIMEOUT)
+        GLES30.glDeleteSync(fence)
+        fences[fenceIndex] = 0L
+    }
+
+    private fun stamp(drawn: Long, sample: CoinageLatencyProbe.Sample?) {
+        val swapped = System.nanoTime()
+
+        if (lastSwap != 0L && swapped - lastSwap < CONTINUOUS) {
+            drawInterval = CoinageLatencyProbe.smoothed(drawInterval, (swapped - lastSwap).toDouble())
+        }
+        lastSwap = swapped
+
+        if (sample != null) stampedFrame = CoinageLatencyProbe.Frame(++sequence, sample, drawn, swapped)
     }
 
     /**
      * A real elapsed time rather than a nominal frame: the spring is exact for any step, and a dropped frame
      * should not slow the motion down.
      */
-    private fun advance(): Boolean {
-        val now = System.nanoTime()
+    private fun advance(now: Long): Boolean {
         val elapsed = if (lastFrame == 0L) {
             NOMINAL_FRAME
         } else {
@@ -272,7 +351,7 @@ class CoinageRenderThread(
 
         field.advance(elapsed)
 
-        return tilt.advance(elapsed)
+        return tilt.advance(now)
     }
 
     /**
@@ -430,6 +509,9 @@ class CoinageRenderThread(
         const val LONGEST_FRAME = 1f / 20
         const val NANOSECONDS = 1_000_000_000f
         const val SHUTDOWN_WAIT = 500L
+        const val FRAMES_IN_FLIGHT = 2
+        const val FENCE_TIMEOUT = 100_000_000L
+        const val CONTINUOUS = 50_000_000L
     }
 }
 

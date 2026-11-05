@@ -1,13 +1,22 @@
 package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.graphics.Color
 import android.graphics.SurfaceTexture
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.TextureView
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.TextView
+import io.paritytech.polkadotapp.common.utils.FeatureOption
+import io.paritytech.polkadotapp.common.utils.isEnabled
 
 /**
  * Every holding, as real coins, in one of two arrangements.
@@ -46,6 +55,21 @@ class CoinageCoinsView(context: Context) : FrameLayout(context), TextureView.Sur
     private var focus: CoinageArrangement.Focus? = null
     private var window = 0f
     private var coinSet = CoinageScene.CoinSet.SHIPPED
+    private var previousMode: Int? = null
+
+    private val overlay = TextView(context).apply {
+        typeface = Typeface.MONOSPACE
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, OVERLAY_TEXT_SIZE)
+        setTextColor(Color.WHITE)
+        setBackgroundColor(OVERLAY_BACKGROUND)
+    }
+
+    /** On the window rather than in the strip, which is too short for it and draws the coins over it. */
+    private val probe = if (FeatureOption.COINAGE_DEBUG_TOOLS.isEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        CoinageLatencyProbe { overlay.text = it }
+    } else {
+        null
+    }
 
     var onMetrics: ((CoinageCoinsMetrics) -> Unit)? = null
 
@@ -99,7 +123,7 @@ class CoinageCoinsView(context: Context) : FrameLayout(context), TextureView.Sur
     }
 
     override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        val started = CoinageRenderThread(context, surface) { metrics ->
+        val started = CoinageRenderThread(context, surface, probe = probe != null) { metrics ->
             main.post { onMetrics?.invoke(metrics) }
         }
 
@@ -122,9 +146,51 @@ class CoinageCoinsView(context: Context) : FrameLayout(context), TextureView.Sur
     }
 
     override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-        val drawn = thread?.drawnWindow ?: return
+        val thread = thread ?: return
 
-        texture.translationY = drawn * resources.displayMetrics.density
+        texture.translationY = thread.drawnWindow * resources.displayMetrics.density
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) probe?.latched(thread.stampedFrame, thread.drawInterval)
+    }
+
+    /**
+     * Before Android 15 there is no per-view request, so the window asks for the display's fastest mode at its
+     * own resolution while the coins are on screen, and gives the mode back after.
+     */
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+
+        if (probe != null) {
+            context.activity()?.findViewById<FrameLayout>(android.R.id.content)?.addView(
+                overlay,
+                LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL or Gravity.END)
+            )
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+
+        val window = context.activity()?.window ?: return
+        val screen = display ?: return
+        val current = screen.mode
+        val fastest = screen.supportedModes
+            .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+            .maxByOrNull { it.refreshRate } ?: return
+
+        previousMode = window.attributes.preferredDisplayModeId
+        window.attributes = window.attributes.apply { preferredDisplayModeId = fastest.modeId }
+    }
+
+    override fun onDetachedFromWindow() {
+        (overlay.parent as? FrameLayout)?.removeView(overlay)
+
+        val mode = previousMode
+
+        if (mode != null) {
+            context.activity()?.window?.let { it.attributes = it.attributes.apply { preferredDisplayModeId = mode } }
+            previousMode = null
+        }
+
+        super.onDetachedFromWindow()
     }
 
     /**
@@ -136,5 +202,20 @@ class CoinageCoinsView(context: Context) : FrameLayout(context), TextureView.Sur
         super.onVisibilityAggregated(isVisible)
 
         thread?.setVisible(isVisible)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (isVisible) probe?.start() else probe?.stop()
+        }
     }
+
+    private companion object {
+        const val OVERLAY_BACKGROUND = 0xCC000000.toInt()
+        const val OVERLAY_TEXT_SIZE = 10f
+    }
+}
+
+private tailrec fun Context.activity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.activity()
+    else -> null
 }
