@@ -48,20 +48,16 @@ internal inline fun <reified W : ListenableWorker> enqueueQuietTransfer(context:
         .enqueueUniqueWork(workId, ExistingWorkPolicy.KEEP, request)
 }
 
-// REPLACE: only the finishing pass schedules this, re-targeting the wake-up to the soonest backoff deadline.
-internal inline fun <reified W : ListenableWorker> enqueueDelayedTransfer(context: Context, workId: String, executeAt: Instant) {
+// Kept apart from the pass's unique name, where the starters' KEEP would hold every new transfer behind this delay.
+internal fun scheduleTransferWakeUp(context: Context, transfer: HopTransfer, executeAt: Instant) {
     val delay = executeAt - Clock.System.now()
-    val request = OneTimeWorkRequestBuilder<W>()
+    val request = OneTimeWorkRequestBuilder<HopTransferWakeUpWorker>()
         .setInitialDelay(delay.inWholeMilliseconds.coerceAtLeast(0), TimeUnit.MILLISECONDS)
-        .setConstraints(
-            Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-        )
+        .setInputData(HopTransferWakeUpWorker.inputFor(transfer))
         .build()
 
     WorkManager.getInstance(context)
-        .enqueueUniqueWork(workId, ExistingWorkPolicy.REPLACE, request)
+        .enqueueUniqueWork(transfer.wakeUpWorkId, ExistingWorkPolicy.REPLACE, request)
 }
 
 internal fun hopTransferForegroundInfo(

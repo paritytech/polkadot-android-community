@@ -8,9 +8,10 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferQueueProcessor
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueDelayedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueQuietTransfer
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.scheduleTransferWakeUp
 
 @HiltWorker
 class CompactionExpansionWorker @AssistedInject constructor(
@@ -23,7 +24,7 @@ class CompactionExpansionWorker @AssistedInject constructor(
         val processed = runCancellableCatching { transferQueueProcessor.processPending(transferQueue) }
 
         transferQueue.soonestNextAttemptAt()?.let { soonest ->
-            enqueueDelayedTransfer<CompactionExpansionWorker>(applicationContext, WORK_ID, soonest)
+            scheduleTransferWakeUp(applicationContext, HopTransfer.COMPACTION_EXPANSION, soonest)
         }
 
         return processed.toWorkerResult(retryOnFailure = true)

@@ -46,6 +46,11 @@ dependencies {
     testImplementation(project(":test-shared"))
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.work.testing)
 }
 
 tasks.register<JacocoReport>("chatsCoverage") {
