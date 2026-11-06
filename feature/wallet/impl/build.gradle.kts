@@ -38,5 +38,9 @@ dependencies {
     implementation(project(":tools:remoteconfig:api"))
 
     testImplementation(project(":test-shared"))
+
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
     testImplementation(libs.mockk)
 }
