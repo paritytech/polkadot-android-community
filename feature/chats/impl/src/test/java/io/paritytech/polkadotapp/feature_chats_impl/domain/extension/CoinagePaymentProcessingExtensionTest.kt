@@ -83,15 +83,6 @@ class CoinagePaymentProcessingExtensionTest {
     @After
     fun unmockDerivation() = unmockkStatic(DERIVATION_FILE)
 
-    private val probed = mutableSetOf<CoinPrivateKey>()
-
-    private fun bindingFailureFor(key: CoinPrivateKey): Throwable? = when {
-        key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
-        key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
-        key == REFUSED_AFTER_PROBE && !probed.add(key) -> Exception("Invalid secret")
-        else -> null
-    }
-
     private val context: ChatExtensionContext = mockk(relaxed = true)
     private lateinit var scope: CoroutineScope
 
@@ -753,6 +744,15 @@ class CoinagePaymentProcessingExtensionTest {
     }
 
     // ---- harness ----
+
+    private val probed = mutableSetOf<CoinPrivateKey>()
+
+    private fun bindingFailureFor(key: CoinPrivateKey): Throwable? = when {
+        key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
+        key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
+        key == REFUSED_AFTER_PROBE && !probed.add(key) -> Exception("Invalid secret")
+        else -> null
+    }
 
     private fun startWork(vararg unprocessed: ChatMessage, arriving: List<ChatMessage> = emptyList()) {
         scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher())

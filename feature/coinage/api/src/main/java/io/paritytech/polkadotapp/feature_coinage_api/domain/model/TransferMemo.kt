@@ -9,7 +9,7 @@ typealias CoinPrivateKey = EncodedPrivateKey
 
 fun CoinPrivateKey.deriveKeypair() = Sr25519SubstrateKeypairFactory.createKeypairFromSecret(value)
 
-/** Whether the key is 64 bytes and the sr25519 binding loads it; [deriveKeypair] throws on a secret it cannot load. */
+/** Whether [deriveKeypair] can load this key; the binding throws on a secret it cannot load. */
 fun CoinPrivateKey.isValidCoinKey(): Boolean {
     if (Sr25519SecretKey.fromBytes(this).isFailure) return false
 
