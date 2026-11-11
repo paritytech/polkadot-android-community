@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ChatExtension
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ChatExtensionContext
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.markMessageProcessed
@@ -19,6 +20,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isValidCoinKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -79,24 +81,54 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             .d("Payment processing message=${message.id} incoming=${message.isIncoming} coins=${content.coinKeys.size}")
 
         chatExtensionContext.scope.launch {
-            val coinKeys = content.coinKeys.map { it.toDataByteArray() }
+            runCancellableCatching {
+                val coinKeys = usableCoinKeys(message, content)
 
-            val outcome = if (message.isIncoming) {
-                claimStatuses(message, content, coinKeys)
-            } else {
-                handoffStatuses(coinKeys)
-            }
-                .distinctUntilChanged()
-                .onEach { status -> modifyPaymentContent(message, status) }
-                .lastOrNull()
-
-            // Reaching the end of the flow is the finish, not any status seen along the way. An incoming
-            // payment's claim keeps retrying while a coin is still there to be claimed, so a partial
-            // Transferred is a progress report; treating it as the end is what settled a 1.00 payment as
-            // 0.12. A claim cut short by shutdown throws instead, leaving the message for the next launch.
-            logSettled(message, outcome)
-            with(chatExtensionContext) { markMessageProcessed(message) }
+                if (coinKeys.isEmpty()) {
+                    closeAsUnusable(message)
+                } else {
+                    settle(message, content, coinKeys)
+                }
+            }.logFailure("Payment processing failed message=${message.id}")
         }
+    }
+
+    private fun usableCoinKeys(message: ChatMessage, content: CoinagePayment): List<CoinPrivateKey> {
+        val usable = content.coinKeys.map { it.toDataByteArray() }.filter { it.isValidCoinKey() }
+
+        val unusable = content.coinKeys.size - usable.size
+        if (unusable > 0) {
+            Timber.tag(COINAGE_LOG_TAG).w("Payment has unusable coin keys message=${message.id} unusable=$unusable")
+        }
+
+        return usable
+    }
+
+    context(chatExtensionContext: ChatExtensionContext)
+    private suspend fun closeAsUnusable(message: ChatMessage) {
+        val status = if (message.isIncoming) Status.FailedTransfer else Status.FailedDetection
+
+        modifyPaymentContent(message, status)
+        with(chatExtensionContext) { markMessageProcessed(message) }
+    }
+
+    context(chatExtensionContext: ChatExtensionContext)
+    private suspend fun settle(message: ChatMessage, content: CoinagePayment, coinKeys: List<CoinPrivateKey>) {
+        val outcome = if (message.isIncoming) {
+            claimStatuses(message, content, coinKeys)
+        } else {
+            handoffStatuses(coinKeys)
+        }
+            .distinctUntilChanged()
+            .onEach { status -> modifyPaymentContent(message, status) }
+            .lastOrNull()
+
+        // Reaching the end of the flow is the finish, not any status seen along the way. An incoming
+        // payment's claim keeps retrying while a coin is still there to be claimed, so a partial
+        // Transferred is a progress report; treating it as the end is what settled a 1.00 payment as
+        // 0.12. A claim cut short by shutdown throws instead, leaving the message for the next launch.
+        logSettled(message, outcome)
+        with(chatExtensionContext) { markMessageProcessed(message) }
     }
 
     /**
