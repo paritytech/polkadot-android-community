@@ -1,12 +1,16 @@
 package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.protocol
 
-import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.common.domain.model.X25519PrivateKey
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateAckScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.DeviceTransferCheckpointStorage
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine.SyncEntityApplier
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -18,9 +22,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class DeviceTransferReceiver(
-    private val applyUpdate: suspend (SyncUpdateScale) -> Unit,
+    private val senderInstallationId: DataByteArray,
+    private val applier: SyncEntityApplier,
+    private val checkpointStorage: DeviceTransferCheckpointStorage,
+    private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
 ) {
-    private val appliedUpdateIds = mutableSetOf<UInt>()
     private val cancelRequest = CompletableDeferred<Unit>()
     private val mutableProgress = MutableStateFlow(DeviceTransferProgress(appliedChanges = 0, totalChanges = 0))
 
@@ -31,21 +37,28 @@ class DeviceTransferReceiver(
     }
 
     suspend fun run(transport: DataTransport): DeviceTransferReceiverOutcome = coroutineScope {
+        val senderStarted = CompletableDeferred<Unit>()
         val senderEnd = CompletableDeferred<DeviceTransferReceiverOutcome>()
 
         val updateListening = launch(start = CoroutineStart.UNDISPATCHED) {
             transport.subscribeSyncMessages().collect { message ->
-                if (message is SyncMessageScale.Update) apply(transport, message.update)
+                if (message is SyncMessageScale.Update) {
+                    senderStarted.await()
+                    apply(transport, message.update)
+                }
             }
         }
         val controlListening = launch(start = CoroutineStart.UNDISPATCHED) {
             transport.subscribeControls().collect { control ->
-                handleControl(transport, control)?.let(senderEnd::complete)
+                handleControl(transport, control, senderStarted)?.let(senderEnd::complete)
             }
         }
 
         val outcome = raceFirst(
-            { senderEnd.await() },
+            {
+                transport.sendControl(DeviceTransferControlScale.Resume(checkpointStorage.getCheckpoint(senderInstallationId)))
+                senderEnd.await()
+            },
             { awaitCancelRequest(transport) },
         )
 
@@ -55,9 +68,10 @@ class DeviceTransferReceiver(
     }
 
     private suspend fun apply(transport: DataTransport, update: SyncUpdateScale) {
-        if (update.id !in appliedUpdateIds) {
-            applyUpdate(update)
-            appliedUpdateIds += update.id
+        if (update.entities.isEmpty()) {
+            checkpointStorage.saveCheckpoint(senderInstallationId, update.timePoint)
+        } else {
+            applier.apply(update)
             mutableProgress.update { it.copy(appliedChanges = it.appliedChanges + update.entities.itemCount()) }
         }
 
@@ -67,20 +81,23 @@ class DeviceTransferReceiver(
     private suspend fun handleControl(
         transport: DataTransport,
         control: DeviceTransferControlScale,
+        senderStarted: CompletableDeferred<Unit>,
     ): DeviceTransferReceiverOutcome? = when (control) {
-        is DeviceTransferControlScale.Begin -> {
-            mutableProgress.update { it.copy(totalChanges = control.totalChanges.toInt()) }
+        is DeviceTransferControlScale.SenderStarted -> {
+            ourDeviceKeypairProvider.importPrivateKey(X25519PrivateKey.fromDerivedBytes(control.deviceEncryptionKey))
+            mutableProgress.value = DeviceTransferProgress(appliedChanges = 0, totalChanges = control.totalChanges.toInt())
+            senderStarted.complete(Unit)
             null
         }
 
-        is DeviceTransferControlScale.SenderCompleted -> {
+        DeviceTransferControlScale.SenderCompleted -> {
             transport.sendControl(DeviceTransferControlScale.ReceiverCompleted)
-            DeviceTransferReceiverOutcome.Completed(control.deviceKey.toDataByteArray())
+            DeviceTransferReceiverOutcome.Completed
         }
 
         is DeviceTransferControlScale.Abort -> DeviceTransferReceiverOutcome.AbortedBySender(control.reason.toDomain())
 
-        DeviceTransferControlScale.ReceiverCompleted -> null
+        DeviceTransferControlScale.ReceiverCompleted, is DeviceTransferControlScale.Resume -> null
     }
 
     private suspend fun awaitCancelRequest(transport: DataTransport): DeviceTransferReceiverOutcome {

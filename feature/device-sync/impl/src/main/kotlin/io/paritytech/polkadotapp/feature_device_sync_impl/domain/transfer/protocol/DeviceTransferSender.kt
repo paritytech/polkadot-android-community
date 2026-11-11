@@ -1,11 +1,11 @@
 package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.protocol
 
-import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -16,13 +16,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class DeviceTransferSender(
-    private val updates: List<SyncUpdateScale>,
-    private val deviceKey: DataByteArray,
+    private val collectUpdates: suspend (checkpoint: ULong?) -> List<SyncUpdateScale>,
+    private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
 ) {
-    private val acknowledgedUpdateIds = mutableSetOf<UInt>()
     private val cancelRequest = CompletableDeferred<Unit>()
-
-    val totalChanges: Int = updates.sumOf { it.entities.itemCount() }
 
     fun cancel() {
         cancelRequest.complete(Unit)
@@ -30,6 +27,7 @@ class DeviceTransferSender(
 
     suspend fun run(transport: DataTransport): DeviceTransferSenderOutcome = coroutineScope {
         val acks = Channel<UInt>(Channel.UNLIMITED)
+        val resumeCheckpoints = Channel<ULong?>(Channel.UNLIMITED)
         val receiverEnd = CompletableDeferred<DeviceTransferSenderOutcome>()
 
         val ackListening = launch(start = CoroutineStart.UNDISPATCHED) {
@@ -39,13 +37,15 @@ class DeviceTransferSender(
         }
         val controlListening = launch(start = CoroutineStart.UNDISPATCHED) {
             transport.subscribeControls().collect { control ->
+                if (control is DeviceTransferControlScale.Resume) resumeCheckpoints.send(control.fromTimePoint)
                 control.toSenderOutcome()?.let(receiverEnd::complete)
             }
         }
 
         val outcome = raceFirst(
             {
-                sendSnapshot(transport, acks)
+                val updates = collectUpdates(resumeCheckpoints.receive())
+                sendUpdates(transport, updates, acks)
                 awaitCancellation()
             },
             { receiverEnd.await() },
@@ -57,18 +57,21 @@ class DeviceTransferSender(
         outcome
     }
 
-    private suspend fun sendSnapshot(transport: DataTransport, acks: ReceiveChannel<UInt>) {
-        transport.sendControl(DeviceTransferControlScale.Begin(totalChanges.toUInt()))
+    private suspend fun sendUpdates(
+        transport: DataTransport,
+        updates: List<SyncUpdateScale>,
+        acks: ReceiveChannel<UInt>,
+    ) {
+        val deviceKey = ourDeviceKeypairProvider.get().privateKey.bytes.value
+        val totalChanges = updates.sumOf { it.entities.itemCount() }
+        transport.sendControl(DeviceTransferControlScale.SenderStarted(deviceKey, totalChanges.toUInt()))
 
         for (update in updates) {
-            if (update.id in acknowledgedUpdateIds) continue
-
             transport.sendSyncMessage(SyncMessageScale.Update(update))
             awaitAck(update.id, acks)
-            acknowledgedUpdateIds += update.id
         }
 
-        transport.sendControl(DeviceTransferControlScale.SenderCompleted(deviceKey.value))
+        transport.sendControl(DeviceTransferControlScale.SenderCompleted)
     }
 
     private suspend fun awaitAck(updateId: UInt, acks: ReceiveChannel<UInt>) {
@@ -86,6 +89,8 @@ class DeviceTransferSender(
     private fun DeviceTransferControlScale.toSenderOutcome(): DeviceTransferSenderOutcome? = when (this) {
         DeviceTransferControlScale.ReceiverCompleted -> DeviceTransferSenderOutcome.Completed
         is DeviceTransferControlScale.Abort -> DeviceTransferSenderOutcome.AbortedByReceiver(reason.toDomain())
-        is DeviceTransferControlScale.Begin, is DeviceTransferControlScale.SenderCompleted -> null
+        is DeviceTransferControlScale.SenderStarted,
+        DeviceTransferControlScale.SenderCompleted,
+        is DeviceTransferControlScale.Resume -> null
     }
 }

@@ -81,7 +81,11 @@ class DeviceTransferConnector @Inject constructor(
 
         return try {
             raceFirst(
-                { useOpenedChannel(channel, useChannel) },
+                {
+                    useChannel(channel.dataTransport)
+                    ConnectionAttempt.FINISHED
+                },
+                { awaitChannelEnd(channel) },
                 { awaitReconnectRequest(session) },
             )
         } finally {
@@ -89,22 +93,11 @@ class DeviceTransferConnector @Inject constructor(
         }
     }
 
-    private suspend fun useOpenedChannel(
-        channel: PeerChannel,
-        useChannel: suspend (DataTransport) -> Unit,
-    ): ConnectionAttempt {
+    private suspend fun awaitChannelEnd(channel: PeerChannel): ConnectionAttempt {
         if (!channel.awaitOpen()) return ConnectionAttempt.NOT_OPENED
 
-        return raceFirst(
-            {
-                useChannel(channel.dataTransport)
-                ConnectionAttempt.FINISHED
-            },
-            {
-                channel.connectionState.first { it.isTerminal() }
-                ConnectionAttempt.DROPPED
-            },
-        )
+        channel.connectionState.first { it.isTerminal() }
+        return ConnectionAttempt.DROPPED
     }
 
     private suspend fun awaitReconnectRequest(session: DeviceTransferSession): ConnectionAttempt {

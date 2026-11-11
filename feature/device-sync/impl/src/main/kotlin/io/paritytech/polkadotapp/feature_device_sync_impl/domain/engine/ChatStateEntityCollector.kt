@@ -73,7 +73,7 @@ class ChatStateEntityCollector @Inject constructor(
         )
     }
 
-    private companion object {
+    companion object {
         val NOTHING_SYNCED_CHECKPOINT = Instant.fromEpochMilliseconds(0)
     }
 }

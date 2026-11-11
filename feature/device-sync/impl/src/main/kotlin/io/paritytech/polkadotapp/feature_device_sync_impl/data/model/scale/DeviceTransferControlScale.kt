@@ -8,14 +8,15 @@ import kotlinx.serialization.Serializable
 sealed interface DeviceTransferControlScale {
     @Serializable
     @EnumIndex(0)
-    class Begin(val totalChanges: UInt) : DeviceTransferControlScale
+    class SenderStarted(
+        @FixedLength(32)
+        val deviceEncryptionKey: ByteArray,
+        val totalChanges: UInt,
+    ) : DeviceTransferControlScale
 
     @Serializable
     @EnumIndex(1)
-    class SenderCompleted(
-        @FixedLength(32)
-        val deviceKey: ByteArray,
-    ) : DeviceTransferControlScale
+    data object SenderCompleted : DeviceTransferControlScale
 
     @Serializable
     @EnumIndex(2)
@@ -24,6 +25,10 @@ sealed interface DeviceTransferControlScale {
     @Serializable
     @EnumIndex(3)
     class Abort(val reason: AbortReasonScale) : DeviceTransferControlScale
+
+    @Serializable
+    @EnumIndex(4)
+    class Resume(val fromTimePoint: ULong?) : DeviceTransferControlScale
 }
 
 @Serializable
