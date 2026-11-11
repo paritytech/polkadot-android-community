@@ -580,7 +580,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment()
         startWork(arriving = listOf(unusable, valid))
 
-        thenClosedAsFailed(unusable, CoinagePayment.Status.FailedTransfer)
+        verifyClosedAsFailed(unusable, CoinagePayment.Status.FailedTransfer)
         coVerify(exactly = 1) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
         coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
     }
@@ -593,7 +593,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment()
         startWork(unusable, valid)
 
-        thenClosedAsFailed(unusable, CoinagePayment.Status.FailedTransfer)
+        verifyClosedAsFailed(unusable, CoinagePayment.Status.FailedTransfer)
         coVerify(exactly = 1) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
         coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
     }
@@ -643,8 +643,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment()
         startWork(arriving = listOf(broken, valid))
 
-        coVerify(exactly = 0) { context.markMessageProcessed(broken.chatId, broken.id) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
+        verifyLeftOpen(broken, stillProcessing = valid)
     }
 
     @Test
@@ -656,8 +655,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment(id = "incoming")
         startWork(arriving = listOf(outgoing, valid))
 
-        coVerify(exactly = 0) { context.markMessageProcessed(outgoing.chatId, outgoing.id) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
+        verifyLeftOpen(outgoing, stillProcessing = valid)
     }
 
     @Test
@@ -665,7 +663,7 @@ class CoinagePaymentProcessingExtensionTest {
         val message = outgoingPayment(coinKeys = listOf(ByteArray(0)))
         startWork(message)
 
-        thenClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
+        verifyClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
         verify(exactly = 0) { paymentStatusUseCase.subscribeStatuses(any()) }
     }
 
@@ -676,7 +674,7 @@ class CoinagePaymentProcessingExtensionTest {
         val message = incomingPayment(coinKeys = emptyList())
         startWork(message)
 
-        thenClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
+        verifyClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
         coVerify(exactly = 0) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
     }
 
@@ -687,7 +685,7 @@ class CoinagePaymentProcessingExtensionTest {
         )
         startWork(message)
 
-        thenClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
+        verifyClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
         verify(exactly = 0) { match<CoinPrivateKey> { it.value.size != Sr25519SecretKey.SIZE_BYTES }.deriveKeypair() }
     }
 
@@ -696,7 +694,7 @@ class CoinagePaymentProcessingExtensionTest {
         val message = outgoingPayment(coinKeys = listOf(REFUSED_KEY.value))
         startWork(message)
 
-        thenClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
+        verifyClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
     }
 
     @Test
@@ -708,8 +706,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment()
         startWork(arriving = listOf(broken, valid))
 
-        coVerify(exactly = 0) { context.markMessageProcessed(broken.chatId, broken.id) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
+        verifyLeftOpen(broken, stillProcessing = valid)
     }
 
     @Test
@@ -721,8 +718,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment()
         startWork(arriving = listOf(broken, valid))
 
-        coVerify(exactly = 0) { context.markMessageProcessed(broken.chatId, broken.id) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
+        verifyLeftOpen(broken, stillProcessing = valid)
     }
 
     @Test
@@ -733,8 +729,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment()
         startWork(arriving = listOf(broken, valid))
 
-        coVerify(exactly = 0) { context.markMessageProcessed(broken.chatId, broken.id) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
+        verifyLeftOpen(broken, stillProcessing = valid)
     }
 
     @Test
@@ -745,8 +740,7 @@ class CoinagePaymentProcessingExtensionTest {
         val valid = incomingPayment(id = "incoming")
         startWork(arriving = listOf(broken, valid))
 
-        coVerify(exactly = 0) { context.markMessageProcessed(broken.chatId, broken.id) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
+        verifyLeftOpen(broken, stillProcessing = valid)
     }
 
     @Test
@@ -817,11 +811,16 @@ class CoinagePaymentProcessingExtensionTest {
         )
     }
 
-    private fun thenClosedAsFailed(message: ChatMessage, status: CoinagePayment.Status) {
+    private fun verifyClosedAsFailed(message: ChatMessage, status: CoinagePayment.Status) {
         coVerify {
             context.modifyMessage(message.chatId, message.id, match { it is CoinagePayment && it.status == status })
         }
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
+    }
+
+    private fun verifyLeftOpen(message: ChatMessage, stillProcessing: ChatMessage) {
+        coVerify(exactly = 0) { context.markMessageProcessed(message.chatId, message.id) }
+        coVerify(exactly = 1) { context.markMessageProcessed(stillProcessing.chatId, stillProcessing.id) }
     }
 
     private fun accountId(seed: Int): AccountId = byteArrayOf(seed.toByte()).toDataByteArray()

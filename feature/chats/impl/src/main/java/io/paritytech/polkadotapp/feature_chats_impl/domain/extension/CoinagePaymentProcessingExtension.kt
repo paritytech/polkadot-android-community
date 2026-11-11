@@ -89,7 +89,7 @@ class CoinagePaymentProcessingExtension @Inject constructor(
                 } else {
                     settle(message, content, coinKeys)
                 }
-            }.logFailure("Payment processing failed message=${message.id}")
+            }.onFailure { Timber.tag(COINAGE_LOG_TAG).e(it, "Payment processing failed message=${message.id}") }
         }
     }
 
