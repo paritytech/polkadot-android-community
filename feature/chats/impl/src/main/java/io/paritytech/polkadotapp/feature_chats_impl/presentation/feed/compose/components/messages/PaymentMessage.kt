@@ -3,7 +3,6 @@ package io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.c
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,18 +14,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.PaymentAssetBrand
-import io.paritytech.polkadotapp.design.components.icon.NovaIcon
-import io.paritytech.polkadotapp.design.components.icon.NovaIcons
-import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowUpward
-import io.paritytech.polkadotapp.design.components.icon.vectors.Check
-import io.paritytech.polkadotapp.design.components.icon.vectors.CheckDouble
+import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
+import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
+import io.paritytech.polkadotapp.design.components.button.default.PolkadotButtonSize
+import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.surface.PolkadotSurface
 import io.paritytech.polkadotapp.design.components.text.NovaText
@@ -40,11 +37,11 @@ import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageAct
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.MessageLayoutInfo
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.FlatMessageTimestamp
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.PaymentAmounts
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.compose.components.messages.components.PaymentStatusIndicator
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.ChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.formatter.LocalChatMessageTimeFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.LocalTokenAmountFormatter
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.TokenAmountFormatter
-import io.paritytech.polkadotapp.feature_tokens_api.presentation.formatter.formatFiatSigned
 import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmountModel
 import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
@@ -70,7 +67,7 @@ fun PaymentMessage(
         onMessageAction = onMessageAction,
         onLongPress = onLongPress,
         reactions = message.reactions,
-        surfaceStyle = customBubbleStyle ?: ChatMessageSurfaceStyle.default(message.direction),
+        surfaceStyle = customBubbleStyle ?: paymentSurfaceStyle(message),
     ) {
         val isIncoming = message.direction == ChatMessageUiModel.Direction.INCOMING
         val headerText = if (isIncoming) {
@@ -88,8 +85,20 @@ fun PaymentMessage(
             message = message,
             isIncoming = isIncoming,
             headerText = headerText,
-            username = username
+            username = username,
+            onReclaim = { onMessageAction(MessageAction.ReclaimPayment(message)) }
         )
+    }
+}
+
+@Composable
+private fun paymentSurfaceStyle(message: ChatMessageUiModel.CoinagePayment): ChatMessageSurfaceStyle {
+    val default = ChatMessageSurfaceStyle.default(message.direction)
+
+    return if (message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.Reclaimed) {
+        default.copy(alpha = RECLAIMED_ALPHA)
+    } else {
+        default
     }
 }
 
@@ -98,7 +107,8 @@ private fun PaymentMessageContent(
     message: ChatMessageUiModel.CoinagePayment,
     isIncoming: Boolean,
     headerText: String,
-    username: String
+    username: String,
+    onReclaim: () -> Unit
 ) {
     val headerColor: Color
     val amountBoxColor: Color
@@ -118,6 +128,8 @@ private fun PaymentMessageContent(
     }
 
     val differingAmount = message.differingAmount
+    val isReclaimed = message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.Reclaimed
+    val isReturnedToSender = message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ReturnedToSender
 
     val bubbleWidth = minOf(PaymentMessageWidth, getMaxMessageWidth())
     val boxHorizontalInset = PolkadotTheme.spacings.extraMedium
@@ -154,6 +166,7 @@ private fun PaymentMessageContent(
                 PaymentAmounts(
                     amount = message.amount,
                     differingAmount = differingAmount,
+                    struckThrough = isReclaimed || isReturnedToSender,
                     maxWidthPx = amountMaxWidthPx,
                     primaryTextColor = primaryTextColor,
                     secondaryTextColor = secondaryTextColor
@@ -170,6 +183,27 @@ private fun PaymentMessageContent(
             amount = message.amount,
             differingAmount = differingAmount
         )
+
+        if (!isIncoming && message.paymentStatus.canReclaim) {
+            VerticalSpacer { small }
+
+            PolkadotTextButton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PolkadotTheme.spacings.extraMedium),
+                text = stringResource(
+                    if (message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ReclaimFailed) {
+                        RCommon.string.chat_payment_reclaim_retry_action
+                    } else {
+                        RCommon.string.chat_payment_reclaim_action
+                    }
+                ),
+                style = PolkadotButtonStyle.secondaryInverted(),
+                size = PolkadotButtonSize.medium(),
+                shape = PolkadotButtonShape.rounded,
+                onClick = onReclaim
+            )
+        }
 
         VerticalSpacer { tiny }
 
@@ -189,116 +223,6 @@ private fun PaymentMessageContent(
         }
 
         VerticalSpacer { small }
-    }
-}
-
-@Composable
-private fun PaymentStatusIndicator(
-    modifier: Modifier = Modifier,
-    status: ChatMessageUiModel.CoinagePayment.Status,
-    baseStatusColor: Color,
-    isIncoming: Boolean,
-    username: String,
-    amount: TokenAmountModel,
-    differingAmount: TokenAmountModel?
-) {
-    val formatter = LocalTokenAmountFormatter.current
-
-    val icon: ImageVector?
-    val text: String
-    val color: Color
-
-    if (differingAmount != null) {
-        icon = null
-        text = if (isIncoming) {
-            stringResource(
-                RCommon.string.chat_payment_amount_differs_recipient,
-                formatter.formatFiatSigned(differingAmount),
-                formatter.formatFiatSigned(amount)
-            )
-        } else {
-            stringResource(
-                RCommon.string.chat_payment_amount_differs_sender,
-                username,
-                formatter.formatFiatSigned(differingAmount),
-                formatter.formatFiatSigned(amount)
-            )
-        }
-        color = PolkadotTheme.colors.fg.warning
-    } else {
-        when (status) {
-            is ChatMessageUiModel.CoinagePayment.Status.Detecting -> {
-                icon = NovaIcons.ArrowUpward
-                text = stringResource(
-                    if (isIncoming) {
-                        RCommon.string.chat_payment_status_detecting_recipient
-                    } else {
-                        RCommon.string.chat_payment_status_detecting_sender
-                    }
-                )
-                color = baseStatusColor
-            }
-
-            is ChatMessageUiModel.CoinagePayment.Status.Detected,
-            is ChatMessageUiModel.CoinagePayment.Status.PartiallyClaimed -> {
-                if (isIncoming) {
-                    icon = NovaIcons.ArrowUpward
-                    text = stringResource(RCommon.string.chat_payment_status_claiming_recipient)
-                } else {
-                    icon = NovaIcons.Check
-                    text = stringResource(RCommon.string.chat_payment_status_sent_sender)
-                }
-                color = baseStatusColor
-            }
-
-            is ChatMessageUiModel.CoinagePayment.Status.Transferred -> {
-                icon = NovaIcons.CheckDouble
-                text = if (isIncoming) {
-                    stringResource(RCommon.string.chat_payment_status_claimed_recipient)
-                } else {
-                    stringResource(RCommon.string.chat_payment_status_claimed_sender, username)
-                }
-                color = baseStatusColor
-            }
-
-            ChatMessageUiModel.CoinagePayment.Status.FailedDetection,
-            ChatMessageUiModel.CoinagePayment.Status.FailedTransfer -> {
-                icon = null
-                text = stringResource(
-                    if (isIncoming) {
-                        RCommon.string.chat_payment_status_failed_recipient
-                    } else {
-                        RCommon.string.chat_payment_status_failed_sender
-                    }
-                )
-                color = PolkadotTheme.colors.fg.warning
-            }
-        }
-    }
-
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.extraTiny)
-    ) {
-        if (icon != null) {
-            NovaIcon(
-                modifier = Modifier.size(16.dp),
-                imageVector = icon,
-                tint = color
-            )
-        }
-
-        NovaText(
-            modifier = if (icon == null) {
-                Modifier.padding(horizontal = PolkadotTheme.spacings.small)
-            } else {
-                Modifier
-            },
-            text = text,
-            style = PolkadotTheme.typography.body.medium,
-            color = color
-        )
     }
 }
 
@@ -372,6 +296,30 @@ private fun MessagesPreview(direction: ChatMessageUiModel.Direction) {
                     paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Detected(TokenAmountModel.mock),
                     deliveryStatus = ChatMessageUiModel.Status.FAILED,
                 )
+                if (direction == ChatMessageUiModel.Direction.INCOMING) {
+                    PaymentMessagePreview(
+                        direction = direction,
+                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.ReturnedToSender,
+                    )
+                }
+                if (direction == ChatMessageUiModel.Direction.OUTGOING) {
+                    PaymentMessagePreview(
+                        direction = direction,
+                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Unclaimed,
+                    )
+                    PaymentMessagePreview(
+                        direction = direction,
+                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Reclaiming,
+                    )
+                    PaymentMessagePreview(
+                        direction = direction,
+                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Reclaimed(TokenAmountModel.mock),
+                    )
+                    PaymentMessagePreview(
+                        direction = direction,
+                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.ReclaimFailed,
+                    )
+                }
             }
         }
     }
@@ -407,5 +355,7 @@ private fun PaymentMessagePreview(
 
 private val PaymentMessageWidth = 250.dp
 
+private const val RECLAIMED_ALPHA = 0.55f
+
 /** Tall enough for the whole status gallery; the scroll is for the interactive preview. */
-private const val PREVIEW_HEIGHT = 2100
+private const val PREVIEW_HEIGHT = 3000

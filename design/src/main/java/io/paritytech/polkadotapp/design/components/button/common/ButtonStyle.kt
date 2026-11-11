@@ -37,6 +37,17 @@ interface PolkadotButtonStyle {
         )
 
         @Composable
+        fun secondaryInverted(): PolkadotButtonStyle = rememberButtonStyle(
+            colors = PolkadotButtonColors(
+                containerBrush = SolidColor(PolkadotTheme.colors.bg.action.secondaryInverted),
+                contentColor = PolkadotTheme.colors.fg.primaryInverted,
+                disabledContainerBrush = SolidColor(PolkadotTheme.colors.bg.action.disabled),
+                disabledContentColor = PolkadotTheme.colors.fg.disabled
+            ),
+            rippleColor = PolkadotTheme.colors.fg.primaryInverted
+        )
+
+        @Composable
         fun tertiary(): PolkadotButtonStyle = rememberButtonStyle(
             colors = PolkadotButtonColors(
                 containerBrush = SolidColor(PolkadotTheme.colors.bg.action.tertiary),

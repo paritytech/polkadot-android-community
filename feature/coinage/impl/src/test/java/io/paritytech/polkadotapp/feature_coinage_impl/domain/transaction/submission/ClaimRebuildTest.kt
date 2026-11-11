@@ -18,7 +18,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinReposi
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.LedgerAsset
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.CoinTransferExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.COINAGE_DOMAIN
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
@@ -58,9 +58,9 @@ class ClaimRebuildTest {
     private val chain: Chain = mockk()
     private val chainAssetProvider: ChainAssetProvider = mockk()
     private val coinRepository: CoinRepository = mockk()
-    private val claimExtrinsicBuilder: ClaimExtrinsicBuilder = mockk()
+    private val coinTransferExtrinsicBuilder: CoinTransferExtrinsicBuilder = mockk()
 
-    private val rebuild = ClaimRebuild(chainAssetProvider, coinRepository, claimExtrinsicBuilder)
+    private val rebuild = ClaimRebuild(chainAssetProvider, coinRepository, coinTransferExtrinsicBuilder)
 
     @Before
     fun setUp() {
@@ -159,7 +159,7 @@ class ClaimRebuildTest {
 
         rebuild.build(listOf(resolved))
 
-        coVerify(exactly = 1) { claimExtrinsicBuilder.build(chain, any(), claim.destination) }
+        coVerify(exactly = 1) { coinTransferExtrinsicBuilder.build(chain, any(), claim.destination) }
     }
 
     /** The peer's key lives only in the payment message, so the rebuild signs with the one kept in the params. */
@@ -171,13 +171,13 @@ class ClaimRebuildTest {
 
         rebuild.build(listOf(resolved))
 
-        coVerify(exactly = 1) { claimExtrinsicBuilder.build(any(), claim.keypair, any()) }
+        coVerify(exactly = 1) { coinTransferExtrinsicBuilder.build(any(), claim.keypair, any()) }
     }
 
     @Test
     fun `a claim that cannot be built fails the whole build`() = runTest {
         val claim = claimOf(1)
-        coEvery { claimExtrinsicBuilder.build(any(), any(), any()) } returns Result.failure(IllegalStateException("no runtime"))
+        coEvery { coinTransferExtrinsicBuilder.build(any(), any(), any()) } returns Result.failure(IllegalStateException("no runtime"))
         val resolved = rebuild.resolve(listOf(claim.scheduled), assetsOf(claim)).getValue(claim.id)
 
         assertTrue(rebuild.build(listOf(resolved)).isFailure)
@@ -186,7 +186,7 @@ class ClaimRebuildTest {
     // ---- harness ----
 
     private fun givenBuildsSucceed() {
-        coEvery { claimExtrinsicBuilder.build(any(), any(), any()) } returns Result.success(mockk<EnrichedSendableExtrinsic>())
+        coEvery { coinTransferExtrinsicBuilder.build(any(), any(), any()) } returns Result.success(mockk<EnrichedSendableExtrinsic>())
     }
 
     /** One emission per read, and a subscription that stays open after the last one. */

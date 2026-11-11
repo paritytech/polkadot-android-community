@@ -29,6 +29,8 @@ interface CoinageTransaction {
     /** A coin whose key a peer sent us: an input, never one of our assets. */
     fun consumeReceivedCoin(publicKey: DataByteArray)
 
+    fun reclaimCoin(coin: Coin)
+
     fun useVouchers(vouchers: List<RecyclerVoucher>)
 
     /** Records that these assets' keys are leaving the device. */

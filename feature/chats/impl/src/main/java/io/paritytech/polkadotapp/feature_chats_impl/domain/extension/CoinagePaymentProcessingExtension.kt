@@ -1,8 +1,8 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.extension
 
 import io.paritytech.polkadotapp.chains.network.binding.Balance
+import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
-import io.paritytech.polkadotapp.common.domain.model.intoAccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ChatExtension
@@ -11,26 +11,28 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.extension.markMessageP
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage.Content.CoinagePayment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage.Content.CoinagePayment.Status
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.isIncoming
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.paymentContentOrNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.common.formatCoinsToBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
-import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.isTerminal
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
@@ -49,11 +51,13 @@ private const val COINAGE_LOG_TAG = "CoinageTransfer"
  * again from the message's id. That is why a restart mid-payment needs nothing to resume from: the message
  * says which coins, and the ledger says what happened to them.
  */
-@OptIn(ExperimentalTime::class)
+@OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
 class CoinagePaymentProcessingExtension @Inject constructor(
     private val paymentStatusUseCase: CoinagePaymentStatusUseCase,
     private val claimReceivedCoinsUseCase: ClaimReceivedCoinsUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
+    private val reclaimHandedOffCoinsUseCase: ReclaimHandedOffCoinsUseCase,
+    private val timeProvider: TimeProvider,
 ) : ChatExtension {
     override val id = "CoinagePaymentProcessing"
 
@@ -79,12 +83,10 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             .d("Payment processing message=${message.id} incoming=${message.isIncoming} coins=${content.coinKeys.size}")
 
         chatExtensionContext.scope.launch {
-            val coinKeys = content.coinKeys.map { it.toDataByteArray() }
-
             val outcome = if (message.isIncoming) {
-                claimStatuses(message, content, coinKeys)
+                claimStatuses(message, content, content.coinKeys.map { it.toDataByteArray() })
             } else {
-                handoffStatuses(coinKeys)
+                handoffStatuses(message, content)
             }
                 .distinctUntilChanged()
                 .onEach { status -> modifyPaymentContent(message, status) }
@@ -119,24 +121,68 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             .i("Payment claiming message=${message.id} group=${groupId.value} coins=${coinKeys.size} until=$retryUntil")
 
         return claimReceivedCoinsUseCase.claim(coinKeys, groupId, retryUntil)
-            .map { it.toPaymentStatus(expected = content.totalValue) }
+            .flatMapLatest { claimStatusesOf(it, message, expected = content.totalValue) }
+    }
+
+    private fun claimStatusesOf(
+        detection: CoinageTransferDetection,
+        message: ChatMessage,
+        expected: Balance,
+    ): Flow<Status> = flow {
+        val remaining = claimWindowClosesAt(message) - timeProvider.now()
+
+        when (detection) {
+            is CoinageTransferDetection.Absent -> {
+                if (remaining.isPositive()) {
+                    emit(detection.toPaymentStatus(expected))
+                    delay(remaining)
+                }
+
+                emit(Status.ReturnedToSender)
+            }
+
+            is CoinageTransferDetection.NotClaimed ->
+                emit(if (remaining.isPositive()) detection.toPaymentStatus(expected) else Status.ReturnedToSender)
+
+            else -> emit(detection.toPaymentStatus(expected))
+        }
     }
 
     /**
      * Ours until the peer takes them. Stops once every coin has been claimed or proven never to have existed,
      * since nothing after that can change.
      */
-    private fun handoffStatuses(coinKeys: List<CoinPrivateKey>): Flow<Status> {
-        val accountIds = coinKeys.map { it.deriveKeypair().publicKey.intoAccountId() }
+    private fun handoffStatuses(message: ChatMessage, content: CoinagePayment): Flow<Status> {
+        val accountIds = content.coinAccountIds()
 
         // Watched until every coin is beyond recall, not until it merely looks settled: a claim seen only
         // in a best-chain block can be forked away, and a closed message is one nothing is watching.
-        return paymentStatusUseCase.subscribeStatuses(accountIds).transformWhile { states ->
-            emit(states.toPaymentStatus())
+        return combine(
+            paymentStatusUseCase.subscribeStatuses(accountIds),
+            reclaimHandedOffCoinsUseCase.subscribeFailedReclaims(reclaimGroupOf(message.id)),
+            claimWindowClosed(message),
+        ) { states, failedReclaims, windowClosed ->
+            states to states.toPaymentStatus(failedReclaims, windowClosed)
+        }.transformWhile { (states, status) ->
+            emit(status)
 
             states.isEmpty() || states.hasOngoing()
         }
     }
+
+    private fun claimWindowClosed(message: ChatMessage): Flow<Boolean> = flow {
+        val remaining = claimWindowClosesAt(message) - timeProvider.now()
+
+        if (remaining.isPositive()) {
+            emit(false)
+            delay(remaining)
+        }
+
+        emit(true)
+    }
+
+    private fun claimWindowClosesAt(message: ChatMessage): Instant =
+        Instant.fromEpochMilliseconds(message.timestamp) + CoinagePayment.CLAIM_WINDOW
 
     /**
      * Whether anything about this payment could still change.
@@ -156,9 +202,14 @@ class CoinagePaymentProcessingExtension @Inject constructor(
      * rather than a whole finality later. Whether it may be *closed* is [hasOngoing]'s business, and that
      * one does wait for finality.
      */
-    private suspend fun Map<AccountId, CoinagePaymentState>.toPaymentStatus(): Status {
+    private suspend fun Map<AccountId, CoinagePaymentState>.toPaymentStatus(
+        failedReclaims: Set<AccountId>,
+        claimWindowClosed: Boolean,
+    ): Status {
         val claimed = coinsMatching { it is CoinagePaymentStatus.Claimed }
         val awaiting = coinsMatching { it is CoinagePaymentStatus.AwaitingClaim }
+        val reclaiming = coinsMatching { it is CoinagePaymentStatus.Reclaiming }
+        val reclaimed = coinsMatching { it is CoinagePaymentStatus.Reclaimed }
 
         // Coins the peer has yet to take: on chain waiting, or not yet minted. Not the same as unproven —
         // a claim seen in a best block has been taken, whether or not it can still be rolled back.
@@ -168,6 +219,14 @@ class CoinagePaymentProcessingExtension @Inject constructor(
 
         return when {
             isEmpty() -> Status.Detecting
+
+            reclaiming.isNotEmpty() -> Status.Reclaiming
+
+            awaiting.any { it.accountId in failedReclaims } -> Status.ReclaimFailed
+
+            claimWindowClosed && awaiting.isNotEmpty() -> Status.Unclaimed
+
+            reclaimed.isNotEmpty() -> Status.Reclaimed(valueOf(reclaimed))
 
             // Something is still to be taken. A large payment is minted by several transactions, so its
             // coins appear in waves; calling it transferred for the wave already taken makes the message
@@ -206,25 +265,23 @@ class CoinagePaymentProcessingExtension @Inject constructor(
     }
 
     private fun logSettled(message: ChatMessage, status: Status?) {
-        val outcome = if (message.isIncoming) "claimed" else "collectedByPeer"
-        val group = if (message.isIncoming) claimGroupOf(message.id).value else "none"
+        val (outcome, group) = when {
+            message.isIncoming -> "claimed" to claimGroupOf(message.id).value
+            status is Status.Reclaimed -> "reclaimed" to reclaimGroupOf(message.id).value
+            else -> "collectedByPeer" to "none"
+        }
 
         Timber.tag(COINAGE_LOG_TAG).i("Payment settled message=${message.id} outcome=$outcome group=$group status=$status")
     }
 }
 
 /**
- * Derived from the message rather than stored, so a retry after process death rejoins the claims the previous
- * attempt registered instead of submitting a second set.
- */
-private fun claimGroupOf(messageId: ChatMessageId) = CoinageOperationGroupId("chat-claim:$messageId")
-
-/**
  * [expected] stands in for the amount while claiming is still under way: what is worth reporting then is the
  * whole payment we are working towards, not the nothing that has landed so far.
  */
 private fun CoinageTransferDetection.toPaymentStatus(expected: Balance): Status = when (this) {
-    is CoinageTransferDetection.Detecting -> Status.Detecting
+    is CoinageTransferDetection.Detecting,
+    is CoinageTransferDetection.Absent -> Status.Detecting
     is CoinageTransferDetection.Claiming -> Status.Detected(expected)
     is CoinageTransferDetection.ClaimingRest -> Status.PartiallyClaimed(claimed)
 

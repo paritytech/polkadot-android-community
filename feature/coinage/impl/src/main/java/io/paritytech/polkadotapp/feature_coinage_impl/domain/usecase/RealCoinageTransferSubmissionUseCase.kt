@@ -18,7 +18,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.mintCoin
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.CoinTransferExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ClaimSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSubmissionParams
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
@@ -53,7 +53,7 @@ interface CoinageTransferSubmissionUseCase {
 @OptIn(ExperimentalTime::class)
 class RealCoinageTransferSubmissionUseCase @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
-    private val claimExtrinsicBuilder: ClaimExtrinsicBuilder,
+    private val coinTransferExtrinsicBuilder: CoinTransferExtrinsicBuilder,
     private val transactionService: CoinageTransactionService,
     private val coinageTransactionFactory: CoinageTransaction.Factory,
 ) : CoinageTransferSubmissionUseCase {
@@ -118,7 +118,7 @@ class RealCoinageTransferSubmissionUseCase @Inject constructor(
 
         coinageLogD("Claim built group=${groupId.value} coin=$source value=${valueExponent.value}")
 
-        return claimExtrinsicBuilder.build(chain, coin.keypair, destination.accountId).map { extrinsic ->
+        return coinTransferExtrinsicBuilder.build(chain, coin.keypair, destination.accountId).map { extrinsic ->
             CoinageTransactionRequest(
                 extrinsic = extrinsic,
                 inputs = assets.inputs,

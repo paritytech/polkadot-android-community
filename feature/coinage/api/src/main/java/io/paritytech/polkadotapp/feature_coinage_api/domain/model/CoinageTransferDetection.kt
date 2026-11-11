@@ -12,6 +12,8 @@ sealed interface CoinageTransferDetection {
     /** Nothing the keys control is on chain yet, so there is nothing to claim. */
     data object Detecting : CoinageTransferDetection
 
+    data object Absent : CoinageTransferDetection
+
     /**
      * Claims are under way and none of the coins is ours yet. No failures occurred so far.
      */

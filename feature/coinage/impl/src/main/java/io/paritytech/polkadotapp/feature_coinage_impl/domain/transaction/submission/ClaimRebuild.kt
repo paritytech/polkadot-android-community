@@ -9,7 +9,7 @@ import io.paritytech.polkadotapp.common.utils.mapAsync
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.CoinTransferExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
@@ -26,7 +26,7 @@ import javax.inject.Inject
 class ClaimRebuild @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val coinRepository: CoinRepository,
-    private val claimExtrinsicBuilder: ClaimExtrinsicBuilder,
+    private val coinTransferExtrinsicBuilder: CoinTransferExtrinsicBuilder,
 ) : CoinageRebuild<ClaimRebuild.Claim, AccountId> {
     class Claim(val keypair: Keypair, val source: AccountId, val destination: AccountId)
 
@@ -53,6 +53,6 @@ class ClaimRebuild @Inject constructor(
     override suspend fun build(transactions: List<Claim>): Result<List<EnrichedSendableExtrinsic>> {
         val chain = chainAssetProvider.chain()
 
-        return transactions.mapAsync { claimExtrinsicBuilder.build(chain, it.keypair, it.destination) }.flattenResult()
+        return transactions.mapAsync { coinTransferExtrinsicBuilder.build(chain, it.keypair, it.destination) }.flattenResult()
     }
 }

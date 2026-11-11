@@ -72,6 +72,24 @@ class ChatMessageContentLocalEncodingTest {
     }
 
     @Test
+    fun `decode reclaim Payment statuses from encoded bytes`() {
+        val payment = "10070010a5d4e80480000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+
+        fun statusOf(encodedStatus: String) =
+            (BinaryScale.decodeFromByteArray<ChatMessageContentLocal>((payment + encodedStatus).fromHex()) as ChatMessageContentLocal.CoinagePayment)
+                .status
+
+        assertTrue(statusOf("06") is CoinagePaymentStatusLocal.Unclaimed)
+        assertTrue(statusOf("07") is CoinagePaymentStatusLocal.Reclaiming)
+        assertTrue(statusOf("09") is CoinagePaymentStatusLocal.ReclaimFailed)
+        assertTrue(statusOf("0a") is CoinagePaymentStatusLocal.ReturnedToSender)
+
+        val reclaimed = statusOf("08070088526a74")
+        assertTrue(reclaimed is CoinagePaymentStatusLocal.Reclaimed)
+        assertEquals(500000000000.toBigInteger().intoBalance(), (reclaimed as CoinagePaymentStatusLocal.Reclaimed).reclaimed)
+    }
+
+    @Test
     fun `decode ContactAdded content from encoded bytes`() {
         val encoded = "03"
         val decoded = BinaryScale.decodeFromByteArray<ChatMessageContentLocal>(encoded.fromHex())

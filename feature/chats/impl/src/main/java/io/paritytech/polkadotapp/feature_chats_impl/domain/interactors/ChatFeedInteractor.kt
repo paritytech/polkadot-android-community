@@ -41,6 +41,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.contactOrNull
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.isIncoming
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.isOutgoing
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.onContact
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.paymentContentOrNull
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.userDeclinedIncomingRequest
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.CustomChatAppearance
 import io.paritytech.polkadotapp.feature_chats_impl.data.AttachmentMetaBuilder
@@ -62,6 +63,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.chatDisplay.ChatDispl
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingChatRequestProcessor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.OutgoingChatRequestCancelService
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.ChatRequestError
+import io.paritytech.polkadotapp.feature_chats_impl.domain.extension.coinAccountIds
+import io.paritytech.polkadotapp.feature_chats_impl.domain.extension.reclaimGroupOf
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsent
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsentUseCase
@@ -73,6 +76,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.DmChatM
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.MessageOriginDisplayResolver
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.DeleteLocalChatUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
@@ -111,6 +115,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private val attachmentMetaBuilder: AttachmentMetaBuilder,
     private val attachmentFileStorage: AttachmentFileStorage,
     private val hopNodeUrlProvider: HopNodeUrlProvider,
+    private val reclaimHandedOffCoinsUseCase: ReclaimHandedOffCoinsUseCase,
     private val chatSigners: ContactChatSigners,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
     private val chatSeenRepository: ChatSeenRepository,
@@ -398,6 +403,15 @@ class ChatFeedInteractor @Inject internal constructor(
 
     suspend fun getEditHistory(chatId: ChatId, messageId: ChatMessageId): List<MessageEditHistoryItem> {
         return chatEngine.getEditHistory(chatId, messageId)
+    }
+
+    suspend fun reclaimPayment(chatId: ChatId, messageId: ChatMessageId): Result<Unit> {
+        return withContext(coroutineDispatchers.io) {
+            val payment = chatEngine.getMessageById(chatId, messageId)?.paymentContentOrNull()
+                ?: return@withContext Result.failure(IllegalStateException("No payment message $messageId to reclaim"))
+
+            reclaimHandedOffCoinsUseCase.reclaim(payment.coinAccountIds(), reclaimGroupOf(messageId))
+        }
     }
 
     suspend fun acceptIncomingRequest(contactAccountId: AccountId): Result<Unit> {

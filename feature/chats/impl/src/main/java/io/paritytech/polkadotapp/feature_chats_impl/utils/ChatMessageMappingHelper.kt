@@ -37,6 +37,13 @@ class ChatMessageMappingHelper @Inject constructor(
                 ChatMessageUiModel.CoinagePayment.Status.Transferred(dollarAssetProvider.extractAmount(status.amount))
             is ChatMessage.Content.CoinagePayment.Status.FailedDetection -> ChatMessageUiModel.CoinagePayment.Status.FailedDetection
             is ChatMessage.Content.CoinagePayment.Status.FailedTransfer -> ChatMessageUiModel.CoinagePayment.Status.FailedTransfer
+            is ChatMessage.Content.CoinagePayment.Status.Unclaimed -> ChatMessageUiModel.CoinagePayment.Status.Unclaimed
+            is ChatMessage.Content.CoinagePayment.Status.Reclaiming -> ChatMessageUiModel.CoinagePayment.Status.Reclaiming
+
+            is ChatMessage.Content.CoinagePayment.Status.Reclaimed ->
+                ChatMessageUiModel.CoinagePayment.Status.Reclaimed(dollarAssetProvider.extractAmount(status.amount))
+            is ChatMessage.Content.CoinagePayment.Status.ReclaimFailed -> ChatMessageUiModel.CoinagePayment.Status.ReclaimFailed
+            is ChatMessage.Content.CoinagePayment.Status.ReturnedToSender -> ChatMessageUiModel.CoinagePayment.Status.ReturnedToSender
         }
     }
 

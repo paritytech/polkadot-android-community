@@ -277,6 +277,16 @@ suspend fun DurabilityHarness.register(
     groupId = null,
 )
 
+suspend fun DurabilityHarness.registerReclaim(
+    inputCoin: Int,
+    outputCoin: Int,
+) = service.submitTransaction(
+    extrinsic = extrinsicAnchoredAtFinalizedHead(HARNESS_MORTAL_PERIOD),
+    inputs = listOf(CoinageInput.Coin.Reclaimed(testKey(inputCoin))),
+    outputs = listOf(OwnAsset.Coin(testKey(outputCoin))),
+    groupId = null,
+)
+
 /**
  * Several one-coin-in, one-coin-out transactions as one group, each with its own extrinsic.
  *
