@@ -321,7 +321,6 @@ or a `BuildConfig` field. Mandatory ones have no fallback; optional ones list th
 
 Point `SENTRY_ORG` / `SENTRY_PROJECT` at **your** Sentry and set `SENTRY_DSN` to the
 project's DSN; while `SENTRY_DSN` is unset, crash reporting stays disabled.
-`release` builds have no crash reporting at all.
 
 ### 5.4 Build
 
