@@ -10,6 +10,8 @@ This file is intentionally **thin**. Detailed architecture and code rules are in
 
 Index of all docs: `.claude/docs/README.md`.
 
+Known centralised dependencies (such as Firebase Remote Config) and their tracking issues are listed in `README.md` › Centralised dependencies.
+
 For PR reviews from CI or against a branch:
 - `/reviewer` with no arg — review the current branch's diff against `master`.
 
