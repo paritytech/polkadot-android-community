@@ -33,6 +33,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.compaction.ChatMessag
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ContactWithDevicePresence
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.PushSubscriptionSynchronizer
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageSender
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageReplacementPolicy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
@@ -113,6 +115,9 @@ internal class RealContactChatSessionManager @Inject constructor(
     private val proverFactory: StatementStoreMessageProver.Factory,
     private val chatSigners: ContactChatSigners,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
+    private val seenMessageSender: SeenMessageSender,
+    private val seenMessageReplacementPolicy: SeenMessageReplacementPolicy,
+    private val transientMessageProcessor: TransientMessageProcessor,
     dispatchers: CoroutineDispatchers
 ) : ContactChatSessionManager, ContactChatSessionRestarter, CoroutineScope, ChatSessionCallbacks {
     companion object {
@@ -292,6 +297,8 @@ internal class RealContactChatSessionManager @Inject constructor(
             syncContactUsernameUseCase = syncContactUsernameUseCase,
             incomingChatMessageProcessor = incomingChatMessageProcessor,
             notificationPayloadEncoder = notificationPayloadEncoder,
+            seenMessageSender = seenMessageSender,
+            transientMessageProcessor = transientMessageProcessor,
         )
 
         syncIncomingPushId(chatSession, contact)
@@ -395,6 +402,7 @@ internal class RealContactChatSessionManager @Inject constructor(
                     identityChatDomain = contact.sharedSecretDerivationDomain,
                     maxStatementSize = MAX_STATEMENT_SIZE,
                     compactor = chatMessageCompactor,
+                    replacementPolicy = seenMessageReplacementPolicy,
                 )
 
                 // Never signs an acceptance: ours go out as one-shot statements and incoming ones are not acknowledged.
@@ -420,6 +428,7 @@ internal class RealContactChatSessionManager @Inject constructor(
                     maxStatementSize = MAX_STATEMENT_SIZE,
                     compactor = chatMessageCompactor,
                     responsePolicy = ACCEPTANCES_UNACKNOWLEDGED,
+                    replacementPolicy = seenMessageReplacementPolicy,
                 )
                 CommunicationSessions.Pairwise(session)
             }
