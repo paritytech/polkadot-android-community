@@ -2,9 +2,11 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest
 
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
+import io.paritytech.polkadotapp.common.domain.model.X25519PublicKey
 import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.ResourcesRepository
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.requireConsumerInfo
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.IdentityProof
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.toDomain
@@ -22,23 +24,35 @@ class RealIncomingChatRequestVerifier @Inject constructor(
     private val knownChains: KnownChains,
 ) : IncomingChatRequestVerifier {
     override suspend fun verify(request: ChatRequestDecrypted): Result<Unit> = runCatching {
-        val content = request.message.content
-        if (content !is VersionedRequestContent.V2) return@runCatching
+        val ok = when (val content = request.message.content) {
+            is VersionedRequestContent.V1 -> return@runCatching
 
-        val proof = content.content.identityProof.toDomain()
-        val statementAccountId = request.proof.signerAccountId()
+            is VersionedRequestContent.V2 -> {
+                val proof = content.content.identityProof.toDomain()
+                identityProofCodec.verify(
+                    proof = proof,
+                    statementAccountId = request.proof.signerAccountId(),
+                    peerIdentityChatPubKey = peerChatPubKeyOf(proof),
+                )
+            }
 
-        val peerChatPubKey = resourcesRepository
+            is VersionedRequestContent.Cancel -> {
+                val proof = content.content.identityProof.toDomain()
+                identityProofCodec.verifyCancel(
+                    proof = proof,
+                    requestId = request.message.messageId,
+                    peerIdentityChatPubKey = peerChatPubKeyOf(proof),
+                )
+            }
+        }
+        if (!ok) error("IdentityProof verification failed for chat request ${request.message.messageId}")
+    }
+
+    private suspend fun peerChatPubKeyOf(proof: IdentityProof): X25519PublicKey {
+        return resourcesRepository
             .requireConsumerInfo(chainRegistry.getChain(knownChains.people), proof.identityAccountId)
             .getOrThrow()
             .identifierKey
             .let { it.x25519OrNull() ?: error("Peer account uses an unsupported chat encryption key type") }
-
-        val ok = identityProofCodec.verify(
-            proof = proof,
-            statementAccountId = statementAccountId,
-            peerIdentityChatPubKey = peerChatPubKey,
-        )
-        if (!ok) error("IdentityProof verification failed for chat request ${request.message.messageId}")
     }
 }
