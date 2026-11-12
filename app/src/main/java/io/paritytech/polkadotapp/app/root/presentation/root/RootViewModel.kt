@@ -25,6 +25,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentWorkerStarter
 import io.paritytech.polkadotapp.feature_coinage_api.domain.service.CoinageServiceStarter
 import io.paritytech.polkadotapp.feature_connection_status_api.presentation.mixin.ChainHealthMixin
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.runWhileActive
 import io.paritytech.polkadotapp.feature_fund_api.domain.AutoConvertDepositService
 import io.paritytech.polkadotapp.feature_products_impl.domain.exploreProducts.ExploreProductsService
 import io.paritytech.polkadotapp.feature_products_impl.domain.funding.FundingProductsWarmUp
@@ -62,8 +64,9 @@ class RootViewModel @Inject constructor(
     private val exploreProductsService: ExploreProductsService,
     private val fundingProductsWarmUp: FundingProductsWarmUp,
     private val jwtAuthWarmUpService: JwtAuthWarmUpService,
+    private val activeInstallationManager: ActiveInstallationManager,
+    private val chatBotStateController: ChatBotStateController,
     appThemeSelector: AppThemeSelector,
-    chatBotStateController: ChatBotStateController,
     chatEngine: ChatEngine,
     observeAccountOnboardingStatus: ObserveAccountOnboardingStatusUseCase,
     bottomNavHeightProvider: BottomNavHeightProvider,
@@ -102,10 +105,7 @@ class RootViewModel @Inject constructor(
 
     init {
         with(servicesScope) {
-            // Durability must not hang off the remote config fetch: a failed sync would otherwise skip
-            // handoff release and transaction recovery for the whole session.
-            coinageServiceStarter.start()
-            externalPaymentWorkerStarter.start()
+            launch { activeInstallationManager.runWhileActive { startActiveInstallationServices() } }
 
             launch {
                 remoteConfigService.sync()
@@ -113,18 +113,28 @@ class RootViewModel @Inject constructor(
             }
 
             launch { jwtAuthWarmUpService.warmUpToken() }
-            launch { chatRequestServiceCoordinator.runChatRequestServices() }
-            launch { chatBotStateController.activateDefaultBots() }
             launch { rootInteractor.printAccountAddresses() }
             launch { checkDevReset() }
         }
         watchSsoEvents(servicesScope)
     }
 
+    private fun CoroutineScope.startActiveInstallationServices() {
+        with(ComputationalScope(this)) {
+            // Durability must not hang off the remote config fetch: a failed sync would otherwise skip
+            // handoff release and transaction recovery for the whole session.
+            coinageServiceStarter.start()
+            externalPaymentWorkerStarter.start()
+
+            launch { chatRequestServiceCoordinator.runChatRequestServices() }
+            launch { chatBotStateController.activateDefaultBots() }
+        }
+    }
+
     private fun launchServicesBasedOnRemoteConfig() {
         with(servicesScope) {
             launch { rootInteractor.syncPrices() }
-            launch { depositService.startObserveAndConvert() }
+            launch { activeInstallationManager.runWhileActive { depositService.startObserveAndConvert() } }
             launch { syncPriceCurrencyChange.startObserving() }
             launch { statementStoreSlotAllocator.scheduleSlotRenewals() }
 

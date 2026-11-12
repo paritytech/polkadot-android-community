@@ -11,14 +11,18 @@ import io.paritytech.polkadotapp.app.root.domain.ObserveTabWarningsUseCase
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.presentation.tabs.BottomTab
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatMessageSender
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.runWhileActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class MainInteractor @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val messageSender: ChatMessageSender,
     private val observeTabWarningsUseCase: ObserveTabWarningsUseCase,
-    private val tooltipStorage: TooltipStorage
+    private val tooltipStorage: TooltipStorage,
+    private val activeInstallationManager: ActiveInstallationManager,
 ) {
     context(scope: ComputationalScope)
     fun initialize() {
@@ -28,7 +32,11 @@ class MainInteractor @Inject constructor(
             AppSetIdManager.get(context)
         }
 
-        messageSender.startExtensions()
+        scope.launch {
+            activeInstallationManager.runWhileActive {
+                with(ComputationalScope(this)) { messageSender.startExtensions() }
+            }
+        }
     }
 
     fun observeTabWarnings(): Flow<Map<BottomTab, Boolean>> = observeTabWarningsUseCase()
