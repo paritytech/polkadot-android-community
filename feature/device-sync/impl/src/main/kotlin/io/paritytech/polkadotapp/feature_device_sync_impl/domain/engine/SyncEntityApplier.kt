@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
@@ -10,12 +11,15 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySynce
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactDevice
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageStatement
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.IncomingStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.LocalStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.OutgoingStatusScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatBlockStateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatIdScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceChangeScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceStatusScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingChatRequestScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusUpdateScale
@@ -56,6 +60,8 @@ class SyncEntityApplier @Inject constructor(
                         updates = entity.updates.mapNotNull { it.toOutgoingRequestUpdate() },
                         removedAt = update.timePoint.toLong(),
                     )
+                    is SyncEntityScale.ContactDevicesChanged ->
+                        applySyncedChatStateUseCase.applyContactDevices(entity.changes.mapNotNull { it.toContactDeviceChange() })
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
@@ -145,6 +151,21 @@ private fun IncomingRequestStatusScale.isAcceptedOrNull(): Boolean? = when (this
 private fun OutgoingChatRequestScale.toPendingOutgoingRequest(): ChatStateForSync.OutgoingRequest? {
     if (status != OutgoingRequestStatusScale.PENDING) return null
     return ChatStateForSync.OutgoingRequest(requestId, AccountId(peer), timestamp.toLong(), BinaryScale.encodeToByteArray(content))
+}
+
+private fun ContactDeviceChangeScale.toContactDeviceChange(): ChatStateForSync.ContactDeviceChange? {
+    val contactAccountId = when (val chat = chatId) {
+        is ChatIdScale.Contact -> AccountId(chat.accountId)
+    }
+    val encryptionPublicKey = encryptionPublicKey.toDomain()
+        .onFailure { Timber.w(it, "SyncEntityApplier: invalid encryption key of a device of contact $contactAccountId") }
+        .getOrNull() ?: return null
+
+    return ChatStateForSync.ContactDeviceChange(
+        device = ContactDevice(contactAccountId, AccountId(statementAccountId), encryptionPublicKey),
+        isActive = status == ContactDeviceStatusScale.ACTIVE,
+        changedAt = changedAt.toLong(),
+    )
 }
 
 private fun OutgoingRequestStatusUpdateScale.toOutgoingRequestUpdate(): ChatStateForSync.OutgoingRequestUpdate? = when (status) {

@@ -28,6 +28,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccou
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatAcceptanceRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRoomRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
@@ -124,6 +125,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val knownChains: KnownChains,
     private val currentTimeContext: CurrentTimeContext,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
+    private val contactDevicesRepository: ContactDevicesRepository,
 ) : IncomingChatRequestProcessor {
     override suspend fun processIncomingRequest(
         data: IncomingChatRequestData
@@ -261,6 +263,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
 
     private suspend fun markChatAccepted(contactAccountId: AccountId) {
         contactsRepository.markChatRequestAccepted(contactAccountId, currentTimeContext.currentTime())
+        contactDevicesRepository.markDevicesModified(contactAccountId)
     }
 
     private suspend fun updateIfNewer(

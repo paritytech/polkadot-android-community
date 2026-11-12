@@ -21,6 +21,31 @@ abstract class ContactDeviceDao {
         if (stored == null || stored.changedAt < device.changedAt) upsert(device)
     }
 
+    @Upsert(entity = ContactDeviceLocal::class)
+    protected abstract suspend fun upsertSynced(device: SyncedDeviceLocal)
+
+    @Transaction
+    open suspend fun upsertSyncedIfNewer(device: SyncedDeviceLocal) {
+        val stored = get(device.contactAccountId, device.statementAccountId)
+        if (stored == null || stored.changedAt < device.changedAt) upsertSynced(device)
+    }
+
+    @Query("UPDATE contact_devices SET modifiedAt = :modifiedAt WHERE contactAccountId = :contactAccountId")
+    abstract suspend fun markModified(contactAccountId: ByteArray, modifiedAt: Long)
+
+    @Query(
+        """
+        SELECT contact_devices.* FROM contact_devices
+        INNER JOIN contacts ON contacts.accountId = contact_devices.contactAccountId
+        WHERE contacts.chatRequestId IS NULL
+          AND (:modifiedAfter IS NULL OR contact_devices.modifiedAt > :modifiedAfter)
+        """
+    )
+    abstract suspend fun getForSync(modifiedAfter: Long?): List<ContactDeviceLocal>
+
+    @Query("SELECT MAX(modifiedAt) FROM contact_devices")
+    abstract fun observeLastModifiedAt(): Flow<Long?>
+
     @Query(
         """
         UPDATE contact_devices
@@ -48,4 +73,12 @@ abstract class ContactDeviceDao {
 
     @Query("DELETE FROM contact_devices WHERE contactAccountId = :contactAccountId")
     abstract suspend fun deleteAllForContact(contactAccountId: ByteArray)
+
+    class SyncedDeviceLocal(
+        val contactAccountId: ByteArray,
+        val statementAccountId: ByteArray,
+        val encryptionPublicKey: ByteArray,
+        val status: ContactDeviceLocal.Status,
+        val changedAt: Long,
+    )
 }

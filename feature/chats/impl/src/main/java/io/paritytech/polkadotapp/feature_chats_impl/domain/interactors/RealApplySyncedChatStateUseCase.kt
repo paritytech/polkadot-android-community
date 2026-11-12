@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsentUseCase
 import javax.inject.Inject
@@ -17,6 +18,7 @@ class RealApplySyncedChatStateUseCase @Inject constructor(
     private val addContactUseCase: RealAddContactUseCase,
     private val removeContactUseCase: RemoveContactUseCase,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
+    private val contactDevicesRepository: ContactDevicesRepository,
 ) : ApplySyncedChatStateUseCase {
     override suspend fun applyBlockStates(states: List<ChatStateForSync.BlockState>) {
         states.forEach { state ->
@@ -63,6 +65,14 @@ class RealApplySyncedChatStateUseCase @Inject constructor(
             val peer = chatRequestRepository.getById(update.id)?.peer ?: return@forEach
 
             if (isLinkedToContact(update.id, peer)) removeContactUseCase.recordRemoteContactRemoval(peer, removedAt)
+        }
+    }
+
+    override suspend fun applyContactDevices(changes: List<ChatStateForSync.ContactDeviceChange>) {
+        changes.groupBy { it.device.contactAccountId }.forEach { (contactAccountId, contactChanges) ->
+            if (contactsRepository.getContact(contactAccountId) == null) return@forEach
+
+            contactChanges.forEach { contactDevicesRepository.applySyncedDevice(it) }
         }
     }
 

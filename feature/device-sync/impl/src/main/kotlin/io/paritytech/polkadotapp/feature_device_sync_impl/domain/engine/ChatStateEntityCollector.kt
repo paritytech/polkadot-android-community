@@ -1,12 +1,15 @@
 package io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
+import io.paritytech.polkadotapp.common.domain.model.scale.toScale
 import io.paritytech.polkadotapp.common.utils.decodeFromByteArrayCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatBlockStateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatIdScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceChangeScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceStatusScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingChatRequestScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.OutgoingChatRequestScale
@@ -32,6 +35,8 @@ class ChatStateEntityCollector @Inject constructor(
                 .takeIf { it.isNotEmpty() }?.let(SyncEntityScale::IncomingRequestsAdded),
             state.outgoingRequestUpdates.map { it.toScale() }
                 .takeIf { it.isNotEmpty() }?.let(SyncEntityScale::OutgoingRequestsStatusUpdated),
+            state.contactDevices.map { it.toScale() }
+                .takeIf { it.isNotEmpty() }?.let(SyncEntityScale::ContactDevicesChanged),
         )
     }
 
@@ -70,6 +75,16 @@ class ChatStateEntityCollector @Inject constructor(
         return OutgoingRequestStatusUpdateScale(
             requestId = id,
             status = if (isCancelled) OutgoingRequestStatusScale.CANCELLED else OutgoingRequestStatusScale.ACCEPTED,
+        )
+    }
+
+    private fun ChatStateForSync.ContactDeviceChange.toScale(): ContactDeviceChangeScale {
+        return ContactDeviceChangeScale(
+            chatId = ChatIdScale.Contact(device.contactAccountId.value),
+            statementAccountId = device.statementAccountId.value,
+            encryptionPublicKey = device.encryptionPublicKey.toScale(),
+            status = if (isActive) ContactDeviceStatusScale.ACTIVE else ContactDeviceStatusScale.INACTIVE,
+            changedAt = changedAt.toULong(),
         )
     }
 
