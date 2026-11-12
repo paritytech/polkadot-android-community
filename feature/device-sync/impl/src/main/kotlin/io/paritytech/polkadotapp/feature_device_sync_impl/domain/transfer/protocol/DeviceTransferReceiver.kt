@@ -41,11 +41,9 @@ class DeviceTransferReceiver(
 
     private val cancelRequest = CompletableDeferred<Unit>()
     private val fileChannels = SyncFileChannelRegistry()
-    private val mutableProgress = MutableStateFlow<DeviceTransferProgress>(
-        DeviceTransferProgress.Syncing(appliedChanges = 0, totalChanges = 0)
-    )
+    private val mutableProgress = MutableStateFlow<DeviceTransferProgress?>(null)
 
-    val progress: StateFlow<DeviceTransferProgress> = mutableProgress.asStateFlow()
+    val progress: StateFlow<DeviceTransferProgress?> = mutableProgress.asStateFlow()
 
     @Volatile
     private var waitingPayments = emptyList<SettledIncomingPayment>()
@@ -130,7 +128,7 @@ class DeviceTransferReceiver(
         mutableProgress.update { progress ->
             when (progress) {
                 is DeviceTransferProgress.Syncing -> progress.copy(appliedChanges = progress.appliedChanges + count)
-                is DeviceTransferProgress.Files -> progress
+                is DeviceTransferProgress.Files, null -> progress
             }
         }
     }
