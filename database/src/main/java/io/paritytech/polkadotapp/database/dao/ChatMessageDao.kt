@@ -274,6 +274,15 @@ abstract class ChatMessageDao {
     @Query("SELECT * FROM chat_messages WHERE type = 'RICH_TEXT' ORDER BY timestamp DESC")
     abstract suspend fun getRichTextMessages(): List<ChatMessageLocal>
 
+    @Query(
+        """
+        SELECT * FROM chat_messages
+        WHERE type = 'PAYMENT' AND origintype != 'USER'
+          AND (:updatedAfter IS NULL OR updatedAt > :updatedAfter)
+        """
+    )
+    abstract suspend fun getIncomingPaymentsUpdatedAfter(updatedAfter: Long?): List<ChatMessageLocal>
+
     @Query("DELETE FROM chat_messages WHERE chatId = :chatId")
     abstract suspend fun deleteAllMessageRows(chatId: ByteArray)
 
