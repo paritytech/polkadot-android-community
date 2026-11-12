@@ -609,18 +609,24 @@ class CoinagePaymentProcessingExtensionTest {
     @Test
     fun `a payment that fails while processing is left open and later payments are still processed`() = runTest {
         givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-        val broken = incomingPayment(id = "broken")
+        val failedClaim = incomingPayment(id = "failed-claim")
         every {
-            claimReceivedCoinsUseCase.claim(any(), CoinageOperationGroupId("chat-claim:${broken.id}"), any())
+            claimReceivedCoinsUseCase.claim(any(), CoinageOperationGroupId("chat-claim:${failedClaim.id}"), any())
         } returns flow {
             emit(CoinageTransferDetection.Detecting)
             throw IllegalStateException("ledger unavailable")
         }
 
-        val valid = incomingPayment()
-        startWork(arriving = listOf(broken, valid))
+        val unreadableStatus = outgoingPayment(id = "unreadable-status")
+        every { paymentStatusUseCase.subscribeStatuses(any()) } returns flow { throw IllegalStateException("ledger unavailable") }
 
-        verifyLeftOpen(broken, stillProcessing = valid)
+        val unwritableStatus = incomingPayment(id = "unwritable-status", coinKeys = listOf(ByteArray(0)))
+        coEvery { context.modifyMessage(any(), unwritableStatus.id, any()) } throws IllegalStateException("db")
+
+        val valid = incomingPayment()
+        startWork(arriving = listOf(failedClaim, unreadableStatus, unwritableStatus, valid))
+
+        verifyLeftOpen(failedClaim, unreadableStatus, unwritableStatus, stillProcessing = valid)
     }
 
     @Test
@@ -709,10 +715,12 @@ class CoinagePaymentProcessingExtensionTest {
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
-    private fun verifyLeftOpen(message: ChatMessage, stillProcessing: ChatMessage) {
-        coVerify(exactly = 0) { context.markMessageProcessed(message.chatId, message.id) }
+    private fun verifyLeftOpen(vararg messages: ChatMessage, stillProcessing: ChatMessage) {
+        messages.forEach { message ->
+            coVerify(exactly = 0) { context.markMessageProcessed(message.chatId, message.id) }
+        }
         coVerify(exactly = 1) { context.markMessageProcessed(stillProcessing.chatId, stillProcessing.id) }
-        failureLog.expectedIds += message.id
+        failureLog.expectedIds += messages.map { it.id }
     }
 
     private fun accountId(seed: Int): AccountId = byteArrayOf(seed.toByte()).toDataByteArray()
@@ -723,8 +731,9 @@ class CoinagePaymentProcessingExtensionTest {
     )
 
     private fun outgoingPayment(
+        id: String = "message-1",
         coinKeys: List<ByteArray> = listOf(coinKey(1), coinKey(2)),
-    ) = incomingPayment(coinKeys = coinKeys).copy(origin = ChatMessageOrigin.User)
+    ) = incomingPayment(id = id, coinKeys = coinKeys).copy(origin = ChatMessageOrigin.User)
 
     private fun coinKey(seed: Int) = ByteArray(Sr25519SecretKey.SIZE_BYTES) { seed.toByte() }
 
