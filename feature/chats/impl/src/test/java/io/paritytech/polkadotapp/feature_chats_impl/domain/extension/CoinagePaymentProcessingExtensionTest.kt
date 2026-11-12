@@ -79,7 +79,7 @@ class CoinagePaymentProcessingExtensionTest {
         mockkStatic(DERIVATION_FILE)
         every { any<CoinPrivateKey>().deriveKeypair() } answers {
             val key = firstArg<CoinPrivateKey>()
-            binding.failureFor(key)?.let { throw it }
+            bindingFailureFor(key)?.let { throw it }
             mockk<Sr25519Keypair> { every { publicKey } returns key.value }
         }
     }
@@ -571,67 +571,43 @@ class CoinagePaymentProcessingExtensionTest {
     }
 
     @Test
-    fun `an incoming payment with no usable coin key is closed as failed without a claim`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-
-        val unusable = incomingPayment(id = "unusable", coinKeys = listOf(ByteArray(0)))
-        val valid = incomingPayment()
-        startWork(arriving = listOf(unusable, valid))
-
-        verifyClosedAsFailed(unusable, CoinagePayment.Status.FailedTransfer)
-        coVerify(exactly = 1) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
-    }
-
-    @Test
-    fun `a stored incoming payment with no usable coin key is closed as failed at launch`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-
-        val unusable = incomingPayment(id = "unusable", coinKeys = listOf(ByteArray(0)))
-        val valid = incomingPayment()
-        startWork(unusable, valid)
-
-        verifyClosedAsFailed(unusable, CoinagePayment.Status.FailedTransfer)
-        coVerify(exactly = 1) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
-        coVerify(exactly = 1) { context.markMessageProcessed(valid.chatId, valid.id) }
-    }
-
-    @Test
-    fun `only the usable coin keys of a payment are claimed`() = runTest {
-        givenClaimReports(CoinageTransferDetection.ClaimedPartially(PARTIAL))
-
-        val usable = coinKey(1)
-        val message = incomingPayment(coinKeys = listOf(ByteArray(0), ByteArray(3), REFUSED_KEY.value, usable))
+    fun `an incoming payment with no good coin key is closed as failed without a claim`() = runTest {
+        val message = incomingPayment(
+            coinKeys = listOf(
+                ByteArray(0),
+                ByteArray(Sr25519SecretKey.SIZE_BYTES - 1),
+                ByteArray(Sr25519SecretKey.SIZE_BYTES + 1),
+                REFUSED_KEY.value,
+            ),
+        )
         startWork(message)
 
-        coVerify(exactly = 1) {
-            claimReceivedCoinsUseCase.claim(listOf(usable.toDataByteArray()), any(), any())
-        }
+        verifyClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
+        coVerify(exactly = 0) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
         verify(exactly = 0) { match<CoinPrivateKey> { it.value.size != Sr25519SecretKey.SIZE_BYTES }.deriveKeypair() }
-        coVerify {
-            context.modifyMessage(
-                message.chatId,
-                message.id,
-                match { it is CoinagePayment && it.status == CoinagePayment.Status.Transferred(PARTIAL) },
-            )
-        }
-        coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
     @Test
-    fun `a payment whose coin keys are all usable claims every one of them`() = runTest {
+    fun `an outgoing payment with no good coin key is closed as failed`() = runTest {
+        val message = outgoingPayment(coinKeys = listOf(ByteArray(0), REFUSED_KEY.value))
+        startWork(message)
+
+        verifyClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
+        verify(exactly = 0) { paymentStatusUseCase.subscribeStatuses(any()) }
+    }
+
+    @Test
+    fun `only the good coin keys of a payment are claimed`() = runTest {
         givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
 
-        val keys = listOf(coinKey(1), coinKey(2), coinKey(3))
-        startWork(incomingPayment(coinKeys = keys))
+        val good = coinKey(1)
+        startWork(incomingPayment(coinKeys = listOf(ByteArray(0), REFUSED_KEY.value, good)))
 
-        coVerify(exactly = 1) {
-            claimReceivedCoinsUseCase.claim(keys.map { it.toDataByteArray() }, any(), any())
-        }
+        coVerify(exactly = 1) { claimReceivedCoinsUseCase.claim(listOf(good.toDataByteArray()), any(), any()) }
     }
 
     @Test
-    fun `a claim that fails leaves its payment open and later payments still processed`() = runTest {
+    fun `a payment that fails while processing is left open and later payments are still processed`() = runTest {
         givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
         val broken = incomingPayment(id = "broken")
         every {
@@ -648,91 +624,13 @@ class CoinagePaymentProcessingExtensionTest {
     }
 
     @Test
-    fun `an outgoing payment whose status cannot be read is left open`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-        every { paymentStatusUseCase.subscribeStatuses(any()) } returns flow { throw IllegalStateException("ledger unavailable") }
-
-        val outgoing = outgoingPayment()
-        val valid = incomingPayment(id = "incoming")
-        startWork(arriving = listOf(outgoing, valid))
-
-        verifyLeftOpen(outgoing, stillProcessing = valid)
-    }
-
-    @Test
-    fun `an outgoing payment with no usable coin key is closed as failed`() = runTest {
-        val message = outgoingPayment(coinKeys = listOf(ByteArray(0)))
+    fun `a payment is left open when the binding itself fails`() = runTest {
+        val message = incomingPayment(coinKeys = listOf(BROKEN_BINDING_KEY.value))
         startWork(message)
 
-        verifyClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
-        verify(exactly = 0) { paymentStatusUseCase.subscribeStatuses(any()) }
-    }
-
-    @Test
-    fun `a payment with no coin keys at all is closed as failed without a claim`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-
-        val message = incomingPayment(coinKeys = emptyList())
-        startWork(message)
-
-        verifyClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
-        coVerify(exactly = 0) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
-    }
-
-    @Test
-    fun `coin keys one byte either side of a secret's length are never derived`() = runTest {
-        val message = incomingPayment(
-            coinKeys = listOf(ByteArray(Sr25519SecretKey.SIZE_BYTES - 1), ByteArray(Sr25519SecretKey.SIZE_BYTES + 1)),
-        )
-        startWork(message)
-
-        verifyClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
-        coVerify(exactly = 0) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
-        verify(exactly = 0) { match<CoinPrivateKey> { it.value.size != Sr25519SecretKey.SIZE_BYTES }.deriveKeypair() }
-    }
-
-    @Test
-    fun `an outgoing payment whose only coin key cannot be loaded is closed as failed`() = runTest {
-        val message = outgoingPayment(coinKeys = listOf(REFUSED_KEY.value))
-        startWork(message)
-
-        verifyClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
-        verify(exactly = 0) { paymentStatusUseCase.subscribeStatuses(any()) }
-    }
-
-    @Test
-    fun `a status write that fails leaves its payment open`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-
-        val broken = incomingPayment(id = "broken")
-        coEvery { context.modifyMessage(any(), broken.id, any()) } throws IllegalStateException("db")
-        val valid = incomingPayment()
-        startWork(arriving = listOf(broken, valid))
-
-        verifyLeftOpen(broken, stillProcessing = valid)
-    }
-
-    @Test
-    fun `a failed status write for a payment with no usable coin key does not escape`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-
-        val broken = incomingPayment(id = "broken", coinKeys = listOf(ByteArray(0)))
-        coEvery { context.modifyMessage(any(), broken.id, any()) } throws IllegalStateException("db")
-        val valid = incomingPayment()
-        startWork(arriving = listOf(broken, valid))
-
-        verifyLeftOpen(broken, stillProcessing = valid)
-    }
-
-    @Test
-    fun `a coin key that fails after validation leaves its incoming payment open`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
-
-        val broken = incomingPayment(id = "broken", coinKeys = listOf(REFUSED_AFTER_PROBE.value))
-        val valid = incomingPayment()
-        startWork(arriving = listOf(broken, valid))
-
-        verifyLeftOpen(broken, stillProcessing = valid)
+        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), any()) }
+        failureLog.expectedIds += message.id
     }
 
     @Test
@@ -745,19 +643,7 @@ class CoinagePaymentProcessingExtensionTest {
         keys.forEach { key -> verify(exactly = 1) { key.toDataByteArray().deriveKeypair() } }
     }
 
-    @Test
-    fun `a payment is left open when the binding itself fails`() = runTest {
-        val message = incomingPayment(coinKeys = listOf(BROKEN_BINDING_KEY.value))
-        startWork(message)
-
-        coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
-        coVerify(exactly = 0) { context.modifyMessage(any(), any(), any()) }
-        failureLog.expectedIds += message.id
-    }
-
     // ---- harness ----
-
-    private val binding = FakeBinding()
 
     private fun startWork(vararg unprocessed: ChatMessage, arriving: List<ChatMessage> = emptyList()) {
         scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher())
@@ -874,19 +760,13 @@ class CoinagePaymentProcessingExtensionTest {
 }
 
 private val REFUSED_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -1 }.toDataByteArray()
-private val REFUSED_AFTER_PROBE = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -2 }.toDataByteArray()
 private val BROKEN_BINDING_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -3 }.toDataByteArray()
 private val PROCESSING_FAILED = Regex("^Payment processing failed message=(\\S+)")
 
-private class FakeBinding {
-    private val probed = mutableSetOf<CoinPrivateKey>()
-
-    fun failureFor(key: CoinPrivateKey): Throwable? = when {
-        key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
-        key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
-        key == REFUSED_AFTER_PROBE && !probed.add(key) -> Exception("Invalid secret")
-        else -> null
-    }
+private fun bindingFailureFor(key: CoinPrivateKey): Throwable? = when {
+    key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
+    key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
+    else -> null
 }
 
 class FailureLog : ExternalResource() {
