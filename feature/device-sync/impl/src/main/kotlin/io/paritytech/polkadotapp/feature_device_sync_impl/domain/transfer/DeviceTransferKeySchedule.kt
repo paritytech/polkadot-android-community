@@ -4,7 +4,6 @@ import io.paritytech.polkadotapp.common.domain.model.AeadKey
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.blake2b256
-import java.util.UUID
 
 class DeviceTransferKeySchedule private constructor(
     val transferSeed: DataByteArray,
@@ -15,7 +14,7 @@ class DeviceTransferKeySchedule private constructor(
     val activeDeviceTopic: DataByteArray,
     val activeDeviceKey: AeadKey,
 ) {
-    fun sessionKey(requestId: UUID): AeadKey {
+    fun sessionKey(requestId: String): AeadKey {
         return AeadKey.fromDerivedBytes(khash(transferSeed.value, SESSION_KEY_LABEL + requestId))
     }
 

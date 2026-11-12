@@ -6,7 +6,6 @@ import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallati
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.DeviceTransferCheckpointStorage
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.DeviceTransferProcessedRequestStorage
 import kotlinx.coroutines.delay
-import java.util.UUID
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -21,7 +20,7 @@ class DeviceTransferFinalizer @Inject constructor(
         val PUBLISH_RETRY_DELAY = exponentialRetryDelay(initialDelay = 1.seconds, maxDelay = 5.minutes)
     }
 
-    suspend fun finalize(ownRequestId: UUID): Result<Unit> {
+    suspend fun finalize(ownRequestId: String): Result<Unit> {
         processedRequestStorage.markProcessed(ownRequestId)
 
         return publishOwnRecord()

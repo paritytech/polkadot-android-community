@@ -23,7 +23,7 @@ class RealDeviceTransferRequestPublisher @Inject constructor(
     override suspend fun publishRequest(): Result<DeviceTransferRequest> = withContext(dispatchers.io) {
         val deviceInfo = deviceInfoProvider.current()
         val request = DeviceTransferRequest(
-            requestId = UUID.randomUUID(),
+            requestId = UUID.randomUUID().toString(),
             deviceModel = deviceInfo.model,
             operatingSystem = deviceInfo.operatingSystem,
             createdAt = Instant.fromEpochMilliseconds(timeProvider.now().toEpochMilliseconds()),
@@ -32,7 +32,7 @@ class RealDeviceTransferRequestPublisher @Inject constructor(
         publish(DeviceTransferMessage.Request(request)).map { request }
     }
 
-    override suspend fun cancelRequest(requestId: UUID): Result<Unit> = withContext(dispatchers.io) {
+    override suspend fun cancelRequest(requestId: String): Result<Unit> = withContext(dispatchers.io) {
         publish(DeviceTransferMessage.Cancel(requestId))
     }
 

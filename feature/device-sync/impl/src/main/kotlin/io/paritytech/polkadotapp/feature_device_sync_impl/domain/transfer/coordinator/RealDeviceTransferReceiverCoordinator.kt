@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
@@ -62,7 +61,7 @@ class RealDeviceTransferReceiverCoordinator @Inject constructor(
     private var runJob: Job? = null
 
     @Volatile
-    private var publishedRequestId: UUID? = null
+    private var publishedRequestId: String? = null
 
     @Volatile
     private var activeReceiver: DeviceTransferReceiver? = null
@@ -125,7 +124,7 @@ class RealDeviceTransferReceiverCoordinator @Inject constructor(
     private suspend fun receiveOver(
         session: DeviceTransferSession,
         senderInstallationId: DataByteArray,
-        requestId: UUID,
+        requestId: String,
     ): DeviceTransferState = coroutineScope {
         val receiver = protocolFactory.createReceiver(senderInstallationId).also { activeReceiver = it }
         val peerWatching = launch {
@@ -152,7 +151,7 @@ class RealDeviceTransferReceiverCoordinator @Inject constructor(
         }
     }
 
-    private suspend fun finish(outcome: DeviceTransferReceiverOutcome?, requestId: UUID): DeviceTransferState {
+    private suspend fun finish(outcome: DeviceTransferReceiverOutcome?, requestId: String): DeviceTransferState {
         return when (outcome) {
             DeviceTransferReceiverOutcome.Completed -> finalize(requestId)
             is DeviceTransferReceiverOutcome.AbortedBySender -> DeviceTransferState.Failed(DeviceTransferFailure.ABORTED)
@@ -161,7 +160,7 @@ class RealDeviceTransferReceiverCoordinator @Inject constructor(
         }
     }
 
-    private suspend fun finalize(requestId: UUID): DeviceTransferState {
+    private suspend fun finalize(requestId: String): DeviceTransferState {
         mutableState.value = DeviceTransferState.Finalizing
 
         return finalizer.finalize(requestId)

@@ -18,7 +18,6 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.Sessi
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import java.util.UUID
 import javax.inject.Inject
 
 class DeviceTransferSessionFactory @Inject constructor(
@@ -27,7 +26,7 @@ class DeviceTransferSessionFactory @Inject constructor(
     private val sessionCreatorFactory: CommunicationSessionCreator.Factory,
 ) {
     suspend fun create(
-        requestId: UUID,
+        requestId: String,
         role: DeviceTransferRole,
         parentScope: CoroutineScope,
     ): Result<DeviceTransferSession> {
@@ -40,7 +39,7 @@ class DeviceTransferSessionFactory @Inject constructor(
 
     private suspend fun createSession(
         keys: DeviceTransferKeySchedule,
-        requestId: UUID,
+        requestId: String,
         role: DeviceTransferRole,
         encryption: PresharedKeyEncryption,
         parentScope: CoroutineScope,
@@ -69,7 +68,7 @@ class DeviceTransferSessionFactory @Inject constructor(
 
     private fun presharedKeyEncryption(
         keys: DeviceTransferKeySchedule,
-        requestId: UUID,
+        requestId: String,
     ): Result<PresharedKeyEncryption> {
         val unusedPublicKey = ByteArray(X25519PublicKey.SIZE_BYTES).toDataByteArray()
 

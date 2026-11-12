@@ -5,10 +5,9 @@ import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SyncP
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
-import java.util.UUID
 
 class DeviceTransferSession(
-    val requestId: UUID,
+    val requestId: String,
     val role: DeviceTransferRole,
     val signaling: SyncPeerChannelSignaling,
     private val transport: DeviceTransferSessionTransport,

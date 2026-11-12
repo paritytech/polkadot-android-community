@@ -11,7 +11,6 @@ import io.paritytech.polkadotapp.feature_device_sync_api.domain.transfer.DeviceT
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferMessageScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferRequestScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.discovery.DeviceTransferMessage
-import java.util.UUID
 import javax.inject.Inject
 import kotlin.time.Instant
 
@@ -36,11 +35,11 @@ class DeviceTransferMessageCipher @Inject constructor() {
 
     private fun DeviceTransferMessage.toScale(): DeviceTransferMessageScale = when (this) {
         is DeviceTransferMessage.Request -> DeviceTransferMessageScale.Request(request.toScale())
-        is DeviceTransferMessage.Cancel -> DeviceTransferMessageScale.Cancel(requestId.toString())
+        is DeviceTransferMessage.Cancel -> DeviceTransferMessageScale.Cancel(requestId)
     }
 
     private fun DeviceTransferRequest.toScale() = DeviceTransferRequestScale(
-        requestId = requestId.toString(),
+        requestId = requestId,
         deviceModel = deviceModel,
         operatingSystem = operatingSystem,
         createdAt = createdAt.toEpochMilliseconds().toULong(),
@@ -48,11 +47,11 @@ class DeviceTransferMessageCipher @Inject constructor() {
 
     private fun DeviceTransferMessageScale.toDomain(): DeviceTransferMessage = when (this) {
         is DeviceTransferMessageScale.Request -> DeviceTransferMessage.Request(request.toDomain())
-        is DeviceTransferMessageScale.Cancel -> DeviceTransferMessage.Cancel(UUID.fromString(requestId))
+        is DeviceTransferMessageScale.Cancel -> DeviceTransferMessage.Cancel(requestId)
     }
 
     private fun DeviceTransferRequestScale.toDomain() = DeviceTransferRequest(
-        requestId = UUID.fromString(requestId),
+        requestId = requestId,
         deviceModel = deviceModel,
         operatingSystem = operatingSystem,
         createdAt = Instant.fromEpochMilliseconds(createdAt.toLong()),
