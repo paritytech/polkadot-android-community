@@ -90,6 +90,11 @@ class CoinagePaymentProcessingExtension @Inject constructor(
                 .onEach { status -> modifyPaymentContent(message, status) }
                 .lastOrNull()
 
+            if (message.isIncoming && !outcome.isFinal()) {
+                Timber.tag(COINAGE_LOG_TAG).w("Payment claim ended without a verdict message=${message.id} last=$outcome")
+                return@launch
+            }
+
             // Reaching the end of the flow is the finish, not any status seen along the way. An incoming
             // payment's claim keeps retrying while a coin is still there to be claimed, so a partial
             // Transferred is a progress report; treating it as the end is what settled a 1.00 payment as
@@ -235,3 +240,5 @@ private fun CoinageTransferDetection.toPaymentStatus(expected: Balance): Status 
 
     is CoinageTransferDetection.NotClaimed -> Status.FailedTransfer
 }
+
+private fun Status?.isFinal() = this is Status.Transferred || this is Status.FailedTransfer

@@ -8,7 +8,6 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.novasama.substrate_sdk_android.encrypt.keypair.Keypair
 import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519Keypair
-import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.network.binding.intoBalance
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
@@ -589,14 +588,8 @@ class RealClaimReceivedCoinsUseCaseTest {
         assertDoesNotComplete(coin)
     }
 
-    /**
-     * The claimed coins cannot be valued — that needs chain metadata, which may not be to hand.
-     *
-     * The claim still reports where it got to, for nothing. Saying nothing would leave a payment that
-     * actually arrived looking as though it never did.
-     */
     @Test
-    fun `a claim whose coins cannot be valued still reports that they arrived`() = runTest {
+    fun `a claim whose coins cannot be valued ends without a verdict`() = runTest {
         val coin = key(1)
         coEvery { assetValueUseCase.valueOf(any()) } returns Result.failure(IllegalStateException("no metadata"))
         givenChainSees(listOf(coin.accountId))
@@ -604,7 +597,7 @@ class RealClaimReceivedCoinsUseCaseTest {
 
         val reported = reportsOfCompleted(coin)
 
-        assertEquals(CoinageTransferDetection.Claimed(Balance.ZERO, finalized = true), reported.last())
+        assertEquals(listOf(CoinageTransferDetection.Detecting), reported)
     }
 
     // ---- harness ----
