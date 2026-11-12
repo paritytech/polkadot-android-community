@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.extension
 
+import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519Keypair
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.intoAccountId
@@ -19,8 +20,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.common.formatCoinsTo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.isValidCoinKey
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypairOrNull
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -93,8 +93,11 @@ class CoinagePaymentProcessingExtension @Inject constructor(
         }
     }
 
-    private fun usableCoinKeys(message: ChatMessage, content: CoinagePayment): List<CoinPrivateKey> {
-        val usable = content.coinKeys.map { it.toDataByteArray() }.filter { it.isValidCoinKey() }
+    private fun usableCoinKeys(message: ChatMessage, content: CoinagePayment): List<UsableCoinKey> {
+        val usable = content.coinKeys.mapNotNull { bytes ->
+            val key = bytes.toDataByteArray()
+            key.deriveKeypairOrNull()?.let { keypair -> UsableCoinKey(key, keypair) }
+        }
 
         val unusable = content.coinKeys.size - usable.size
         if (unusable > 0) {
@@ -113,11 +116,11 @@ class CoinagePaymentProcessingExtension @Inject constructor(
     }
 
     context(chatExtensionContext: ChatExtensionContext)
-    private suspend fun settle(message: ChatMessage, content: CoinagePayment, coinKeys: List<CoinPrivateKey>) {
+    private suspend fun settle(message: ChatMessage, content: CoinagePayment, coinKeys: List<UsableCoinKey>) {
         val outcome = if (message.isIncoming) {
-            claimStatuses(message, content, coinKeys)
+            claimStatuses(message, content, coinKeys.map { it.key })
         } else {
-            handoffStatuses(coinKeys)
+            handoffStatuses(coinKeys.map { it.keypair })
         }
             .distinctUntilChanged()
             .onEach { status -> modifyPaymentContent(message, status) }
@@ -158,8 +161,8 @@ class CoinagePaymentProcessingExtension @Inject constructor(
      * Ours until the peer takes them. Stops once every coin has been claimed or proven never to have existed,
      * since nothing after that can change.
      */
-    private fun handoffStatuses(coinKeys: List<CoinPrivateKey>): Flow<Status> {
-        val accountIds = coinKeys.map { it.deriveKeypair().publicKey.intoAccountId() }
+    private fun handoffStatuses(keypairs: List<Sr25519Keypair>): Flow<Status> {
+        val accountIds = keypairs.map { it.publicKey.intoAccountId() }
 
         // Watched until every coin is beyond recall, not until it merely looks settled: a claim seen only
         // in a best-chain block can be forked away, and a closed message is one nothing is watching.
@@ -244,6 +247,8 @@ class CoinagePaymentProcessingExtension @Inject constructor(
         Timber.tag(COINAGE_LOG_TAG).i("Payment settled message=${message.id} outcome=$outcome group=$group status=$status")
     }
 }
+
+private class UsableCoinKey(val key: CoinPrivateKey, val keypair: Sr25519Keypair)
 
 /**
  * Derived from the message rather than stored, so a retry after process death rejoins the claims the previous

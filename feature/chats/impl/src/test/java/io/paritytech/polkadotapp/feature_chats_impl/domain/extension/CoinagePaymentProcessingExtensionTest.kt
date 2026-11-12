@@ -736,14 +736,13 @@ class CoinagePaymentProcessingExtensionTest {
     }
 
     @Test
-    fun `a coin key that fails after validation leaves its outgoing payment open`() = runTest {
-        givenClaimReports(CoinageTransferDetection.Claimed(FULL, finalized = true))
+    fun `an outgoing payment loads each coin key once`() = runTest {
+        givenPeerHasTaken(claimed = 2, awaiting = 0, detecting = 0, failed = 0, finalized = true)
 
-        val broken = outgoingPayment(coinKeys = listOf(REFUSED_AFTER_PROBE.value))
-        val valid = incomingPayment(id = "incoming")
-        startWork(arriving = listOf(broken, valid))
+        val keys = listOf(coinKey(1), coinKey(2))
+        startWork(outgoingPayment(coinKeys = keys))
 
-        verifyLeftOpen(broken, stillProcessing = valid)
+        keys.forEach { key -> verify(exactly = 1) { key.toDataByteArray().deriveKeypair() } }
     }
 
     @Test

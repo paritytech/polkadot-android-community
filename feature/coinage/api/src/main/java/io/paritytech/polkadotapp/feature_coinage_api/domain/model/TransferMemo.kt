@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_api.domain.model
 
+import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519Keypair
 import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519SubstrateKeypairFactory
 import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.chains.util.Sr25519SecretKey
@@ -9,15 +10,14 @@ typealias CoinPrivateKey = EncodedPrivateKey
 
 fun CoinPrivateKey.deriveKeypair() = Sr25519SubstrateKeypairFactory.createKeypairFromSecret(value)
 
-/** Whether [deriveKeypair] can load this key; the binding throws on a secret it cannot load. */
-fun CoinPrivateKey.isValidCoinKey(): Boolean {
-    if (Sr25519SecretKey.fromBytes(this).isFailure) return false
+/** Null when the binding refuses this key; a binding that cannot load at all still throws. */
+fun CoinPrivateKey.deriveKeypairOrNull(): Sr25519Keypair? {
+    if (Sr25519SecretKey.fromBytes(this).isFailure) return null
 
     return try {
         deriveKeypair()
-        true
     } catch (_: Exception) {
-        false
+        null
     }
 }
 
