@@ -378,6 +378,8 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
 
     override suspend fun getCommittedCoinHandoffs(committedAfter: Instant?): List<HandedOffCoin> = emptyList()
 
+    override suspend fun insertSyncedHandoffs(assets: List<LedgerAsset>) = Unit
+
     override fun observeLastHandoffCommit(): Flow<Long?> = flowOf(null)
 
     override suspend fun releaseUncommittedHandoffs(): Result<Unit> = store.transaction {

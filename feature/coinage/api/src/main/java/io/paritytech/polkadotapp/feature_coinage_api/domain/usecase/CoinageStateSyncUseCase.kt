@@ -7,5 +7,7 @@ import kotlin.time.Instant
 interface CoinageStateSyncUseCase {
     suspend fun getHandedOffCoins(committedAfter: Instant?): List<HandedOffCoin>
 
+    suspend fun applyHandedOffCoins(coins: List<HandedOffCoin>)
+
     fun observeHandoffChanges(): Flow<Unit>
 }

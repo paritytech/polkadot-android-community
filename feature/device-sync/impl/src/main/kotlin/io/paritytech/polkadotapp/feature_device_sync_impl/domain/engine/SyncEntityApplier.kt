@@ -4,6 +4,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
@@ -16,10 +17,15 @@ import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMess
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.IncomingStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.LocalStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.OutgoingStatusScale
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageStateSyncUseCase
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatBlockStateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatIdScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceChangeScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceStatusScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.HandedOffCoinScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingChatRequestScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusUpdateScale
@@ -41,14 +47,16 @@ class SyncEntityApplier @Inject constructor(
     private val removeContactUseCase: RemoveContactUseCase,
     private val applyRemoteChatMessageUseCase: ApplyRemoteChatMessageUseCase,
     private val applySyncedChatStateUseCase: ApplySyncedChatStateUseCase,
+    private val coinageStateSyncUseCase: CoinageStateSyncUseCase,
 ) {
     suspend fun apply(update: SyncUpdateScale, messagePlacement: Placement) {
         for (entity in update.entities) {
             runCatching {
                 when (entity) {
                     is SyncEntityScale.Devices,
-                    is SyncEntityScale.CoinsHandedOff,
                     is SyncEntityScale.CoinageMessagesStatusUpdated -> Unit
+                    is SyncEntityScale.CoinsHandedOff ->
+                        coinageStateSyncUseCase.applyHandedOffCoins(entity.coins.mapNotNull { it.toHandedOffCoin() })
                     is SyncEntityScale.ChatsAdded -> applyChatsAdded(entity)
                     is SyncEntityScale.ChatsRemoved -> applyChatsRemoved(entity, removedAt = update.timePoint.toLong())
                     is SyncEntityScale.Messages -> applyMessages(entity, messagePlacement)
@@ -167,6 +175,18 @@ private fun ContactDeviceChangeScale.toContactDeviceChange(): ChatStateForSync.C
         device = ContactDevice(contactAccountId, AccountId(statementAccountId), encryptionPublicKey),
         isActive = status == ContactDeviceStatusScale.ACTIVE,
         changedAt = changedAt.toLong(),
+    )
+}
+
+private fun HandedOffCoinScale.toHandedOffCoin(): HandedOffCoin? {
+    if (derivationIndex > Int.MAX_VALUE.toULong()) {
+        Timber.w("SyncEntityApplier: derivation index $derivationIndex of a handed-off coin does not fit, skipping")
+        return null
+    }
+
+    return HandedOffCoin(
+        index = CoinageKeyIndex(CoinageInstallationId(installationId.toDataByteArray()), derivationIndex.toInt()),
+        exponent = exponent.toInt(),
     )
 }
 

@@ -68,6 +68,8 @@ interface CoinageAssetLedger {
 
     suspend fun getCommittedCoinHandoffs(committedAfter: Instant?): List<HandedOffCoin>
 
+    suspend fun insertSyncedHandoffs(assets: List<LedgerAsset>)
+
     fun observeLastHandoffCommit(): Flow<Long?>
 
     /** Drops every mark that was never committed — the payments behind them never happened. */

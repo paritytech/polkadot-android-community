@@ -127,6 +127,10 @@ class RealCoinageAssetLedger @Inject constructor(
         }
     }
 
+    override suspend fun insertSyncedHandoffs(assets: List<LedgerAsset>) {
+        dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal(committed = true, committedAt = null) })
+    }
+
     override fun observeLastHandoffCommit(): Flow<Long?> = dao.observeLastHandoffCommittedAt()
 
     override suspend fun releaseUncommittedHandoffs(): Result<Unit> = runCatching {
