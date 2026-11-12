@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.harness
 
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetStates
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
@@ -36,9 +37,11 @@ import io.paritytech.polkadotapp.feature_transactions_impl.data.durable.DurableT
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Instant
 
 internal data class HandoffRow(val asset: OwnAsset, val committed: Boolean)
 
@@ -372,6 +375,10 @@ private class InMemoryCoinageAssetLedger(private val store: InMemoryLedger) : Co
             if (key in keys) row.copy(committed = true) else row
         }
     }
+
+    override suspend fun getCommittedCoinHandoffs(committedAfter: Instant?): List<HandedOffCoin> = emptyList()
+
+    override fun observeLastHandoffCommit(): Flow<Long?> = flowOf(null)
 
     override suspend fun releaseUncommittedHandoffs(): Result<Unit> = store.transaction {
         store.handoffs = store.handoffs.filterValues { it.committed }

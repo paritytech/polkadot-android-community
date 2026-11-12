@@ -32,6 +32,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageHoldingsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyclingUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageStateSyncUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.OnboardingUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
@@ -121,6 +122,7 @@ import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinage
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageOnboardingSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinagePaymentStatusUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageRecyclingUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageStateSyncUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageTestnetFundUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealCoinageTransferSubmissionUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealOnboardingUseCase
@@ -284,6 +286,9 @@ interface CoinageFeatureModule {
 
     @Binds
     fun bindCoinageHoldingsUseCase(impl: RealCoinageHoldingsUseCase): CoinageHoldingsUseCase
+
+    @Binds
+    fun bindCoinageStateSyncUseCase(impl: RealCoinageStateSyncUseCase): CoinageStateSyncUseCase
 
     @Binds
     fun bindShareCoinageLogsUseCase(impl: RealShareCoinageLogsUseCase): ShareCoinageLogsUseCase

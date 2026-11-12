@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 71,
-    "identityHash": "d35d54b8a05e494016bc1522828afb9b",
+    "identityHash": "45f1ff7616301eb27b52fe377350c93a",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -2944,7 +2944,7 @@
       },
       {
         "tableName": "coinage_handoff",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`onChainKey` BLOB NOT NULL, `assetKind` TEXT NOT NULL, `installationId` BLOB NOT NULL, `derivationIndex` INTEGER NOT NULL, `committed` INTEGER NOT NULL, PRIMARY KEY(`onChainKey`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`onChainKey` BLOB NOT NULL, `assetKind` TEXT NOT NULL, `installationId` BLOB NOT NULL, `derivationIndex` INTEGER NOT NULL, `committed` INTEGER NOT NULL, `committedAt` INTEGER, PRIMARY KEY(`onChainKey`))",
         "fields": [
           {
             "fieldPath": "onChainKey",
@@ -2975,6 +2975,11 @@
             "columnName": "committed",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "committedAt",
+            "columnName": "committedAt",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -3149,7 +3154,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd35d54b8a05e494016bc1522828afb9b')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '45f1ff7616301eb27b52fe377350c93a')"
     ]
   }
 }
