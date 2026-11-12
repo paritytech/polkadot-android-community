@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.X25519PrivateKey
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledIncomingPayment
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
@@ -46,11 +47,15 @@ class DeviceTransferReceiver(
 
     val progress: StateFlow<DeviceTransferProgress> = mutableProgress.asStateFlow()
 
+    @Volatile
+    private var waitingPayments = emptyList<SettledIncomingPayment>()
+
     fun cancel() {
         cancelRequest.complete(Unit)
     }
 
     suspend fun run(transport: DataTransport): DeviceTransferReceiverOutcome = coroutineScope {
+        waitingPayments = emptyList()
         val senderStarted = CompletableDeferred<Unit>()
         val senderCompleted = CompletableDeferred<Unit>()
         val senderAbort = CompletableDeferred<DeviceTransferReceiverOutcome>()
@@ -78,6 +83,7 @@ class DeviceTransferReceiver(
             {
                 transport.sendControl(DeviceTransferControlScale.Resume(checkpointStorage.getCheckpoint(senderInstallationId)))
                 senderCompleted.await()
+                dropWaitingPayments()
                 pullFiles()
                 transport.sendControl(DeviceTransferControlScale.ReceiverCompleted)
                 DeviceTransferReceiverOutcome.Completed
@@ -94,13 +100,30 @@ class DeviceTransferReceiver(
 
     private suspend fun apply(transport: DataTransport, update: SyncUpdateScale) {
         if (update.entities.isEmpty()) {
-            checkpointStorage.saveCheckpoint(senderInstallationId, update.timePoint)
+            closeRound(update)
         } else {
-            applier.apply(update, messagePlacement = Placement.AFTER_EXISTING)
+            waitingPayments = waitingPayments + applier.apply(update, messagePlacement = Placement.AFTER_EXISTING)
             addAppliedChanges(update.entities.itemCount())
         }
 
         transport.sendSyncMessage(SyncMessageScale.Ack(SyncUpdateAckScale(update.id)))
+    }
+
+    private suspend fun closeRound(update: SyncUpdateScale) {
+        if (waitingPayments.isNotEmpty()) waitingPayments = applier.applySettledPayments(waitingPayments)
+
+        if (waitingPayments.isEmpty()) {
+            checkpointStorage.saveCheckpoint(senderInstallationId, update.timePoint)
+        } else {
+            Timber.w("DeviceTransferReceiver: checkpoint held back by ${waitingPayments.size} payment outcomes without a message")
+        }
+    }
+
+    private fun dropWaitingPayments() {
+        if (waitingPayments.isEmpty()) return
+
+        Timber.w("DeviceTransferReceiver: dropped ${waitingPayments.size} payment outcomes without a message")
+        waitingPayments = emptyList()
     }
 
     private fun addAppliedChanges(count: Int) {

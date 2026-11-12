@@ -55,7 +55,11 @@ class CoinagePaymentProcessingExtension @Inject constructor(
     private val claimReceivedCoinsUseCase: ClaimReceivedCoinsUseCase,
     private val balanceConverterUseCase: CoinageBalanceConverterUseCase,
 ) : ChatExtension {
-    override val id = "CoinagePaymentProcessing"
+    companion object {
+        const val ID = "CoinagePaymentProcessing"
+    }
+
+    override val id = ID
 
     override val activationStateExternallyControlled: Boolean = false
 
