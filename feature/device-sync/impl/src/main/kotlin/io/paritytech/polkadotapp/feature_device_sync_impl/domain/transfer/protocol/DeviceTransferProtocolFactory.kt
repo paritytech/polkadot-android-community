@@ -13,6 +13,7 @@ class DeviceTransferProtocolFactory @Inject constructor(
     private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
     private val checkpointStorage: DeviceTransferCheckpointStorage,
     private val fileTransferFactory: SyncFileTransfer.Factory,
+    private val filePuller: DeviceTransferFilePuller,
 ) {
     fun createSender(): DeviceTransferSender = DeviceTransferSender(sequencer, ourDeviceKeypairProvider, fileTransferFactory)
 
@@ -23,6 +24,7 @@ class DeviceTransferProtocolFactory @Inject constructor(
             checkpointStorage,
             ourDeviceKeypairProvider,
             fileTransferFactory,
+            filePuller,
         )
     }
 }

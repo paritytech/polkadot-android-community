@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.proto
 
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.X25519PrivateKey
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class DeviceTransferReceiver(
     private val senderInstallationId: DataByteArray,
@@ -30,6 +32,7 @@ class DeviceTransferReceiver(
     private val checkpointStorage: DeviceTransferCheckpointStorage,
     private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
     private val fileTransferFactory: SyncFileTransfer.Factory,
+    private val filePuller: DeviceTransferFilePuller,
 ) {
     private companion object {
         const val FILE_PEER_LOG_ID = "device-transfer-sender"
@@ -37,7 +40,9 @@ class DeviceTransferReceiver(
 
     private val cancelRequest = CompletableDeferred<Unit>()
     private val fileChannels = SyncFileChannelRegistry()
-    private val mutableProgress = MutableStateFlow(DeviceTransferProgress(appliedChanges = 0, totalChanges = 0))
+    private val mutableProgress = MutableStateFlow<DeviceTransferProgress>(
+        DeviceTransferProgress.Syncing(appliedChanges = 0, totalChanges = 0)
+    )
 
     val progress: StateFlow<DeviceTransferProgress> = mutableProgress.asStateFlow()
 
@@ -47,7 +52,8 @@ class DeviceTransferReceiver(
 
     suspend fun run(transport: DataTransport): DeviceTransferReceiverOutcome = coroutineScope {
         val senderStarted = CompletableDeferred<Unit>()
-        val senderEnd = CompletableDeferred<DeviceTransferReceiverOutcome>()
+        val senderCompleted = CompletableDeferred<Unit>()
+        val senderAbort = CompletableDeferred<DeviceTransferReceiverOutcome>()
 
         val updateListening = launch(start = CoroutineStart.UNDISPATCHED) {
             transport.subscribeSyncMessages().collect { message ->
@@ -59,7 +65,7 @@ class DeviceTransferReceiver(
         }
         val controlListening = launch(start = CoroutineStart.UNDISPATCHED) {
             transport.subscribeControls().collect { control ->
-                handleControl(transport, control, senderStarted)?.let(senderEnd::complete)
+                handleControl(control, senderStarted, senderCompleted, senderAbort)
             }
         }
         val fileServing = launch(start = CoroutineStart.UNDISPATCHED) {
@@ -71,8 +77,12 @@ class DeviceTransferReceiver(
         val outcome = raceFirst(
             {
                 transport.sendControl(DeviceTransferControlScale.Resume(checkpointStorage.getCheckpoint(senderInstallationId)))
-                senderEnd.await()
+                senderCompleted.await()
+                pullFiles()
+                transport.sendControl(DeviceTransferControlScale.ReceiverCompleted)
+                DeviceTransferReceiverOutcome.Completed
             },
+            { senderAbort.await() },
             { awaitCancelRequest(transport) },
         )
 
@@ -87,32 +97,52 @@ class DeviceTransferReceiver(
             checkpointStorage.saveCheckpoint(senderInstallationId, update.timePoint)
         } else {
             applier.apply(update, messagePlacement = Placement.AFTER_EXISTING)
-            mutableProgress.update { it.copy(appliedChanges = it.appliedChanges + update.entities.itemCount()) }
+            addAppliedChanges(update.entities.itemCount())
         }
 
         transport.sendSyncMessage(SyncMessageScale.Ack(SyncUpdateAckScale(update.id)))
     }
 
+    private fun addAppliedChanges(count: Int) {
+        mutableProgress.update { progress ->
+            when (progress) {
+                is DeviceTransferProgress.Syncing -> progress.copy(appliedChanges = progress.appliedChanges + count)
+                is DeviceTransferProgress.Files -> progress
+            }
+        }
+    }
+
     private suspend fun handleControl(
-        transport: DataTransport,
         control: DeviceTransferControlScale,
         senderStarted: CompletableDeferred<Unit>,
-    ): DeviceTransferReceiverOutcome? = when (control) {
-        is DeviceTransferControlScale.SenderStarted -> {
-            ourDeviceKeypairProvider.importPrivateKey(X25519PrivateKey.fromDerivedBytes(control.deviceEncryptionKey))
-            mutableProgress.value = DeviceTransferProgress(appliedChanges = 0, totalChanges = control.totalChanges.toInt())
-            senderStarted.complete(Unit)
-            null
+        senderCompleted: CompletableDeferred<Unit>,
+        senderAbort: CompletableDeferred<DeviceTransferReceiverOutcome>,
+    ) {
+        when (control) {
+            is DeviceTransferControlScale.SenderStarted -> {
+                ourDeviceKeypairProvider.importPrivateKey(X25519PrivateKey.fromDerivedBytes(control.deviceEncryptionKey))
+                mutableProgress.value = DeviceTransferProgress.Syncing(appliedChanges = 0, totalChanges = control.totalChanges.toInt())
+                senderStarted.complete(Unit)
+            }
+
+            DeviceTransferControlScale.SenderCompleted -> senderCompleted.complete(Unit)
+
+            is DeviceTransferControlScale.Abort ->
+                senderAbort.complete(DeviceTransferReceiverOutcome.AbortedBySender(control.reason.toDomain()))
+
+            DeviceTransferControlScale.ReceiverCompleted, is DeviceTransferControlScale.Resume -> Unit
+        }
+    }
+
+    private suspend fun pullFiles() {
+        val requester = fileChannels.openRequester()
+        if (requester == null) {
+            Timber.w("DeviceTransferReceiver: no file channel, completing without files")
+            return
         }
 
-        DeviceTransferControlScale.SenderCompleted -> {
-            transport.sendControl(DeviceTransferControlScale.ReceiverCompleted)
-            DeviceTransferReceiverOutcome.Completed
-        }
-
-        is DeviceTransferControlScale.Abort -> DeviceTransferReceiverOutcome.AbortedBySender(control.reason.toDomain())
-
-        DeviceTransferControlScale.ReceiverCompleted, is DeviceTransferControlScale.Resume -> null
+        filePuller.pull(requester, onProgress = { mutableProgress.value = it })
+            .logFailure("DeviceTransferReceiver: failed to pull missing files, completing without them")
     }
 
     private suspend fun awaitCancelRequest(transport: DataTransport): DeviceTransferReceiverOutcome {
