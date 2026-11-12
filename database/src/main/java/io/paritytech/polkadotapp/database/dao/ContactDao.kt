@@ -169,7 +169,10 @@ abstract class ContactDao {
     @Query(
         """
         SELECT contacts.*,
-            EXISTS(SELECT 1 FROM contact_devices WHERE contact_devices.contactAccountId = contacts.accountId) AS hasDevices
+            EXISTS(
+                SELECT 1 FROM contact_devices
+                WHERE contact_devices.contactAccountId = contacts.accountId AND contact_devices.status = 'ACTIVE'
+            ) AS hasDevices
         FROM contacts
         """
     )

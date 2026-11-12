@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 71,
-    "identityHash": "1dd3beb94afc0e310af72c402fae05b6",
+    "identityHash": "d35d54b8a05e494016bc1522828afb9b",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -781,7 +781,7 @@
       },
       {
         "tableName": "contact_devices",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `statementAccountId` BLOB NOT NULL, `encryptionPublicKey` BLOB NOT NULL, PRIMARY KEY(`contactAccountId`, `statementAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `statementAccountId` BLOB NOT NULL, `encryptionPublicKey` BLOB NOT NULL, `status` TEXT NOT NULL DEFAULT 'ACTIVE', `changedAt` INTEGER NOT NULL DEFAULT 0, `modifiedAt` INTEGER, PRIMARY KEY(`contactAccountId`, `statementAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "contactAccountId",
@@ -800,6 +800,25 @@
             "columnName": "encryptionPublicKey",
             "affinity": "BLOB",
             "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'ACTIVE'"
+          },
+          {
+            "fieldPath": "changedAt",
+            "columnName": "changedAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "modifiedAt",
+            "columnName": "modifiedAt",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -3130,7 +3149,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1dd3beb94afc0e310af72c402fae05b6')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd35d54b8a05e494016bc1522828afb9b')"
     ]
   }
 }

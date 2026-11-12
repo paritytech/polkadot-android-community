@@ -19,9 +19,9 @@ interface ContactDevicesRepository {
 
     fun subscribeAllDevices(): Flow<Map<ContactAccountId, List<ContactDevice>>>
 
-    suspend fun addDevice(device: ContactDevice)
+    suspend fun addDevice(device: ContactDevice, changedAt: Long)
 
-    suspend fun removeDevice(contactAccountId: ContactAccountId, statementAccountId: AccountId)
+    suspend fun removeDevice(contactAccountId: ContactAccountId, statementAccountId: AccountId, changedAt: Long)
 
     suspend fun clearDevicesFor(contactAccountId: ContactAccountId)
 }
@@ -30,29 +30,30 @@ class RealContactDevicesRepository @Inject constructor(
     private val dao: ContactDeviceDao
 ) : ContactDevicesRepository {
     override suspend fun getDevices(contactAccountId: ContactAccountId): List<ContactDevice> {
-        return dao.getByContact(contactAccountId.value).map { it.toDomain() }
+        return dao.getActiveByContact(contactAccountId.value).map { it.toDomain() }
     }
 
     override fun subscribeDevices(contactAccountId: ContactAccountId): Flow<List<ContactDevice>> {
-        return dao.subscribeByContact(contactAccountId.value)
+        return dao.subscribeActiveByContact(contactAccountId.value)
             .mapList { it.toDomain() }
     }
 
     override fun subscribeAllDevices(): Flow<Map<ContactAccountId, List<ContactDevice>>> {
-        return dao.subscribeAll()
+        return dao.subscribeAllActive()
             .mapList { it.toDomain() }
             .map { devices -> devices.groupBy { it.contactAccountId } }
     }
 
-    override suspend fun addDevice(device: ContactDevice) {
-        dao.upsert(device.toLocal())
+    override suspend fun addDevice(device: ContactDevice, changedAt: Long) {
+        dao.upsertIfNewer(device.toLocal(changedAt, modifiedAt = System.currentTimeMillis()))
     }
 
     override suspend fun removeDevice(
         contactAccountId: ContactAccountId,
-        statementAccountId: AccountId
+        statementAccountId: AccountId,
+        changedAt: Long,
     ) {
-        dao.delete(contactAccountId.value, statementAccountId.value)
+        dao.deactivateIfOlder(contactAccountId.value, statementAccountId.value, changedAt, modifiedAt = System.currentTimeMillis())
     }
 
     override suspend fun clearDevicesFor(contactAccountId: ContactAccountId) {
@@ -68,10 +69,13 @@ private fun ContactDeviceLocal.toDomain(): ContactDevice {
     )
 }
 
-private fun ContactDevice.toLocal(): ContactDeviceLocal {
+private fun ContactDevice.toLocal(changedAt: Long, modifiedAt: Long): ContactDeviceLocal {
     return ContactDeviceLocal(
         contactAccountId = contactAccountId.value,
         statementAccountId = statementAccountId.value,
         encryptionPublicKey = encryptionPublicKey.bytes.value,
+        status = ContactDeviceLocal.Status.ACTIVE,
+        changedAt = changedAt,
+        modifiedAt = modifiedAt,
     )
 }

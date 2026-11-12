@@ -36,7 +36,8 @@ class DeviceLifecycleMessageProcessor @Inject constructor(
                         contactAccountId = contactAccountId,
                         statementAccountId = content.statementAccountId,
                         encryptionPublicKey = content.encryptionPublicKey,
-                    )
+                    ),
+                    changedAt = message.timestamp,
                 )
             }
 
@@ -47,7 +48,8 @@ class DeviceLifecycleMessageProcessor @Inject constructor(
                         contactAccountId = contactAccountId,
                         statementAccountId = content.device.statementAccountId,
                         encryptionPublicKey = content.device.encryptionPublicKey,
-                    )
+                    ),
+                    changedAt = message.timestamp,
                 )
             }
 
@@ -56,6 +58,7 @@ class DeviceLifecycleMessageProcessor @Inject constructor(
                 contactDevicesRepository.removeDevice(
                     contactAccountId = contactAccountId,
                     statementAccountId = content.statementAccountId,
+                    changedAt = message.timestamp,
                 )
             }
 
