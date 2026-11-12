@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContact
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySyncedChatStateUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.GetLocalAttachmentFileUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.IncomingChatPushDecoder
 import io.paritytech.polkadotapp.feature_chats_api.domain.sessions.ContactChatSessionRefCounter
@@ -113,6 +114,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealApply
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealApplySyncedChatStateUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealChatRequestsListInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealChatStateSyncUseCase
+import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealGetLocalAttachmentFileUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealRemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.middleware.CompoundExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
@@ -153,6 +155,9 @@ internal interface ChatsFeatureApiModule {
 
     @Binds
     fun bindApplyRemoteChatMessageUseCase(impl: RealApplyRemoteChatMessageUseCase): ApplyRemoteChatMessageUseCase
+
+    @Binds
+    fun bindGetLocalAttachmentFileUseCase(impl: RealGetLocalAttachmentFileUseCase): GetLocalAttachmentFileUseCase
 
     @Binds
     fun bindChatStateSyncUseCase(impl: RealChatStateSyncUseCase): ChatStateSyncUseCase
