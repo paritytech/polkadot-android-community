@@ -3,6 +3,8 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.proto
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileChannelRegistry
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileTransfer
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
@@ -18,8 +20,14 @@ import kotlinx.coroutines.launch
 class DeviceTransferSender(
     private val sequencer: DeviceTransferSenderSequencer,
     private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
+    private val fileTransferFactory: SyncFileTransfer.Factory,
 ) {
+    private companion object {
+        const val FILE_PEER_LOG_ID = "device-transfer-receiver"
+    }
+
     private val cancelRequest = CompletableDeferred<Unit>()
+    private val fileChannels = SyncFileChannelRegistry()
 
     fun cancel() {
         cancelRequest.complete(Unit)
@@ -41,6 +49,9 @@ class DeviceTransferSender(
                 control.toSenderOutcome()?.let(receiverEnd::complete)
             }
         }
+        val fileServing = launch(start = CoroutineStart.UNDISPATCHED) {
+            fileTransferFactory.createForDeviceTransfer(transport, FILE_PEER_LOG_ID, fileChannels).run()
+        }
 
         transport.awaitOpen()
 
@@ -55,6 +66,7 @@ class DeviceTransferSender(
 
         ackListening.cancel()
         controlListening.cancel()
+        fileServing.cancel()
         outcome
     }
 

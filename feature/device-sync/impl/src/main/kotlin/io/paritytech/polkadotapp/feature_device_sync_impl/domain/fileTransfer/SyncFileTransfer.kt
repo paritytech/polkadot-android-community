@@ -22,13 +22,21 @@ class SyncFileTransfer(
 ) {
     class Factory @Inject constructor(
         private val locator: SyncFileLocator,
-        private val registry: SyncFileChannelRegistry,
+        private val siblingRegistry: SyncFileChannelRegistry,
     ) {
         private companion object {
             val NO_RESPONSE_TIMEOUT = 30.seconds
         }
 
         fun create(dataTransport: DataTransport, peerLogId: String): SyncFileTransfer {
+            return SyncFileTransfer(dataTransport, locator, siblingRegistry, peerLogId, NO_RESPONSE_TIMEOUT)
+        }
+
+        fun createForDeviceTransfer(
+            dataTransport: DataTransport,
+            peerLogId: String,
+            registry: SyncFileChannelRegistry,
+        ): SyncFileTransfer {
             return SyncFileTransfer(dataTransport, locator, registry, peerLogId, NO_RESPONSE_TIMEOUT)
         }
     }

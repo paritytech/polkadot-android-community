@@ -10,6 +10,8 @@ import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncU
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.transfer.DeviceTransferCheckpointStorage
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine.SyncEntityApplier
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileChannelRegistry
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileTransfer
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
@@ -27,8 +29,14 @@ class DeviceTransferReceiver(
     private val applier: SyncEntityApplier,
     private val checkpointStorage: DeviceTransferCheckpointStorage,
     private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
+    private val fileTransferFactory: SyncFileTransfer.Factory,
 ) {
+    private companion object {
+        const val FILE_PEER_LOG_ID = "device-transfer-sender"
+    }
+
     private val cancelRequest = CompletableDeferred<Unit>()
+    private val fileChannels = SyncFileChannelRegistry()
     private val mutableProgress = MutableStateFlow(DeviceTransferProgress(appliedChanges = 0, totalChanges = 0))
 
     val progress: StateFlow<DeviceTransferProgress> = mutableProgress.asStateFlow()
@@ -54,6 +62,9 @@ class DeviceTransferReceiver(
                 handleControl(transport, control, senderStarted)?.let(senderEnd::complete)
             }
         }
+        val fileServing = launch(start = CoroutineStart.UNDISPATCHED) {
+            fileTransferFactory.createForDeviceTransfer(transport, FILE_PEER_LOG_ID, fileChannels).run()
+        }
 
         transport.awaitOpen()
 
@@ -67,6 +78,7 @@ class DeviceTransferReceiver(
 
         updateListening.cancel()
         controlListening.cancel()
+        fileServing.cancel()
         outcome
     }
 
