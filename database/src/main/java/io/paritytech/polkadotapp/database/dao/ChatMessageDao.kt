@@ -271,6 +271,9 @@ abstract class ChatMessageDao {
     @Query("SELECT * FROM chat_messages WHERE chatId = :chatId AND type = 'UNSUPPORTED'")
     abstract suspend fun getUnsupportedMessages(chatId: ByteArray): List<ChatMessageLocal>
 
+    @Query("SELECT * FROM chat_messages WHERE type = 'RICH_TEXT' ORDER BY timestamp DESC")
+    abstract suspend fun getRichTextMessages(): List<ChatMessageLocal>
+
     @Query("DELETE FROM chat_messages WHERE chatId = :chatId")
     abstract suspend fun deleteAllMessageRows(chatId: ByteArray)
 
