@@ -16,6 +16,6 @@ class RealSiblingFileFetcher @Inject constructor(
         val requester = registry.openRequester()
             ?: return requests.map { SiblingFileOutcome.Unavailable(SiblingFileOutcome.Unavailable.Reason.NOT_STORED) }
 
-        return requests.chunked(MAX_FILES_PER_REQUEST).flatMap { requester.request(it) }
+        return requests.chunked(MAX_FILES_PER_REQUEST).flatMap { requester.request(it, onBytes = {}) }
     }
 }

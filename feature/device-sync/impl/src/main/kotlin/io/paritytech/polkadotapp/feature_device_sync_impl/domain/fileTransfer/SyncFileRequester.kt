@@ -6,12 +6,14 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.SiblingFile
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.SiblingFileOutcome
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.SiblingFileRequest
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FileAvailabilityScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FileChunkScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FileHeaderScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FileReferenceScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FileRequestItemScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FileUnavailableReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FileUnavailableScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FilesAvailabilityRequestScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.FilesRequestScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.MessageAttachmentIdScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncFileMessageScale
@@ -42,6 +44,7 @@ class SyncFileRequester(
 
     private class InFlightRequest(
         val files: List<InFlightFile>,
+        val onBytes: (InformationSize) -> Unit,
         val result: CompletableDeferred<List<SiblingFileOutcome>>,
     ) {
         var hasResponse = false
@@ -50,19 +53,34 @@ class SyncFileRequester(
         fun file(index: UInt): InFlightFile? = files.getOrNull(index.toInt())
     }
 
+    private class InFlightAvailability(
+        val fileCount: Int,
+        val result: CompletableDeferred<List<FileAvailabilityScale>>,
+    ) {
+        var timeoutJob: Job? = null
+    }
+
+    private companion object {
+        val NOT_STORED_AVAILABILITY = FileAvailabilityScale.Unavailable(FileUnavailableReasonScale.NOT_STORED)
+    }
+
     private val mutex = Mutex()
     private val inFlight = mutableMapOf<UInt, InFlightRequest>()
+    private val inFlightAvailability = mutableMapOf<UInt, InFlightAvailability>()
     private var nextRequestId = 0u
-    private var providerMessages = 0L
+    private var providerMessageCount = 0L
     private var closed = false
 
-    suspend fun request(requests: List<SiblingFileRequest>): List<SiblingFileOutcome> {
+    suspend fun request(
+        requests: List<SiblingFileRequest>,
+        onBytes: (InformationSize) -> Unit,
+    ): List<SiblingFileOutcome> {
         if (requests.isEmpty()) return emptyList()
 
         val result = CompletableDeferred<List<SiblingFileOutcome>>()
         val wireRequest = mutex.withLock {
             if (closed) return requests.map { SiblingFileOutcome.Interrupted }
-            startRequest(requests, result)
+            startRequest(requests, onBytes, result)
         }
         scope.launch { sendRequest(wireRequest) }
 
@@ -74,20 +92,34 @@ class SyncFileRequester(
         }
     }
 
+    suspend fun requestAvailability(files: List<SiblingFile>): List<FileAvailabilityScale> {
+        if (files.isEmpty()) return emptyList()
+
+        val result = CompletableDeferred<List<FileAvailabilityScale>>()
+        val wireRequest = mutex.withLock {
+            if (closed) return files.map { NOT_STORED_AVAILABILITY }
+            startAvailabilityRequest(files, result)
+        }
+        scope.launch { sendAvailabilityRequest(wireRequest) }
+
+        return result.await()
+    }
+
     suspend fun handle(message: SyncFileMessageScale) {
         mutex.withLock {
-            providerMessages++
+            providerMessageCount++
 
             when (message) {
                 is SyncFileMessageScale.Header -> handleHeader(message.header)
                 is SyncFileMessageScale.Chunk -> handleChunk(message.chunk)
                 is SyncFileMessageScale.Unavailable -> handleUnavailable(message.unavailable)
                 is SyncFileMessageScale.Completed -> finishRequest(message.requestId, remaining = SiblingFileOutcome.Interrupted)
+                is SyncFileMessageScale.AvailabilityResponse ->
+                    finishAvailability(message.response.requestId, message.response.availability)
 
                 is SyncFileMessageScale.FilesRequest,
                 is SyncFileMessageScale.CancelFilesRequest,
-                is SyncFileMessageScale.AvailabilityRequest,
-                is SyncFileMessageScale.AvailabilityResponse -> Unit
+                is SyncFileMessageScale.AvailabilityRequest -> Unit
             }
         }
     }
@@ -96,17 +128,19 @@ class SyncFileRequester(
         mutex.withLock {
             closed = true
             inFlight.keys.toList().forEach { finishRequest(it, remaining = SiblingFileOutcome.Interrupted) }
+            inFlightAvailability.keys.toList().forEach { finishAvailability(it, availability = emptyList()) }
         }
     }
 
     private fun startRequest(
         requests: List<SiblingFileRequest>,
+        onBytes: (InformationSize) -> Unit,
         result: CompletableDeferred<List<SiblingFileOutcome>>,
     ): FilesRequestScale {
         val requestId = nextRequestId++
         val files = requests.map { InFlightFile(SyncFileWriter(it.destination)) }
 
-        inFlight[requestId] = InFlightRequest(files, result).apply {
+        inFlight[requestId] = InFlightRequest(files, onBytes, result).apply {
             timeoutJob = scope.launch { awaitResponse(requestId) }
         }
 
@@ -118,22 +152,51 @@ class SyncFileRequester(
         )
     }
 
+    private fun startAvailabilityRequest(
+        files: List<SiblingFile>,
+        result: CompletableDeferred<List<FileAvailabilityScale>>,
+    ): FilesAvailabilityRequestScale {
+        val requestId = nextRequestId++
+
+        inFlightAvailability[requestId] = InFlightAvailability(files.size, result).apply {
+            timeoutJob = scope.launch { awaitAvailabilityResponse(requestId) }
+        }
+
+        return FilesAvailabilityRequestScale(requestId = requestId, files = files.map { it.toScale() })
+    }
+
     private suspend fun sendRequest(request: FilesRequestScale) {
         sender.sendCatching(SyncFileMessageScale.FilesRequest(request))
             .onFailure { mutex.withLock { finishRequest(request.requestId, remaining = SiblingFileOutcome.Interrupted) } }
             .logFailure("SyncFileRequester: failed to send request ${request.requestId} to $peerLogId")
     }
 
+    private suspend fun sendAvailabilityRequest(request: FilesAvailabilityRequestScale) {
+        sender.sendCatching(SyncFileMessageScale.AvailabilityRequest(request))
+            .onFailure { mutex.withLock { finishAvailability(request.requestId, availability = emptyList()) } }
+            .logFailure("SyncFileRequester: failed to send availability request ${request.requestId} to $peerLogId")
+    }
+
+    private suspend fun awaitAvailabilityResponse(requestId: UInt) {
+        delay(noResponseTimeout)
+
+        mutex.withLock {
+            if (requestId !in inFlightAvailability) return
+            Timber.w("SyncFileRequester: availability request $requestId to $peerLogId got no response, treating files as not stored")
+            finishAvailability(requestId, availability = emptyList())
+        }
+    }
+
     private suspend fun awaitResponse(requestId: UInt) {
         while (true) {
-            val messagesBefore = mutex.withLock { providerMessages }
+            val messageCountBefore = mutex.withLock { providerMessageCount }
             delay(noResponseTimeout)
 
             mutex.withLock {
                 val request = inFlight[requestId] ?: return
                 if (request.hasResponse) return
 
-                if (providerMessages == messagesBefore) {
+                if (providerMessageCount == messageCountBefore) {
                     Timber.w("SyncFileRequester: request $requestId to $peerLogId got no response, treating files as not stored")
                     finishRequest(requestId, remaining = SiblingFileOutcome.Unavailable(SiblingFileOutcome.Unavailable.Reason.NOT_STORED))
                     return
@@ -160,6 +223,7 @@ class SyncFileRequester(
         markResponse(request)
         val totalSize = header.totalSize.toLong().bytes
         file.totalSize = totalSize
+        request.onBytes(file.writer.storedBytes())
 
         if (file.writer.storedBytes() >= totalSize) completeFile(request, file, totalSize)
     }
@@ -177,6 +241,8 @@ class SyncFileRequester(
             resolveFile(request, file, SiblingFileOutcome.SizeMismatch)
             return
         }
+
+        request.onBytes(chunk.data.size.bytes)
 
         if (file.writer.storedBytes() >= totalSize) completeFile(request, file, totalSize)
     }
@@ -224,6 +290,13 @@ class SyncFileRequester(
         request.result.complete(outcomes)
 
         return true
+    }
+
+    private fun finishAvailability(requestId: UInt, availability: List<FileAvailabilityScale>) {
+        val request = inFlightAvailability.remove(requestId) ?: return
+
+        request.timeoutJob?.cancel()
+        request.result.complete(List(request.fileCount) { availability.getOrNull(it) ?: NOT_STORED_AVAILABILITY })
     }
 
     private fun SiblingFile.toScale(): FileReferenceScale = when (this) {

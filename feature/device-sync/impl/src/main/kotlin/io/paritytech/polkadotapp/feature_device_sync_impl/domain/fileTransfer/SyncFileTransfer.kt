@@ -58,10 +58,8 @@ class SyncFileTransfer(
             is SyncFileMessageScale.Header,
             is SyncFileMessageScale.Chunk,
             is SyncFileMessageScale.Unavailable,
-            is SyncFileMessageScale.Completed -> requester.handle(message)
-
-            is SyncFileMessageScale.AvailabilityResponse ->
-                Timber.d("SyncFileTransfer: ignoring unrequested availability response from $peerLogId")
+            is SyncFileMessageScale.Completed,
+            is SyncFileMessageScale.AvailabilityResponse -> requester.handle(message)
         }
     }
 
