@@ -75,6 +75,8 @@ sealed class IncomingRequestProcessingResult {
     /** Request was ignored (e.g., already exists with same or newer timestamp) */
     sealed class Ignored : IncomingRequestProcessingResult() {
         data object ChatRequestAlreadyProcessed : Ignored()
+
+        data object SenderBlocked : Ignored()
     }
 
     /** New contact and request were created */
@@ -103,7 +105,7 @@ interface IncomingChatRequestProcessor {
     suspend fun processIncomingRequestForOutgoingRequest(
         data: IncomingChatRequestData,
         contact: Contact
-    ): Result<IncomingRequestProcessingResult.AutoAccepted>
+    ): Result<IncomingRequestProcessingResult>
 
     suspend fun acceptIncomingRequest(contact: Contact): Result<Unit>
 
@@ -163,7 +165,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     override suspend fun processIncomingRequestForOutgoingRequest(
         data: IncomingChatRequestData,
         contact: Contact
-    ): Result<IncomingRequestProcessingResult.AutoAccepted> {
+    ): Result<IncomingRequestProcessingResult> {
         return runCatching {
             val existingRequest = chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestId!!)
             autoAcceptMutualRequest(contact, existingRequest, data)
@@ -197,6 +199,8 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact,
         data: IncomingChatRequestData
     ): IncomingRequestProcessingResult {
+        if (contact.isBlocked) return IncomingRequestProcessingResult.Ignored.SenderBlocked
+
         // Known contact re-invited (left + came back): recreate the request + auto-accept so both reconnect.
         val created = createNewIncomingRequestChat(data, contact.username, contact.chatKey)
         require(created is IncomingRequestProcessingResult.NewContactCreated)
@@ -210,7 +214,9 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact,
         ourRequest: ChatRequest,
         incomingData: IncomingChatRequestData
-    ): IncomingRequestProcessingResult.AutoAccepted {
+    ): IncomingRequestProcessingResult {
+        if (contact.isBlocked) return IncomingRequestProcessingResult.Ignored.SenderBlocked
+
         val updatedContact = contactsRepository.withTransaction {
             markChatAccepted(contact.accountId)
             chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
