@@ -30,6 +30,9 @@ class SyncEntityChunker(private val maxPayloadSize: InformationSize) {
                 splitItems(entity.requests).map(SyncEntityScale::OutgoingRequestsAdded)
             is SyncEntityScale.OutgoingRequestsStatusUpdated ->
                 splitItems(entity.updates).map(SyncEntityScale::OutgoingRequestsStatusUpdated)
+            is SyncEntityScale.CoinsHandedOff -> splitItems(entity.coins).map(SyncEntityScale::CoinsHandedOff)
+            is SyncEntityScale.CoinageMessagesStatusUpdated ->
+                splitItems(entity.updates).map(SyncEntityScale::CoinageMessagesStatusUpdated)
             is SyncEntityScale.ContactDevicesChanged ->
                 splitItems(entity.changes).map(SyncEntityScale::ContactDevicesChanged)
         }

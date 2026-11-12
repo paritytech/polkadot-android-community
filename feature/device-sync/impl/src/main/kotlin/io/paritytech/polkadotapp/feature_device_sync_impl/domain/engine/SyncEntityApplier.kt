@@ -46,7 +46,9 @@ class SyncEntityApplier @Inject constructor(
         for (entity in update.entities) {
             runCatching {
                 when (entity) {
-                    is SyncEntityScale.Devices -> Unit
+                    is SyncEntityScale.Devices,
+                    is SyncEntityScale.CoinsHandedOff,
+                    is SyncEntityScale.CoinageMessagesStatusUpdated -> Unit
                     is SyncEntityScale.ChatsAdded -> applyChatsAdded(entity)
                     is SyncEntityScale.ChatsRemoved -> applyChatsRemoved(entity, removedAt = update.timePoint.toLong())
                     is SyncEntityScale.Messages -> applyMessages(entity, messagePlacement)

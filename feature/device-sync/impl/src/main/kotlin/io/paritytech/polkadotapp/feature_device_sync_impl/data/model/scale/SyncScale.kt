@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.EnumIndex
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.annotations.FixedLength
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.serializers.BigIntegerSerializable
 import io.paritytech.polkadotapp.common.domain.model.scale.X25519PublicKeyScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.LocalMessageScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
@@ -72,8 +73,46 @@ sealed interface SyncEntityScale {
     class OutgoingRequestsStatusUpdated(val updates: List<OutgoingRequestStatusUpdateScale>) : SyncEntityScale
 
     @Serializable
+    @EnumIndex(9)
+    class CoinsHandedOff(val coins: List<HandedOffCoinScale>) : SyncEntityScale
+
+    @Serializable
+    @EnumIndex(10)
+    class CoinageMessagesStatusUpdated(val updates: List<CoinageMessageStatusUpdateScale>) : SyncEntityScale
+
+    @Serializable
     @EnumIndex(11)
     class ContactDevicesChanged(val changes: List<ContactDeviceChangeScale>) : SyncEntityScale
+}
+
+@Serializable
+class HandedOffCoinScale(
+    @FixedLength(32)
+    val installationId: ByteArray,
+    val derivationIndex: ULong,
+    val exponent: Short,
+)
+
+@Serializable
+class CoinageMessageStatusUpdateScale(
+    val chatId: ChatIdScale,
+    val messageId: String,
+    val status: CoinageMessageStatusScale,
+)
+
+@Serializable
+sealed interface CoinageMessageStatusScale {
+    @Serializable
+    @EnumIndex(0)
+    data object None : CoinageMessageStatusScale
+
+    @Serializable
+    @EnumIndex(1)
+    class Claimed(val partial: BigIntegerSerializable?) : CoinageMessageStatusScale
+
+    @Serializable
+    @EnumIndex(2)
+    data object Failed : CoinageMessageStatusScale
 }
 
 @Serializable
