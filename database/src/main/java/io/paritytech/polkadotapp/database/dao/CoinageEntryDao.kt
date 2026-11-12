@@ -110,6 +110,9 @@ abstract class CoinageEntryDao {
     @Query("SELECT onChainKey FROM coinage_handoff WHERE onChainKey IN (:onChainKeys)")
     abstract suspend fun filterHandedOff(onChainKeys: List<ByteArray>): List<ByteArray>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM coinage_handoff WHERE installationId = :installationId AND onChainKey IN (:onChainKeys))")
+    abstract suspend fun hasHandoffsFrom(installationId: ByteArray, onChainKeys: List<ByteArray>): Boolean
+
     // ---- assets ----
 
     @Query("SELECT * FROM coinage_entry_input WHERE entryId IN (:entryIds)")

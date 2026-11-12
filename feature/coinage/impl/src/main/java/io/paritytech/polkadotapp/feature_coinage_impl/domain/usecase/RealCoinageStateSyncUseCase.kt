@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
+import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.mapToUnit
+import io.paritytech.polkadotapp.feature_coinage_api.data.installation.CoinageCurrentInstallationRepository
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageStateSyncUseCase
@@ -17,6 +19,7 @@ import kotlin.time.Instant
 class RealCoinageStateSyncUseCase @Inject constructor(
     private val assetLedger: CoinageAssetLedger,
     private val coinKeypairDerivation: CoinKeypairDerivation,
+    private val currentInstallationRepository: CoinageCurrentInstallationRepository,
 ) : CoinageStateSyncUseCase {
     override suspend fun getHandedOffCoins(committedAfter: Instant?): List<HandedOffCoin> {
         return assetLedger.getCommittedCoinHandoffs(committedAfter)
@@ -30,6 +33,10 @@ class RealCoinageStateSyncUseCase @Inject constructor(
             LedgerAsset(kind = CoinageAssetKind.COIN, asset = OwnAsset.Coin(index), publicKey = publicKey)
         }
         assetLedger.insertSyncedHandoffs(assets)
+    }
+
+    override suspend fun isHandedOffFromThisInstallation(coins: List<AccountId>): Boolean {
+        return assetLedger.hasHandoffsFrom(currentInstallationRepository.getOrCreateCurrent(), coins)
     }
 
     override fun observeHandoffChanges(): Flow<Unit> {

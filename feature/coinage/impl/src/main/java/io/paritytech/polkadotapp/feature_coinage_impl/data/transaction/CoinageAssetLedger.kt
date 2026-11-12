@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.data.transaction
 
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetStates
@@ -69,6 +70,8 @@ interface CoinageAssetLedger {
     suspend fun getCommittedCoinHandoffs(committedAfter: Instant?): List<HandedOffCoin>
 
     suspend fun insertSyncedHandoffs(assets: List<LedgerAsset>)
+
+    suspend fun hasHandoffsFrom(installation: CoinageInstallationId, keys: List<AssetPublicKey>): Boolean
 
     fun observeLastHandoffCommit(): Flow<Long?>
 

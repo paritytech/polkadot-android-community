@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
 import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
 import io.paritytech.polkadotapp.database.model.DurableTxLocal
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
@@ -129,6 +130,10 @@ class RealCoinageAssetLedger @Inject constructor(
 
     override suspend fun insertSyncedHandoffs(assets: List<LedgerAsset>) {
         dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal(committed = true, committedAt = null) })
+    }
+
+    override suspend fun hasHandoffsFrom(installation: CoinageInstallationId, keys: List<AssetPublicKey>): Boolean {
+        return dao.hasHandoffsFrom(installation.value.value, keys.map { it.value })
     }
 
     override fun observeLastHandoffCommit(): Flow<Long?> = dao.observeLastHandoffCommittedAt()
