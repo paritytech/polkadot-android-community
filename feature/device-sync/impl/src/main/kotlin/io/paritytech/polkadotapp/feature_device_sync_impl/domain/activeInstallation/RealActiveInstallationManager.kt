@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallati
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.InstallationStatus
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.ActiveInstallationRecordRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.ActiveInstallationRecordsPage
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.InstallationStatusStorage
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.device.DeviceInfoProvider
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.DeviceTransferKeySchedule
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.DeviceTransferKeyScheduleProvider
@@ -41,8 +42,9 @@ class RealActiveInstallationManager @Inject constructor(
     private val deviceInfoProvider: DeviceInfoProvider,
     private val timeProvider: TimeProvider,
     private val dispatchers: CoroutineDispatchers,
+    private val statusStorage: InstallationStatusStorage,
 ) : ActiveInstallationManager {
-    private val mutableStatus = MutableStateFlow<InstallationStatus>(InstallationStatus.Unknown)
+    private val mutableStatus = MutableStateFlow(statusStorage.getStatus() ?: InstallationStatus.Unknown)
     override val status: StateFlow<InstallationStatus> = mutableStatus.asStateFlow()
 
     private val trackingContextMutex = Mutex()
@@ -147,6 +149,7 @@ class RealActiveInstallationManager @Inject constructor(
         if (mutableStatus.value != newStatus) {
             Timber.i("Active installation status: $newStatus")
             mutableStatus.value = newStatus
+            statusStorage.saveStatus(newStatus)
         }
     }
 
