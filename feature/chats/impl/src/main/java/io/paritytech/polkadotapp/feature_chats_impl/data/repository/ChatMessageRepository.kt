@@ -91,6 +91,16 @@ interface ChatMessageRepository {
         customContentDecoder: CustomContentDecoder,
     ): List<ChatMessage>
 
+    suspend fun getMessagesUpdatedInRange(
+        updatedAfter: Instant,
+        updatedUpTo: Instant?,
+        after: ChatMessageSyncCursor?,
+        limit: Int,
+        customContentDecoder: CustomContentDecoder,
+    ): List<ChatMessage>
+
+    suspend fun countMessagesUpdatedInRange(updatedAfter: Instant, updatedUpTo: Instant?): Int
+
     suspend fun getMessageById(
         chatId: ChatId,
         messageId: ChatMessageId,
@@ -312,6 +322,29 @@ class RealChatMessageRepository @Inject constructor(
         customContentDecoder: CustomContentDecoder,
     ): List<ChatMessage> {
         return chatMessageDao.getMessagesUpdatedAfter(after.toEpochMilliseconds()).map { it.toDomain(customContentDecoder) }
+    }
+
+    override suspend fun getMessagesUpdatedInRange(
+        updatedAfter: Instant,
+        updatedUpTo: Instant?,
+        after: ChatMessageSyncCursor?,
+        limit: Int,
+        customContentDecoder: CustomContentDecoder,
+    ): List<ChatMessage> {
+        return chatMessageDao.getMessagesUpdatedInRange(
+            updatedAfter = updatedAfter.toEpochMilliseconds(),
+            updatedUpTo = updatedUpTo?.toEpochMilliseconds() ?: Long.MAX_VALUE,
+            afterTimestamp = after?.timestamp,
+            afterId = after?.messageId,
+            limit = limit,
+        ).map { it.toDomain(customContentDecoder) }
+    }
+
+    override suspend fun countMessagesUpdatedInRange(updatedAfter: Instant, updatedUpTo: Instant?): Int {
+        return chatMessageDao.countMessagesUpdatedInRange(
+            updatedAfter = updatedAfter.toEpochMilliseconds(),
+            updatedUpTo = updatedUpTo?.toEpochMilliseconds() ?: Long.MAX_VALUE,
+        )
     }
 
     override fun subscribeMessages(

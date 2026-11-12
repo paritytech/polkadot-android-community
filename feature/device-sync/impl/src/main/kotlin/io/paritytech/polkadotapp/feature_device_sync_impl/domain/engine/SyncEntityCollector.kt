@@ -63,8 +63,12 @@ class SyncEntityCollector @Inject constructor(
             ?.let { ids -> SyncEntityScale.ChatsRemoved(ids.map { ChatIdScale.Contact(it.value) }) }
     }
 
-    suspend fun collectMessages(checkpoint: Instant): SyncEntityScale.Messages? {
-        val messages = applyRemoteChatMessageUseCase.getMessagesUpdatedAfter(checkpoint).mapNotNull { syncMessage ->
+    private suspend fun collectMessages(checkpoint: Instant): SyncEntityScale.Messages? {
+        return toMessagesEntity(applyRemoteChatMessageUseCase.getMessagesUpdatedAfter(checkpoint))
+    }
+
+    fun toMessagesEntity(syncMessages: List<ApplyRemoteChatMessageUseCase.MessageForSync>): SyncEntityScale.Messages? {
+        val messages = syncMessages.mapNotNull { syncMessage ->
             BinaryScale.decodeFromByteArrayCatching<ChatMessageStatement>(syncMessage.encoded)
                 .onFailure { Timber.w(it, "SyncEntityCollector: failed to decode outbound chat message for sync") }
                 .getOrNull()

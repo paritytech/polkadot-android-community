@@ -12,6 +12,8 @@ import io.paritytech.polkadotapp.database.model.ChatMessageSearchRow
 import io.paritytech.polkadotapp.database.model.TransferRetryStateLocal
 import kotlinx.coroutines.flow.Flow
 
+private const val UPDATED_AT_OR_TIMESTAMP = "(CASE WHEN updatedAt > 0 THEN updatedAt ELSE timestamp END)"
+
 @Dao
 abstract class ChatMessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -136,6 +138,28 @@ abstract class ChatMessageDao {
 
     @Query("SELECT * FROM chat_messages WHERE updatedAt > :after ORDER BY updatedAt ASC")
     abstract suspend fun getMessagesUpdatedAfter(after: Long): List<ChatMessageLocal>
+
+    @Query(
+        """
+        SELECT * FROM chat_messages
+        WHERE $UPDATED_AT_OR_TIMESTAMP > :updatedAfter AND $UPDATED_AT_OR_TIMESTAMP <= :updatedUpTo
+        AND (:afterTimestamp IS NULL OR timestamp > :afterTimestamp OR (timestamp = :afterTimestamp AND id > :afterId))
+        ORDER BY timestamp ASC, id ASC
+        LIMIT :limit
+        """
+    )
+    abstract suspend fun getMessagesUpdatedInRange(
+        updatedAfter: Long,
+        updatedUpTo: Long,
+        afterTimestamp: Long?,
+        afterId: String?,
+        limit: Int,
+    ): List<ChatMessageLocal>
+
+    @Query(
+        "SELECT COUNT(*) FROM chat_messages WHERE $UPDATED_AT_OR_TIMESTAMP > :updatedAfter AND $UPDATED_AT_OR_TIMESTAMP <= :updatedUpTo"
+    )
+    abstract suspend fun countMessagesUpdatedInRange(updatedAfter: Long, updatedUpTo: Long): Int
 
     @Query("SELECT * FROM chat_messages WHERE id = :messageId")
     abstract suspend fun getMessage(messageId: String): ChatMessageLocal?

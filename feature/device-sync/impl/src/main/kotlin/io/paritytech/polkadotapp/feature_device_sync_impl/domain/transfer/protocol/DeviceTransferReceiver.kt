@@ -54,6 +54,8 @@ class DeviceTransferReceiver(
             }
         }
 
+        transport.awaitOpen()
+
         val outcome = raceFirst(
             {
                 transport.sendControl(DeviceTransferControlScale.Resume(checkpointStorage.getCheckpoint(senderInstallationId)))

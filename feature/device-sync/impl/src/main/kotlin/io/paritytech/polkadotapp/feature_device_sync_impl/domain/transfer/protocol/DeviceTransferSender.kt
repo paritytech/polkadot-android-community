@@ -3,7 +3,6 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.proto
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
-import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
@@ -13,10 +12,11 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 class DeviceTransferSender(
-    private val collectUpdates: suspend (checkpoint: ULong?) -> List<SyncUpdateScale>,
+    private val sequencer: DeviceTransferSenderSequencer,
     private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
 ) {
     private val cancelRequest = CompletableDeferred<Unit>()
@@ -42,10 +42,11 @@ class DeviceTransferSender(
             }
         }
 
+        transport.awaitOpen()
+
         val outcome = raceFirst(
             {
-                val updates = collectUpdates(resumeCheckpoints.receive())
-                sendUpdates(transport, updates, acks)
+                sendSteps(transport, sequencer.stepsFrom(resumeCheckpoints.receive()), acks)
                 awaitCancellation()
             },
             { receiverEnd.await() },
@@ -57,18 +58,23 @@ class DeviceTransferSender(
         outcome
     }
 
-    private suspend fun sendUpdates(
+    private suspend fun sendSteps(
         transport: DataTransport,
-        updates: List<SyncUpdateScale>,
+        steps: Flow<DeviceTransferSenderStep>,
         acks: ReceiveChannel<UInt>,
     ) {
-        val deviceKey = ourDeviceKeypairProvider.get().privateKey.bytes.value
-        val totalChanges = updates.sumOf { it.entities.itemCount() }
-        transport.sendControl(DeviceTransferControlScale.SenderStarted(deviceKey, totalChanges.toUInt()))
+        steps.collect { step ->
+            when (step) {
+                is DeviceTransferSenderStep.Started -> {
+                    val deviceKey = ourDeviceKeypairProvider.get().privateKey.bytes.value
+                    transport.sendControl(DeviceTransferControlScale.SenderStarted(deviceKey, step.totalChanges.toUInt()))
+                }
 
-        for (update in updates) {
-            transport.sendSyncMessage(SyncMessageScale.Update(update))
-            awaitAck(update.id, acks)
+                is DeviceTransferSenderStep.Update -> {
+                    transport.sendSyncMessage(SyncMessageScale.Update(step.update))
+                    awaitAck(step.update.id, acks)
+                }
+            }
         }
 
         transport.sendControl(DeviceTransferControlScale.SenderCompleted)
