@@ -43,8 +43,12 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
+import timber.log.Timber
 import java.math.BigInteger
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -75,7 +79,7 @@ class CoinagePaymentProcessingExtensionTest {
         mockkStatic(DERIVATION_FILE)
         every { any<CoinPrivateKey>().deriveKeypair() } answers {
             val key = firstArg<CoinPrivateKey>()
-            bindingFailureFor(key)?.let { throw it }
+            binding.failureFor(key)?.let { throw it }
             mockk<Sr25519Keypair> { every { publicKey } returns key.value }
         }
     }
@@ -85,6 +89,9 @@ class CoinagePaymentProcessingExtensionTest {
 
     private val context: ChatExtensionContext = mockk(relaxed = true)
     private lateinit var scope: CoroutineScope
+
+    @get:Rule
+    val failureLog = FailureLog()
 
     @After
     fun stopWork() {
@@ -629,7 +636,10 @@ class CoinagePaymentProcessingExtensionTest {
         val broken = incomingPayment(id = "broken")
         every {
             claimReceivedCoinsUseCase.claim(any(), CoinageOperationGroupId("chat-claim:${broken.id}"), any())
-        } returns flow { throw IllegalStateException("ledger unavailable") }
+        } returns flow {
+            emit(CoinageTransferDetection.Detecting)
+            throw IllegalStateException("ledger unavailable")
+        }
 
         val valid = incomingPayment()
         startWork(arriving = listOf(broken, valid))
@@ -677,6 +687,7 @@ class CoinagePaymentProcessingExtensionTest {
         startWork(message)
 
         verifyClosedAsFailed(message, CoinagePayment.Status.FailedTransfer)
+        coVerify(exactly = 0) { claimReceivedCoinsUseCase.claim(any(), any(), any()) }
         verify(exactly = 0) { match<CoinPrivateKey> { it.value.size != Sr25519SecretKey.SIZE_BYTES }.deriveKeypair() }
     }
 
@@ -686,6 +697,7 @@ class CoinagePaymentProcessingExtensionTest {
         startWork(message)
 
         verifyClosedAsFailed(message, CoinagePayment.Status.FailedDetection)
+        verify(exactly = 0) { paymentStatusUseCase.subscribeStatuses(any()) }
     }
 
     @Test
@@ -741,18 +753,12 @@ class CoinagePaymentProcessingExtensionTest {
 
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
         coVerify(exactly = 0) { context.modifyMessage(any(), any(), any()) }
+        failureLog.expectedIds += message.id
     }
 
     // ---- harness ----
 
-    private val probed = mutableSetOf<CoinPrivateKey>()
-
-    private fun bindingFailureFor(key: CoinPrivateKey): Throwable? = when {
-        key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
-        key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
-        key == REFUSED_AFTER_PROBE && !probed.add(key) -> Exception("Invalid secret")
-        else -> null
-    }
+    private val binding = FakeBinding()
 
     private fun startWork(vararg unprocessed: ChatMessage, arriving: List<ChatMessage> = emptyList()) {
         scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher())
@@ -812,7 +818,7 @@ class CoinagePaymentProcessingExtensionTest {
     }
 
     private fun verifyClosedAsFailed(message: ChatMessage, status: CoinagePayment.Status) {
-        coVerify {
+        coVerify(exactly = 1) {
             context.modifyMessage(message.chatId, message.id, match { it is CoinagePayment && it.status == status })
         }
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
@@ -821,6 +827,7 @@ class CoinagePaymentProcessingExtensionTest {
     private fun verifyLeftOpen(message: ChatMessage, stillProcessing: ChatMessage) {
         coVerify(exactly = 0) { context.markMessageProcessed(message.chatId, message.id) }
         coVerify(exactly = 1) { context.markMessageProcessed(stillProcessing.chatId, stillProcessing.id) }
+        failureLog.expectedIds += message.id
     }
 
     private fun accountId(seed: Int): AccountId = byteArrayOf(seed.toByte()).toDataByteArray()
@@ -864,8 +871,39 @@ class CoinagePaymentProcessingExtensionTest {
 
         val FULL = BigInteger.valueOf(100).intoBalance()
         val PARTIAL = BigInteger.valueOf(12).intoBalance()
-        val REFUSED_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -1 }.toDataByteArray()
-        val REFUSED_AFTER_PROBE = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -2 }.toDataByteArray()
-        val BROKEN_BINDING_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -3 }.toDataByteArray()
+    }
+}
+
+private val REFUSED_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -1 }.toDataByteArray()
+private val REFUSED_AFTER_PROBE = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -2 }.toDataByteArray()
+private val BROKEN_BINDING_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -3 }.toDataByteArray()
+private val PROCESSING_FAILED = Regex("^Payment processing failed message=(\\S+)")
+
+private class FakeBinding {
+    private val probed = mutableSetOf<CoinPrivateKey>()
+
+    fun failureFor(key: CoinPrivateKey): Throwable? = when {
+        key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
+        key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
+        key == REFUSED_AFTER_PROBE && !probed.add(key) -> Exception("Invalid secret")
+        else -> null
+    }
+}
+
+class FailureLog : ExternalResource() {
+    val expectedIds = mutableListOf<String>()
+    private val failedIds = mutableListOf<String>()
+
+    private val tree = object : Timber.Tree() {
+        override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+            PROCESSING_FAILED.find(message)?.let { failedIds += it.groupValues[1] }
+        }
+    }
+
+    override fun before() = Timber.plant(tree)
+
+    override fun after() {
+        Timber.uproot(tree)
+        assertEquals(expectedIds, failedIds)
     }
 }

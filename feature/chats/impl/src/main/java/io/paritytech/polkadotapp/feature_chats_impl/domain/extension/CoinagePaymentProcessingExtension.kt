@@ -123,7 +123,10 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             .onEach { status -> modifyPaymentContent(message, status) }
             .lastOrNull()
 
-        // Only the flow's end settles it: a partial Transferred is progress, and a shutdown throws to leave it open.
+        // Reaching the end of the flow is the finish, not any status seen along the way. An incoming
+        // payment's claim keeps retrying while a coin is still there to be claimed, so a partial
+        // Transferred is a progress report; treating it as the end is what settled a 1.00 payment as
+        // 0.12. A claim cut short by shutdown throws instead, leaving the message for the next launch.
         logSettled(message, outcome)
         with(chatExtensionContext) { markMessageProcessed(message) }
     }
