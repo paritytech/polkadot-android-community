@@ -19,13 +19,21 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKey
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
+import java.util.concurrent.TimeoutException
+import kotlin.time.Duration.Companion.seconds
 
 class DeviceTransferReceiver(
     private val senderInstallationId: DataByteArray,
@@ -37,10 +45,13 @@ class DeviceTransferReceiver(
 ) {
     private companion object {
         const val FILE_PEER_LOG_ID = "device-transfer-sender"
+        val RESPONSE_TIMEOUT = 60.seconds
     }
 
     private val cancelRequest = CompletableDeferred<Unit>()
     private val fileChannels = SyncFileChannelRegistry()
+    private val senderMessageArrived = Channel<Unit>(Channel.CONFLATED)
+    private val applyingUpdate = MutableStateFlow(false)
     private val mutableProgress = MutableStateFlow<DeviceTransferProgress?>(null)
 
     val progress: StateFlow<DeviceTransferProgress?> = mutableProgress.asStateFlow()
@@ -62,12 +73,19 @@ class DeviceTransferReceiver(
             transport.subscribeSyncMessages().collect { message ->
                 if (message is SyncMessageScale.Update) {
                     senderStarted.await()
-                    apply(transport, message.update)
+                    applyingUpdate.value = true
+                    senderMessageArrived.trySend(Unit)
+                    try {
+                        apply(transport, message.update)
+                    } finally {
+                        applyingUpdate.value = false
+                    }
                 }
             }
         }
         val controlListening = launch(start = CoroutineStart.UNDISPATCHED) {
             transport.subscribeControls().collect { control ->
+                senderMessageArrived.trySend(Unit)
                 handleControl(control, senderStarted, senderCompleted, senderAbort)
             }
         }
@@ -88,6 +106,7 @@ class DeviceTransferReceiver(
             },
             { senderAbort.await() },
             { awaitCancelRequest(transport) },
+            { failOnResponseTimeout(senderCompleted) },
         )
 
         updateListening.cancel()
@@ -164,6 +183,20 @@ class DeviceTransferReceiver(
 
         filePuller.pull(requester, onProgress = { mutableProgress.value = it })
             .logFailure("DeviceTransferReceiver: failed to pull missing files, completing without them")
+    }
+
+    private suspend fun failOnResponseTimeout(senderCompleted: Deferred<Unit>): DeviceTransferReceiverOutcome {
+        while (true) {
+            applyingUpdate.first { applying -> !applying }
+            val messageArrived = withTimeoutOrNull(RESPONSE_TIMEOUT) {
+                select<Boolean> {
+                    senderMessageArrived.onReceive { true }
+                    senderCompleted.onAwait { false }
+                }
+            } ?: throw TimeoutException("No message from the sender for $RESPONSE_TIMEOUT")
+
+            if (!messageArrived) awaitCancellation()
+        }
     }
 
     private suspend fun awaitCancelRequest(transport: DataTransport): DeviceTransferReceiverOutcome {
