@@ -501,6 +501,7 @@ class ChatEngine @Inject constructor(
         chatMessage: ChatMessage,
         onConflict: ChatMessageSaveConflictStrategy = ChatMessageSaveConflictStrategy.REPLACE,
         placement: ChatMessagePlacement = ChatMessagePlacement.Latest,
+        isFromSync: Boolean = false,
         onSaved: suspend () -> Unit = {},
     ): Boolean {
         val customContentDecoder = getCustomContentDecoder(chatMessage.chatId)
@@ -509,7 +510,7 @@ class ChatEngine @Inject constructor(
         // A processor's writes (e.g. an acceptance's request state and peer device) commit with the message or not at all.
         contactsRepository.withTransaction {
             saved = chatMessageRepository.saveMessage(chatMessage, customContentDecoder, onConflict, placement, onSaved)
-            if (saved) messageSaveProcessors.forEach { it.onMessageSaved(chatMessage) }
+            if (saved) messageSaveProcessors.forEach { it.onMessageSaved(chatMessage, isFromSync) }
         }
 
         if (saved) {
@@ -532,7 +533,7 @@ class ChatEngine @Inject constructor(
 
         contactsRepository.withTransaction {
             savedMessages = chatMessageRepository.saveMessages(chatMessages, customContentDecoder, onConflict, placement)
-            savedMessages.forEach { saved -> messageSaveProcessors.forEach { it.onMessageSaved(saved) } }
+            savedMessages.forEach { saved -> messageSaveProcessors.forEach { it.onMessageSaved(saved, isFromSync = false) } }
         }
 
         savedMessages.forEach { saved -> savedMessagesFlow.tryEmit(saved) }

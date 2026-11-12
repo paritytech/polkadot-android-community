@@ -60,7 +60,12 @@ class RealApplyRemoteChatMessageUseCase @Inject constructor(
             .logFailure("ApplyRemoteChatMessageUseCase: failed to decode remote/synced message; dropping")
             .getOrElse { return }
 
-        val isSavedAsNew = chatEngine.saveMessage(chatMessage, ChatMessageSaveConflictStrategy.IGNORE, placement.toChatMessagePlacement())
+        val isSavedAsNew = chatEngine.saveMessage(
+            chatMessage,
+            ChatMessageSaveConflictStrategy.IGNORE,
+            placement.toChatMessagePlacement(),
+            isFromSync = true,
+        )
 
         if (!isSavedAsNew) {
             chatMessageRepository.updateMessageStatus(chatMessage.id, status)

@@ -22,7 +22,8 @@ import javax.inject.Singleton
 class DeviceLifecycleMessageProcessor @Inject constructor(
     private val contactDevicesRepository: ContactDevicesRepository,
 ) : ChatMessageSaveProcessor {
-    override suspend fun onMessageSaved(message: ChatMessage) {
+    override suspend fun onMessageSaved(message: ChatMessage, isFromSync: Boolean) {
+        if (isFromSync) return
         val contactVariant = message.chatId.contactOrNull() ?: return
         if (message.origin !is ChatMessageOrigin.Contact) return
 

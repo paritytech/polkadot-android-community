@@ -21,6 +21,7 @@ import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import org.mockito.Mockito.anyBoolean
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 
@@ -57,12 +58,13 @@ class RealApplyRemoteChatMessageUseCaseTest {
             any(),
             eq(ChatMessageSaveConflictStrategy.IGNORE),
             eq(ChatMessagePlacement.ByTimestamp),
+            eq(true),
             any(),
         )
     }
 
     private suspend fun withNewMessageSaved() {
-        whenever(chatEngine.saveMessage(any(), any(), any(), any())).thenReturn(true)
+        whenever(chatEngine.saveMessage(any(), any(), any(), anyBoolean(), any())).thenReturn(true)
     }
 
     private suspend fun withMessageAlreadyProcessed() {
