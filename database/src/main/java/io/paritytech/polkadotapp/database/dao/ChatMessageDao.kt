@@ -143,14 +143,20 @@ abstract class ChatMessageDao {
         """
         SELECT * FROM chat_messages
         WHERE $UPDATED_AT_OR_TIMESTAMP > :updatedAfter AND $UPDATED_AT_OR_TIMESTAMP <= :updatedUpTo
-        AND (:afterTimestamp IS NULL OR timestamp > :afterTimestamp OR (timestamp = :afterTimestamp AND id > :afterId))
-        ORDER BY timestamp ASC, id ASC
+        AND (
+            :afterSortOrder IS NULL
+            OR sortOrder > :afterSortOrder
+            OR (sortOrder = :afterSortOrder AND timestamp > :afterTimestamp)
+            OR (sortOrder = :afterSortOrder AND timestamp = :afterTimestamp AND id > :afterId)
+        )
+        ORDER BY sortOrder ASC, timestamp ASC, id ASC
         LIMIT :limit
         """
     )
     abstract suspend fun getMessagesUpdatedInRange(
         updatedAfter: Long,
         updatedUpTo: Long,
+        afterSortOrder: Long?,
         afterTimestamp: Long?,
         afterId: String?,
         limit: Int,

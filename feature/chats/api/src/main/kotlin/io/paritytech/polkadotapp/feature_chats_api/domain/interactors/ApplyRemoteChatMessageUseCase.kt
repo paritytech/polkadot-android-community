@@ -12,7 +12,7 @@ interface ApplyRemoteChatMessageUseCase {
         val peerAccountId: AccountId,
         val isOutgoing: Boolean,
         val status: ChatMessage.Status,
-        val timestamp: Long,
+        val order: Long,
     )
 
     class MessagePageForSync(
@@ -20,11 +20,17 @@ interface ApplyRemoteChatMessageUseCase {
         val nextCursor: ChatMessageSyncCursor?,
     )
 
+    enum class Placement {
+        BY_TIMESTAMP,
+        AFTER_EXISTING,
+    }
+
     suspend fun apply(
         encoded: ByteArray,
         peerAccountId: AccountId,
         isOutgoing: Boolean,
         status: ChatMessage.Status,
+        placement: Placement,
     )
 
     suspend fun getMessagesUpdatedAfter(after: Instant): List<MessageForSync>

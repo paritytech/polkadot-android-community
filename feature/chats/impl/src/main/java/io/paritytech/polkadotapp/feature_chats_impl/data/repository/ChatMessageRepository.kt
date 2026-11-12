@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.mappers.toLocal
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatMessageSearchHit
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatMessageWithSortOrder
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastMessageSummary
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toDomain
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocal
@@ -97,7 +98,7 @@ interface ChatMessageRepository {
         after: ChatMessageSyncCursor?,
         limit: Int,
         customContentDecoder: CustomContentDecoder,
-    ): List<ChatMessage>
+    ): List<ChatMessageWithSortOrder>
 
     suspend fun countMessagesUpdatedInRange(updatedAfter: Instant, updatedUpTo: Instant?): Int
 
@@ -330,14 +331,15 @@ class RealChatMessageRepository @Inject constructor(
         after: ChatMessageSyncCursor?,
         limit: Int,
         customContentDecoder: CustomContentDecoder,
-    ): List<ChatMessage> {
+    ): List<ChatMessageWithSortOrder> {
         return chatMessageDao.getMessagesUpdatedInRange(
             updatedAfter = updatedAfter.toEpochMilliseconds(),
             updatedUpTo = updatedUpTo?.toEpochMilliseconds() ?: Long.MAX_VALUE,
+            afterSortOrder = after?.sortOrder,
             afterTimestamp = after?.timestamp,
             afterId = after?.messageId,
             limit = limit,
-        ).map { it.toDomain(customContentDecoder) }
+        ).map { ChatMessageWithSortOrder(it.toDomain(customContentDecoder), it.sortOrder) }
     }
 
     override suspend fun countMessagesUpdatedInRange(updatedAfter: Instant, updatedUpTo: Instant?): Int {

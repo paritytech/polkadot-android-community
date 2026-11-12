@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.proto
 
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.X25519PrivateKey
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
@@ -73,7 +74,7 @@ class DeviceTransferReceiver(
         if (update.entities.isEmpty()) {
             checkpointStorage.saveCheckpoint(senderInstallationId, update.timePoint)
         } else {
-            applier.apply(update)
+            applier.apply(update, messagePlacement = Placement.AFTER_EXISTING)
             mutableProgress.update { it.copy(appliedChanges = it.appliedChanges + update.entities.itemCount()) }
         }
 

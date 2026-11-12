@@ -5,6 +5,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.enco
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySyncedChatStateUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
@@ -37,14 +38,14 @@ class SyncEntityApplier @Inject constructor(
     private val applyRemoteChatMessageUseCase: ApplyRemoteChatMessageUseCase,
     private val applySyncedChatStateUseCase: ApplySyncedChatStateUseCase,
 ) {
-    suspend fun apply(update: SyncUpdateScale) {
+    suspend fun apply(update: SyncUpdateScale, messagePlacement: Placement) {
         for (entity in update.entities) {
             runCatching {
                 when (entity) {
                     is SyncEntityScale.Devices -> Unit
                     is SyncEntityScale.ChatsAdded -> applyChatsAdded(entity)
                     is SyncEntityScale.ChatsRemoved -> applyChatsRemoved(entity, removedAt = update.timePoint.toLong())
-                    is SyncEntityScale.Messages -> applyMessages(entity)
+                    is SyncEntityScale.Messages -> applyMessages(entity, messagePlacement)
                     is SyncEntityScale.ChatsBlocked -> applySyncedChatStateUseCase.applyBlockStates(entity.states.map { it.toBlockState() })
                     is SyncEntityScale.IncomingRequestsAdded ->
                         applySyncedChatStateUseCase.applyIncomingRequests(entity.requests.mapNotNull { it.toIncomingRequest() })
@@ -87,7 +88,7 @@ class SyncEntityApplier @Inject constructor(
             .onFailure { Timber.w(it, "SyncEntityApplier: failed to add contacts for ${entity.requests.size} outgoing requests") }
     }
 
-    private suspend fun applyMessages(entity: SyncEntityScale.Messages) {
+    private suspend fun applyMessages(entity: SyncEntityScale.Messages, placement: Placement) {
         Timber.d("Apply messages:\n%s", entity.messages.joinToString("\n") { it.logMessage() })
         entity.messages.forEach { message ->
             runCatching {
@@ -98,6 +99,7 @@ class SyncEntityApplier @Inject constructor(
                     peerAccountId = AccountId(message.peerId),
                     isOutgoing = isOutgoing,
                     status = message.status.toDomainStatus(),
+                    placement = placement,
                 )
             }.onFailure { error ->
                 if (error is CancellationException) throw error

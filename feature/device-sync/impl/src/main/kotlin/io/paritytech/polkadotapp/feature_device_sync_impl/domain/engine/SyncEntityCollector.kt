@@ -77,7 +77,7 @@ class SyncEntityCollector @Inject constructor(
                         remote = remote,
                         peerId = syncMessage.peerAccountId.value,
                         status = syncMessage.toLocalStatusScale(),
-                        order = syncMessage.timestamp.toULong(),
+                        order = syncMessage.order.toULong(),
                     )
                 }
         }
