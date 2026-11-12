@@ -19,9 +19,7 @@ class DeviceTransferSession(
         peerFound.await()
     }
 
-    fun sendRejection() {
-        transport.sendRejection()
-    }
+    suspend fun sendRejection(): Result<Unit> = transport.sendRejection()
 
     suspend fun awaitRejection() {
         transport.awaitRejection()

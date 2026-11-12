@@ -9,6 +9,8 @@ sealed interface DeviceTransferState {
 
     data object Connecting : DeviceTransferState
 
+    data object Transferring : DeviceTransferState
+
     data class Syncing(val appliedChanges: Int, val totalChanges: Int) : DeviceTransferState
 
     data class Files(val receivedBytes: InformationSize, val totalBytes: InformationSize) : DeviceTransferState
@@ -21,6 +23,7 @@ sealed interface DeviceTransferState {
 }
 
 enum class DeviceTransferFailure {
+    EXPIRED,
     REJECTED,
     CANCELLED,
     ABORTED,
