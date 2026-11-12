@@ -221,9 +221,10 @@ class RealIncomingChatRequestProcessor @Inject constructor(
             markChatAccepted(contact.accountId)
             chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
             chatRequestRepository.save(createNewChatRequest(incomingData, ChatRequest.Status.ACCEPTED))
+            saveWelcomeMessage(contact.accountId, incomingData)
             val updated = updateContactFromRequest(contact, incomingData)
             markOurWelcomeMessageAsRead(ourRequest.welcomeMessageId)
-            recordAcceptance(contact.accountId, ourRequest.id)
+            recordAcceptance(contact.accountId, incomingData.chatRequestId)
             updated
         }
 
