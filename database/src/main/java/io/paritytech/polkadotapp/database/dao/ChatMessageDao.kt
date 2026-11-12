@@ -277,11 +277,11 @@ abstract class ChatMessageDao {
     @Query(
         """
         SELECT * FROM chat_messages
-        WHERE type = 'PAYMENT' AND origintype != 'USER'
+        WHERE type = 'PAYMENT'
           AND (:updatedAfter IS NULL OR updatedAt > :updatedAfter)
         """
     )
-    abstract suspend fun getIncomingPaymentsUpdatedAfter(updatedAfter: Long?): List<ChatMessageLocal>
+    abstract suspend fun getPaymentsUpdatedAfter(updatedAfter: Long?): List<ChatMessageLocal>
 
     @Query("DELETE FROM chat_messages WHERE chatId = :chatId")
     abstract suspend fun deleteAllMessageRows(chatId: ByteArray)

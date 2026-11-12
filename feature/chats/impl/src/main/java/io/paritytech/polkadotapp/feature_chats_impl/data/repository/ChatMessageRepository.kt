@@ -136,7 +136,7 @@ interface ChatMessageRepository {
 
     suspend fun getUnsupportedMessages(chatId: ChatId): List<ChatMessage>
     suspend fun getRichTextMessages(): List<ChatMessage>
-    suspend fun getIncomingPaymentsUpdatedAfter(updatedAfter: Instant?): List<ChatMessage>
+    suspend fun getPaymentsUpdatedAfter(updatedAfter: Instant?): List<ChatMessage>
     suspend fun deleteAllChatMessages(chatId: ChatId)
 
     suspend fun getMessageStatuses(messageIds: List<ChatMessageId>): Map<ChatMessageId, ChatMessage.Status>
@@ -427,10 +427,10 @@ class RealChatMessageRepository @Inject constructor(
             .map { it.toDomain(decoder) }
     }
 
-    override suspend fun getIncomingPaymentsUpdatedAfter(updatedAfter: Instant?): List<ChatMessage> {
+    override suspend fun getPaymentsUpdatedAfter(updatedAfter: Instant?): List<ChatMessage> {
         val decoder = AlwaysFailCustomContentDecoder()
         return chatMessageDao
-            .getIncomingPaymentsUpdatedAfter(updatedAfter?.toEpochMilliseconds())
+            .getPaymentsUpdatedAfter(updatedAfter?.toEpochMilliseconds())
             .map { it.toDomain(decoder) }
     }
 

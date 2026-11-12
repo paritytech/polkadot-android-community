@@ -1,6 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_api.domain.interactors
 
-import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledIncomingPayment
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledPayment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
 
 interface ApplySyncedChatStateUseCase {
@@ -16,5 +16,5 @@ interface ApplySyncedChatStateUseCase {
 
     suspend fun applyContactDevices(changes: List<ChatStateForSync.ContactDeviceChange>)
 
-    suspend fun applySettledIncomingPayments(payments: List<SettledIncomingPayment>): List<SettledIncomingPayment>
+    suspend fun applySettledPayments(payments: List<SettledPayment>): List<SettledPayment>
 }

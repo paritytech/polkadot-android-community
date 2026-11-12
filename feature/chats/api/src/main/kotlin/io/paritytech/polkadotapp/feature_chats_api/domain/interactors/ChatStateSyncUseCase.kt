@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
 interface ChatStateSyncUseCase {
-    class SettledIncomingPayment(
+    class SettledPayment(
         val contactAccountId: AccountId,
         val messageId: ChatMessageId,
         val outcome: Outcome,
@@ -22,7 +22,7 @@ interface ChatStateSyncUseCase {
 
     suspend fun getChatState(changedAfter: Instant?): ChatStateForSync
 
-    suspend fun getSettledIncomingPayments(updatedAfter: Instant?): List<SettledIncomingPayment>
+    suspend fun getSettledPayments(updatedAfter: Instant?): List<SettledPayment>
 
     fun observeChatStateChanges(): Flow<Unit>
 }

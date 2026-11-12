@@ -10,7 +10,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContact
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySyncedChatStateUseCase
-import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledIncomingPayment
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledPayment
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
@@ -53,8 +53,8 @@ class SyncEntityApplier @Inject constructor(
     private val applySyncedChatStateUseCase: ApplySyncedChatStateUseCase,
     private val coinageStateSyncUseCase: CoinageStateSyncUseCase,
 ) {
-    suspend fun apply(update: SyncUpdateScale, messagePlacement: Placement): List<SettledIncomingPayment> {
-        val waitingPayments = mutableListOf<SettledIncomingPayment>()
+    suspend fun apply(update: SyncUpdateScale, messagePlacement: Placement): List<SettledPayment> {
+        val waitingPayments = mutableListOf<SettledPayment>()
 
         for (entity in update.entities) {
             runCatching {
@@ -63,7 +63,7 @@ class SyncEntityApplier @Inject constructor(
                     is SyncEntityScale.CoinsHandedOff ->
                         coinageStateSyncUseCase.applyHandedOffCoins(entity.coins.mapNotNull { it.toHandedOffCoin() })
                     is SyncEntityScale.CoinageMessagesStatusUpdated ->
-                        waitingPayments.addAll(applySettledPayments(entity.updates.mapNotNull { it.toSettledIncomingPayment() }))
+                        waitingPayments.addAll(applySettledPayments(entity.updates.mapNotNull { it.toSettledPayment() }))
                     is SyncEntityScale.ChatsAdded -> applyChatsAdded(entity)
                     is SyncEntityScale.ChatsRemoved -> applyChatsRemoved(entity, removedAt = update.timePoint.toLong())
                     is SyncEntityScale.Messages -> applyMessages(entity, messagePlacement)
@@ -89,8 +89,8 @@ class SyncEntityApplier @Inject constructor(
         return waitingPayments
     }
 
-    suspend fun applySettledPayments(payments: List<SettledIncomingPayment>): List<SettledIncomingPayment> {
-        return applySyncedChatStateUseCase.applySettledIncomingPayments(payments)
+    suspend fun applySettledPayments(payments: List<SettledPayment>): List<SettledPayment> {
+        return applySyncedChatStateUseCase.applySettledPayments(payments)
     }
 
     private suspend fun applyChatsAdded(entity: SyncEntityScale.ChatsAdded) {
@@ -191,17 +191,17 @@ private fun ContactDeviceChangeScale.toContactDeviceChange(): ChatStateForSync.C
     )
 }
 
-private fun CoinageMessageStatusUpdateScale.toSettledIncomingPayment(): SettledIncomingPayment? {
+private fun CoinageMessageStatusUpdateScale.toSettledPayment(): SettledPayment? {
     val contactAccountId = when (val chat = chatId) {
         is ChatIdScale.Contact -> AccountId(chat.accountId)
     }
     val outcome = when (val status = status) {
         CoinageMessageStatusScale.None -> return null
-        is CoinageMessageStatusScale.Claimed -> SettledIncomingPayment.Outcome.Claimed(status.partial?.let(::Balance))
-        CoinageMessageStatusScale.Failed -> SettledIncomingPayment.Outcome.Failed
+        is CoinageMessageStatusScale.Claimed -> SettledPayment.Outcome.Claimed(status.partial?.let(::Balance))
+        CoinageMessageStatusScale.Failed -> SettledPayment.Outcome.Failed
     }
 
-    return SettledIncomingPayment(contactAccountId = contactAccountId, messageId = messageId, outcome = outcome)
+    return SettledPayment(contactAccountId = contactAccountId, messageId = messageId, outcome = outcome)
 }
 
 private fun HandedOffCoinScale.toHandedOffCoin(): HandedOffCoin? {

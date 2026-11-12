@@ -4,7 +4,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase
-import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledIncomingPayment
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledPayment
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
@@ -48,25 +48,25 @@ class RealChatStateSyncUseCase @Inject constructor(
         )
     }
 
-    override suspend fun getSettledIncomingPayments(updatedAfter: Instant?): List<SettledIncomingPayment> {
-        return chatMessageRepository.getIncomingPaymentsUpdatedAfter(updatedAfter).mapNotNull { it.toSettledIncomingPayment() }
+    override suspend fun getSettledPayments(updatedAfter: Instant?): List<SettledPayment> {
+        return chatMessageRepository.getPaymentsUpdatedAfter(updatedAfter).mapNotNull { it.toSettledPayment() }
     }
 
     override fun observeChatStateChanges(): Flow<Unit> {
         return merge(chatRequestRepository.observeStatusChanges(), contactDevicesRepository.observeModifications())
     }
 
-    private fun ChatMessage.toSettledIncomingPayment(): SettledIncomingPayment? {
+    private fun ChatMessage.toSettledPayment(): SettledPayment? {
         val payment = content as? ChatMessage.Content.CoinagePayment ?: return null
         val contact = chatId.chatVariant() as? ChatVariant.Contact ?: return null
 
         val outcome = when (val status = payment.status) {
-            is PaymentStatus.Transferred -> SettledIncomingPayment.Outcome.Claimed(partial = status.amount.takeIf { it < payment.totalValue })
-            PaymentStatus.FailedDetection, PaymentStatus.FailedTransfer -> SettledIncomingPayment.Outcome.Failed
+            is PaymentStatus.Transferred -> SettledPayment.Outcome.Claimed(partial = status.amount.takeIf { it < payment.totalValue })
+            PaymentStatus.FailedDetection, PaymentStatus.FailedTransfer -> SettledPayment.Outcome.Failed
             PaymentStatus.Detecting, is PaymentStatus.Detected, is PaymentStatus.PartiallyClaimed -> return null
         }
 
-        return SettledIncomingPayment(contactAccountId = contact.contactAccountId, messageId = id, outcome = outcome)
+        return SettledPayment(contactAccountId = contact.contactAccountId, messageId = id, outcome = outcome)
     }
 
     private suspend fun blockStates(changedAfter: Instant?): List<ChatStateForSync.BlockState> {
