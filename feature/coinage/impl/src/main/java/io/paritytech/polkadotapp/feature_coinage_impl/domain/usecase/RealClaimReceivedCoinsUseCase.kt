@@ -15,7 +15,10 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.instanceIdOrNull
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
+import io.paritytech.polkadotapp.feature_coinage_impl.data.model.belongsTo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
@@ -46,6 +49,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     private val assetValueUseCase: CoinageAssetValueUseCase,
     private val submissionUseCase: CoinageTransferSubmissionUseCase,
     private val timeProvider: TimeProvider,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
 ) : ClaimReceivedCoinsUseCase {
     private companion object {
         /**
@@ -77,21 +81,28 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
         var settled: List<CoinageTransactionState>
         var chainAnswered = false
+        val rejected = mutableSetOf<AccountId>()
 
         while (true) {
             settled = awaitKnownOperationsSettled(groupId, keys.keys, report = ::send)
 
             // Each coin is registered once. Rebuilding a claim that failed is its submission policy's job, into
             // the coin it recorded; a second claim here would mint into a coin nothing would ever wait on.
-            val unregistered = keys.keys - settled.registeredCoins()
+            val unregistered = keys.keys - settled.registeredCoins() - rejected
 
-            // Every coin has a claim, and none of them can change any more. Claim finished.
+            // Every coin has a claim that can no longer change, or was refused as another instance's. Claim finished.
             if (unregistered.isEmpty()) break
 
-            val look = awaitOnChainWithTimeout(onChain, unregistered)
+            val look = awaitOnChainWithTimeout(onChain, unregistered)?.splitByConfiguredInstance()
             if (look != null) chainAnswered = true
 
-            val claimable = look.orEmpty()
+            val foreign = look?.foreign.orEmpty()
+            if (foreign.isNotEmpty()) {
+                coinageLogW("Claim rejected coins of another instance group=${groupId.value} coins=${foreign.size}")
+                rejected += foreign
+            }
+
+            val claimable = look?.claimable.orEmpty()
 
             when {
                 // Coin detected => register its claim
@@ -171,6 +182,17 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
         return latest
     }
+
+    private suspend fun Map<AccountId, OnChainCoinInfo>.splitByConfiguredInstance(): InstanceSplit? {
+        if (isEmpty()) return InstanceSplit(claimable = emptyMap(), foreign = emptySet())
+
+        val instance = coinageInstanceIdProvider.instanceIdOrNull() ?: return null
+        val claimable = filterValues { it.belongsTo(instance) }
+
+        return InstanceSplit(claimable, foreign = keys - claimable.keys)
+    }
+
+    private class InstanceSplit(val claimable: Map<AccountId, OnChainCoinInfo>, val foreign: Set<AccountId>)
 
     private suspend fun submit(
         keys: Map<AccountId, CoinPrivateKey>,

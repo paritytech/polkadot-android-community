@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.common.utils.mapAsync
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.EntryAssets
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
@@ -27,6 +28,7 @@ class ClaimRebuild @Inject constructor(
     @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
     private val coinRepository: CoinRepository,
     private val claimExtrinsicBuilder: ClaimExtrinsicBuilder,
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
 ) : CoinageRebuild<ClaimRebuild.Claim, AccountId> {
     class Claim(val keypair: Keypair, val source: AccountId, val destination: AccountId)
 
@@ -48,7 +50,7 @@ class ClaimRebuild @Inject constructor(
     override fun inputsOf(transaction: Claim): Set<AccountId> = setOf(transaction.source)
 
     override suspend fun presence(inputs: Set<AccountId>): Flow<Set<AccountId>> =
-        coinRepository.subscribeCoinPresence(chainAssetProvider.chainId(), inputs.toList())
+        coinRepository.subscribeCoinPresenceInConfiguredInstance(chainAssetProvider.chainId(), inputs.toList(), coinageInstanceIdProvider)
 
     override suspend fun build(transactions: List<Claim>): Result<List<EnrichedSendableExtrinsic>> {
         val chain = chainAssetProvider.chain()

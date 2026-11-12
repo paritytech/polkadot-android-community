@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
@@ -59,13 +60,15 @@ class ClaimRebuildTest {
     private val chainAssetProvider: ChainAssetProvider = mockk()
     private val coinRepository: CoinRepository = mockk()
     private val claimExtrinsicBuilder: ClaimExtrinsicBuilder = mockk()
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider = mockk()
 
-    private val rebuild = ClaimRebuild(chainAssetProvider, coinRepository, claimExtrinsicBuilder)
+    private val rebuild = ClaimRebuild(chainAssetProvider, coinRepository, claimExtrinsicBuilder, coinageInstanceIdProvider)
 
     @Before
     fun setUp() {
         every { chainAssetProvider.chainId() } returns "test-chain"
         coEvery { chainAssetProvider.chain() } returns chain
+        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(0u)
     }
 
     // ---- reading back ----
@@ -117,7 +120,7 @@ class ClaimRebuildTest {
     fun `presence reports the peer's coins the chain holds`() = runTest {
         val present = claimOf(1).source
         val absent = claimOf(2).source
-        givenChainReads(listOf(Result.success(setOf(present))))
+        givenChainReads(listOf(Result.success(mapOf(present to 0))))
 
         val looks = rebuild.presence(setOf(present, absent)).take(1).toList()
 
@@ -127,7 +130,42 @@ class ClaimRebuildTest {
     @Test
     fun `a failed chain read is not reported as a look`() = runTest {
         val coin = claimOf(1).source
-        givenChainReads(listOf(Result.failure(IllegalStateException("node unreachable")), Result.success(emptySet())))
+        givenChainReads(listOf(Result.failure(IllegalStateException("node unreachable")), Result.success(emptyMap())))
+
+        val looks = rebuild.presence(setOf(coin)).take(1).toList()
+
+        assertEquals(listOf(emptySet<AccountId>()), looks)
+    }
+
+    @Test
+    fun `presence reports only the coins of the configured instance`() = runTest {
+        val home = claimOf(1).source
+        val foreign = claimOf(2).source
+        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(7u)
+        givenChainReads(listOf(Result.success(mapOf(home to 7, foreign to 0))))
+
+        val looks = rebuild.presence(setOf(home, foreign)).take(1).toList()
+
+        assertEquals(listOf(setOf(home)), looks)
+    }
+
+    @Test
+    fun `an unreadable configured instance is not reported as a look`() = runTest {
+        val coin = claimOf(1).source
+        coEvery { coinageInstanceIdProvider.instanceId() } returnsMany
+            listOf(Result.failure(IllegalStateException("Malformed coinage instance id: abc")), Result.success(0u))
+        givenChainReads(listOf(Result.success(mapOf(coin to 0)), Result.success(mapOf(coin to 0))))
+
+        val looks = rebuild.presence(setOf(coin)).take(1).toList()
+
+        assertEquals(listOf(setOf(coin)), looks)
+    }
+
+    @Test
+    fun `a look with none of the coins is reported even when the configured instance can't be read`() = runTest {
+        val coin = claimOf(1).source
+        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.failure(IllegalStateException("Malformed coinage instance id: abc"))
+        givenChainReads(listOf(Result.success(emptyMap())))
 
         val looks = rebuild.presence(setOf(coin)).take(1).toList()
 
@@ -190,7 +228,7 @@ class ClaimRebuildTest {
     }
 
     /** One emission per read, and a subscription that stays open after the last one. */
-    private fun givenChainReads(reads: List<Result<Set<AccountId>>>) {
+    private fun givenChainReads(reads: List<Result<Map<AccountId, Int>>>) {
         coEvery { coinRepository.subscribeCoinsInfoFor(any(), any()) } answers {
             val requested = secondArg<List<AccountId>>()
 
@@ -198,7 +236,9 @@ class ClaimRebuildTest {
                 reads.forEach { read ->
                     emit(
                         read.map { present ->
-                            requested.associateWith { OnChainCoinInfo(instanceId = 0, value = 3, age = 0).takeIf { _ -> it in present } }
+                            requested.associateWith { accountId ->
+                                present[accountId]?.let { instance -> OnChainCoinInfo(instanceId = instance, value = 3, age = 0) }
+                            }
                         }
                     )
                 }

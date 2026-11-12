@@ -23,6 +23,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
@@ -74,6 +75,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     private val assetValueUseCase: CoinageAssetValueUseCase = mockk()
     private val submissionUseCase: CoinageTransferSubmissionUseCase = mockk()
     private val timeProvider: TimeProvider = mockk()
+    private val coinageInstanceIdProvider: CoinageInstanceIdProvider = mockk()
 
     private val useCase = RealClaimReceivedCoinsUseCase(
         chainAssetProvider = chainAssetProvider,
@@ -82,6 +84,7 @@ class RealClaimReceivedCoinsUseCaseTest {
         assetValueUseCase = assetValueUseCase,
         submissionUseCase = submissionUseCase,
         timeProvider = timeProvider,
+        coinageInstanceIdProvider = coinageInstanceIdProvider,
     )
 
     private val groupId = CoinageOperationGroupId("group")
@@ -90,6 +93,7 @@ class RealClaimReceivedCoinsUseCaseTest {
     fun openTheWindow() {
         every { chainAssetProvider.chainId() } returns "test-chain"
         every { timeProvider.now() } returns WINDOW_OPEN
+        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(0u)
         coEvery { submissionUseCase(any(), any(), any(), any()) } returns Result.success(Unit)
         coEvery { assetValueUseCase.valueOf(any()) } answers {
             // One unit per minted output, so what a claim is said to be worth stays visible in assertions.
