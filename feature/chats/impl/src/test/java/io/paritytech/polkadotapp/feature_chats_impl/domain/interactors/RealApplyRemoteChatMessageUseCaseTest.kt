@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
@@ -20,6 +21,7 @@ import io.paritytech.polkadotapp.test_shared.eq
 import io.paritytech.polkadotapp.test_shared.whenever
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import org.mockito.Mockito.anyBoolean
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 
@@ -44,18 +46,25 @@ class RealApplyRemoteChatMessageUseCaseTest {
         withNewMessageSaved()
         withMessageAlreadyProcessed()
 
-        useCase.apply(encodedIncomingText(), peerAccountId, isOutgoing = false, status = ChatMessage.Status.NEW)
+        useCase.apply(
+            encodedIncomingText(),
+            peerAccountId,
+            isOutgoing = false,
+            status = ChatMessage.Status.NEW,
+            placement = Placement.BY_TIMESTAMP,
+        )
 
         verify(chatEngine).saveMessage(
             any(),
             eq(ChatMessageSaveConflictStrategy.IGNORE),
             eq(ChatMessagePlacement.ByTimestamp),
+            eq(true),
             any(),
         )
     }
 
     private suspend fun withNewMessageSaved() {
-        whenever(chatEngine.saveMessage(any(), any(), any(), any())).thenReturn(true)
+        whenever(chatEngine.saveMessage(any(), any(), any(), anyBoolean(), any())).thenReturn(true)
     }
 
     private suspend fun withMessageAlreadyProcessed() {

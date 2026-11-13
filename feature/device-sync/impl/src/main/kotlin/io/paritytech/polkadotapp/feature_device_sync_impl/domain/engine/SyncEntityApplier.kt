@@ -2,16 +2,40 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
+import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySyncedChatStateUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledPayment
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactDevice
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMessageStatement
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.IncomingStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.LocalStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.OutgoingStatusScale
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageStateSyncUseCase
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatBlockStateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatIdScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.CoinageMessageStatusScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.CoinageMessageStatusUpdateScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceChangeScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceStatusScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.HandedOffCoinScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingChatRequestScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusUpdateScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.OutgoingChatRequestScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.OutgoingRequestStatusScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.OutgoingRequestStatusUpdateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncEntityScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateScale
 import kotlinx.coroutines.CancellationException
@@ -26,21 +50,47 @@ class SyncEntityApplier @Inject constructor(
     private val addContactUseCase: AddContactUseCase,
     private val removeContactUseCase: RemoveContactUseCase,
     private val applyRemoteChatMessageUseCase: ApplyRemoteChatMessageUseCase,
+    private val applySyncedChatStateUseCase: ApplySyncedChatStateUseCase,
+    private val coinageStateSyncUseCase: CoinageStateSyncUseCase,
 ) {
-    suspend fun apply(update: SyncUpdateScale) {
+    suspend fun apply(update: SyncUpdateScale, messagePlacement: Placement): List<SettledPayment> {
+        val waitingPayments = mutableListOf<SettledPayment>()
+
         for (entity in update.entities) {
             runCatching {
                 when (entity) {
                     is SyncEntityScale.Devices -> Unit
+                    is SyncEntityScale.CoinsHandedOff ->
+                        coinageStateSyncUseCase.applyHandedOffCoins(entity.coins.mapNotNull { it.toHandedOffCoin() })
+                    is SyncEntityScale.CoinageMessagesStatusUpdated ->
+                        waitingPayments.addAll(applySettledPayments(entity.updates.mapNotNull { it.toSettledPayment() }))
                     is SyncEntityScale.ChatsAdded -> applyChatsAdded(entity)
                     is SyncEntityScale.ChatsRemoved -> applyChatsRemoved(entity, removedAt = update.timePoint.toLong())
-                    is SyncEntityScale.Messages -> applyMessages(entity)
+                    is SyncEntityScale.Messages -> applyMessages(entity, messagePlacement)
+                    is SyncEntityScale.ChatsBlocked -> applySyncedChatStateUseCase.applyBlockStates(entity.states.map { it.toBlockState() })
+                    is SyncEntityScale.IncomingRequestsAdded ->
+                        applySyncedChatStateUseCase.applyIncomingRequests(entity.requests.mapNotNull { it.toIncomingRequest() })
+                    is SyncEntityScale.IncomingRequestsStatusUpdated ->
+                        applySyncedChatStateUseCase.applyIncomingRequestUpdates(entity.updates.mapNotNull { it.toIncomingRequestUpdate() })
+                    is SyncEntityScale.OutgoingRequestsAdded -> applyOutgoingRequestsAdded(entity)
+                    is SyncEntityScale.OutgoingRequestsStatusUpdated -> applySyncedChatStateUseCase.applyOutgoingRequestUpdates(
+                        updates = entity.updates.mapNotNull { it.toOutgoingRequestUpdate() },
+                        removedAt = update.timePoint.toLong(),
+                    )
+                    is SyncEntityScale.ContactDevicesChanged ->
+                        applySyncedChatStateUseCase.applyContactDevices(entity.changes.mapNotNull { it.toContactDeviceChange() })
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 Timber.w(error, "SyncEntityApplier: failed to apply entity ${entity::class.simpleName} from update id=${update.id} — skipping")
             }
         }
+
+        return waitingPayments
+    }
+
+    suspend fun applySettledPayments(payments: List<SettledPayment>): List<SettledPayment> {
+        return applySyncedChatStateUseCase.applySettledPayments(payments)
     }
 
     private suspend fun applyChatsAdded(entity: SyncEntityScale.ChatsAdded) {
@@ -62,7 +112,12 @@ class SyncEntityApplier @Inject constructor(
         }
     }
 
-    private suspend fun applyMessages(entity: SyncEntityScale.Messages) {
+    private suspend fun applyOutgoingRequestsAdded(entity: SyncEntityScale.OutgoingRequestsAdded) {
+        applySyncedChatStateUseCase.applyPendingOutgoingRequests(entity.requests.mapNotNull { it.toPendingOutgoingRequest() })
+            .onFailure { Timber.w(it, "SyncEntityApplier: failed to add contacts for ${entity.requests.size} outgoing requests") }
+    }
+
+    private suspend fun applyMessages(entity: SyncEntityScale.Messages, placement: Placement) {
         Timber.d("Apply messages:\n%s", entity.messages.joinToString("\n") { it.logMessage() })
         entity.messages.forEach { message ->
             runCatching {
@@ -73,6 +128,7 @@ class SyncEntityApplier @Inject constructor(
                     peerAccountId = AccountId(message.peerId),
                     isOutgoing = isOutgoing,
                     status = message.status.toDomainStatus(),
+                    placement = placement,
                 )
             }.onFailure { error ->
                 if (error is CancellationException) throw error
@@ -93,4 +149,75 @@ class SyncEntityApplier @Inject constructor(
             IncomingStatusScale.SEEN -> ChatMessage.Status.IS_READ
         }
     }
+}
+
+private fun ChatBlockStateScale.toBlockState(): ChatStateForSync.BlockState = when (val chat = chatId) {
+    is ChatIdScale.Contact -> ChatStateForSync.BlockState(AccountId(chat.accountId), isBlocked = blocked)
+}
+
+private fun IncomingChatRequestScale.toIncomingRequest(): ChatStateForSync.IncomingRequest? {
+    val isAccepted = status.isAcceptedOrNull() ?: return null
+    return ChatStateForSync.IncomingRequest(requestId, AccountId(peer), timestamp.toLong(), isAccepted)
+}
+
+private fun IncomingRequestStatusUpdateScale.toIncomingRequestUpdate(): ChatStateForSync.IncomingRequestUpdate? {
+    val isAccepted = status.isAcceptedOrNull() ?: return null
+    return ChatStateForSync.IncomingRequestUpdate(requestId, isAccepted)
+}
+
+private fun IncomingRequestStatusScale.isAcceptedOrNull(): Boolean? = when (this) {
+    IncomingRequestStatusScale.PENDING -> null
+    IncomingRequestStatusScale.ACCEPTED -> true
+    IncomingRequestStatusScale.DECLINED -> false
+}
+
+private fun OutgoingChatRequestScale.toPendingOutgoingRequest(): ChatStateForSync.OutgoingRequest? {
+    if (status != OutgoingRequestStatusScale.PENDING) return null
+    return ChatStateForSync.OutgoingRequest(requestId, AccountId(peer), timestamp.toLong(), BinaryScale.encodeToByteArray(content))
+}
+
+private fun ContactDeviceChangeScale.toContactDeviceChange(): ChatStateForSync.ContactDeviceChange? {
+    val contactAccountId = when (val chat = chatId) {
+        is ChatIdScale.Contact -> AccountId(chat.accountId)
+    }
+    val encryptionPublicKey = encryptionPublicKey.toDomain()
+        .onFailure { Timber.w(it, "SyncEntityApplier: invalid encryption key of a device of contact $contactAccountId") }
+        .getOrNull() ?: return null
+
+    return ChatStateForSync.ContactDeviceChange(
+        device = ContactDevice(contactAccountId, AccountId(statementAccountId), encryptionPublicKey),
+        isActive = status == ContactDeviceStatusScale.ACTIVE,
+        changedAt = changedAt.toLong(),
+    )
+}
+
+private fun CoinageMessageStatusUpdateScale.toSettledPayment(): SettledPayment? {
+    val contactAccountId = when (val chat = chatId) {
+        is ChatIdScale.Contact -> AccountId(chat.accountId)
+    }
+    val outcome = when (val status = status) {
+        CoinageMessageStatusScale.None -> return null
+        is CoinageMessageStatusScale.Claimed -> SettledPayment.Outcome.Claimed(status.partial?.let(::Balance))
+        CoinageMessageStatusScale.Failed -> SettledPayment.Outcome.Failed
+    }
+
+    return SettledPayment(contactAccountId = contactAccountId, messageId = messageId, outcome = outcome)
+}
+
+private fun HandedOffCoinScale.toHandedOffCoin(): HandedOffCoin? {
+    if (derivationIndex > Int.MAX_VALUE.toULong()) {
+        Timber.w("SyncEntityApplier: derivation index $derivationIndex of a handed-off coin does not fit, skipping")
+        return null
+    }
+
+    return HandedOffCoin(
+        index = CoinageKeyIndex(CoinageInstallationId(installationId.toDataByteArray()), derivationIndex.toInt()),
+        exponent = exponent.toInt(),
+    )
+}
+
+private fun OutgoingRequestStatusUpdateScale.toOutgoingRequestUpdate(): ChatStateForSync.OutgoingRequestUpdate? = when (status) {
+    OutgoingRequestStatusScale.PENDING -> null
+    OutgoingRequestStatusScale.ACCEPTED -> ChatStateForSync.OutgoingRequestUpdate(requestId, isCancelled = false)
+    OutgoingRequestStatusScale.CANCELLED -> ChatStateForSync.OutgoingRequestUpdate(requestId, isCancelled = true)
 }

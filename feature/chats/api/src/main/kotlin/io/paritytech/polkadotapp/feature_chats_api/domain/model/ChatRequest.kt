@@ -1,7 +1,10 @@
 package io.paritytech.polkadotapp.feature_chats_api.domain.model
 
+import io.paritytech.polkadotapp.common.domain.model.AccountId
+
 data class ChatRequest(
     val welcomeMessageId: ChatMessageId,
+    val peer: AccountId?,
     val timestamp: Long,
     val direction: Direction,
     val status: Status,

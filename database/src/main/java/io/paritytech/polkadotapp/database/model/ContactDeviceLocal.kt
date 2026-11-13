@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.database.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -23,4 +24,12 @@ class ContactDeviceLocal(
     val contactAccountId: ByteArray,
     val statementAccountId: ByteArray,
     val encryptionPublicKey: ByteArray,
-)
+    @ColumnInfo(defaultValue = "ACTIVE") val status: Status,
+    @ColumnInfo(defaultValue = "0") val changedAt: Long,
+    val modifiedAt: Long?,
+) {
+    enum class Status {
+        ACTIVE,
+        INACTIVE
+    }
+}

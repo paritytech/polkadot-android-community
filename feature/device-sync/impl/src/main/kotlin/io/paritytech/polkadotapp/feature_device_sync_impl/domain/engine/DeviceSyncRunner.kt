@@ -5,6 +5,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.enco
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.kilobytes
 import io.paritytech.polkadotapp.common.utils.decodeFromByteArrayCatching
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncEntityScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateAckScale
@@ -132,7 +133,7 @@ class DeviceSyncRunner(
         when (message) {
             is SyncMessageScale.Update -> {
                 Timber.i("DeviceSyncRunner: applying update id=${message.update.id} from $peerLogId — ${message.update.entities.summary()}")
-                applier.apply(message.update)
+                applier.apply(message.update, messagePlacement = Placement.BY_TIMESTAMP)
                 send(SyncMessageScale.Ack(SyncUpdateAckScale(message.update.id)))
                 Timber.i("DeviceSyncRunner: applied update id=${message.update.id} from $peerLogId, sent ack")
             }

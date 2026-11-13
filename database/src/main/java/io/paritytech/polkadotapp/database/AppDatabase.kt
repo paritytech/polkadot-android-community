@@ -89,6 +89,7 @@ import io.paritytech.polkadotapp.database.migrations.Migration62To63
 import io.paritytech.polkadotapp.database.migrations.Migration63To64
 import io.paritytech.polkadotapp.database.migrations.Migration65To66
 import io.paritytech.polkadotapp.database.migrations.Migration67To68Spec
+import io.paritytech.polkadotapp.database.migrations.Migration70To71Spec
 import io.paritytech.polkadotapp.database.model.BrowserTabLocal
 import io.paritytech.polkadotapp.database.model.ChatAcceptanceLocal
 import io.paritytech.polkadotapp.database.model.ChatBotStateLocal
@@ -144,7 +145,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 70,
+    version = 71,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -285,6 +286,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 68, to = 69),
         // Add chat_acceptances, chat_identity_signing_consents and statement_store_slot_allocations.tag
         AutoMigration(from = 69, to = 70),
+        AutoMigration(from = 70, to = 71, spec = Migration70To71Spec::class),
     ]
 )
 @TypeConverters(

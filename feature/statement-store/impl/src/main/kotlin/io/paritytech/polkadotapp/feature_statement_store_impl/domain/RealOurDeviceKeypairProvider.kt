@@ -37,6 +37,13 @@ class RealOurDeviceKeypairProvider @Inject constructor(
         return get().publicKey
     }
 
+    override suspend fun importPrivateKey(privateKey: X25519PrivateKey) {
+        mutex.withLock {
+            encryptedPreferences.putEncryptedString(OUR_DEVICE_PRIVATE_KEY, privateKey.bytes.value.toHexString())
+            cached = keyGenerator.createKeyPair(privateKey)
+        }
+    }
+
     private fun load(): X25519KeyPair {
         val storedPrivateKey = encryptedPreferences.getDecryptedString(OUR_DEVICE_PRIVATE_KEY)
         if (storedPrivateKey != null) {

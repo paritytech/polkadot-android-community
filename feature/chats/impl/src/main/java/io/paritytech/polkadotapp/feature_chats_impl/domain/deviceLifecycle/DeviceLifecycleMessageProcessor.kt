@@ -22,7 +22,8 @@ import javax.inject.Singleton
 class DeviceLifecycleMessageProcessor @Inject constructor(
     private val contactDevicesRepository: ContactDevicesRepository,
 ) : ChatMessageSaveProcessor {
-    override suspend fun onMessageSaved(message: ChatMessage) {
+    override suspend fun onMessageSaved(message: ChatMessage, isFromSync: Boolean) {
+        if (isFromSync) return
         val contactVariant = message.chatId.contactOrNull() ?: return
         if (message.origin !is ChatMessageOrigin.Contact) return
 
@@ -36,7 +37,8 @@ class DeviceLifecycleMessageProcessor @Inject constructor(
                         contactAccountId = contactAccountId,
                         statementAccountId = content.statementAccountId,
                         encryptionPublicKey = content.encryptionPublicKey,
-                    )
+                    ),
+                    changedAt = message.timestamp,
                 )
             }
 
@@ -47,7 +49,8 @@ class DeviceLifecycleMessageProcessor @Inject constructor(
                         contactAccountId = contactAccountId,
                         statementAccountId = content.device.statementAccountId,
                         encryptionPublicKey = content.device.encryptionPublicKey,
-                    )
+                    ),
+                    changedAt = message.timestamp,
                 )
             }
 
@@ -56,6 +59,7 @@ class DeviceLifecycleMessageProcessor @Inject constructor(
                 contactDevicesRepository.removeDevice(
                     contactAccountId = contactAccountId,
                     statementAccountId = content.statementAccountId,
+                    changedAt = message.timestamp,
                 )
             }
 

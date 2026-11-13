@@ -13,6 +13,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.Commu
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.ContactDeviceProvider
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.IncomingRequestResponsePolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.encryption.MultiDeviceEnvelopeEncryption
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.encryption.toEnvelopeRecipients
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.codec.IncomingTopicsProvider
@@ -69,6 +70,7 @@ class RealCommunicationSessionCreator(
         maxStatementSize: InformationSize,
         compactor: MessageCompactor?,
         responsePolicy: IncomingRequestResponsePolicy,
+        statementLifetime: StatementLifetime,
     ): CommunicationSession {
         val outgoingTopic = deriveCommunicationTopic(localAccount, remoteAccount, encryption)
         val envelopeEncryption = buildEnvelopeEncryption(localAccount)
@@ -98,6 +100,7 @@ class RealCommunicationSessionCreator(
             maxStatementSize = maxStatementSize,
             compactor = compactor,
             responsePolicy = responsePolicy,
+            statementLifetime = statementLifetime,
         )
     }
 
@@ -142,6 +145,7 @@ class RealCommunicationSessionCreator(
             maxStatementSize = maxStatementSize,
             compactor = compactor,
             responsePolicy = responsePolicy,
+            statementLifetime = StatementLifetime.Permanent,
         )
     }
 
@@ -164,6 +168,7 @@ class RealCommunicationSessionCreator(
         maxStatementSize: InformationSize,
         compactor: MessageCompactor?,
         responsePolicy: IncomingRequestResponsePolicy,
+        statementLifetime: StatementLifetime,
     ): CommunicationSession {
         val decoder = StatementDecoder(
             encryption = encryption,
@@ -195,6 +200,7 @@ class RealCommunicationSessionCreator(
             maxStatementSize = maxStatementSize,
             compactor = compactor,
             responsePolicy = responsePolicy,
+            statementLifetime = statementLifetime,
             scope = scope,
         )
     }

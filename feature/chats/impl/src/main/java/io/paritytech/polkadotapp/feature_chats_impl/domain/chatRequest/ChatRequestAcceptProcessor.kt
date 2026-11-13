@@ -24,7 +24,7 @@ class ChatRequestAcceptProcessor @Inject constructor(
     private val contactsRepository: ContactsRepository,
     private val incomingChatRequestProcessor: IncomingChatRequestProcessor,
 ) : ChatMessageSaveProcessor {
-    override suspend fun onMessageSaved(message: ChatMessage) {
+    override suspend fun onMessageSaved(message: ChatMessage, isFromSync: Boolean) {
         Timber.d("onMessageSaved: ${message.id} (${message.content})")
 
         // Only process incoming messages from contacts
@@ -51,7 +51,7 @@ class ChatRequestAcceptProcessor @Inject constructor(
         if (shouldAccept) {
             Timber.d("Marking request as accepted: ${message.id} (${message.content})")
 
-            incomingChatRequestProcessor.markOutgoingRequestAccepted(contact, request)
+            incomingChatRequestProcessor.markOutgoingRequestAccepted(contact, request, isFromSync)
         }
     }
 }

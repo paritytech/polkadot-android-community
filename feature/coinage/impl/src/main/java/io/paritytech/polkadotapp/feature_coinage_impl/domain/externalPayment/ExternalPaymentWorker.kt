@@ -24,6 +24,8 @@ import io.paritytech.polkadotapp.common.data.worker.stateMachine.executeUntilPos
 import io.paritytech.polkadotapp.common.data.worker.stateMachine.toWorkerResult
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.externalPayment.repository.ExternalPaymentRepository
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.isActive
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import java.util.concurrent.TimeUnit
@@ -36,7 +38,8 @@ class ExternalPaymentWorker @AssistedInject constructor(
     private val repository: ExternalPaymentRepository,
     private val stateMachineFactory: ExternalPaymentStateMachine.Factory,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
-    @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider
+    @param:DigitalDollarChainAssetProvider private val chainAssetProvider: ChainAssetProvider,
+    private val activeInstallationManager: ActiveInstallationManager,
 ) : CoroutineWorker(appContext, parameters) {
     companion object {
         private const val WORK_ID = "ExternalPayment"
@@ -61,6 +64,11 @@ class ExternalPaymentWorker @AssistedInject constructor(
     private val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     override suspend fun doWork(): Result {
+        if (!activeInstallationManager.isActive()) {
+            coinageLogD("External payment worker skipped: this installation is not active")
+            return Result.success()
+        }
+
         coinageLogD("External payment worker run started")
 
         return chainConnectionRefCounter.withConnectionEnabled(chainAssetProvider.chainId(), "ExternalPaymentWorker") {

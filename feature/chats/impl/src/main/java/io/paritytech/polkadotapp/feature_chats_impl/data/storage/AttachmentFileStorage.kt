@@ -2,12 +2,15 @@ package io.paritytech.polkadotapp.feature_chats_impl.data.storage
 
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.data.storage.file.ContentResolver
 import io.paritytech.polkadotapp.common.data.storage.file.FileProvider
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.readNBytesCompat
 import io.paritytech.polkadotapp.common.utils.skipNBytesCompat
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.HopService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -62,6 +65,16 @@ class AttachmentFileStorage @Inject constructor(
     fun createDownloadFile(mimeType: String): File {
         val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
         return fileProvider.getFileInScopedStorage("downloads/${System.currentTimeMillis()}.$extension")
+    }
+
+    fun getAttachmentDownloadFile(messageId: ChatMessageId, identifier: DataByteArray, mimeType: String): File {
+        val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+        val name = "${messageId.replace(UNSAFE_FILE_NAME_CHARACTERS, "_")}-${identifier.value.toHexString()}"
+        return fileProvider.getFileInScopedStorage("downloads/$name.$extension")
+    }
+
+    private companion object {
+        val UNSAFE_FILE_NAME_CHARACTERS = Regex("[^A-Za-z0-9-]")
     }
 }
 

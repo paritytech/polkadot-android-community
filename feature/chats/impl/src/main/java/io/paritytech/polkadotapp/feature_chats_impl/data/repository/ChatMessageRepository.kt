@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.mappers.toLocal
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatMessageSearchHit
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatMessageWithSortOrder
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastMessageSummary
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toDomain
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.toLocal
@@ -91,6 +92,16 @@ interface ChatMessageRepository {
         customContentDecoder: CustomContentDecoder,
     ): List<ChatMessage>
 
+    suspend fun getMessagesUpdatedInRange(
+        updatedAfter: Instant,
+        updatedUpTo: Instant?,
+        after: ChatMessageSyncCursor?,
+        limit: Int,
+        customContentDecoder: CustomContentDecoder,
+    ): List<ChatMessageWithSortOrder>
+
+    suspend fun countMessagesUpdatedInRange(updatedAfter: Instant, updatedUpTo: Instant?): Int
+
     suspend fun getMessageById(
         chatId: ChatId,
         messageId: ChatMessageId,
@@ -124,6 +135,8 @@ interface ChatMessageRepository {
     suspend fun removeMessageReaction(reaction: ChatMessageReaction, chatId: ChatId)
 
     suspend fun getUnsupportedMessages(chatId: ChatId): List<ChatMessage>
+    suspend fun getRichTextMessages(): List<ChatMessage>
+    suspend fun getPaymentsUpdatedAfter(updatedAfter: Instant?): List<ChatMessage>
     suspend fun deleteAllChatMessages(chatId: ChatId)
 
     suspend fun getMessageStatuses(messageIds: List<ChatMessageId>): Map<ChatMessageId, ChatMessage.Status>
@@ -314,6 +327,30 @@ class RealChatMessageRepository @Inject constructor(
         return chatMessageDao.getMessagesUpdatedAfter(after.toEpochMilliseconds()).map { it.toDomain(customContentDecoder) }
     }
 
+    override suspend fun getMessagesUpdatedInRange(
+        updatedAfter: Instant,
+        updatedUpTo: Instant?,
+        after: ChatMessageSyncCursor?,
+        limit: Int,
+        customContentDecoder: CustomContentDecoder,
+    ): List<ChatMessageWithSortOrder> {
+        return chatMessageDao.getMessagesUpdatedInRange(
+            updatedAfter = updatedAfter.toEpochMilliseconds(),
+            updatedUpTo = updatedUpTo?.toEpochMilliseconds() ?: Long.MAX_VALUE,
+            afterSortOrder = after?.sortOrder,
+            afterTimestamp = after?.timestamp,
+            afterId = after?.messageId,
+            limit = limit,
+        ).map { ChatMessageWithSortOrder(it.toDomain(customContentDecoder), it.sortOrder) }
+    }
+
+    override suspend fun countMessagesUpdatedInRange(updatedAfter: Instant, updatedUpTo: Instant?): Int {
+        return chatMessageDao.countMessagesUpdatedInRange(
+            updatedAfter = updatedAfter.toEpochMilliseconds(),
+            updatedUpTo = updatedUpTo?.toEpochMilliseconds() ?: Long.MAX_VALUE,
+        )
+    }
+
     override fun subscribeMessages(
         chatId: ChatId,
         direction: ChatMessageDirection,
@@ -380,6 +417,20 @@ class RealChatMessageRepository @Inject constructor(
         val decoder = AlwaysFailCustomContentDecoder()
         return chatMessageDao
             .getUnsupportedMessages(chatId.toLocal())
+            .map { it.toDomain(decoder) }
+    }
+
+    override suspend fun getRichTextMessages(): List<ChatMessage> {
+        val decoder = AlwaysFailCustomContentDecoder()
+        return chatMessageDao
+            .getRichTextMessages()
+            .map { it.toDomain(decoder) }
+    }
+
+    override suspend fun getPaymentsUpdatedAfter(updatedAfter: Instant?): List<ChatMessage> {
+        val decoder = AlwaysFailCustomContentDecoder()
+        return chatMessageDao
+            .getPaymentsUpdatedAfter(updatedAfter?.toEpochMilliseconds())
             .map { it.toDomain(decoder) }
     }
 

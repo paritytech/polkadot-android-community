@@ -22,6 +22,11 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.devices.OurDevicesProv
 import io.paritytech.polkadotapp.feature_chats_api.domain.extension.ExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySyncedChatStateUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.GetLocalAttachmentFileUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.MissingAttachmentFilesUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.PendingPaymentsUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.notifications.IncomingChatPushDecoder
 import io.paritytech.polkadotapp.feature_chats_api.domain.sessions.ContactChatSessionRefCounter
@@ -108,7 +113,12 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.devices.RealOurDevice
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatRequestsListInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealAddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealApplyRemoteChatMessageUseCase
+import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealApplySyncedChatStateUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealChatRequestsListInteractor
+import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealChatStateSyncUseCase
+import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealGetLocalAttachmentFileUseCase
+import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealMissingAttachmentFilesUseCase
+import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealPendingPaymentsUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.RealRemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.domain.middleware.CompoundExternalExtensionProvider
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
@@ -149,6 +159,21 @@ internal interface ChatsFeatureApiModule {
 
     @Binds
     fun bindApplyRemoteChatMessageUseCase(impl: RealApplyRemoteChatMessageUseCase): ApplyRemoteChatMessageUseCase
+
+    @Binds
+    fun bindGetLocalAttachmentFileUseCase(impl: RealGetLocalAttachmentFileUseCase): GetLocalAttachmentFileUseCase
+
+    @Binds
+    fun bindMissingAttachmentFilesUseCase(impl: RealMissingAttachmentFilesUseCase): MissingAttachmentFilesUseCase
+
+    @Binds
+    fun bindChatStateSyncUseCase(impl: RealChatStateSyncUseCase): ChatStateSyncUseCase
+
+    @Binds
+    fun bindApplySyncedChatStateUseCase(impl: RealApplySyncedChatStateUseCase): ApplySyncedChatStateUseCase
+
+    @Binds
+    fun bindPendingPaymentsUseCase(impl: RealPendingPaymentsUseCase): PendingPaymentsUseCase
 
     @Binds
     fun bindContactDevicesRepository(impl: RealContactDevicesRepository): ContactDevicesRepository
