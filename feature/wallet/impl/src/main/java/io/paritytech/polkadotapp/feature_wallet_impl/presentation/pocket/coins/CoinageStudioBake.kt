@@ -9,7 +9,7 @@ import java.nio.ByteOrder
 
 /**
  * Bakes [CoinageStudio] into the prefiltered cube the coin shader samples, on the thread holding the GL
- * context. It replaces forty-two shipped Radiance faces and their decoder.
+ * context.
  *
  * GLES 3.0 has no compute shaders, so every face of every level is a fragment pass into a half-float render
  * target. Rendering into one is an extension in ES 3.0; nearly every GPU has it, and one without gets the same
@@ -30,14 +30,16 @@ object CoinageStudioBake {
 
     fun bake(studio: CoinageStudio, vertexSource: String, fragmentSource: String): Cube {
         val started = SystemClock.elapsedRealtime()
-        val onGpu = rendersToFloat()
-        val cube = if (onGpu) {
-            gpu(studio, vertexSource, fragmentSource, CoinageStudio.SIZE, CoinageStudio.LEVELS)
+        val onGpu = if (rendersToFloat()) {
+            runCatching { gpu(studio, vertexSource, fragmentSource, CoinageStudio.SIZE, CoinageStudio.LEVELS) }
+                .onFailure { Timber.e(it, "CoinageStudioBake: GPU bake failed, baking on the CPU") }
+                .getOrNull()
         } else {
-            cpu(studio)
+            null
         }
+        val cube = onGpu ?: cpu(studio)
 
-        Timber.i("CoinageStudioBake: ${if (onGpu) "GPU" else "CPU"} bake took ${SystemClock.elapsedRealtime() - started} ms")
+        Timber.i("CoinageStudioBake: ${if (onGpu != null) "GPU" else "CPU"} bake took ${SystemClock.elapsedRealtime() - started} ms")
 
         return cube
     }
@@ -50,8 +52,8 @@ object CoinageStudioBake {
 
     /** Exposed at any size so a test can check it against [CoinageStudio.bake] on a device. */
     fun gpu(studio: CoinageStudio, vertexSource: String, fragmentSource: String, size: Int, levels: Int): Cube {
+        val program = CoinageGlProgram.link(vertexSource, fragmentSource)
         val texture = cube(size, levels)
-        val program = CoinageGlRenderer.link(vertexSource, fragmentSource)
         val vertexArray = IntArray(1).also { GLES30.glGenVertexArrays(1, it, 0) }[0]
         val framebuffer = IntArray(1).also { GLES20.glGenFramebuffers(1, it, 0) }[0]
 
@@ -106,7 +108,7 @@ object CoinageStudioBake {
                 // Each level waited for in turn, as on iOS: the first two are most of the work.
                 GLES20.glFinish()
             }
-        } catch (failure: IllegalStateException) {
+        } catch (failure: RuntimeException) {
             GLES20.glDeleteTextures(1, intArrayOf(texture), 0)
             throw failure
         } finally {

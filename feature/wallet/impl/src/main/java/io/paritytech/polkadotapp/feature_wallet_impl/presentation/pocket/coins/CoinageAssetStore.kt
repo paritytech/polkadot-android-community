@@ -153,7 +153,7 @@ object CoinageAssetStore {
         val roughness: Float,
         val tone: List<Float>,
         /** How strongly handling brushes this metal's worn face. */
-        val brush: Float = 1f
+        val brush: Float
     )
 
     @Serializable

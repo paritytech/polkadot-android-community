@@ -25,10 +25,6 @@ import kotlin.math.sqrt
  * a face-on coin mirrors the ceiling. Gravity cannot see a turn about the vertical, so this is the part of the
  * phone's movement it can see. The coins themselves never move with the phone.
  *
- * It replaces a pair of angles, sideways and lean, each measured against the whole of gravity. With the phone
- * leaned back, dipping either edge also shrank the lean, so a sideways tilt came with a pitch forward that was
- * the same whichever way the edge dipped; on the dim side of the room tilting right read as tilting down.
- *
  * `TYPE_GRAVITY` needs no permission and no prompt. It is a fused reading and not present on every device,
  * so the plain accelerometer stands in; at rest the two agree, which is when the studio is allowed to move.
  */
@@ -122,11 +118,8 @@ class CoinageTilt(context: Context) : SensorEventListener {
     @Volatile
     private var target = Turn()
 
-    /** The reading that last moved the studio and no frame has drawn yet, while [probe] is on. */
     @Volatile
-    private var pending: CoinageLatencyProbe.Sample? = null
-
-    var probe = false
+    var timings: CoinageFrameTimings? = null
 
     @Volatile
     var turn = Turn()
@@ -180,7 +173,6 @@ class CoinageTilt(context: Context) : SensorEventListener {
         previous = null
         stillFor = 0.0
         lastReading = 0L
-        pending = null
     }
 
     /**
@@ -204,9 +196,6 @@ class CoinageTilt(context: Context) : SensorEventListener {
         return now - lastChange < LINGER
     }
 
-    /** The reading the frame about to be drawn is the first to show, if any. */
-    fun takeSample(): CoinageLatencyProbe.Sample? = pending?.also { pending = null }
-
     override fun onSensorChanged(event: SensorEvent) {
         // The sampling period is only a hint, so the real gap decides how much of it counts as stillness.
         val elapsed = if (lastReading == 0L) {
@@ -218,12 +207,13 @@ class CoinageTilt(context: Context) : SensorEventListener {
 
         absorb(Pose.ofSensor(event.values), elapsed)
 
-        if (probe && distance(target, turn) > REST_BAND) {
+        val timings = timings
+
+        if (timings != null && distance(target, turn) > REST_BAND) {
             // Sensor time is on the boot clock; the frame timeline is on the monotonic one.
             val now = System.nanoTime()
-            val boot = SystemClock.elapsedRealtimeNanos()
 
-            pending = CoinageLatencyProbe.Sample(sensed = event.timestamp - boot + now, delivered = now)
+            timings.onReading(sensed = event.timestamp - SystemClock.elapsedRealtimeNanos() + now, delivered = now)
         }
     }
 

@@ -30,11 +30,10 @@ import timber.log.Timber
 class CoinageRenderThread(
     context: Context,
     private val surface: SurfaceTexture,
-    private val probe: Boolean,
     private val report: (CoinageCoinsMetrics) -> Unit
 ) : Thread("coinage-render") {
     private val appContext = context.applicationContext
-    private val tilt = CoinageTilt(context).also { it.probe = probe }
+    private val tilt = CoinageTilt(context)
     private val fences = LongArray(FRAMES_IN_FLIGHT)
     private var fenceIndex = 0
 
@@ -42,6 +41,7 @@ class CoinageRenderThread(
     private val vsyncHandler = Handler(vsyncThread.looper)
     private var vsyncs = 0L
     private var vsyncRequested = false
+    private val requestVsync = Runnable { Choreographer.getInstance().postFrameCallback(onVsync) }
     private val onVsync = Choreographer.FrameCallback {
         synchronized(lock) {
             vsyncs++
@@ -93,18 +93,12 @@ class CoinageRenderThread(
     private var bundle: CoinageAssetBundle? = null
 
     private var lastFrame = 0L
-    private var lastSwap = 0L
-    private var sequence = 0L
 
-    /** The last swapped frame that first showed a reading, while the probe is on. */
-    @Volatile
-    var stampedFrame: CoinageLatencyProbe.Frame? = null
-        private set
-
-    /** Mean time between consecutive swaps while drawing continuously, in nanoseconds. */
-    @Volatile
-    var drawInterval = 0.0
-        private set
+    var timings: CoinageFrameTimings?
+        get() = tilt.timings
+        set(value) {
+            tilt.timings = value
+        }
 
     /**
      * Only a width change re-aims the coins: both arrangements are laid out against the width alone, and
@@ -230,7 +224,7 @@ class CoinageRenderThread(
 
                 if (!vsyncRequested) {
                     vsyncRequested = true
-                    vsyncHandler.post { Choreographer.getInstance().postFrameCallback(onVsync) }
+                    vsyncHandler.post(requestVsync)
                 }
 
                 while (running && vsyncs == seen) lock.wait()
@@ -284,7 +278,7 @@ class CoinageRenderThread(
         awaitFrameBeforeLast()
 
         val drawn = System.nanoTime()
-        val sample = if (probe) tilt.takeSample() else null
+        val light = tilt.turn
 
         if (retarget) retarget(ready.designs) else if (follow) follow()
 
@@ -310,7 +304,7 @@ class CoinageRenderThread(
         EGL14.eglSwapBuffers(display, eglSurface)
         drawnWindow = offset
 
-        if (probe) stamp(drawn, sample)
+        tilt.timings?.onSwapped(drawn, System.nanoTime(), tookReading = tilt.turn != light)
 
         return field.isMoving || moved
     }
@@ -324,17 +318,6 @@ class CoinageRenderThread(
         GLES30.glClientWaitSync(fence, GLES30.GL_SYNC_FLUSH_COMMANDS_BIT, FENCE_TIMEOUT)
         GLES30.glDeleteSync(fence)
         fences[fenceIndex] = 0L
-    }
-
-    private fun stamp(drawn: Long, sample: CoinageLatencyProbe.Sample?) {
-        val swapped = System.nanoTime()
-
-        if (lastSwap != 0L && swapped - lastSwap < CONTINUOUS) {
-            drawInterval = CoinageLatencyProbe.smoothed(drawInterval, (swapped - lastSwap).toDouble())
-        }
-        lastSwap = swapped
-
-        if (sample != null) stampedFrame = CoinageLatencyProbe.Frame(++sequence, sample, drawn, swapped)
     }
 
     /**
@@ -511,7 +494,6 @@ class CoinageRenderThread(
         const val SHUTDOWN_WAIT = 500L
         const val FRAMES_IN_FLIGHT = 2
         const val FENCE_TIMEOUT = 100_000_000L
-        const val CONTINUOUS = 50_000_000L
     }
 }
 

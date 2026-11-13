@@ -3,30 +3,35 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins
 import android.os.Build
 import android.view.Choreographer
 import androidx.annotation.RequiresApi
+import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Debug only: how long a gravity reading takes to reach the glass, carried through the pipeline as one
- * timestamp and read back from the frame timeline. All times are on the monotonic clock, in nanoseconds.
+ * How long a gravity reading takes to reach the glass, carried through the pipeline as one timestamp and read
+ * back from the frame timeline.
  *
  * Stages: the sensor to the app, the app to the draw that first uses the reading, that draw to its swap
  * returning, the swap to the UI frame latching the texture, and that frame to its expected presentation.
  * Its own vsync callback draws nothing; when it runs no faster than the draws, the device is capped, not the
  * renderer.
- *
- * Lives on the main thread.
  */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-class CoinageLatencyProbe(private val onReport: (String) -> Unit) {
-    class Sample(val sensed: Long, val delivered: Long)
+class CoinageLatencyProbe(private val onReport: (String) -> Unit) : CoinageFrameTimings {
+    private class Sample(val sensed: Long, val delivered: Long)
 
-    class Frame(val sequence: Long, val sample: Sample, val drawn: Long, val swapped: Long)
+    private class Frame(val sample: Sample, val drawn: Long, val swapped: Long)
+
+    private val pending = AtomicReference<Sample?>()
+    private val stamped = AtomicReference<Frame?>()
+
+    @Volatile
+    private var drawInterval = 0.0
+    private var lastSwap = 0L
 
     private val choreographer = Choreographer.getInstance()
     private val stages = Array(STAGES) { LongArray(WINDOW) }
     private val totals = LongArray(WINDOW)
     private var count = 0
     private var next = 0
-    private var lastSequence = -1L
     private var lastReport = 0L
     private var lastVsync = 0L
     private var vsyncInterval = 0.0
@@ -59,12 +64,28 @@ class CoinageLatencyProbe(private val onReport: (String) -> Unit) {
         choreographer.removeVsyncCallback(callback)
     }
 
-    /** Called as the UI frame latches the texture; [frame] is the last stamped frame swapped. */
-    fun latched(frame: Frame?, drawInterval: Double) {
-        if (frame == null || frame.sequence == lastSequence) return
+    override fun onReading(sensed: Long, delivered: Long) {
+        pending.set(Sample(sensed, delivered))
+    }
 
-        lastSequence = frame.sequence
+    override fun onSwapped(drawn: Long, swapped: Long, tookReading: Boolean) {
+        if (lastSwap != 0L && swapped - lastSwap < CONTINUOUS) {
+            drawInterval = smoothed(drawInterval, (swapped - lastSwap).toDouble())
+        }
+        lastSwap = swapped
 
+        if (!tookReading) return
+
+        // A reading that landed after this draw began belongs to the next frame.
+        val sample = pending.get() ?: return
+
+        if (sample.delivered <= drawn && pending.compareAndSet(sample, null)) {
+            stamped.set(Frame(sample, drawn, swapped))
+        }
+    }
+
+    override fun onLatched() {
+        val frame = stamped.getAndSet(null) ?: return
         val latch = System.nanoTime()
         val present = presentAt
 
@@ -87,11 +108,11 @@ class CoinageLatencyProbe(private val onReport: (String) -> Unit) {
 
         if (latch - lastReport >= REPORT_EVERY) {
             lastReport = latch
-            onReport(report(drawInterval))
+            onReport(report())
         }
     }
 
-    private fun report(drawInterval: Double): String {
+    private fun report(): String {
         val sorted = totals.copyOf(count).sorted()
         val lines = NAMES.mapIndexed { stage, name ->
             "%-12s %5.1f".format(name, stages[stage].take(count).average() / MILLIS)
@@ -109,12 +130,13 @@ class CoinageLatencyProbe(private val onReport: (String) -> Unit) {
             ).joinToString("\n")
     }
 
-    companion object {
-        private const val STAGES = 5
-        private const val WINDOW = 240
-        private const val REPORT_EVERY = 250_000_000L
-        private const val MILLIS = 1_000_000.0
-        private val NAMES = listOf("sensor>app", "app>draw", "draw>swap", "swap>latch", "latch>glass")
+    private companion object {
+        const val STAGES = 5
+        const val WINDOW = 240
+        const val REPORT_EVERY = 250_000_000L
+        const val CONTINUOUS = 50_000_000L
+        const val MILLIS = 1_000_000.0
+        val NAMES = listOf("sensor>app", "app>draw", "draw>swap", "swap>latch", "latch>glass")
 
         /** A running mean over roughly the last thirty intervals. */
         fun smoothed(average: Double, sample: Double) = if (average == 0.0) sample else average + (sample - average) / 30

@@ -311,7 +311,13 @@ class CoinageGlRenderer private constructor(
          * decode is shared across contexts and this is not.
          */
         fun create(bundle: CoinageAssetBundle): CoinageGlRenderer {
-            val program = link(bundle.vertexSource, bundle.fragmentSource)
+            val environment = CoinageStudioBake.bake(bundle.studio, bundle.studioVertexSource, bundle.studioFragmentSource)
+            val program = try {
+                CoinageGlProgram.link(bundle.vertexSource, bundle.fragmentSource)
+            } catch (failure: IllegalStateException) {
+                GLES20.glDeleteTextures(1, intArrayOf(environment.texture), 0)
+                throw failure
+            }
             val arrays = IntArray(1).also { GLES30.glGenVertexArrays(1, it, 0) }
             val instanceBuffer = IntArray(1).also { GLES20.glGenBuffers(1, it, 0) }[0]
 
@@ -323,11 +329,7 @@ class CoinageGlRenderer private constructor(
                 meshes = bundle.meshes.mapValues { (_, mesh) -> upload(mesh) },
                 instanceBuffer = instanceBuffer,
                 reliefTexture = uploadRelief(bundle.relief),
-                environment = CoinageStudioBake.bake(
-                    bundle.studio,
-                    bundle.studioVertexSource,
-                    bundle.studioFragmentSource
-                ),
+                environment = environment,
                 uniforms = Uniforms(program)
             )
         }
@@ -388,35 +390,6 @@ class CoinageGlRenderer private constructor(
             GLES20.glTexParameteri(target, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
             GLES20.glTexParameteri(target, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
             GLES20.glTexParameteri(target, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
-        }
-
-        fun link(vertexSource: String, fragmentSource: String): Int {
-            val program = GLES20.glCreateProgram()
-
-            GLES20.glAttachShader(program, compile(GLES20.GL_VERTEX_SHADER, vertexSource))
-            GLES20.glAttachShader(program, compile(GLES20.GL_FRAGMENT_SHADER, fragmentSource))
-            GLES20.glLinkProgram(program)
-
-            val status = IntArray(1)
-            GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, status, 0)
-
-            check(status[0] != 0) { "coin program did not link: ${GLES20.glGetProgramInfoLog(program)}" }
-
-            return program
-        }
-
-        private fun compile(type: Int, source: String): Int {
-            val shader = GLES20.glCreateShader(type)
-
-            GLES20.glShaderSource(shader, source)
-            GLES20.glCompileShader(shader)
-
-            val status = IntArray(1)
-            GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status, 0)
-
-            check(status[0] != 0) { "coin shader did not compile: ${GLES20.glGetShaderInfoLog(shader)}" }
-
-            return shader
         }
     }
 }

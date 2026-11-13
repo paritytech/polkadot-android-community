@@ -30,10 +30,6 @@ class CoinageTiltTest {
         assertTrue("the coin should look toward the right wall", mirror[0] > 0.1)
     }
 
-    /**
-     * The bug the single rotation fixes: with the phone leaned back, a sideways tilt also read as a pitch
-     * forward, the same whichever way the edge dipped. Now left and right are mirror images.
-     */
     @Test
     fun `a sideways tilt of a leaned-back phone turns the studio symmetrically`() {
         val neutral = pose(roll = 0.0, lean = 0.9)
