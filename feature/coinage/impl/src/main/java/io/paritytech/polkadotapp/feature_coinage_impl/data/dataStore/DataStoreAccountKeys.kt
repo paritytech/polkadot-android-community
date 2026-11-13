@@ -44,7 +44,7 @@ class RealDataStoreAccountKeys @Inject constructor(
             keypair = this,
             accountId = accountId,
             evmAccountId = accountId.toEvmAccountId(),
-            encryptionKey = deriveDataStoreEncryptionKey(privateKey + nonce),
+            encryptionKey = deriveDataStoreEncryptionKey(secretInEd25519Form()),
         )
     }
 
@@ -54,6 +54,18 @@ class RealDataStoreAccountKeys @Inject constructor(
 }
 
 private val ENCRYPTION_CONTEXT = "encryption".encodeToByteArray()
+private const val COFACTOR_SHIFT_BITS = 3
+
+fun Sr25519Keypair.secretInEd25519Form(): ByteArray {
+    var carry = 0
+    val scalarTimesCofactor = ByteArray(privateKey.size) { index ->
+        val shifted = ((privateKey[index].toInt() and 0xFF) shl COFACTOR_SHIFT_BITS) or carry
+        carry = shifted ushr Byte.SIZE_BITS
+        shifted.toByte()
+    }
+
+    return scalarTimesCofactor + nonce
+}
 
 // Keyed by the full 64-byte sr25519 secret — the scalar followed by its nonce — so iOS derives the same key from
 // the same `//datastore` keypair.
