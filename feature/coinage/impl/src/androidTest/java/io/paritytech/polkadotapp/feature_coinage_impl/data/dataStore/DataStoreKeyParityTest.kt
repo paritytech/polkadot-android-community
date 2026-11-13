@@ -20,7 +20,7 @@ class DataStoreKeyParityTest {
     @Test
     fun theDataStoreKeypairAndItsEncryptionKeyMatchPolkadotJs() {
         val keypair = derive("//datastore")
-        val secret64 = keypair.privateKey + keypair.nonce
+        val secret64 = keypair.secretInEd25519Form()
 
         assertEquals(DATA_STORE_PUBLIC_KEY, keypair.publicKey.toHexString(withPrefix = true))
         assertEquals(DATA_STORE_SECRET, secret64.toHexString(withPrefix = true))
