@@ -94,7 +94,9 @@ class VoucherLocationServiceTest {
 
         startService()
 
-        assertEquals(RecyclerFungibility.ofPercent(100), written.single().values.single().recyclerFungibility)
+        val update = written.single().values.single()
+        assertEquals(RecyclerFungibility.ofPercent(100), update.recyclerFungibility)
+        assertEquals(0, update.location.recyclerUnloaded)
     }
 
     /**
@@ -185,6 +187,33 @@ class VoucherLocationServiceTest {
         assertEquals(NOW, written.last().values.single().location.enteredAt)
     }
 
+    @Test
+    fun `the ring's unloaded count reaches the voucher`() = runTest {
+        givenChain()
+        givenTwoVouchersInDifferentRings()
+        givenCapacityReadable()
+        givenUnloadedCounts(Result.success(mapOf(recyclerKey(RING_INDEX) to 5, recyclerKey(OTHER_RING_INDEX) to 2)))
+
+        startService()
+
+        val updates = written.single()
+        assertEquals(5, updates.getValue(VOUCHER_KEY).location.recyclerUnloaded)
+        assertEquals(2, updates.getValue(OTHER_VOUCHER_KEY).location.recyclerUnloaded)
+    }
+
+    @Test
+    fun `a failed unloaded count read writes no unloaded count`() = runTest {
+        givenChain()
+        givenVoucherIncludedInRing()
+        givenRingStatus(included = RING_MEMBERS)
+        givenCapacityReadable()
+        givenUnloadedCounts(Result.failure(IllegalStateException("subscription dropped")))
+
+        startService()
+
+        assertNull(written.single().values.single().location.recyclerUnloaded)
+    }
+
     private suspend fun startService() {
         with(ComputationalScope(scope)) { service.start() }
     }
@@ -207,15 +236,37 @@ class VoucherLocationServiceTest {
         givenIncludedPosition()
     }
 
-    private fun givenIncludedPosition() {
-        val position = RingPosition.Included(
-            ringIndex = RecyclerIndex(RING_INDEX.toBigInteger()),
-            ringPage = 0,
-            ringPosition = 0
+    private fun givenTwoVouchersInDifferentRings() {
+        every { voucherRepository.subscribeAllVouchers() } returns
+            flowOf(listOf(voucher(), voucher(index = 1, key = OTHER_VOUCHER_KEY)))
+        every { membersRepository.subscribeMembers(any(), any(), any()) } returns flowOf(
+            Result.success(
+                mapOf(
+                    (collectionId() to VOUCHER_KEY) to includedIn(RING_INDEX),
+                    (collectionId() to OTHER_VOUCHER_KEY) to includedIn(OTHER_RING_INDEX),
+                )
+            )
         )
-        every { membersRepository.subscribeMembers(any(), any(), any()) } returns
-            flowOf(Result.success(mapOf((collectionId() to VOUCHER_KEY) to position)))
+        every { membersRepository.subscribeRingStatuses(any(), any()) } returns flowOf(
+            Result.success(
+                listOf(RING_INDEX, OTHER_RING_INDEX).associate { ring ->
+                    (collectionId() to RecyclerIndex(ring.toBigInteger())) to
+                        RingStatus(total = RING_MEMBERS, included = RING_MEMBERS)
+                }
+            )
+        )
     }
+
+    private fun givenIncludedPosition() {
+        every { membersRepository.subscribeMembers(any(), any(), any()) } returns
+            flowOf(Result.success(mapOf((collectionId() to VOUCHER_KEY) to includedIn(RING_INDEX))))
+    }
+
+    private fun includedIn(ring: Int) = RingPosition.Included(
+        ringIndex = RecyclerIndex(ring.toBigInteger()),
+        ringPage = 0,
+        ringPosition = 0
+    )
 
     private fun givenRingStatus(included: Int) {
         every { membersRepository.subscribeRingStatuses(any(), any()) } returns
@@ -238,13 +289,13 @@ class VoucherLocationServiceTest {
         every { voucherRepository.subscribeUnloadedCounts(any(), any(), any()) } returns flowOf(result)
     }
 
-    private fun recyclerKey() = RecyclerKey(DENOMINATION, RecyclerIndex(RING_INDEX.toBigInteger()))
+    private fun recyclerKey(ring: Int = RING_INDEX) = RecyclerKey(DENOMINATION, RecyclerIndex(ring.toBigInteger()))
 
     private fun collectionId(): RingCollectionId = DENOMINATION.toRingCollectionId(INSTANCE_ID)
 
-    private fun voucher() = RecyclerVoucher(
-        ringVrfKeyIndex = testKey(0),
-        ringVrfPublicKey = VOUCHER_KEY,
+    private fun voucher(index: Int = 0, key: BandersnatchPublicKey = VOUCHER_KEY) = RecyclerVoucher(
+        ringVrfKeyIndex = testKey(index),
+        ringVrfPublicKey = key,
         recyclerValue = DENOMINATION,
         location = RecyclerVoucher.Location.Unknown,
         recyclerFungibility = RecyclerFungibility.NONE,
@@ -256,10 +307,12 @@ class VoucherLocationServiceTest {
         const val RING_CAPACITY = 767
         const val RING_MEMBERS = 400
         const val RING_INDEX = 3
+        const val OTHER_RING_INDEX = 4
         const val RING_KEYS_PER_PAGE = 255
         val INSTANCE_ID: CoinageInstanceId = 1u
         val NOW: Instant = Instant.fromEpochMilliseconds(1_000L)
         val DENOMINATION = ValueExponent(3)
         val VOUCHER_KEY: BandersnatchPublicKey = ByteArray(32) { 7 }.toDataByteArray()
+        val OTHER_VOUCHER_KEY: BandersnatchPublicKey = ByteArray(32) { 8 }.toDataByteArray()
     }
 }

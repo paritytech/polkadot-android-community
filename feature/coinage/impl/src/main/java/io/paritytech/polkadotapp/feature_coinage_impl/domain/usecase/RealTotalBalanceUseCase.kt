@@ -40,19 +40,12 @@ class RealTotalBalanceUseCase @Inject constructor(
     private val usabilityContextFactory: VoucherUsabilityContextFactory,
     private val readinessUpdates: VoucherReadinessUpdates,
 ) : TotalBalanceUseCase {
-    private data class Input(
-        val coins: List<TrackedCoin>,
-        val vouchers: List<TrackedVoucher>,
-        val strategyType: RecyclingStrategyType,
-        val verdicts: RecyclingVerdicts,
-    )
-
     override fun subscribeTotalBalance(): Flow<Result<CoinageBalance>> = combine(
         coinageAssetsUseCase.subscribeCoins(),
         coinageAssetsUseCase.subscribeVouchers(),
         settings.strategyFlow(),
         evaluator.verdicts,
-        ::Input,
+        ::CoinageEvaluationInput,
     ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.strategyType })
         .map { calculateCoinageBalance(it.coins, it.vouchers, it.strategyType, it.verdicts) }
         .distinctUntilChanged()

@@ -154,7 +154,7 @@ class VoucherLocationService @Inject constructor(
 
         return vouchers.associate { voucher ->
             val capacity = capacities[voucher.recyclerKey.exponent]
-            val unloaded = unloadedCounts?.get(voucher.recyclerKey) ?: 0
+            val unloaded = voucher.location.recyclerUnloaded ?: 0
             val included = voucher.location.recyclerMembers
 
             // Both inputs or neither: a fungibility computed from a guessed capacity or a guessed unloaded
@@ -182,15 +182,17 @@ class VoucherLocationService @Inject constructor(
 
             if (!ringStatus.includesKey(position, keysPerPage)) return@mapNotNull null
 
+            val recyclerKey = ringStatusKey.toRecyclerKey()
             VoucherInRecycler(
                 publicKey = voucherKey.second,
-                recyclerKey = ringStatusKey.toRecyclerKey(),
+                recyclerKey = recyclerKey,
                 // included, not total: a proof only verifies against the keys baked into the ring root, so
                 // that is the set this voucher actually hides in.
                 location = RecyclerVoucher.Location.InRecycler(
                     recyclerIndex = position.ringIndex,
                     recyclerMembers = ringStatus.included,
-                    enteredAt = timeProvider.now()
+                    enteredAt = timeProvider.now(),
+                    recyclerUnloaded = unloadedCounts?.let { it[recyclerKey] ?: 0 },
                 ),
             )
         }

@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecycl
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingParams
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingSnapshot
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherUsabilityContext
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.anonymityReadyAt
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.resolveAgainst
 import java.math.RoundingMode
 
@@ -61,10 +62,8 @@ class ParametricRecyclingStrategy(
 
         if (location.recyclerMembers >= requiredMembers) return true
 
-        val requirements = params.voucherReadiness.memberAndAgeRequirements ?: return false
-        val enteredAt = location.enteredAt ?: return false
-        return location.recyclerMembers >= requirements.minimumMembers &&
-            context.now - enteredAt >= requirements.delay
+        val readyAt = params.voucherReadiness.anonymityReadyAt(location) ?: return false
+        return context.now >= readyAt
     }
 
     override fun allowsConfirmedSpend(): Boolean = params.allowsConfirmedSpend

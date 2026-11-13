@@ -23,6 +23,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVouch
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FakeCoinagePrivacyConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.ForcedRecyclingAgeProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
@@ -60,7 +61,7 @@ class RealTotalBalanceUseCaseTest {
         override fun now(): Instant = Instant.fromEpochMilliseconds(0)
     }
 
-    private val strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker)
+    private val strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker, FakeCoinagePrivacyConfigProvider())
 
     private val useCase: RealTotalBalanceUseCase
 
@@ -344,7 +345,7 @@ class RealTotalBalanceUseCaseTest {
     private fun stateWithMinter(status: DurableTxStatus) =
         CoinageAssetState(handedOff = false, minterStatus = status, consumerStatus = null)
 
-    private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members, enteredAt = null)
+    private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members, enteredAt = null, recyclerUnloaded = null)
 
     private fun coinOf(exponent: Int, age: Int?, onChain: Boolean = true, derivationIndex: Int = 0) = Coin(
         derivationIndex = testKey(derivationIndex),

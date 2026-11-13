@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.Fraction.Companion.percents
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinProvenance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
@@ -13,8 +14,11 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.AnonymityRequirements
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherReadiness
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -43,6 +47,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mockito.Mockito.mock
 import java.math.BigInteger
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -102,7 +109,7 @@ class VoucherReadinessUpdatesTest {
         }
         runCurrent()
         advanceTimeBy(100000)
-        fixture.vouchers.value = listOf(voucher(enteredAt = Instant.fromEpochMilliseconds(100000)))
+        fixture.vouchers.value = listOf(voucher(fixture.anonymityMembers, enteredAt = Instant.fromEpochMilliseconds(100000)))
         runCurrent()
         advanceTimeBy(500000)
         runCurrent()
@@ -231,17 +238,170 @@ class VoucherReadinessUpdatesTest {
         )
     }
 
+    @Test
+    fun `eight members re-emit at ten minutes`() = runTest {
+        val emissions = balancedEmissions(listOf(voucher(members = 8)))
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L, 600000L), emissions)
+    }
+
+    @Test
+    fun `sixteen members re-emit at five minutes`() = runTest {
+        val emissions = balancedEmissions(listOf(voucher(members = 16)))
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L, 300000L), emissions)
+    }
+
+    @Test
+    fun `an unload moves the deadline out`() = runTest {
+        val fixture = SchedulerFixture(this, RecyclingStrategyType.BALANCED)
+        fixture.vouchers.value = listOf(voucher(members = 8))
+        val emissions = fixture.emissions(this)
+        advanceTimeBy(120000)
+        fixture.vouchers.value = listOf(voucher(members = 8, unloaded = 4))
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L, 120000L, 1200000L), emissions)
+    }
+
+    @Test
+    fun `no members left after unloads schedules no deadline`() = runTest {
+        val fixture = SchedulerFixture(this, RecyclingStrategyType.MAX_PRIVACY)
+        fixture.vouchers.value = listOf(voucher(members = 32, unloaded = 32))
+        val emissions = fixture.emissions(this)
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L), emissions)
+    }
+
+    @Test
+    fun `a new member brings the deadline forward`() = runTest {
+        val fixture = SchedulerFixture(this, RecyclingStrategyType.BALANCED)
+        fixture.vouchers.value = listOf(voucher(members = 8))
+        val emissions = fixture.emissions(this)
+        advanceTimeBy(60000)
+        fixture.vouchers.value = listOf(voucher(members = 16))
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L, 60000L, 300000L), emissions)
+    }
+
+    @Test
+    fun `vouchers sharing a deadline re-emit once`() = runTest {
+        val emissions = balancedEmissions(listOf(voucher(members = 8, index = 0), voucher(members = 8, index = 1)))
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L, 600000L), emissions)
+    }
+
+    @Test
+    fun `a deadline already passed at the first collection does not re-emit`() = runTest {
+        advanceTimeBy(15.minutes)
+        runCurrent()
+        val emissions = balancedEmissions(listOf(voucher(members = 8)))
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(900000L), emissions)
+    }
+
+    @Test
+    fun `a balance first read after the deadline is already ready`() = runTest {
+        advanceTimeBy(15.minutes)
+        runCurrent()
+        val fixture = WalletFixture(this, RecyclingStrategyType.BALANCED)
+        val balances = mutableListOf<CoinageBalance>()
+        backgroundScope.launch { fixture.balance.subscribeTotalBalance().collect { balances += it.getOrThrow() } }
+        with(ComputationalScope(backgroundScope)) { fixture.evaluator.start() }
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(fixture.balanceOf(ready = true)), balances)
+    }
+
+    @Test
+    fun `a fractional deadline re-emits at the exact time`() = runTest {
+        val emissions = balancedEmissions(listOf(voucher(members = 3)))
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L, 1600000L), emissions)
+    }
+
+    @Test
+    fun `a published config sets the deadline and releases the balance at it`() = runTest {
+        val fixture = WalletFixture(this, RecyclingStrategyType.BALANCED)
+        fixture.withBalancedConfig(ringFillPercent = 30, anonymityTime = 5.minutes, anonymityMembers = 4)
+        fixture.vouchers.value = listOf(voucher(members = 4))
+        val emissions = fixture.emissions(this)
+        val balances = mutableListOf<CoinageBalance>()
+        backgroundScope.launch { fixture.balance.subscribeTotalBalance().collect { balances += it.getOrThrow() } }
+        with(ComputationalScope(backgroundScope)) { fixture.evaluator.start() }
+
+        advanceTimeBy(1.days)
+        runCurrent()
+
+        assertEquals(listOf(0L, 300000L), emissions)
+        assertEquals(listOf(fixture.balanceOf(ready = false), fixture.balanceOf(ready = true)), balances)
+    }
+
+    private fun SchedulerFixture.withBalancedConfig(
+        ringFillPercent: Int,
+        anonymityTime: Duration,
+        anonymityMembers: Int,
+    ) {
+        val balanced = VoucherReadiness(ringFillPercent.percents, AnonymityRequirements(anonymityTime, anonymityMembers))
+        privacyConfig.config = CoinagePrivacyConfig.BUNDLED.copy(balanced = balanced)
+    }
+
+    private fun TestScope.balancedEmissions(vouchers: List<TrackedVoucher>): List<Long> {
+        val fixture = SchedulerFixture(this, RecyclingStrategyType.BALANCED)
+        fixture.vouchers.value = vouchers
+        return fixture.emissions(this)
+    }
+
+    private fun SchedulerFixture.emissions(scope: TestScope): List<Long> {
+        val emissions = mutableListOf<Long>()
+        scope.backgroundScope.launch {
+            vouchers.withReadinessUpdates(updates, { it }, { strategy.value })
+                .collect { emissions += scope.testScheduler.currentTime }
+        }
+        scope.runCurrent()
+        return emissions
+    }
+
     private open class SchedulerFixture(scope: TestScope, type: RecyclingStrategyType = RecyclingStrategyType.MAX_PRIVACY) {
+        val anonymityMembers = requireNotNull(type.bundledParams.voucherReadiness.anonymityRequirements).anonymityMembers
         val strategy = MutableStateFlow(type)
-        val vouchers = MutableStateFlow(listOf(voucher()))
+        val vouchers = MutableStateFlow(listOf(voucher(anonymityMembers)))
         var clockOffset = 0L
         val clockChanges = MutableSharedFlow<Unit>()
         val clock = object : TimeProvider {
             override fun now() = Instant.fromEpochMilliseconds(scope.testScheduler.currentTime + clockOffset)
         }
-        val updates = VoucherReadinessUpdates(clock, mock<ClockChangesSource>().also {
-            whenever(it.changes()).thenReturn(clockChanges)
-        })
+        val privacyConfig = FakeCoinagePrivacyConfigProvider()
+        val updates = VoucherReadinessUpdates(
+            clock,
+            mock<ClockChangesSource>().also { whenever(it.changes()).thenReturn(clockChanges) },
+            privacyConfig,
+        )
     }
 
     private class WalletFixture(scope: TestScope, type: RecyclingStrategyType) : SchedulerFixture(scope, type) {
@@ -252,9 +412,10 @@ class VoucherReadinessUpdatesTest {
         private val capacities: RingCapacityProvider = mock()
         private val converter: CoinageBalanceConverterUseCase = mock()
         private val quota: UnloadQuotaTracker = mock()
-        private val provider = RecyclingStrategyProvider(forcedAgeOf(14), quota)
+        private val provider = RecyclingStrategyProvider(forcedAgeOf(14), quota, privacyConfig)
         private val contextFactory = VoucherUsabilityContextFactory(capacities, clock)
         private val dispatchers: CoroutineDispatchers = mock()
+        private val allowsConfirmedSpend = type.bundledParams.allowsConfirmedSpend
 
         init {
             runBlocking {
@@ -280,19 +441,24 @@ class VoucherReadinessUpdatesTest {
             val zero = amount - amount
             return CoinageBalance(
                 availablePrivate = if (ready) amount else zero,
-                gainingPrivacy = CoinageBalance.GainingPrivacyBalance(if (ready) zero else amount, false),
+                gainingPrivacy = CoinageBalance.GainingPrivacyBalance(if (ready) zero else amount, allowsConfirmedSpend),
                 pending = zero,
             )
         }
     }
 
     private companion object {
-        fun voucher(enteredAt: Instant = Instant.fromEpochMilliseconds(0)) = TrackedVoucher(
+        fun voucher(
+            members: Int,
+            enteredAt: Instant = Instant.fromEpochMilliseconds(0),
+            unloaded: Int = 0,
+            index: Int = 0,
+        ) = TrackedVoucher(
             RecyclerVoucher(
-                ringVrfKeyIndex = testKey(0),
+                ringVrfKeyIndex = testKey(index),
                 ringVrfPublicKey = mock(),
                 recyclerValue = ValueExponent(1),
-                location = RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), 32, enteredAt),
+                location = RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), members, enteredAt, unloaded),
                 recyclerFungibility = RecyclerFungibility.NONE,
                 maxRecyclerFungibility = null,
             ),
