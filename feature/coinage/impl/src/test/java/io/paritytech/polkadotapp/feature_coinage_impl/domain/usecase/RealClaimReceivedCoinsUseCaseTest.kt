@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.ConfiguredInstanceCoins
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
@@ -84,7 +85,7 @@ class RealClaimReceivedCoinsUseCaseTest {
         assetValueUseCase = assetValueUseCase,
         submissionUseCase = submissionUseCase,
         timeProvider = timeProvider,
-        coinageInstanceIdProvider = coinageInstanceIdProvider,
+        configuredInstanceCoins = ConfiguredInstanceCoins(coinageInstanceIdProvider),
     )
 
     private val groupId = CoinageOperationGroupId("group")

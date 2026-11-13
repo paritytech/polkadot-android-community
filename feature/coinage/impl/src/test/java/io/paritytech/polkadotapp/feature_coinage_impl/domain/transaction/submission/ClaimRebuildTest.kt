@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.ConfiguredInstanceCoins
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.data.transaction.CoinageAssetKind
@@ -62,7 +63,7 @@ class ClaimRebuildTest {
     private val claimExtrinsicBuilder: ClaimExtrinsicBuilder = mockk()
     private val coinageInstanceIdProvider: CoinageInstanceIdProvider = mockk()
 
-    private val rebuild = ClaimRebuild(chainAssetProvider, coinRepository, claimExtrinsicBuilder, coinageInstanceIdProvider)
+    private val rebuild = ClaimRebuild(chainAssetProvider, coinRepository, claimExtrinsicBuilder, ConfiguredInstanceCoins(coinageInstanceIdProvider))
 
     @Before
     fun setUp() {

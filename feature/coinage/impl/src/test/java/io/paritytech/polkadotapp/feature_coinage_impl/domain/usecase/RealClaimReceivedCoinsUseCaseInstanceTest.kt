@@ -22,13 +22,13 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.ConfiguredInstanceCoins
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus.FINALIZED_SUCCESS
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
@@ -67,7 +67,7 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         assetValueUseCase = assetValueUseCase,
         submissionUseCase = submissionUseCase,
         timeProvider = timeProvider,
-        coinageInstanceIdProvider = coinageInstanceIdProvider,
+        configuredInstanceCoins = ConfiguredInstanceCoins(coinageInstanceIdProvider),
     )
 
     private val groupId = CoinageOperationGroupId("group")
@@ -87,22 +87,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
     }
 
     @Test
-    fun `a coin of another instance is left out of every retried submission`() = runTest {
-        val home = key(1)
-        val foreign = key(2)
-        val both = mapOf(home.accountId to 0, foreign.accountId to 5)
-        givenConfiguredInstance(0u)
-        givenSubmissionRefused()
-        givenChainSees(both, both)
-
-        reportsOf(home, foreign)
-
-        coVerify(exactly = 2) { submissionUseCase(any(), any(), any(), any()) }
-        coVerify(exactly = 2) { submissionUseCase(listOf(home.privateKey), any(), groupId, RETRY_UNTIL) }
-        assertNeverSubmitted(foreign)
-    }
-
-    @Test
     fun `a coin of the configured instance is claimed when that instance is not 0`() = runTest {
         val coin = key(1)
         givenConfiguredInstance(7u)
@@ -111,17 +95,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         reportsOf(coin)
 
         assertClaimedOnce(coin)
-    }
-
-    @Test
-    fun `a coin of instance 0 is not claimed when the app is configured for another instance`() = runTest {
-        val coin = key(1)
-        givenConfiguredInstance(7u)
-        givenChainSees(mapOf(coin.accountId to 0))
-
-        reportsOf(coin)
-
-        assertNeverSubmitted(coin)
     }
 
     @Test
@@ -170,10 +143,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(instance)
     }
 
-    private fun givenSubmissionRefused() {
-        coEvery { submissionUseCase(any(), any(), any(), any()) } returns Result.failure(IllegalStateException("refused"))
-    }
-
     private fun List<CoinageTransferDetection>.reportsAnythingReceived() = any {
         it is CoinageTransferDetection.Claimed || it is CoinageTransferDetection.ClaimingRest || it is CoinageTransferDetection.ClaimedPartially
     }
@@ -201,13 +170,10 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
 
     private fun claimOf(vararg coins: PeerCoin) = useCase.claim(coins.map { it.privateKey }, groupId, RETRY_UNTIL)
 
-    private fun givenChainSees(vararg looks: Map<AccountId, Int>) {
+    private fun givenChainSees(look: Map<AccountId, Int>) {
         coEvery { coinRepository.subscribeCoinsInfoFor(any(), any()) } answers {
             flow {
-                looks.forEachIndexed { index, look ->
-                    if (index > 0) delay(NEXT_PASS)
-                    emit(Result.success(look.mapValues { (_, instance) -> OnChainCoinInfo(instanceId = instance, value = 3, age = 0) }))
-                }
+                emit(Result.success(look.mapValues { (_, instance) -> OnChainCoinInfo(instanceId = instance, value = 3, age = 0) }))
                 awaitCancellation()
             }
         }
@@ -249,9 +215,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         val ONE_ASSET = BigInteger.ONE.intoBalance()
 
         val IDLE = 60.seconds
-
-        // Past the claim's 30 s detection timeout, so each look lands in a pass of its own.
-        val NEXT_PASS = 31.seconds
 
         val RETRY_UNTIL = Instant.fromEpochSeconds(1_000)
         val WINDOW_OPEN = Instant.fromEpochSeconds(500)

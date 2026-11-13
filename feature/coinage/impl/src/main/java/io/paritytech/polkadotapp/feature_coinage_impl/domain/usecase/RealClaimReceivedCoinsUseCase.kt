@@ -5,6 +5,7 @@ import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
+import io.paritytech.polkadotapp.common.utils.filterNotNull
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
@@ -15,10 +16,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageTransactionState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetValueUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinageInstanceIdProvider
-import io.paritytech.polkadotapp.feature_coinage_impl.data.config.instanceIdOrNull
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.ConfiguredInstanceCoins
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
-import io.paritytech.polkadotapp.feature_coinage_impl.data.model.belongsTo
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogD
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
@@ -49,7 +48,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     private val assetValueUseCase: CoinageAssetValueUseCase,
     private val submissionUseCase: CoinageTransferSubmissionUseCase,
     private val timeProvider: TimeProvider,
-    private val coinageInstanceIdProvider: CoinageInstanceIdProvider,
+    private val configuredInstanceCoins: ConfiguredInstanceCoins,
 ) : ClaimReceivedCoinsUseCase {
     private companion object {
         /**
@@ -92,7 +91,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
             if (unregistered.isEmpty()) break
 
-            val look = awaitOnChainWithTimeout(onChain, unregistered)?.splitByConfiguredInstance()
+            val look = awaitOnChainWithTimeout(onChain, unregistered)?.let { configuredInstanceCoins.splitOrNull(it) }
             if (look != null) chainAnswered = true
 
             val foreign = look?.foreign.orEmpty()
@@ -101,7 +100,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
                 rejected += foreign
             }
 
-            val claimable = look?.claimable.orEmpty()
+            val claimable = look?.own.orEmpty()
 
             when {
                 // Coin detected => register its claim
@@ -181,17 +180,6 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
         return latest
     }
-
-    private suspend fun Map<AccountId, OnChainCoinInfo>.splitByConfiguredInstance(): InstanceSplit? {
-        if (isEmpty()) return InstanceSplit(claimable = emptyMap(), foreign = emptySet())
-
-        val instance = coinageInstanceIdProvider.instanceIdOrNull() ?: return null
-        val claimable = filterValues { it.belongsTo(instance) }
-
-        return InstanceSplit(claimable, foreign = keys - claimable.keys)
-    }
-
-    private class InstanceSplit(val claimable: Map<AccountId, OnChainCoinInfo>, val foreign: Set<AccountId>)
 
     private suspend fun submit(
         keys: Map<AccountId, CoinPrivateKey>,
@@ -315,11 +303,8 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
                 read.logFailure("Can't fetch info for coins")
                     // Important: ignore failed reads via mapNotNull
                     .getOrNull()
-                    ?.filterValuesNotNull()
+                    ?.filterNotNull()
             }
 
     private fun Keypair.accountId(): AccountId = publicKey.toDataByteArray()
 }
-
-private fun <K, V : Any> Map<K, V?>.filterValuesNotNull(): Map<K, V> =
-    mapNotNull { (key, value) -> value?.let { key to it } }.toMap()
