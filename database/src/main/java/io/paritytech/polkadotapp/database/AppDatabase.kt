@@ -144,7 +144,7 @@ import io.paritytech.polkadotapp.database.model.chain.ChainNodeLocal
 import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
 
 @Database(
-    version = 70,
+    version = 71,
     entities = [
         ProductFundingOperationLocal::class,
         ChainLocal::class,
@@ -285,6 +285,8 @@ import io.paritytech.polkadotapp.database.model.chain.ChainRuntimeInfoLocal
         AutoMigration(from = 68, to = 69),
         // Add chat_acceptances, chat_identity_signing_consents and statement_store_slot_allocations.tag
         AutoMigration(from = 69, to = 70),
+        // Add recycler_vouchers.recyclerUnloaded for readiness by anonymity-minutes
+        AutoMigration(from = 70, to = 71),
     ]
 )
 @TypeConverters(

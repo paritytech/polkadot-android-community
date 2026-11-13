@@ -154,21 +154,23 @@ class VoucherLocationService @Inject constructor(
 
         return vouchers.associate { voucher ->
             val capacity = capacities[voucher.recyclerKey.exponent]
-            val unloaded = unloadedCounts?.get(voucher.recyclerKey) ?: 0
+            val unloaded = voucher.location.recyclerUnloaded
             val included = voucher.location.recyclerMembers
 
-            // Both inputs or neither: a fungibility computed from a guessed capacity or a guessed unloaded
-            // count would be a number the user reads as privacy they do not have. Null leaves whatever is
-            // stored standing, and the next tick with both reads in hand replaces it.
-            val readable = capacity != null && unloadedCounts != null
+            // A fungibility computed from a guessed input would read to the user as privacy they do not have.
+            val readable = capacity != null && unloaded != null
 
             voucher.publicKey to VoucherRecyclerUpdate(
                 location = voucher.location,
-                recyclerFungibility = capacity.takeIf { readable }?.let {
-                    RecyclerFungibilityCalculator.fungibility(it, included, unloaded)
+                recyclerFungibility = if (readable) {
+                    RecyclerFungibilityCalculator.fungibility(capacity, included, unloaded)
+                } else {
+                    null
                 },
-                maxRecyclerFungibility = capacity.takeIf { readable }?.let {
-                    RecyclerFungibilityCalculator.maxFungibility(it, included, unloaded)
+                maxRecyclerFungibility = if (readable) {
+                    RecyclerFungibilityCalculator.maxFungibility(capacity, included, unloaded)
+                } else {
+                    null
                 },
             )
         }
@@ -182,15 +184,17 @@ class VoucherLocationService @Inject constructor(
 
             if (!ringStatus.includesKey(position, keysPerPage)) return@mapNotNull null
 
+            val recyclerKey = ringStatusKey.toRecyclerKey()
             VoucherInRecycler(
                 publicKey = voucherKey.second,
-                recyclerKey = ringStatusKey.toRecyclerKey(),
+                recyclerKey = recyclerKey,
                 // included, not total: a proof only verifies against the keys baked into the ring root, so
                 // that is the set this voucher actually hides in.
                 location = RecyclerVoucher.Location.InRecycler(
                     recyclerIndex = position.ringIndex,
                     recyclerMembers = ringStatus.included,
-                    enteredAt = timeProvider.now()
+                    enteredAt = timeProvider.now(),
+                    recyclerUnloaded = unloadedCounts?.let { it[recyclerKey] ?: 0 },
                 ),
             )
         }

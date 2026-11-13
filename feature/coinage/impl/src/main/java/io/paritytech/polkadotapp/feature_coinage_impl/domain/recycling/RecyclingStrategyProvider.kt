@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinRecyclingStrategy
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
 import javax.inject.Inject
 
 /**
@@ -14,8 +15,9 @@ import javax.inject.Inject
 class RecyclingStrategyProvider @Inject constructor(
     private val forcedRecyclingAgeProvider: ForcedRecyclingAgeProvider,
     private val quotaTracker: UnloadQuotaTracker,
+    private val privacyConfigProvider: CoinagePrivacyConfigProvider,
 ) {
-    fun strategyFor(type: RecyclingStrategyType): CoinRecyclingStrategy = EnsureChainLimitsStrategy(
+    suspend fun strategyFor(type: RecyclingStrategyType): CoinRecyclingStrategy = EnsureChainLimitsStrategy(
         inner = EnsureQuotaLimitsStrategy(
             inner = policyFor(type),
             quotaTracker = quotaTracker,
@@ -30,8 +32,8 @@ class RecyclingStrategyProvider @Inject constructor(
      * question needs neither the chain limit nor a quota read — which is what keeps the balance off the
      * chain on its hot path.
      */
-    fun voucherStrategyFor(type: RecyclingStrategyType): CoinRecyclingStrategy = policyFor(type)
+    suspend fun voucherStrategyFor(type: RecyclingStrategyType): CoinRecyclingStrategy = policyFor(type)
 
-    private fun policyFor(type: RecyclingStrategyType) =
-        ParametricRecyclingStrategy(type.params, forcedRecyclingAgeProvider)
+    private suspend fun policyFor(type: RecyclingStrategyType) =
+        ParametricRecyclingStrategy(type.params(privacyConfigProvider.privacyConfigOrDefault()), forcedRecyclingAgeProvider)
 }

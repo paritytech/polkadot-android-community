@@ -52,7 +52,8 @@ interface RecyclerVoucherDao {
                 WHEN :maxRecyclerFungibility IS NULL THEN maxRecyclerFungibility
                 WHEN maxRecyclerFungibility IS NULL THEN :maxRecyclerFungibility
                 ELSE maxRecyclerFungibility
-            END
+            END,
+            recyclerUnloaded = :recyclerUnloaded
         WHERE ringVrfPublicKey = :ringVrfPublicKey
         """
     )
@@ -62,7 +63,8 @@ interface RecyclerVoucherDao {
         recyclerMembers: Int,
         enteredAt: Long?,
         recyclerFungibility: Int?,
-        maxRecyclerFungibility: Int?
+        maxRecyclerFungibility: Int?,
+        recyclerUnloaded: Int?
     )
 
     @Transaction
@@ -74,7 +76,8 @@ interface RecyclerVoucherDao {
                 recyclerMembers = update.recyclerMembers,
                 enteredAt = update.enteredAt,
                 recyclerFungibility = update.recyclerFungibility,
-                maxRecyclerFungibility = update.maxRecyclerFungibility
+                maxRecyclerFungibility = update.maxRecyclerFungibility,
+                recyclerUnloaded = update.recyclerUnloaded
             )
         }
     }
@@ -103,7 +106,9 @@ class RecyclerVoucherLocationUpdate(
     val recyclerIndex: Int,
     val recyclerMembers: Int,
     val enteredAt: Long?,
-    /** Null leaves the stored value standing — see [RecyclerVoucherDao.updateLocation]. */
+    /** Null leaves the stored fungibility standing — see [RecyclerVoucherDao.updateLocation]. */
     val recyclerFungibility: Int?,
-    val maxRecyclerFungibility: Int?
+    val maxRecyclerFungibility: Int?,
+    /** Null clears the stored count, so no deadline is ever computed from a stale one. */
+    val recyclerUnloaded: Int?
 )

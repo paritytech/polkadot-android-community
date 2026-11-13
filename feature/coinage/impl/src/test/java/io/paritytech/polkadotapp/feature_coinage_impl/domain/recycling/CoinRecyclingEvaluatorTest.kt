@@ -114,16 +114,17 @@ class CoinRecyclingEvaluatorTest {
         private val clockChanges = mockk<ClockChangesSource> {
             every { changes() } returns emptyFlow()
         }
+        private val privacyConfig = FakeCoinagePrivacyConfigProvider()
 
         private val evaluator = CoinRecyclingEvaluator(
             assets,
             settings,
-            RecyclingStrategyProvider(forcedAgeOf(FORCED_AGE), quota),
+            RecyclingStrategyProvider(forcedAgeOf(FORCED_AGE), quota, privacyConfig),
             VoucherUsabilityContextFactory(capacities, clock),
             converter,
             recycling,
             scope.testDispatchers(),
-            VoucherReadinessUpdates(clock, clockChanges),
+            VoucherReadinessUpdates(clock, clockChanges, privacyConfig),
         )
 
         fun start() {
