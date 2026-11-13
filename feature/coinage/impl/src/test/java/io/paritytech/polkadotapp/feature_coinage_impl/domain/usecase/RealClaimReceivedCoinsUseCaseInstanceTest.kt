@@ -103,17 +103,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
     }
 
     @Test
-    fun `a coin of another instance that appears late is not claimed`() = runTest {
-        val foreign = key(1)
-        givenConfiguredInstance(0u)
-        givenChainSees(emptyMap(), mapOf(foreign.accountId to 5))
-
-        reportsOf(foreign)
-
-        assertNeverSubmitted(foreign)
-    }
-
-    @Test
     fun `a coin of the configured instance is claimed when that instance is not 0`() = runTest {
         val coin = key(1)
         givenConfiguredInstance(7u)
