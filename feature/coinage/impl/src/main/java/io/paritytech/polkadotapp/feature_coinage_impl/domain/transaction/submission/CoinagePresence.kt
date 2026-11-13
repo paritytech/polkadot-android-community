@@ -22,7 +22,8 @@ internal suspend fun CoinRepository.subscribeCoinPresenceInConfiguredInstance(
     instanceIdProvider: CoinageInstanceIdProvider,
 ): Flow<Set<AccountId>> =
     subscribeCoinLooks(chainId, accountIds).mapNotNull { infos ->
-        if (infos.values.all { it == null }) return@mapNotNull emptySet()
+        val nothingOnChain = infos.values.all { it == null }
+        if (nothingOnChain) return@mapNotNull emptySet()
 
         val instance = instanceIdProvider.instanceIdOrNull() ?: return@mapNotNull null
 

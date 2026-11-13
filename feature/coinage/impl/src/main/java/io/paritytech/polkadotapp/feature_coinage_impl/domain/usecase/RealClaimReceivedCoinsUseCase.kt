@@ -90,7 +90,6 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
             // the coin it recorded; a second claim here would mint into a coin nothing would ever wait on.
             val unregistered = keys.keys - settled.registeredCoins() - rejected
 
-            // Every coin has a claim that can no longer change, or was refused as another instance's. Claim finished.
             if (unregistered.isEmpty()) break
 
             val look = awaitOnChainWithTimeout(onChain, unregistered)?.splitByConfiguredInstance()

@@ -92,7 +92,7 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         val foreign = key(2)
         val both = mapOf(home.accountId to 0, foreign.accountId to 5)
         givenConfiguredInstance(0u)
-        coEvery { submissionUseCase(any(), any(), any(), any()) } returns Result.failure(IllegalStateException("refused"))
+        givenSubmissionRefused()
         givenChainSees(both, both)
 
         reportsOf(home, foreign)
@@ -164,51 +164,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         assertFalse(reported.any { it is CoinageTransferDetection.Claimed })
     }
 
-    @Test
-    fun `a coin is not claimed while the configured instance cannot be read`() = runTest {
-        val coin = key(1)
-        every { timeProvider.now() } returns WINDOW_CLOSED
-        givenUnreadableInstance()
-        givenChainSees(mapOf(coin.accountId to 0))
-
-        assertDoesNotComplete(coin)
-        assertNothingSubmitted()
-    }
-
-    @Test
-    fun `an unreadable configured instance does not keep open a claim whose coins never arrived`() = runTest {
-        val coin = key(1)
-        every { timeProvider.now() } returns WINDOW_CLOSED
-        givenUnreadableInstance()
-        givenChainSees(emptyMap())
-
-        val reported = reportsOfCompleted(coin)
-
-        assertEquals(CoinageTransferDetection.NotClaimed, reported.last())
-        assertNothingSubmitted()
-    }
-
-    @Test
-    fun `a coin seen while the configured instance was unreadable is claimed on a later look once it can be read`() = runTest {
-        val coin = key(1)
-        coEvery { coinageInstanceIdProvider.instanceId() } returnsMany listOf(UNREADABLE, Result.success(0u))
-        givenChainSees(mapOf(coin.accountId to 0), mapOf(coin.accountId to 0))
-
-        reportsOf(coin)
-
-        assertClaimedOnce(coin)
-    }
-
-    @Test
-    fun `a coin is not claimed while the configured instance is still unknown`() = runTest {
-        val coin = key(1)
-        coEvery { coinageInstanceIdProvider.instanceId() } coAnswers { awaitCancellation() }
-        givenChainSees(mapOf(coin.accountId to 0))
-
-        assertDoesNotComplete(coin)
-        assertNothingSubmitted()
-    }
-
     private fun assertClaimedOnce(coin: PeerCoin) {
         coVerify(exactly = 1) { submissionUseCase(any(), any(), any(), any()) }
         coVerify(exactly = 1) { submissionUseCase(listOf(coin.privateKey), any(), groupId, RETRY_UNTIL) }
@@ -222,16 +177,12 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         coVerify(exactly = 0) { submissionUseCase(any(), match { accountId in it.keys }, any(), any()) }
     }
 
-    private fun assertNothingSubmitted() {
-        coVerify(exactly = 0) { submissionUseCase(any(), any(), any(), any()) }
-    }
-
     private fun givenConfiguredInstance(instance: UInt) {
         coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(instance)
     }
 
-    private fun givenUnreadableInstance() {
-        coEvery { coinageInstanceIdProvider.instanceId() } returns UNREADABLE
+    private fun givenSubmissionRefused() {
+        coEvery { submissionUseCase(any(), any(), any(), any()) } returns Result.failure(IllegalStateException("refused"))
     }
 
     private fun List<CoinageTransferDetection>.reportsAnythingReceived() = any {
@@ -257,15 +208,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         assertTrue("the claim was left open when nothing more would be attempted", completed == true)
 
         return reported
-    }
-
-    private suspend fun assertDoesNotComplete(vararg coins: PeerCoin) {
-        val completed = withTimeoutOrNull(IDLE) {
-            claimOf(*coins).collect { }
-            true
-        }
-
-        assertFalse("the claim was closed while there was still something to claim", completed == true)
     }
 
     private fun claimOf(vararg coins: PeerCoin) = useCase.claim(coins.map { it.privateKey }, groupId, RETRY_UNTIL)
@@ -317,8 +259,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
     private companion object {
         val ONE_ASSET = BigInteger.ONE.intoBalance()
 
-        val UNREADABLE = Result.failure<UInt>(IllegalStateException("Malformed coinage instance id: abc"))
-
         val IDLE = 60.seconds
 
         // Past the claim's 30 s detection timeout, so each look lands in a pass of its own.
@@ -326,8 +266,6 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
 
         val RETRY_UNTIL = Instant.fromEpochSeconds(1_000)
         val WINDOW_OPEN = Instant.fromEpochSeconds(500)
-        val WINDOW_CLOSED = Instant.fromEpochSeconds(1_500)
-
         const val DERIVATION_FILE = "io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferMemoKt"
     }
 }

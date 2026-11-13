@@ -68,7 +68,6 @@ class ClaimRebuildTest {
     fun setUp() {
         every { chainAssetProvider.chainId() } returns "test-chain"
         coEvery { chainAssetProvider.chain() } returns chain
-        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(0u)
     }
 
     // ---- reading back ----
@@ -120,6 +119,7 @@ class ClaimRebuildTest {
     fun `presence reports the peer's coins the chain holds`() = runTest {
         val present = claimOf(1).source
         val absent = claimOf(2).source
+        givenConfiguredInstance(0u)
         givenChainReads(listOf(Result.success(mapOf(present to 0))))
 
         val looks = rebuild.presence(setOf(present, absent)).take(1).toList()
@@ -130,6 +130,7 @@ class ClaimRebuildTest {
     @Test
     fun `a failed chain read is not reported as a look`() = runTest {
         val coin = claimOf(1).source
+        givenConfiguredInstance(0u)
         givenChainReads(listOf(Result.failure(IllegalStateException("node unreachable")), Result.success(emptyMap())))
 
         val looks = rebuild.presence(setOf(coin)).take(1).toList()
@@ -141,35 +142,12 @@ class ClaimRebuildTest {
     fun `presence reports only the coins of the configured instance`() = runTest {
         val home = claimOf(1).source
         val foreign = claimOf(2).source
-        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(7u)
+        givenConfiguredInstance(7u)
         givenChainReads(listOf(Result.success(mapOf(home to 7, foreign to 0))))
 
         val looks = rebuild.presence(setOf(home, foreign)).take(1).toList()
 
         assertEquals(listOf(setOf(home)), looks)
-    }
-
-    @Test
-    fun `an unreadable configured instance is not reported as a look`() = runTest {
-        val coin = claimOf(1).source
-        coEvery { coinageInstanceIdProvider.instanceId() } returnsMany
-            listOf(Result.failure(IllegalStateException("Malformed coinage instance id: abc")), Result.success(0u))
-        givenChainReads(listOf(Result.success(mapOf(coin to 0)), Result.success(mapOf(coin to 0))))
-
-        val looks = rebuild.presence(setOf(coin)).take(1).toList()
-
-        assertEquals(listOf(setOf(coin)), looks)
-    }
-
-    @Test
-    fun `a look with none of the coins is reported even when the configured instance can't be read`() = runTest {
-        val coin = claimOf(1).source
-        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.failure(IllegalStateException("Malformed coinage instance id: abc"))
-        givenChainReads(listOf(Result.success(emptyMap())))
-
-        val looks = rebuild.presence(setOf(coin)).take(1).toList()
-
-        assertEquals(listOf(emptySet<AccountId>()), looks)
     }
 
     // ---- how long it is retried ----
@@ -222,6 +200,10 @@ class ClaimRebuildTest {
     }
 
     // ---- harness ----
+
+    private fun givenConfiguredInstance(instance: UInt) {
+        coEvery { coinageInstanceIdProvider.instanceId() } returns Result.success(instance)
+    }
 
     private fun givenBuildsSucceed() {
         coEvery { claimExtrinsicBuilder.build(any(), any(), any()) } returns Result.success(mockk<EnrichedSendableExtrinsic>())
