@@ -41,7 +41,7 @@ class RealCoinageHoldingsUseCase @Inject constructor(
         .map { (coins, vouchers, strategyType, verdicts) ->
             val strategy = strategyProvider.voucherStrategyFor(strategyType)
 
-            // IMMEDIATE, as for the balance: the list must not wait on a ring-capacity fetch before appearing.
+            // The list must not wait on a ring-capacity fetch before appearing.
             val usability = usabilityContextFactory.create(
                 balanceEvaluationMode = BalanceEvaluationMode.IMMEDIATE,
                 denominations = vouchers.mapToSet { it.voucher.recyclerValue },

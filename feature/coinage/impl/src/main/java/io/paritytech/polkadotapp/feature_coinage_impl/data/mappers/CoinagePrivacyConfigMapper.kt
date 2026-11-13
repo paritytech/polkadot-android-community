@@ -13,14 +13,12 @@ internal fun CoinagePrivacyConfigRemote?.toDomain(): CoinagePrivacyConfig = Coin
     maxPrivacy = this?.maxPrivacy.toDomain(CoinagePrivacyConfig.BUNDLED.maxPrivacy),
 )
 
-private fun PrivacyModeRemote?.toDomain(bundled: VoucherReadiness): VoucherReadiness {
-    val bundledAnonymity = bundled.anonymityRequirements ?: return bundled
-
-    return VoucherReadiness(
-        requiredRingFill = this?.ringFillPercent?.takeIf { it in 0..100 }?.percents ?: bundled.requiredRingFill,
-        anonymityRequirements = AnonymityRequirements(
+private fun PrivacyModeRemote?.toDomain(bundled: VoucherReadiness): VoucherReadiness = VoucherReadiness(
+    requiredRingFill = this?.ringFillPercent?.takeIf { it in 0..100 }?.percents ?: bundled.requiredRingFill,
+    anonymityRequirements = bundled.anonymityRequirements?.let { bundledAnonymity ->
+        AnonymityRequirements(
             anonymityTime = this?.anonymityMinutes?.takeIf { it > 0 }?.minutes ?: bundledAnonymity.anonymityTime,
             anonymityMembers = this?.anonymityMembers?.takeIf { it > 0 } ?: bundledAnonymity.anonymityMembers,
-        ),
-    )
-}
+        )
+    },
+)
