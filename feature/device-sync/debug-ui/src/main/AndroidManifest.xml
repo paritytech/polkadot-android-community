@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="io.paritytech.polkadotapp.feature_device_sync_debug_ui.DeviceTransferDebugActivity"
+            android:exported="true"
+            android:launchMode="singleTop" />
+
+        <provider
+            android:name="io.paritytech.polkadotapp.feature_device_sync_debug_ui.DeviceTransferDebugButtonInstaller"
+            android:authorities="${applicationId}.devicetransferdebug"
+            android:exported="false" />
+    </application>
+</manifest>
