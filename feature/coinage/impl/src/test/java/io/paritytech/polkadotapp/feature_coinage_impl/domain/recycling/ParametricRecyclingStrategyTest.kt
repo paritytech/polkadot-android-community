@@ -171,11 +171,13 @@ class ParametricRecyclingStrategyTest {
     }
 
     @Test
-    fun `more members shorten the anonymity wait`() {
+    fun `the anonymity wait divides the budget by the members left`() {
         data class Case(val type: RecyclingStrategyType, val members: Int, val wait: Duration)
         val cases = listOf(
             Case(RecyclingStrategyType.BALANCED, members = 16, wait = 5.minutes),
             Case(RecyclingStrategyType.BALANCED, members = 4, wait = 20.minutes),
+            Case(RecyclingStrategyType.BALANCED, members = 1, wait = 80.minutes),
+            Case(RecyclingStrategyType.BALANCED, members = 3, wait = 1_600_000.milliseconds),
             Case(RecyclingStrategyType.MAX_PRIVACY, members = 16, wait = 10.minutes),
         )
 
@@ -207,14 +209,6 @@ class ParametricRecyclingStrategyTest {
 
             assertFalse("$unloaded unloaded", RecyclingStrategyType.BALANCED.isUsable(voucher, after = 1.days))
         }
-    }
-
-    @Test
-    fun `a voucher alone in its ring waits the whole balanced budget`() {
-        val alone = inRecycler(members = 1)
-
-        assertFalse(RecyclingStrategyType.BALANCED.isUsable(alone, after = 80.minutes - 1.milliseconds))
-        assertTrue(RecyclingStrategyType.BALANCED.isUsable(alone, after = 80.minutes))
     }
 
     @Test
@@ -250,14 +244,6 @@ class ParametricRecyclingStrategyTest {
         listOf(RecyclingStrategyType.BALANCED, RecyclingStrategyType.MAX_PRIVACY).forEach { type ->
             assertFalse("$type", type.isUsable(voucher, after = 1.days))
         }
-    }
-
-    @Test
-    fun `a fractional wait is measured exactly`() {
-        val voucher = inRecycler(members = 3)
-
-        assertFalse(RecyclingStrategyType.BALANCED.isUsable(voucher, after = 1_599_999.milliseconds))
-        assertTrue(RecyclingStrategyType.BALANCED.isUsable(voucher, after = 1_600_000.milliseconds))
     }
 
     private fun RecyclingStrategyType.isUsable(

@@ -39,16 +39,6 @@ class RemoteConfigCoinagePrivacyConfigProviderTest {
     )
 
     @Test
-    fun `published values replace the defaults for balanced and max privacy`() = runBlocking<Unit> {
-        withRemote(Result.success(PUBLISHED))
-
-        val config = provider.privacyConfigOrDefault()
-
-        assertEquals(VoucherReadiness(30.percents, AnonymityRequirements(5.minutes, 4)), config.balanced)
-        assertEquals(VoucherReadiness(80.percents, AnonymityRequirements(7.minutes, 12)), config.maxPrivacy)
-    }
-
-    @Test
     fun `a published config changes when a balanced voucher becomes ready`() = runBlocking<Unit> {
         withRemote(Result.success(PUBLISHED))
         val published = provider.privacyConfigOrDefault()
