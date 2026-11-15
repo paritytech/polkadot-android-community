@@ -162,7 +162,7 @@ class RealInstallationAssetScanner @Inject constructor(
     }
 
     private fun RingPosition.getVoucherLocation() = when (this) {
-        // Placeholders, not real values: nothing releases the voucher until the location service reads the ring.
+        // Placeholders, not reads: the time route stays shut until the location service has the ring.
         is RingPosition.Included -> Location.InRecycler(ringIndex, recyclerMembers = 0, enteredAt = null, recyclerUnloaded = null)
         is RingPosition.Onboarding -> Location.Onboarding
         is RingPosition.Suspended -> Location.Unknown
