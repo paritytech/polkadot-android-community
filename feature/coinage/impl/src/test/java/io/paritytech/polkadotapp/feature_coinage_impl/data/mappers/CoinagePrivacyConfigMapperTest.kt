@@ -2,9 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.data.mappers
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
-import io.mockk.mockk
 import io.paritytech.polkadotapp.common.utils.Fraction.Companion.percents
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerFungibility
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
@@ -15,10 +13,11 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherRea
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigRemote
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.PrivacyModeRemote
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FULL_RING_CAPACITY
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FetchedVoucherUsabilityContext
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.ParametricRecyclingStrategy
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.forcedAgeOf
-import io.paritytech.polkadotapp.feature_coinage_impl.testKey
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.voucherOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -103,15 +102,8 @@ class CoinagePrivacyConfigMapperTest {
         val invalid = listOf(0, -1, null)
         val modes = invalid.map { PrivacyModeRemote(ringFillPercent = null, anonymityMinutes = it, anonymityMembers = 8) } +
             invalid.map { PrivacyModeRemote(ringFillPercent = null, anonymityMinutes = 10, anonymityMembers = it) }
-        val voucher = RecyclerVoucher(
-            ringVrfKeyIndex = testKey(0),
-            ringVrfPublicKey = mockk(),
-            recyclerValue = ValueExponent(1),
-            location = RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), 8, ENTERED_AT, recyclerUnloaded = 0),
-            recyclerFungibility = RecyclerFungibility.NONE,
-            maxRecyclerFungibility = RecyclerFungibility.NONE,
-        )
-        val context = FetchedVoucherUsabilityContext(ringCapacities = mapOf(ValueExponent(1) to 767), now = ENTERED_AT)
+        val voucher = voucherOf(RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), 8, ENTERED_AT, recyclerUnloaded = 0))
+        val context = FetchedVoucherUsabilityContext(ringCapacities = mapOf(ValueExponent(1) to FULL_RING_CAPACITY), now = ENTERED_AT)
 
         modes.forEach { mode ->
             val config = CoinagePrivacyConfigRemote(balanced = mode, maxPrivacy = null).toDomain()
