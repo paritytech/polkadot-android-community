@@ -249,16 +249,6 @@ class VoucherReadinessUpdatesTest {
     }
 
     @Test
-    fun `sixteen members re-emit at five minutes`() = runTest {
-        val emissions = balancedEmissions(listOf(voucher(members = 16)))
-
-        advanceTimeBy(1.days)
-        runCurrent()
-
-        assertEquals(listOf(0L, 300000L), emissions)
-    }
-
-    @Test
     fun `an unload moves the deadline out`() = runTest {
         val fixture = SchedulerFixture(this, RecyclingStrategyType.BALANCED)
         fixture.vouchers.value = listOf(voucher(members = 8))

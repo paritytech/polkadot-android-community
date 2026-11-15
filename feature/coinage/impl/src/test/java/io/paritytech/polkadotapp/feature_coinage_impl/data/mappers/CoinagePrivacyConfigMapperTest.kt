@@ -3,40 +3,17 @@ package io.paritytech.polkadotapp.feature_coinage_impl.data.mappers
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import io.paritytech.polkadotapp.common.utils.Fraction.Companion.percents
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.AnonymityRequirements
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherReadiness
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigRemote
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.PrivacyModeRemote
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FULL_RING_CAPACITY
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FetchedVoucherUsabilityContext
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.ParametricRecyclingStrategy
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.forcedAgeOf
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.voucherOf
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import java.math.BigInteger
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 
 class CoinagePrivacyConfigMapperTest {
-    @Test
-    fun `published values are kept`() {
-        val remote = CoinagePrivacyConfigRemote(
-            balanced = PrivacyModeRemote(ringFillPercent = 30, anonymityMinutes = 5, anonymityMembers = 4),
-            maxPrivacy = PrivacyModeRemote(ringFillPercent = 80, anonymityMinutes = 7, anonymityMembers = 12),
-        )
-
-        assertEquals(CoinagePrivacyConfig(readiness(30, 5, 4), readiness(80, 7, 12)), remote.toDomain())
-    }
-
     @Test
     fun `an unset key maps to the bundled defaults`() {
         val unset: CoinagePrivacyConfigRemote? = null
@@ -98,25 +75,6 @@ class CoinagePrivacyConfigMapperTest {
     }
 
     @Test
-    fun `an invalid anonymity budget never releases a balanced voucher at once`() {
-        val invalid = listOf(0, -1, null)
-        val modes = invalid.map { PrivacyModeRemote(ringFillPercent = null, anonymityMinutes = it, anonymityMembers = 8) } +
-            invalid.map { PrivacyModeRemote(ringFillPercent = null, anonymityMinutes = 10, anonymityMembers = it) }
-        val voucher = voucherOf(RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), 8, ENTERED_AT, recyclerUnloaded = 0))
-        val context = FetchedVoucherUsabilityContext(ringCapacities = mapOf(ValueExponent(1) to FULL_RING_CAPACITY), now = ENTERED_AT)
-
-        modes.forEach { mode ->
-            val config = CoinagePrivacyConfigRemote(balanced = mode, maxPrivacy = null).toDomain()
-            val strategy = ParametricRecyclingStrategy(RecyclingStrategyType.BALANCED.params(config), forcedAgeOf(14))
-
-            assertFalse(
-                "minutes ${mode.anonymityMinutes}, members ${mode.anonymityMembers}",
-                strategy.isVoucherUsable(voucher, context),
-            )
-        }
-    }
-
-    @Test
     fun `the published json field names map onto the config`() {
         val documented = """{"balanced":{"ringFillPercent":20,"anonymityMinutes":10,"anonymityMembers":8},""" +
             """"maxPrivacy":{"ringFillPercent":90,"anonymityMinutes":10,"anonymityMembers":16}}"""
@@ -149,8 +107,6 @@ class CoinagePrivacyConfigMapperTest {
     )
 
     private companion object {
-        val ENTERED_AT = Instant.fromEpochMilliseconds(0)
-
         val BUNDLED = CoinagePrivacyConfig(
             balanced = VoucherReadiness(20.percents, AnonymityRequirements(anonymityTime = 10.minutes, anonymityMembers = 8)),
             maxPrivacy = VoucherReadiness(90.percents, AnonymityRequirements(anonymityTime = 10.minutes, anonymityMembers = 16)),

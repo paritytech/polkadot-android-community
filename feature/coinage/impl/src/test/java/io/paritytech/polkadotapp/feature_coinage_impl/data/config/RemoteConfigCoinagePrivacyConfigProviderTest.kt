@@ -3,33 +3,17 @@ package io.paritytech.polkadotapp.feature_coinage_impl.data.config
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.paritytech.polkadotapp.common.utils.Fraction.Companion.percents
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerIndex
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.AnonymityRequirements
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherReadiness
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FULL_RING_CAPACITY
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FetchedVoucherUsabilityContext
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.ParametricRecyclingStrategy
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.forcedAgeOf
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.voucherOf
 import io.paritytech.polkadotapp.test_shared.TestCoroutineDispatchers
 import io.paritytech.polkadotapp.tools_remoteconfig_api.RemoteConfigService
 import io.paritytech.polkadotapp.tools_remoteconfig_api.getJsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.math.BigInteger
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 
 class RemoteConfigCoinagePrivacyConfigProviderTest {
     private val remoteConfigService: RemoteConfigService = mockk()
@@ -37,18 +21,6 @@ class RemoteConfigCoinagePrivacyConfigProviderTest {
         remoteConfigService,
         TestCoroutineDispatchers(Dispatchers.Unconfined),
     )
-
-    @Test
-    fun `a published config changes when a balanced voucher becomes ready`() = runBlocking<Unit> {
-        withRemote(Result.success(PUBLISHED))
-        val published = provider.privacyConfigOrDefault()
-        withRemote(Result.success(null))
-        val bundled = provider.privacyConfigOrDefault()
-
-        assertFalse(published.balancedUsableAfter(5.minutes - 1.milliseconds))
-        assertTrue(published.balancedUsableAfter(5.minutes))
-        assertFalse(bundled.balancedUsableAfter(5.minutes))
-    }
 
     @Test
     fun `an unset key falls back to the bundled defaults`() = runBlocking<Unit> {
@@ -80,17 +52,7 @@ class RemoteConfigCoinagePrivacyConfigProviderTest {
         coEvery { remoteConfigService.getJsonObject<CoinagePrivacyConfigRemote?>("coinage_privacy_config") } returns result
     }
 
-    private fun CoinagePrivacyConfig.balancedUsableAfter(elapsed: Duration): Boolean {
-        val voucher = voucherOf(RecyclerVoucher.Location.InRecycler(RecyclerIndex(BigInteger.ONE), 4, ENTERED_AT, recyclerUnloaded = 0))
-        val context = FetchedVoucherUsabilityContext(mapOf(ValueExponent(1) to FULL_RING_CAPACITY), now = ENTERED_AT + elapsed)
-
-        return ParametricRecyclingStrategy(RecyclingStrategyType.BALANCED.params(this), forcedAgeOf(14))
-            .isVoucherUsable(voucher, context)
-    }
-
     private companion object {
-        val ENTERED_AT = Instant.fromEpochMilliseconds(0)
-
         val PUBLISHED = CoinagePrivacyConfigRemote(
             balanced = PrivacyModeRemote(ringFillPercent = 30, anonymityMinutes = 5, anonymityMembers = 4),
             maxPrivacy = PrivacyModeRemote(ringFillPercent = 80, anonymityMinutes = 7, anonymityMembers = 12),

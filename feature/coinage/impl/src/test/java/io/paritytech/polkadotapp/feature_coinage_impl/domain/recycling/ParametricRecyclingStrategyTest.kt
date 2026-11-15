@@ -163,18 +163,11 @@ class ParametricRecyclingStrategyTest {
     }
 
     @Test
-    fun `eight members are ready after ten minutes and not after nine`() {
-        val voucher = inRecycler(members = 8)
-
-        assertFalse(RecyclingStrategyType.BALANCED.isUsable(voucher, after = 9.minutes))
-        assertTrue(RecyclingStrategyType.BALANCED.isUsable(voucher, after = 10.minutes))
-    }
-
-    @Test
     fun `the anonymity wait divides the budget by the members left`() {
         data class Case(val type: RecyclingStrategyType, val members: Int, val wait: Duration)
         val cases = listOf(
             Case(RecyclingStrategyType.BALANCED, members = 16, wait = 5.minutes),
+            Case(RecyclingStrategyType.BALANCED, members = 8, wait = 10.minutes),
             Case(RecyclingStrategyType.BALANCED, members = 4, wait = 20.minutes),
             Case(RecyclingStrategyType.BALANCED, members = 1, wait = 80.minutes),
             Case(RecyclingStrategyType.BALANCED, members = 3, wait = 1_600_000.milliseconds),
