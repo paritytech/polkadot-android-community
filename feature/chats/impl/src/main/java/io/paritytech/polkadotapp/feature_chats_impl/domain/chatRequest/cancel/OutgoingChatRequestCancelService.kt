@@ -15,9 +15,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
-import io.paritytech.polkadotapp.feature_chats_api.domain.model.isCancellingOutgoing
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.pendingChatRequestIdOrThrow
-import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
@@ -52,7 +50,6 @@ private const val CANCEL_CONNECTION_TAG = "ChatRequestCancel"
 class OutgoingChatRequestCancelService @Inject constructor(
     private val contactsRepository: ContactsRepository,
     private val chatRequestRepository: ChatRequestRepository,
-    private val chatMessageRepository: ChatMessageRepository,
     private val deleteLocalChat: DeleteLocalChatUseCase,
     private val chatSigners: ContactChatSigners,
     private val publisher: ChatRequestPublisher,
@@ -69,33 +66,38 @@ class OutgoingChatRequestCancelService @Inject constructor(
     suspend fun cancel(contactAccountId: AccountId): Result<Unit> {
         return runCancellableCatching {
             val contact = contactsRepository.getContactOrThrow(contactAccountId)
-            contact to contact.pendingChatRequestIdOrThrow()
-        }.flatMap { (contact, requestId) ->
-            markCancelling(requestId).map { launch { cancelInBackground(contact, requestId) } }
+            contact to chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestIdOrThrow())
+        }.flatMap { (contact, request) ->
+            markCancelledAndRemoveChat(contact, request.id).map {
+                releaseChatSigner(contact, request.id)
+                launch { publishCancelInBackground(contact, request) }
+            }
         }.coerceToUnit()
     }
 
-    private suspend fun markCancelling(requestId: ChatRequestId): Result<Unit> {
-        return runCancellableCatching { chatRequestRepository.markCancelling(requestId) }.flatMap { marked ->
+    private suspend fun markCancelledAndRemoveChat(contact: Contact, requestId: ChatRequestId): Result<Unit> {
+        return runCancellableCatching {
+            contactsRepository.withTransaction {
+                val marked = chatRequestRepository.markOutgoingCancelled(requestId)
+                if (marked) deleteLocalChat(ChatId.fromContact(contact.accountId))
+                marked
+            }
+        }.flatMap { marked ->
             if (marked) Result.success(Unit) else Result.failure(OutgoingChatRequestNotPending(requestId))
         }
     }
 
-    private suspend fun cancelInBackground(contact: Contact, requestId: ChatRequestId) {
-        chainConnectionRefCounter.withConnectionEnabled(knownChains.people, CANCEL_CONNECTION_TAG) {
-            publisher.awaitPublishing(requestId)
-
-            publishCancel(contact, requestId)
-                .onSuccess { removeLocally(contact.accountId, requestId) }
-                .onFailure { error -> revert(requestId, error) }
-        }
+    private suspend fun releaseChatSigner(contact: Contact, requestId: ChatRequestId) {
+        chatSigners.release(contact.accountId).logFailure("Failed to release chat signer after request $requestId was cancelled")
     }
 
-    private suspend fun publishCancel(contact: Contact, requestId: ChatRequestId): Result<Unit> {
-        return runCancellableCatching { chatRequestRepository.getByIdOrThrow(requestId) }.flatMap { request ->
-            if (!request.isCancellingOutgoing()) return@flatMap Result.failure(OutgoingChatRequestNotPending(requestId))
+    private suspend fun publishCancelInBackground(contact: Contact, request: ChatRequest) {
+        chainConnectionRefCounter.withConnectionEnabled(knownChains.people, CANCEL_CONNECTION_TAG) {
+            publisher.awaitPublishing(request.id)
 
-            findOwnCopies(contact, request).flatMap { copies -> cancelCopies(contact, request, copies) }
+            findOwnCopies(contact, request)
+                .onSuccess { copies -> cancelCopies(contact, request, copies) }
+                .onFailure { error -> Timber.w(error, "chatRequestCancel: copies of request ${request.id} were not fetched; nothing was cancelled") }
         }
     }
 
@@ -122,25 +124,18 @@ class OutgoingChatRequestCancelService @Inject constructor(
         return (oneShotSigners + signers.usernameSigner(contact, period)).flattenResult()
     }
 
-    private suspend fun cancelCopies(contact: Contact, request: ChatRequest, copies: List<OwnRequestCopy>): Result<Unit> {
-        var isAnyAccepted = false
-        var lastFailure: Throwable? = null
-
+    private suspend fun cancelCopies(contact: Contact, request: ChatRequest, copies: List<OwnRequestCopy>) {
         for (copy in copies) {
             submitCancelWithRetries(contact, request, copy)
-                .onSuccess { isAnyAccepted = true }
+                .onSuccess { Timber.i("chatRequestCancel: a copy of request ${request.id} was cancelled") }
                 .onFailure { error ->
                     if (error is StatementSubmitError.NoAllowance) {
                         Timber.i("chatRequestCancel: a copy of request ${request.id} has no allowance left; the store drops it")
                     } else {
                         Timber.w(error, "chatRequestCancel: a copy of request ${request.id} was not cancelled")
-                        lastFailure = error
                     }
                 }
         }
-
-        val failure = lastFailure
-        return if (failure != null && !isAnyAccepted) Result.failure(failure) else Result.success(Unit)
     }
 
     private suspend fun submitCancelWithRetries(contact: Contact, request: ChatRequest, copy: OwnRequestCopy): Result<Unit> {
@@ -163,42 +158,6 @@ class OutgoingChatRequestCancelService @Inject constructor(
             is StatementSubmitError -> false
             else -> true
         }
-    }
-
-    private suspend fun removeLocally(contactAccountId: AccountId, requestId: ChatRequestId) {
-        val chatId = ChatId.fromContact(contactAccountId)
-
-        runCancellableCatching {
-            contactsRepository.withTransaction {
-                if (!canRemoveChat(requestId, chatId)) return@withTransaction false
-
-                deleteLocalChat(chatId)
-                chatRequestRepository.delete(requestId)
-                true
-            }
-        }
-            .flatMap { removed ->
-                if (!removed) {
-                    Timber.i("chatRequestCancel: request $requestId was accepted and its chat has messages; keeping it")
-                    return@flatMap Result.success(Unit)
-                }
-
-                chatSigners.release(contactAccountId).onSuccess { Timber.i("chatRequestCancel: request $requestId cancelled") }
-            }
-            .logFailure("Chat request $requestId was cancelled on the store but not removed locally")
-    }
-
-    private suspend fun canRemoveChat(requestId: ChatRequestId, chatId: ChatId): Boolean {
-        val request = chatRequestRepository.getById(requestId) ?: return false
-
-        return request.isCancellingOutgoing() || !chatMessageRepository.hasConversationMessages(chatId)
-    }
-
-    private suspend fun revert(requestId: ChatRequestId, error: Throwable) {
-        Timber.w(error, "chatRequestCancel: cancel of request $requestId failed; the request is back")
-
-        runCancellableCatching { chatRequestRepository.revertCancelling(requestId) }
-            .logFailure("Chat request $requestId could not be reverted from cancelling")
     }
 }
 

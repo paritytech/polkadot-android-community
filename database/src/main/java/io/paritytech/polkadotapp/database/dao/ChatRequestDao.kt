@@ -28,7 +28,7 @@ interface ChatRequestDao {
         """
         UPDATE chat_requests
         SET deliveryStatus = :deliveryStatus, deliveredVia = :deliveredVia, lastDeliveredPeriod = :lastDeliveredPeriod
-        WHERE id = :id
+        WHERE id = :id AND status != 'CANCELLED'
         """
     )
     suspend fun updateDelivery(
@@ -38,14 +38,14 @@ interface ChatRequestDao {
         lastDeliveredPeriod: Long?,
     )
 
-    @Query("UPDATE chat_requests SET status = 'CANCELLING' WHERE id = :id AND direction = 'OUTGOING' AND status = 'PENDING'")
-    suspend fun markCancelling(id: String): Int
-
-    @Query("UPDATE chat_requests SET status = 'PENDING' WHERE id = :id AND status = 'CANCELLING'")
-    suspend fun revertCancelling(id: String)
-
-    @Query("UPDATE chat_requests SET status = 'PENDING' WHERE status = 'CANCELLING'")
-    suspend fun revertCancellingToPending()
+    @Query(
+        """
+        UPDATE chat_requests
+        SET status = 'CANCELLED', deliveryStatus = 'DELIVERED', deliveredVia = NULL, lastDeliveredPeriod = NULL
+        WHERE id = :id AND direction = 'OUTGOING' AND status = 'PENDING'
+        """
+    )
+    suspend fun markOutgoingCancelled(id: String): Int
 
     @Query("DELETE FROM chat_requests WHERE id = :id")
     suspend fun delete(id: String)

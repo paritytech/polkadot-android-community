@@ -20,7 +20,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.Ident
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.awaitRetry
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
@@ -47,14 +46,8 @@ class ChatRequestDeliveryService @Inject constructor(
     context(scope: ComputationalScope)
     override fun initialize(): Result<Unit> = runCancellableCatching {
         contactsRepository.subscribeContactsWithUndeliveredOutgoingRequests()
-            .onStart { revertInterruptedCancels() }
             .onEach { pending -> pending.forEach { launchDelivery(it) } }
             .launchIn(scope)
-    }
-
-    private suspend fun revertInterruptedCancels() {
-        runCancellableCatching { chatRequestRepository.revertCancellingToPending() }
-            .logFailure("Chat requests left cancelling by the previous process could not be reverted")
     }
 
     context(scope: ComputationalScope)
