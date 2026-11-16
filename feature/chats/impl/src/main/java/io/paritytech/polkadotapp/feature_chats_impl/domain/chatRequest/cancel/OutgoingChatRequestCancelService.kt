@@ -42,8 +42,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.seconds
 
-private const val CANCEL_ATTEMPTS = 3
-private val CANCEL_RETRY_DELAY = exponentialRetryDelay(initialDelay = 1.seconds, maxDelay = 4.seconds)
+private const val CANCEL_ATTEMPTS = 10
+private val CANCEL_RETRY_DELAY = exponentialRetryDelay(initialDelay = 1.seconds, maxDelay = 256.seconds)
 private const val CANCEL_CONNECTION_TAG = "ChatRequestCancel"
 
 @Singleton
@@ -95,7 +95,7 @@ class OutgoingChatRequestCancelService @Inject constructor(
         chainConnectionRefCounter.withConnectionEnabled(knownChains.people, CANCEL_CONNECTION_TAG) {
             publisher.awaitPublishing(request.id)
 
-            findOwnCopies(contact, request)
+            retryingTransientFailures { findOwnCopies(contact, request) }
                 .onSuccess { copies -> cancelCopies(contact, request, copies) }
                 .onFailure { error -> Timber.w(error, "chatRequestCancel: copies of request ${request.id} were not fetched; nothing was cancelled") }
         }
@@ -126,7 +126,7 @@ class OutgoingChatRequestCancelService @Inject constructor(
 
     private suspend fun cancelCopies(contact: Contact, request: ChatRequest, copies: List<OwnRequestCopy>) {
         for (copy in copies) {
-            submitCancelWithRetries(contact, request, copy)
+            retryingTransientFailures { submitCancel(contact, request, copy) }
                 .onSuccess { Timber.i("chatRequestCancel: a copy of request ${request.id} was cancelled") }
                 .onFailure { error ->
                     if (error is StatementSubmitError.NoAllowance) {
@@ -138,12 +138,17 @@ class OutgoingChatRequestCancelService @Inject constructor(
         }
     }
 
-    private suspend fun submitCancelWithRetries(contact: Contact, request: ChatRequest, copy: OwnRequestCopy): Result<Unit> {
+    private suspend fun submitCancel(contact: Contact, request: ChatRequest, copy: OwnRequestCopy): Result<Unit> {
+        val expiry = StatementExpiry.nextAfter(copy.stored.expiry)
+
+        return outgoingChatRequestService.deliverChatRequestCancel(request, contact, copy.prover, expiry)
+    }
+
+    private suspend fun <T> retryingTransientFailures(action: suspend () -> Result<T>): Result<T> {
         var attempt = 1
 
         while (true) {
-            val expiry = StatementExpiry.nextAfter(copy.stored.expiry)
-            val result = outgoingChatRequestService.deliverChatRequestCancel(request, contact, copy.prover, expiry)
+            val result = action()
             val error = result.exceptionOrNull()
             if (error == null || !error.allowsCancelRetry() || attempt == CANCEL_ATTEMPTS) return result
 
