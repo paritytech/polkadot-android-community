@@ -8,9 +8,20 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacy
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.PrivacyModeRemote
 import kotlin.time.Duration.Companion.minutes
 
+internal val BUNDLED_PRIVACY_CONFIG = CoinagePrivacyConfig(
+    balanced = VoucherReadiness(
+        requiredRingFill = 20.percents,
+        anonymityRequirements = AnonymityRequirements(anonymityTime = 10.minutes, anonymityMembers = 8),
+    ),
+    maxPrivacy = VoucherReadiness(
+        requiredRingFill = 90.percents,
+        anonymityRequirements = AnonymityRequirements(anonymityTime = 10.minutes, anonymityMembers = 16),
+    ),
+)
+
 internal fun CoinagePrivacyConfigRemote?.toDomain(): CoinagePrivacyConfig = CoinagePrivacyConfig(
-    balanced = this?.balanced.toDomain(CoinagePrivacyConfig.BUNDLED.balanced),
-    maxPrivacy = this?.maxPrivacy.toDomain(CoinagePrivacyConfig.BUNDLED.maxPrivacy),
+    balanced = this?.balanced.toDomain(BUNDLED_PRIVACY_CONFIG.balanced),
+    maxPrivacy = this?.maxPrivacy.toDomain(BUNDLED_PRIVACY_CONFIG.maxPrivacy),
 )
 
 private fun PrivacyModeRemote?.toDomain(bundled: VoucherReadiness): VoucherReadiness = VoucherReadiness(

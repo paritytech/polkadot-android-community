@@ -15,7 +15,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVouche
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.AnonymityRequirements
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherReadiness
@@ -26,6 +25,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageRecyc
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
+import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.BUNDLED_PRIVACY_CONFIG
 import io.paritytech.polkadotapp.feature_coinage_impl.data.source.ClockChangesSource
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase.RealTotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
@@ -358,7 +358,7 @@ class VoucherReadinessUpdatesTest {
         anonymityMembers: Int,
     ) {
         val balanced = VoucherReadiness(ringFillPercent.percents, AnonymityRequirements(anonymityTime, anonymityMembers))
-        privacyConfig.config = CoinagePrivacyConfig.BUNDLED.copy(balanced = balanced)
+        privacyConfig.config = BUNDLED_PRIVACY_CONFIG.copy(balanced = balanced)
     }
 
     private fun TestScope.balancedEmissions(vouchers: List<TrackedVoucher>): List<Long> {

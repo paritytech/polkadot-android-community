@@ -1,9 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_api.domain.recycling
 
 import io.paritytech.polkadotapp.common.utils.Fraction
-import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import kotlin.time.Duration
-import kotlin.time.Instant
 
 /**
  * How aggressively coins are moved through the recycler.
@@ -63,15 +61,3 @@ data class AnonymityRequirements(
     val anonymityTime: Duration,
     val anonymityMembers: Int,
 )
-
-/** Valid only for the location's current members and unloads; recompute it when either changes. */
-fun VoucherReadiness.anonymityReadyAt(location: RecyclerVoucher.Location.InRecycler): Instant? {
-    val requirements = anonymityRequirements ?: return null
-    val enteredAt = location.enteredAt ?: return null
-    val unloaded = location.recyclerUnloaded ?: return null
-
-    val anonymity = location.recyclerMembers - unloaded
-    if (anonymity <= 0) return null
-
-    return enteredAt + requirements.anonymityTime * requirements.anonymityMembers / anonymity
-}

@@ -5,12 +5,13 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingP
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.BUNDLED_PRIVACY_CONFIG
 
 val RecyclingStrategyType.bundledParams: RecyclingParams
-    get() = params(CoinagePrivacyConfig.BUNDLED)
+    get() = params(BUNDLED_PRIVACY_CONFIG)
 
 class FakeCoinagePrivacyConfigProvider : CoinagePrivacyConfigProvider {
-    var config: CoinagePrivacyConfig = CoinagePrivacyConfig.BUNDLED
+    var config: CoinagePrivacyConfig = BUNDLED_PRIVACY_CONFIG
 
     override suspend fun privacyConfigOrDefault(): CoinagePrivacyConfig = config
 }
