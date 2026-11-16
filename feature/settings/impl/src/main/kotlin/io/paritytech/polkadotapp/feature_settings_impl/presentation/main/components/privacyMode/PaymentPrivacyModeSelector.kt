@@ -83,7 +83,12 @@ fun PaymentPrivacyModeSelector(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(PolkadotTheme.spacings.mediumIncreased)
+                .padding(
+                    start = PolkadotTheme.spacings.mediumIncreased,
+                    top = PolkadotTheme.spacings.mediumIncreased,
+                    end = PolkadotTheme.spacings.mediumIncreased,
+                    bottom = PolkadotTheme.spacings.small
+                )
         ) {
             Header()
 

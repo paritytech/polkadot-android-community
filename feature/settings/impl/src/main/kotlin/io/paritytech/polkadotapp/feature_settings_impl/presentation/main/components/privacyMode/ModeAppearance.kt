@@ -13,12 +13,14 @@ import io.paritytech.polkadotapp.design.components.icon.vectors.BoltCircleFilled
 import io.paritytech.polkadotapp.design.components.icon.vectors.ShieldHalf
 import io.paritytech.polkadotapp.design.components.icon.vectors.VisibilityOffOutlined
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import io.paritytech.polkadotapp.common.R as RCommon
 
 @Immutable
 internal data class ModeAppearance(
     val label: String,
-    val description: String,
+    val bullets: ImmutableList<String>,
     val accessibilityDescription: String,
     val icon: ImageVector,
     val colors: ModeColors,
@@ -35,7 +37,11 @@ internal data class GlowGeometry(
 internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
     RecyclingStrategyType.MIN_PRIVACY -> ModeAppearance(
         label = stringResource(RCommon.string.payment_privacy_mode_fastest_label),
-        description = stringResource(RCommon.string.payment_privacy_mode_fastest_description),
+        bullets = persistentListOf(
+            stringResource(RCommon.string.payment_privacy_mode_fastest_bullet_1),
+            stringResource(RCommon.string.payment_privacy_mode_fastest_bullet_2),
+            stringResource(RCommon.string.payment_privacy_mode_fastest_bullet_3)
+        ),
         accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_fastest_accessibility),
         icon = NovaIcons.BoltCircleFilled,
         colors = PrivacyModeColors.Fastest,
@@ -44,7 +50,11 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
 
     RecyclingStrategyType.BALANCED -> ModeAppearance(
         label = stringResource(RCommon.string.payment_privacy_mode_balanced_label),
-        description = stringResource(RCommon.string.payment_privacy_mode_balanced_description),
+        bullets = persistentListOf(
+            stringResource(RCommon.string.payment_privacy_mode_balanced_bullet_1),
+            stringResource(RCommon.string.payment_privacy_mode_balanced_bullet_2),
+            stringResource(RCommon.string.payment_privacy_mode_balanced_bullet_3)
+        ),
         accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_balanced_accessibility),
         icon = NovaIcons.ShieldHalf,
         colors = PrivacyModeColors.Balanced,
@@ -53,7 +63,11 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
 
     RecyclingStrategyType.MAX_PRIVACY -> ModeAppearance(
         label = stringResource(RCommon.string.payment_privacy_mode_most_private_label),
-        description = stringResource(RCommon.string.payment_privacy_mode_most_private_description),
+        bullets = persistentListOf(
+            stringResource(RCommon.string.payment_privacy_mode_most_private_bullet_1),
+            stringResource(RCommon.string.payment_privacy_mode_most_private_bullet_2),
+            stringResource(RCommon.string.payment_privacy_mode_most_private_bullet_3)
+        ),
         accessibilityDescription = stringResource(
             RCommon.string.payment_privacy_mode_most_private_accessibility
         ),
