@@ -71,7 +71,7 @@ class BulkRetrieverTest {
         val remaining = pages.toMutableList()
 
         coEvery { socketService.executeAsync(any(), any(), any<ResponseMapper<List<String>>>()) } coAnswers {
-            sent += firstArg<RuntimeRequest>()
+            sent += secondArg<RuntimeRequest>()
             remaining.removeAt(0)
         }
     }
