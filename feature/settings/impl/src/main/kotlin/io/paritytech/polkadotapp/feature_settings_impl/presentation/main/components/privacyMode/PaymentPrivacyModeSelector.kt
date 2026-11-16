@@ -64,7 +64,8 @@ fun PaymentPrivacyModeSelector(
     modifier: Modifier = Modifier,
     shape: Shape,
     selectedMode: RecyclingStrategyType,
-    onModeSelected: (RecyclingStrategyType) -> Unit
+    onModeSelected: (RecyclingStrategyType) -> Unit,
+    onInfoClick: () -> Unit
 ) {
     PolkadotSurface(
         modifier = modifier,
@@ -80,18 +81,11 @@ fun PaymentPrivacyModeSelector(
                     bottom = PolkadotTheme.spacings.small
                 )
         ) {
-            var isCoinQualityInfoVisible by remember { mutableStateOf(false) }
-
-            PrivacyModeHeader(onInfoClick = { isCoinQualityInfoVisible = true })
+            PrivacyModeHeader(onInfoClick = onInfoClick)
 
             ModeSelector(
                 selectedMode = selectedMode,
                 onModeSelected = onModeSelected
-            )
-
-            CoinQualityInfoBottomSheet(
-                isVisible = isCoinQualityInfoVisible,
-                onDismissRequest = { isCoinQualityInfoVisible = false }
             )
         }
     }
@@ -332,7 +326,8 @@ private fun PaymentPrivacyModeSelectorPreview() = CompositionLocalProvider(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(PolkadotTheme.radii.large),
                     selectedMode = mode,
-                    onModeSelected = {}
+                    onModeSelected = {},
+                    onInfoClick = {}
                 )
 
                 VerticalSpacer { mediumIncreased }

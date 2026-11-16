@@ -2,12 +2,16 @@
 
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +54,10 @@ internal fun CoinQualityInfoBottomSheet(
     ) {
         var page by remember { mutableStateOf(CoinQualityInfoPage.WHAT_IS_COIN_QUALITY) }
 
+        BackHandler(enabled = page == CoinQualityInfoPage.WHY_IT_MATTERS) {
+            page = CoinQualityInfoPage.WHAT_IS_COIN_QUALITY
+        }
+
         when (page) {
             CoinQualityInfoPage.WHAT_IS_COIN_QUALITY -> WhatIsCoinQualityContent(
                 onGotItClick = onDismissRequest,
@@ -74,27 +82,29 @@ private fun WhatIsCoinQualityContent(
             .fillMaxWidth()
             .padding(top = PolkadotTheme.spacings.small)
     ) {
-        SheetTitle(text = stringResource(RCommon.string.payment_privacy_mode_coin_quality_title))
+        ScrollableSheetContent {
+            SheetTitle(text = stringResource(RCommon.string.payment_privacy_mode_coin_quality_title))
 
-        Column(verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.medium)) {
-            Image(
-                modifier = Modifier
-                    .padding(horizontal = PolkadotTheme.spacings.large)
-                    .fillMaxWidth()
-                    .clip(PolkadotTheme.shapes.mediumIncreased),
-                painter = painterResource(RCommon.drawable.img_coin_quality),
-                contentDescription = null,
-                contentScale = ContentScale.FillWidth
-            )
-
-            SheetBody(
-                text = highlightedStringResource(
-                    RCommon.string.payment_privacy_mode_coin_quality_description,
-                    RCommon.string.payment_privacy_mode_coin_quality_highlight_coin_quality,
-                    RCommon.string.payment_privacy_mode_coin_quality_highlight_indistinguishable,
-                    RCommon.string.payment_privacy_mode_coin_quality_highlight_higher_quality
+            Column(verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.medium)) {
+                Image(
+                    modifier = Modifier
+                        .padding(horizontal = PolkadotTheme.spacings.large)
+                        .fillMaxWidth()
+                        .clip(PolkadotTheme.shapes.mediumIncreased),
+                    painter = painterResource(RCommon.drawable.img_coin_quality),
+                    contentDescription = null,
+                    contentScale = ContentScale.FillWidth
                 )
-            )
+
+                SheetBody(
+                    text = highlightedStringResource(
+                        RCommon.string.payment_privacy_mode_coin_quality_description,
+                        RCommon.string.payment_privacy_mode_coin_quality_highlight_coin_quality,
+                        RCommon.string.payment_privacy_mode_coin_quality_highlight_indistinguishable,
+                        RCommon.string.payment_privacy_mode_coin_quality_highlight_higher_quality
+                    )
+                )
+            }
         }
 
         Column(
@@ -144,16 +154,18 @@ private fun WhyItMattersContent(
             shape = PolkadotButtonShape.pill
         )
 
-        SheetTitle(text = stringResource(RCommon.string.payment_privacy_mode_why_it_matters_title))
+        ScrollableSheetContent {
+            SheetTitle(text = stringResource(RCommon.string.payment_privacy_mode_why_it_matters_title))
 
-        SheetBody(
-            text = highlightedStringResource(
-                RCommon.string.payment_privacy_mode_why_it_matters_description,
-                RCommon.string.payment_privacy_mode_why_it_matters_highlight_same_denomination,
-                RCommon.string.payment_privacy_mode_coin_quality_highlight_indistinguishable,
-                RCommon.string.payment_privacy_mode_why_it_matters_highlight_fungibility
+            SheetBody(
+                text = highlightedStringResource(
+                    RCommon.string.payment_privacy_mode_why_it_matters_description,
+                    RCommon.string.payment_privacy_mode_why_it_matters_highlight_same_denomination,
+                    RCommon.string.payment_privacy_mode_coin_quality_highlight_indistinguishable,
+                    RCommon.string.payment_privacy_mode_why_it_matters_highlight_fungibility
+                )
             )
-        )
+        }
 
         PolkadotTextButton(
             modifier = Modifier
@@ -166,6 +178,16 @@ private fun WhyItMattersContent(
             onClick = onGotItClick
         )
     }
+}
+
+@Composable
+private fun ColumnScope.ScrollableSheetContent(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .weight(1f, fill = false)
+            .verticalScroll(rememberScrollState()),
+        content = content
+    )
 }
 
 @Composable
