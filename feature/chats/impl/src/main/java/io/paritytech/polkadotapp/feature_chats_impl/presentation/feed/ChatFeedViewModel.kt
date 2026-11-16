@@ -54,6 +54,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.BusyInAno
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.error.toPresentationError
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.draft.ChatDraftController
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.mappers.ChatMessageUiMapper
+import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.mappers.toChatInputUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatInputUiState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatMenuState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatMenuType
@@ -62,7 +63,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.Cha
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatSendMessageInputState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.InputMessageRelation
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.MessagePopUpSelection
-import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.clearRelation
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.isNotNone
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.sendableMessageState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.sendableMessageText
@@ -769,34 +769,6 @@ class ChatFeedViewModel @Inject constructor(
         }
     }
 
-    private fun ChatUserInputState.toChatInputUiState(
-        messageInputState: ChatSendMessageInputState,
-        answerProgress: ChatRequestAnswerProgress
-    ): ChatInputUiState {
-        return when (this) {
-            is ChatUserInputState.AcceptChatRequest -> ChatInputUiState.AcceptChatRequest(answerProgress)
-            is ChatUserInputState.Nothing, ChatUserInputState.UserDeclinedChatRequest -> ChatInputUiState.Hidden
-            is ChatUserInputState.PeerLeft -> ChatInputUiState.PeerLeft
-            is ChatUserInputState.ChatRequestCancelled -> ChatInputUiState.ChatRequestCancelled
-            is ChatUserInputState.ChatRemoved -> ChatInputUiState.Hidden
-            is ChatUserInputState.UnblockUser -> ChatInputUiState.UnblockUser
-            is ChatUserInputState.IdentitySigningConsentRequired -> ChatInputUiState.IdentitySigningConsent
-            is ChatUserInputState.WaitChatRequestApproval -> ChatInputUiState.WaitChatRequestApproval
-            is ChatUserInputState.SendChatRequest -> {
-                ChatInputUiState.SendMessage(messageInputState.clearRelation(), isChatRequest = true)
-            }
-
-            is ChatUserInputState.SendMessage -> {
-                ChatInputUiState.SendMessage(
-                    messageState = messageInputState,
-                    isChatRequest = false,
-                    showPayButton = paymentState is ChatUserInputState.SendMessage.Payment.Available,
-                    showAttachButton = attachmentsSupported
-                )
-            }
-        }
-    }
-
     private fun closeScreenWhenChatRemoved() {
         chatInputStateType
             .filter { it is ChatUserInputState.ChatRemoved }
@@ -823,14 +795,14 @@ class ChatFeedViewModel @Inject constructor(
             }
             .launchIn(this)
     }
+}
 
-    private fun MutableStateFlow<ChatSendMessageInputState>.clear() {
-        update { ChatSendMessageInputState() }
-    }
+private fun MutableStateFlow<ChatSendMessageInputState>.clear() {
+    update { ChatSendMessageInputState() }
+}
 
-    private fun MutableStateFlow<ChatSendMessageInputState>.updateInput(message: String) {
-        update { it.copy(inputMessage = message.take(MAX_CHAT_MESSAGE_LENGTH)) }
-    }
+private fun MutableStateFlow<ChatSendMessageInputState>.updateInput(message: String) {
+    update { it.copy(inputMessage = message.take(MAX_CHAT_MESSAGE_LENGTH)) }
 }
 
 private fun <T> Flow<T>.withLastContentKept(keepsLastContent: Flow<Boolean>, hasContent: (T) -> Boolean): Flow<T> {

@@ -21,8 +21,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.Reque
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTopic
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTransport
-import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.StoredChatRequestCopy
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.OutgoingChatRequestTopics
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.StoredChatRequestCopy
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider

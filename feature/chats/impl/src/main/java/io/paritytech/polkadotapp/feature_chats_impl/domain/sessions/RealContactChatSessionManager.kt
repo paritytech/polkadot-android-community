@@ -33,8 +33,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.compaction.ChatMessag
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ContactWithDevicePresence
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.PushSubscriptionSynchronizer
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageReplacementPolicy
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
