@@ -32,10 +32,10 @@ internal object PrivacyModeColors {
 
     val Fastest = ModeColors(
         selected = CircleColors(
-            fillTop = Color(0xFFF59E0B),
-            fillBottom = Color(0xFFCF5408),
-            rimTop = Color(0xFFFFCE2B),
-            rimBottom = Color(0xFFBB3B00)
+            fillTop = Color(0xFFF7C66A),
+            fillBottom = Color(0xFFB8862A),
+            rimTop = Color(0xFFF5B338),
+            rimBottom = Color(0xFFF5B338)
         ),
         unselected = CircleColors(
             fillTop = Color(0xFF7C591E),
@@ -43,7 +43,7 @@ internal object PrivacyModeColors {
             rimTop = Color(0xFFCFA155),
             rimBottom = Color(0xFF5B3C07)
         ),
-        glow = Color(0xFFF59E0B)
+        glow = Color(0xFFF5B338)
     )
 
     val Balanced = ModeColors(
@@ -64,10 +64,10 @@ internal object PrivacyModeColors {
 
     val MostPrivate = ModeColors(
         selected = CircleColors(
-            fillTop = Color(0xFF8640FF),
-            fillBottom = Color(0xFF461F8A),
-            rimTop = Color(0xFFBC93FF),
-            rimBottom = Color(0xFF5700E6)
+            fillTop = Color(0xFF9D6BF1),
+            fillBottom = Color(0xFF5D2BB2),
+            rimTop = Color(0xFF7C3AED),
+            rimBottom = Color(0xFF7C3AED)
         ),
         unselected = CircleColors(
             fillTop = Color(0xFF503085),
@@ -75,6 +75,6 @@ internal object PrivacyModeColors {
             rimTop = Color(0xFF876CB4),
             rimBottom = Color(0xFF28134A)
         ),
-        glow = Color(0xFF8640FF)
+        glow = Color(0xFF7C3AED)
     )
 }

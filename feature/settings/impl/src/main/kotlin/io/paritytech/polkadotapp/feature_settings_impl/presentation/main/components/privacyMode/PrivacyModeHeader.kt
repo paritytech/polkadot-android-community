@@ -1,6 +1,8 @@
 package io.paritytech.polkadotapp.feature_settings_impl.presentation.main.components.privacyMode
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -27,18 +29,27 @@ import io.paritytech.polkadotapp.common.R as RCommon
 @Composable
 internal fun PrivacyModeHeader(onInfoClick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        NovaIcon(
-            modifier = Modifier.size(HEADER_ICON_SIZE),
-            imageVector = NovaIcons.ShieldOutlined,
-            tint = PolkadotTheme.colors.fg.secondary
-        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.Top)
+                .padding(top = PolkadotTheme.spacings.extraSmall)
+                .size(HEADER_ICON_SLOT_SIZE),
+            contentAlignment = Alignment.Center
+        ) {
+            NovaIcon(
+                modifier = Modifier.size(ICON_SIZE),
+                imageVector = NovaIcons.ShieldOutlined,
+                tint = PolkadotTheme.colors.fg.primary
+            )
+        }
 
-        HorizontalSpacer { small }
+        HorizontalSpacer { smallIncreased }
 
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(vertical = PolkadotTheme.spacings.extraTiny)
+                .padding(vertical = PolkadotTheme.spacings.smallIncreased),
+            verticalArrangement = Arrangement.spacedBy(PolkadotTheme.spacings.extraSmall)
         ) {
             NovaText(
                 text = stringResource(RCommon.string.payment_privacy_mode_title, LocalPaymentAssetBrand.current.symbol)
@@ -58,7 +69,7 @@ internal fun PrivacyModeHeader(onInfoClick: () -> Unit) {
 
         NovaIcon(
             modifier = Modifier
-                .size(INFO_ICON_SIZE)
+                .size(ICON_SIZE)
                 .clip(CircleShape)
                 .clickable(role = Role.Button, onClick = onInfoClick),
             imageVector = NovaIcons.Info,
@@ -68,5 +79,5 @@ internal fun PrivacyModeHeader(onInfoClick: () -> Unit) {
     }
 }
 
-private val HEADER_ICON_SIZE = 24.dp
-private val INFO_ICON_SIZE = 20.dp
+private val HEADER_ICON_SLOT_SIZE = 32.dp
+private val ICON_SIZE = 20.dp

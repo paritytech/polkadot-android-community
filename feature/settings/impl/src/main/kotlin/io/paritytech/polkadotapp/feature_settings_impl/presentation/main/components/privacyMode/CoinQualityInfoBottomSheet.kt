@@ -27,6 +27,7 @@ import io.paritytech.polkadotapp.design.components.bottomsheet.NovaBottomSheetSu
 import io.paritytech.polkadotapp.design.components.bottomsheet.NovaModalBottomSheet
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonShape
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
+import io.paritytech.polkadotapp.design.components.button.default.PolkadotButtonSize
 import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButton
 import io.paritytech.polkadotapp.design.components.button.icon.PolkadotIconButtonSize
@@ -104,6 +105,7 @@ private fun WhatIsCoinQualityContent(
                 modifier = Modifier.fillMaxWidth(),
                 text = stringResource(RCommon.string.common_got_it),
                 style = PolkadotButtonStyle.primary(),
+                size = PolkadotButtonSize.large(),
                 shape = PolkadotButtonShape.pill,
                 onClick = onGotItClick
             )
@@ -112,6 +114,7 @@ private fun WhatIsCoinQualityContent(
                 modifier = Modifier.fillMaxWidth(),
                 text = stringResource(RCommon.string.payment_privacy_mode_why_it_matters_title),
                 style = PolkadotButtonStyle.tertiary(),
+                size = PolkadotButtonSize.large(),
                 shape = PolkadotButtonShape.pill,
                 onClick = onWhyItMattersClick
             )
@@ -158,6 +161,7 @@ private fun WhyItMattersContent(
                 .fillMaxWidth(),
             text = stringResource(RCommon.string.common_got_it),
             style = PolkadotButtonStyle.tertiary(),
+            size = PolkadotButtonSize.large(),
             shape = PolkadotButtonShape.pill,
             onClick = onGotItClick
         )

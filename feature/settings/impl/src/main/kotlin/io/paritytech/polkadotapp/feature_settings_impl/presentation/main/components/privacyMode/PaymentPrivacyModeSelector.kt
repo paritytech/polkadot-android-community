@@ -76,7 +76,6 @@ fun PaymentPrivacyModeSelector(
                 .fillMaxWidth()
                 .padding(
                     start = PolkadotTheme.spacings.mediumIncreased,
-                    top = PolkadotTheme.spacings.mediumIncreased,
                     end = PolkadotTheme.spacings.mediumIncreased,
                     bottom = PolkadotTheme.spacings.small
                 )
@@ -84,8 +83,6 @@ fun PaymentPrivacyModeSelector(
             var isCoinQualityInfoVisible by remember { mutableStateOf(false) }
 
             PrivacyModeHeader(onInfoClick = { isCoinQualityInfoVisible = true })
-
-            VerticalSpacer { extraMedium }
 
             ModeSelector(
                 selectedMode = selectedMode,
