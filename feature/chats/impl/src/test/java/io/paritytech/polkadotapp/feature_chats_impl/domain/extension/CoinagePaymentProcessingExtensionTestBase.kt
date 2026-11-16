@@ -83,7 +83,7 @@ abstract class CoinagePaymentProcessingExtensionTestBase {
         mockkStatic(DERIVATION_FILE)
         every { any<CoinPrivateKey>().deriveKeypair() } answers {
             val key = firstArg<CoinPrivateKey>()
-            binding.failureFor(key)?.let { throw it }
+            bindingFailureFor(key)?.let { throw it }
             mockk<Sr25519Keypair> { every { publicKey } returns key.value }
         }
     }
@@ -101,8 +101,6 @@ abstract class CoinagePaymentProcessingExtensionTestBase {
     fun stopWork() {
         if (::scope.isInitialized) scope.cancel()
     }
-
-    private val binding = FakeBinding()
 
     protected fun startWork(
         vararg unprocessed: ChatMessage,
@@ -174,10 +172,12 @@ abstract class CoinagePaymentProcessingExtensionTestBase {
         coVerify(exactly = 1) { context.markMessageProcessed(message.chatId, message.id) }
     }
 
-    protected fun verifyLeftOpen(message: ChatMessage, stillProcessing: ChatMessage) {
-        coVerify(exactly = 0) { context.markMessageProcessed(message.chatId, message.id) }
+    protected fun verifyLeftOpen(vararg messages: ChatMessage, stillProcessing: ChatMessage) {
+        messages.forEach { message ->
+            coVerify(exactly = 0) { context.markMessageProcessed(message.chatId, message.id) }
+        }
         coVerify(exactly = 1) { context.markMessageProcessed(stillProcessing.chatId, stillProcessing.id) }
-        failureLog.expectedIds += message.id
+        failureLog.expectedIds += messages.map { it.id }
     }
 
     protected fun accountId(seed: Int): AccountId = byteArrayOf(seed.toByte()).toDataByteArray()
@@ -191,8 +191,9 @@ abstract class CoinagePaymentProcessingExtensionTestBase {
         match<ChatMessage.Content> { it is CoinagePayment && it.status == status }
 
     protected fun outgoingPayment(
+        id: String = "message-1",
         coinKeys: List<ByteArray> = listOf(coinKey(1), coinKey(2)),
-    ) = incomingPayment(coinKeys = coinKeys).copy(origin = ChatMessageOrigin.User)
+    ) = incomingPayment(id = id, coinKeys = coinKeys).copy(origin = ChatMessageOrigin.User)
 
     protected fun coinKey(seed: Int) = ByteArray(Sr25519SecretKey.SIZE_BYTES) { seed.toByte() }
 
@@ -229,19 +230,13 @@ abstract class CoinagePaymentProcessingExtensionTestBase {
 }
 
 internal val REFUSED_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -1 }.toDataByteArray()
-internal val REFUSED_AFTER_PROBE = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -2 }.toDataByteArray()
 internal val BROKEN_BINDING_KEY = ByteArray(Sr25519SecretKey.SIZE_BYTES) { -3 }.toDataByteArray()
 private val PROCESSING_FAILED = Regex("^Payment processing failed message=(\\S+)")
 
-internal class FakeBinding {
-    private val probed = mutableSetOf<CoinPrivateKey>()
-
-    fun failureFor(key: CoinPrivateKey): Throwable? = when {
-        key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
-        key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
-        key == REFUSED_AFTER_PROBE && !probed.add(key) -> Exception("Invalid secret")
-        else -> null
-    }
+private fun bindingFailureFor(key: CoinPrivateKey): Throwable? = when {
+    key.value.size != Sr25519SecretKey.SIZE_BYTES || key == REFUSED_KEY -> Exception("Invalid secret")
+    key == BROKEN_BINDING_KEY -> LinkageError("binding unavailable")
+    else -> null
 }
 
 class FailureLog : ExternalResource() {
@@ -258,6 +253,6 @@ class FailureLog : ExternalResource() {
 
     override fun after() {
         Timber.uproot(tree)
-        assertEquals(expectedIds, failedIds)
+        assertEquals(expectedIds.sorted(), failedIds.sorted())
     }
 }
