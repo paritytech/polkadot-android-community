@@ -25,7 +25,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import io.paritytech.polkadotapp.design.components.bottomsheet.NovaBottomSheetSurface
 import io.paritytech.polkadotapp.design.components.bottomsheet.NovaModalBottomSheet
@@ -39,6 +38,7 @@ import io.paritytech.polkadotapp.design.components.icon.NovaIcons
 import io.paritytech.polkadotapp.design.components.icon.vectors.ArrowLeft
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
+import io.paritytech.polkadotapp.design.utils.withSpanStyle
 import io.paritytech.polkadotapp.common.R as RCommon
 
 private enum class CoinQualityInfoPage { WHAT_IS_COIN_QUALITY, WHY_IT_MATTERS }
@@ -218,22 +218,10 @@ private fun highlightedStringResource(
     @StringRes textRes: Int,
     @StringRes vararg highlightRes: Int
 ): AnnotatedString {
-    val highlights = highlightRes.map { stringResource(it) }
-    val text = stringResource(textRes, *highlights.toTypedArray())
-    val highlightColor = PolkadotTheme.colors.fg.primary
+    val highlights = highlightRes.map { stringResource(it) }.toTypedArray()
 
-    return remember(text, highlights, highlightColor) {
-        buildAnnotatedString {
-            append(text)
-            highlights.forEach { highlight ->
-                var start = text.indexOf(highlight)
-                while (start >= 0) {
-                    addStyle(SpanStyle(color = highlightColor), start, start + highlight.length)
-                    start = text.indexOf(highlight, start + highlight.length)
-                }
-            }
-        }
-    }
+    return stringResource(textRes, *highlights)
+        .withSpanStyle(SpanStyle(color = PolkadotTheme.colors.fg.primary), *highlights)
 }
 
 @Preview

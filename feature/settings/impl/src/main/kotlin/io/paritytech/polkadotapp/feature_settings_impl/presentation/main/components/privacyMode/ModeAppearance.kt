@@ -21,7 +21,6 @@ import io.paritytech.polkadotapp.common.R as RCommon
 internal data class ModeAppearance(
     val label: String,
     val bullets: ImmutableList<String>,
-    val accessibilityDescription: String,
     val icon: ImageVector,
     val colors: ModeColors,
     val glowGeometry: GlowGeometry
@@ -42,7 +41,6 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
             stringResource(RCommon.string.payment_privacy_mode_fastest_bullet_2),
             stringResource(RCommon.string.payment_privacy_mode_fastest_bullet_3)
         ),
-        accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_fastest_accessibility),
         icon = NovaIcons.BoltCircleFilled,
         colors = PrivacyModeColors.Fastest,
         glowGeometry = WIDE_GLOW
@@ -55,7 +53,6 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
             stringResource(RCommon.string.payment_privacy_mode_balanced_bullet_2),
             stringResource(RCommon.string.payment_privacy_mode_balanced_bullet_3)
         ),
-        accessibilityDescription = stringResource(RCommon.string.payment_privacy_mode_balanced_accessibility),
         icon = NovaIcons.ShieldHalf,
         colors = PrivacyModeColors.Balanced,
         glowGeometry = DISC_GLOW
@@ -67,9 +64,6 @@ internal fun RecyclingStrategyType.appearance(): ModeAppearance = when (this) {
             stringResource(RCommon.string.payment_privacy_mode_most_private_bullet_1),
             stringResource(RCommon.string.payment_privacy_mode_most_private_bullet_2),
             stringResource(RCommon.string.payment_privacy_mode_most_private_bullet_3)
-        ),
-        accessibilityDescription = stringResource(
-            RCommon.string.payment_privacy_mode_most_private_accessibility
         ),
         icon = NovaIcons.VisibilityOffOutlined,
         colors = PrivacyModeColors.MostPrivate,
