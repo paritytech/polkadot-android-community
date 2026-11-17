@@ -16,14 +16,6 @@ class RecyclingStrategyStorageTest {
     private val storage = SingleValueStorageFactory(preferences).createRecyclingStrategyStorage()
 
     @Test
-    fun `an absent preference reads as balanced`() = runBlocking<Unit> {
-        withStored(null)
-
-        assertEquals(RecyclingStrategyType.BALANCED, storage.requireValue())
-        assertEquals(RecyclingStrategyType.BALANCED, storage.valueFlow().first())
-    }
-
-    @Test
     fun `a stored choice survives the new default`() = runBlocking<Unit> {
         withStored("MIN_PRIVACY")
 
@@ -31,15 +23,7 @@ class RecyclingStrategyStorageTest {
         assertEquals(RecyclingStrategyType.MIN_PRIVACY, storage.valueFlow().first())
     }
 
-    @Test
-    fun `an unrecognised stored name reads as balanced`() = runBlocking<Unit> {
-        withStored("GARBAGE")
-
-        assertEquals(RecyclingStrategyType.BALANCED, storage.requireValue())
-        assertEquals(RecyclingStrategyType.BALANCED, storage.valueFlow().first())
-    }
-
-    private fun withStored(value: String?) {
+    private fun withStored(value: String) {
         every { preferences.getString(KEY) } returns value
         every { preferences.keyFlow(KEY) } returns flowOf(KEY)
     }

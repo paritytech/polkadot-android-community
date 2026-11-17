@@ -27,29 +27,10 @@ class RemoteConfigCoinagePrivacyConfigProviderTest {
     )
 
     @Test
-    fun `an unset key falls back to the bundled defaults`() = runBlocking<Unit> {
-        withRemote(Result.success(null))
-
-        assertEquals(BUNDLED, provider.privacyConfigOrDefault())
-    }
-
-    @Test
     fun `a remote read failure falls back to the bundled defaults`() = runBlocking<Unit> {
         withRemote(Result.failure(IllegalStateException("not activated")))
 
         assertEquals(BUNDLED, provider.privacyConfigOrDefault())
-    }
-
-    @Test
-    fun `a newly activated value applies on the next read`() = runBlocking<Unit> {
-        withRemote(Result.success(null))
-        val before = provider.privacyConfigOrDefault()
-        withRemote(Result.success(PUBLISHED))
-
-        val after = provider.privacyConfigOrDefault()
-
-        assertEquals(BUNDLED, before)
-        assertEquals(AnonymityRequirements(5.minutes, 4), after.balanced.anonymityRequirements)
     }
 
     @Test

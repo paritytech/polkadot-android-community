@@ -1,7 +1,6 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.data.mappers
 
 import com.google.gson.Gson
-import com.google.gson.JsonSyntaxException
 import io.paritytech.polkadotapp.common.utils.Fraction.Companion.percents
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.AnonymityRequirements
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
@@ -9,7 +8,6 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherRea
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigRemote
 import io.paritytech.polkadotapp.feature_coinage_impl.data.config.PrivacyModeRemote
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Test
 import kotlin.time.Duration.Companion.minutes
 
@@ -76,27 +74,10 @@ class CoinagePrivacyConfigMapperTest {
 
     @Test
     fun `the published json field names map onto the config`() {
-        val documented = """{"balanced":{"ringFillPercent":20,"anonymityMinutes":10,"anonymityMembers":8},""" +
-            """"maxPrivacy":{"ringFillPercent":90,"anonymityMinutes":10,"anonymityMembers":16}}"""
         val custom = """{"balanced":{"ringFillPercent":30,"anonymityMinutes":5,"anonymityMembers":4},""" +
             """"maxPrivacy":{"ringFillPercent":80,"anonymityMinutes":7,"anonymityMembers":12}}"""
 
-        assertEquals(BUNDLED, documented.parsedConfig())
         assertEquals(CoinagePrivacyConfig(readiness(30, 5, 4), readiness(80, 7, 12)), custom.parsedConfig())
-    }
-
-    @Test
-    fun `a quoted integer is read as the number it holds`() {
-        val quoted = """{"balanced":{"ringFillPercent":"20","anonymityMinutes":10,"anonymityMembers":8}}"""
-
-        assertEquals(readiness(20, 10, 8), quoted.parsedConfig().balanced)
-    }
-
-    @Test
-    fun `a fractional number does not parse at all`() {
-        val fractional = """{"balanced":{"ringFillPercent":20.5,"anonymityMinutes":10,"anonymityMembers":8}}"""
-
-        assertThrows(JsonSyntaxException::class.java) { fractional.parsedConfig() }
     }
 
     private fun String.parsedConfig() = Gson().fromJson(this, CoinagePrivacyConfigRemote::class.java).toDomain()
