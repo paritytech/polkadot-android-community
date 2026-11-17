@@ -119,12 +119,13 @@ class CoinRecyclingEvaluatorTest {
         private val evaluator = CoinRecyclingEvaluator(
             assets,
             settings,
-            RecyclingStrategyProvider(forcedAgeOf(FORCED_AGE), quota, privacyConfig),
+            RecyclingStrategyProvider(forcedAgeOf(FORCED_AGE), quota),
             VoucherUsabilityContextFactory(capacities, clock),
             converter,
             recycling,
             scope.testDispatchers(),
-            VoucherReadinessUpdates(clock, clockChanges, privacyConfig),
+            VoucherReadinessUpdates(clock, clockChanges),
+            privacyConfig,
         )
 
         fun start() {

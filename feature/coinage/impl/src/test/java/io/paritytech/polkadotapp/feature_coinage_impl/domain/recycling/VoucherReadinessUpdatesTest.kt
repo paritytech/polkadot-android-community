@@ -104,7 +104,7 @@ class VoucherReadinessUpdatesTest {
         val fixture = SchedulerFixture(this)
         val emissions = mutableListOf<Long>()
         backgroundScope.launch {
-            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY })
+            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY }, { fixture.privacyConfig.config })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -126,7 +126,7 @@ class VoucherReadinessUpdatesTest {
         val emissions = mutableListOf<Long>()
         val inputs = combine(fixture.vouchers, fixture.strategy) { vouchers, strategy -> vouchers to strategy }
         backgroundScope.launch {
-            inputs.withReadinessUpdates(fixture.updates, { it.first }, { it.second })
+            inputs.withReadinessUpdates(fixture.updates, { it.first }, { it.second }, { fixture.privacyConfig.config })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -147,7 +147,7 @@ class VoucherReadinessUpdatesTest {
         val fixture = SchedulerFixture(this)
         val emissions = mutableListOf<Long>()
         backgroundScope.launch {
-            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY })
+            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY }, { fixture.privacyConfig.config })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -166,7 +166,7 @@ class VoucherReadinessUpdatesTest {
         val fixture = SchedulerFixture(this)
         val emissions = mutableListOf<Long>()
         backgroundScope.launch {
-            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY })
+            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY }, { fixture.privacyConfig.config })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -188,7 +188,7 @@ class VoucherReadinessUpdatesTest {
         val releaseCollector = CompletableDeferred<Unit>()
         val received = mutableListOf<Int>()
         backgroundScope.launch {
-            inputs.withReadinessUpdates(fixture.updates, { emptyList() }, { RecyclingStrategyType.MIN_PRIVACY })
+            inputs.withReadinessUpdates(fixture.updates, { emptyList() }, { RecyclingStrategyType.MIN_PRIVACY }, { fixture.privacyConfig.config })
                 .collect { snapshot ->
                     received += snapshot
                     if (snapshot == 0) releaseCollector.await()
@@ -370,7 +370,7 @@ class VoucherReadinessUpdatesTest {
     private fun SchedulerFixture.emissions(scope: TestScope): List<Long> {
         val emissions = mutableListOf<Long>()
         scope.backgroundScope.launch {
-            vouchers.withReadinessUpdates(updates, { it }, { strategy.value })
+            vouchers.withReadinessUpdates(updates, { it }, { strategy.value }, { privacyConfig.config })
                 .collect { emissions += scope.testScheduler.currentTime }
         }
         scope.runCurrent()
@@ -390,7 +390,6 @@ class VoucherReadinessUpdatesTest {
         val updates = VoucherReadinessUpdates(
             clock,
             mock<ClockChangesSource>().also { whenever(it.changes()).thenReturn(clockChanges) },
-            privacyConfig,
         )
     }
 
@@ -402,7 +401,7 @@ class VoucherReadinessUpdatesTest {
         private val capacities: RingCapacityProvider = mock()
         private val converter: CoinageBalanceConverterUseCase = mock()
         private val quota: UnloadQuotaTracker = mock()
-        private val provider = RecyclingStrategyProvider(forcedAgeOf(14), quota, privacyConfig)
+        private val provider = RecyclingStrategyProvider(forcedAgeOf(14), quota)
         private val contextFactory = VoucherUsabilityContextFactory(capacities, clock)
         private val dispatchers: CoroutineDispatchers = mock()
         private val allowsConfirmedSpend = type.bundledParams.allowsConfirmedSpend
@@ -422,9 +421,10 @@ class VoucherReadinessUpdatesTest {
             }
         }
 
-        val evaluator = CoinRecyclingEvaluator(assets, settings, provider, contextFactory, converter, recycling, dispatchers, updates)
-        val balance = RealTotalBalanceUseCase(assets, converter, provider, settings, evaluator, contextFactory, updates)
-        val selector = CoinageAssetSelector(assets, provider, settings, evaluator, contextFactory)
+        val evaluator =
+            CoinRecyclingEvaluator(assets, settings, provider, contextFactory, converter, recycling, dispatchers, updates, privacyConfig)
+        val balance = RealTotalBalanceUseCase(assets, converter, provider, settings, evaluator, contextFactory, updates, privacyConfig)
+        val selector = CoinageAssetSelector(assets, provider, settings, evaluator, contextFactory, privacyConfig)
 
         fun balanceOf(ready: Boolean): CoinageBalance {
             val amount = testConversionContext.formatExponentToBalance(ValueExponent(1))

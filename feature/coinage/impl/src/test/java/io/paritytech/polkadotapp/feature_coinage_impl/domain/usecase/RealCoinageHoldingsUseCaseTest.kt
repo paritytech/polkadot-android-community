@@ -82,11 +82,12 @@ class RealCoinageHoldingsUseCaseTest {
             val privacyConfig = FakeCoinagePrivacyConfigProvider()
             useCase = RealCoinageHoldingsUseCase(
                 assets,
-                RecyclingStrategyProvider(forcedAgeOf(FORCED_AGE), quota, privacyConfig),
+                RecyclingStrategyProvider(forcedAgeOf(FORCED_AGE), quota),
                 settings,
                 evaluator,
                 VoucherUsabilityContextFactory(capacities, clock),
-                VoucherReadinessUpdates(clock, clockChanges, privacyConfig),
+                VoucherReadinessUpdates(clock, clockChanges),
+                privacyConfig,
             )
         }
 

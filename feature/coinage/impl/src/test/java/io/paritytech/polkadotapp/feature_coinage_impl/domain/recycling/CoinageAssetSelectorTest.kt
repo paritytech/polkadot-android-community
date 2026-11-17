@@ -47,10 +47,11 @@ class CoinageAssetSelectorTest {
 
     private val selector = CoinageAssetSelector(
         coinageAssetsUseCase = coinageAssetsUseCase,
-        strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker, FakeCoinagePrivacyConfigProvider()),
+        strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker),
         settings = settings,
         evaluator = evaluator,
         voucherUsabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider, timeProvider),
+        privacyConfigProvider = FakeCoinagePrivacyConfigProvider(),
     )
 
     private val spendable = coinOf(derivationIndex = 1)

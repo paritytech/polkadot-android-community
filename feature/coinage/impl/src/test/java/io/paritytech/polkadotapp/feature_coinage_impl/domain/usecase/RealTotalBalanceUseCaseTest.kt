@@ -21,6 +21,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
+import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.BUNDLED_PRIVACY_CONFIG
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FakeCoinagePrivacyConfigProvider
@@ -61,7 +62,7 @@ class RealTotalBalanceUseCaseTest {
         override fun now(): Instant = Instant.fromEpochMilliseconds(0)
     }
 
-    private val strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker, FakeCoinagePrivacyConfigProvider())
+    private val strategyProvider = RecyclingStrategyProvider(ForcedRecyclingAgeProvider(coinRepository), quotaTracker)
 
     private val useCase: RealTotalBalanceUseCase
 
@@ -85,6 +86,7 @@ class RealTotalBalanceUseCaseTest {
             evaluator = evaluator,
             usabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider, timeProvider),
             readinessUpdates = mock(),
+            privacyConfigProvider = FakeCoinagePrivacyConfigProvider(),
         )
     }
 
@@ -328,6 +330,7 @@ class RealTotalBalanceUseCaseTest {
             vouchers = vouchers.zip(voucherStates, ::TrackedVoucher),
             strategyType = strategyType,
             verdicts = verdicts,
+            privacyConfig = BUNDLED_PRIVACY_CONFIG,
         ).getOrThrow()
     }
 

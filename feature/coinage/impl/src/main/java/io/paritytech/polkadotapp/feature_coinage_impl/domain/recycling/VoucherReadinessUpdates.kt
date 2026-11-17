@@ -2,10 +2,10 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
-import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.source.ClockChangesSource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -21,18 +21,18 @@ import javax.inject.Inject
 class VoucherReadinessUpdates @Inject constructor(
     private val timeProvider: TimeProvider,
     private val clockChangesSource: ClockChangesSource,
-    private val privacyConfigProvider: CoinagePrivacyConfigProvider,
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
     internal fun <Input> observe(
         inputs: Flow<Input>,
         vouchers: (Input) -> List<TrackedVoucher>,
         strategy: (Input) -> RecyclingStrategyType,
+        privacyConfig: (Input) -> CoinagePrivacyConfig,
     ): Flow<Input> = inputs.combine(clockChangesSource.changes().onStart { emit(Unit) }) { input, _ -> input }
         .flatMapLatest { input ->
             flow {
                 val now = timeProvider.now()
-                val readiness = strategy(input).params(privacyConfigProvider.privacyConfigOrDefault()).voucherReadiness
+                val readiness = strategy(input).params(privacyConfig(input)).voucherReadiness
                 val deadlines = vouchers(input).mapNotNull { tracked ->
                     if (!tracked.state.isFree) return@mapNotNull null
                     val location = tracked.voucher.location as? RecyclerVoucher.Location.InRecycler
@@ -56,4 +56,5 @@ fun <Input> Flow<Input>.withReadinessUpdates(
     readinessUpdates: VoucherReadinessUpdates,
     vouchers: (Input) -> List<TrackedVoucher>,
     strategy: (Input) -> RecyclingStrategyType,
-): Flow<Input> = readinessUpdates.observe(this, vouchers, strategy)
+    privacyConfig: (Input) -> CoinagePrivacyConfig,
+): Flow<Input> = readinessUpdates.observe(this, vouchers, strategy, privacyConfig)

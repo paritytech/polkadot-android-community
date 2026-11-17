@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassif
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageHoldings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageHoldingsUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherReadinessUpdates
@@ -30,16 +31,18 @@ class RealCoinageHoldingsUseCase @Inject constructor(
     private val evaluator: CoinRecyclingEvaluator,
     private val usabilityContextFactory: VoucherUsabilityContextFactory,
     private val readinessUpdates: VoucherReadinessUpdates,
+    private val privacyConfigProvider: CoinagePrivacyConfigProvider,
 ) : CoinageHoldingsUseCase {
     override fun subscribeHoldings(): Flow<CoinageHoldings> = combine(
         coinageAssetsUseCase.subscribeCoins(),
         coinageAssetsUseCase.subscribeVouchers(),
         settings.strategyFlow(),
         evaluator.verdicts,
+        privacyConfigProvider.privacyConfigUpdates(),
         ::CoinageEvaluationInput,
-    ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.strategyType })
-        .map { (coins, vouchers, strategyType, verdicts) ->
-            val strategy = strategyProvider.voucherStrategyFor(strategyType)
+    ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.strategyType }, { it.privacyConfig })
+        .map { (coins, vouchers, strategyType, verdicts, privacyConfig) ->
+            val strategy = strategyProvider.voucherStrategyFor(strategyType, privacyConfig)
 
             // The list must not wait on a ring-capacity fetch before appearing.
             val usability = usabilityContextFactory.create(

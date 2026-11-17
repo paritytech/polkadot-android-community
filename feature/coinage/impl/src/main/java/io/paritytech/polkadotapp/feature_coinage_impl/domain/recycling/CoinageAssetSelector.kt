@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherBuc
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
+import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -43,6 +44,7 @@ class CoinageAssetSelector @Inject constructor(
     private val settings: CoinageRecyclingStrategySettings,
     private val evaluator: CoinRecyclingEvaluator,
     private val voucherUsabilityContextFactory: VoucherUsabilityContextFactory,
+    private val privacyConfigProvider: CoinagePrivacyConfigProvider,
 ) {
     /** Suspends until the first verdict exists, so nothing is spent before the strategy has judged it. */
     suspend fun getSelectableCoinsByScope(): Map<SpendScope, List<Coin>> {
@@ -95,7 +97,8 @@ class CoinageAssetSelector @Inject constructor(
 
     private suspend fun confirmedSpendAllowed(): Boolean = currentStrategy().allowsConfirmedSpend()
 
-    private suspend fun currentStrategy() = strategyProvider.voucherStrategyFor(settings.getStrategy())
+    private suspend fun currentStrategy() =
+        strategyProvider.voucherStrategyFor(settings.getStrategy(), privacyConfigProvider.privacyConfigOrDefault())
 
     private suspend fun voucherBuckets(): VoucherBuckets {
         val tracked = coinageAssetsUseCase.getVouchers()
