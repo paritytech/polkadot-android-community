@@ -155,7 +155,7 @@ class ChatMessageUiMapper @Inject constructor(
         isSeenByPeer: Boolean
     ): ChatMessageUiModel? {
         val direction = direction.toUi()
-        val status = if (isSeenByPeer) ChatMessageUiModel.Status.SEEN else status.toUi(direction)
+        val status = if (isSeenByPeer) ChatMessageUiModel.Status.SEEN else status.toUi()
 
         return when (latestContent) {
             is ChatMessage.Content.Text -> mapText(
@@ -316,21 +316,19 @@ class ChatMessageUiMapper @Inject constructor(
 
 private fun ChatMessage.isSeenByPeer(peerSeenOrder: Long): Boolean {
     val sortOrder = sortOrder ?: return false
-    val isSentOrDelivered = status == ChatMessage.Status.IS_SENT || status == ChatMessage.Status.IS_READ
+    val isSentOrDelivered = status == ChatMessage.Status.IS_SENT || status == ChatMessage.Status.IS_DELIVERED
 
     return origin.isUser() && isSentOrDelivered && sortOrder in 1..peerSeenOrder
 }
 
-private fun ChatMessage.Status.toUi(direction: ChatMessageUiModel.Direction): ChatMessageUiModel.Status {
+private fun ChatMessage.Status.toUi(): ChatMessageUiModel.Status {
     return when (this) {
         ChatMessage.Status.PROCESSING,
         ChatMessage.Status.NEW -> ChatMessageUiModel.Status.PENDING
 
         ChatMessage.Status.IS_SENT -> ChatMessageUiModel.Status.SENT
-        ChatMessage.Status.IS_READ -> when (direction) {
-            ChatMessageUiModel.Direction.INCOMING -> ChatMessageUiModel.Status.SEEN
-            ChatMessageUiModel.Direction.OUTGOING -> ChatMessageUiModel.Status.DELIVERED
-        }
+        ChatMessage.Status.IS_DELIVERED -> ChatMessageUiModel.Status.DELIVERED
+        ChatMessage.Status.IS_READ -> ChatMessageUiModel.Status.SEEN
         ChatMessage.Status.DELIVERY_FAILED -> ChatMessageUiModel.Status.FAILED
     }
 }

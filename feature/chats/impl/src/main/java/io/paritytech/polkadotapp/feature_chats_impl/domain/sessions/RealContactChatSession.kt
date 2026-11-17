@@ -242,10 +242,10 @@ class RealContactChatSession(
             val versionedMessage = encodedMessage.decodeAlwaysDecodableChatMessagePart().getOrNull() ?: continue
             chatMessageRepository.updateMessageStatus(
                 messageId = versionedMessage.id,
-                status = ChatMessage.Status.IS_READ
+                status = ChatMessage.Status.IS_DELIVERED
             )
             if (encodedMessage.isCompactionCommit()) {
-                chatMessageRepository.propagateStatusToCompactedMessages(versionedMessage.id, ChatMessage.Status.IS_READ)
+                chatMessageRepository.propagateStatusToCompactedMessages(versionedMessage.id, ChatMessage.Status.IS_DELIVERED)
             }
         }
     }

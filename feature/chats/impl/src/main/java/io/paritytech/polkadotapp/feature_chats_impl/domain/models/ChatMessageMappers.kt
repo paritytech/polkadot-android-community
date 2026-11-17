@@ -195,6 +195,7 @@ fun ChatMessage.Status.toLocal(): ChatMessageLocal.Status {
         ChatMessage.Status.PROCESSING -> ChatMessageLocal.Status.PROCESSING
         ChatMessage.Status.NEW -> ChatMessageLocal.Status.NEW
         ChatMessage.Status.IS_SENT -> ChatMessageLocal.Status.IS_SENT
+        ChatMessage.Status.IS_DELIVERED -> ChatMessageLocal.Status.IS_DELIVERED
         ChatMessage.Status.IS_READ -> ChatMessageLocal.Status.IS_READ
         ChatMessage.Status.DELIVERY_FAILED -> ChatMessageLocal.Status.DELIVERY_FAILED
     }
@@ -205,6 +206,7 @@ internal fun ChatMessageLocal.Status.toDomain(): ChatMessage.Status {
         ChatMessageLocal.Status.PROCESSING -> ChatMessage.Status.PROCESSING
         ChatMessageLocal.Status.NEW -> ChatMessage.Status.NEW
         ChatMessageLocal.Status.IS_SENT -> ChatMessage.Status.IS_SENT
+        ChatMessageLocal.Status.IS_DELIVERED -> ChatMessage.Status.IS_DELIVERED
         ChatMessageLocal.Status.IS_READ -> ChatMessage.Status.IS_READ
         ChatMessageLocal.Status.DELIVERY_FAILED -> ChatMessage.Status.DELIVERY_FAILED
     }

@@ -418,7 +418,7 @@ class ChatFeedInteractor @Inject internal constructor(
 
             withTimeout(LEFT_CHAT_SENT_TIMEOUT) {
                 chatMessageRepository.subscribeMessageStatus(message.id)
-                    .first { it == ChatMessage.Status.IS_SENT || it == ChatMessage.Status.IS_READ }
+                    .first { it == ChatMessage.Status.IS_SENT || it == ChatMessage.Status.IS_DELIVERED }
             }
         }.logFailure("Failed to notify peer about leaving chat")
     }

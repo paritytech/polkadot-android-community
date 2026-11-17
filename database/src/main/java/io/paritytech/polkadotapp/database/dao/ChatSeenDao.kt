@@ -14,7 +14,7 @@ abstract class ChatSeenDao {
     @Query(
         """
         SELECT MAX(sortOrder) FROM chat_messages
-        WHERE chatId = :chatId AND origintype = 'USER' AND status IN ('IS_SENT', 'IS_READ') AND timestamp <= :timestamp
+        WHERE chatId = :chatId AND origintype = 'USER' AND status IN ('IS_SENT', 'IS_DELIVERED') AND timestamp <= :timestamp
         """
     )
     abstract suspend fun getHighestSentOutgoingOrderUpTo(chatId: ByteArray, timestamp: Long): Long?
