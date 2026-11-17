@@ -1,0 +1,169 @@
+package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel
+
+import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
+import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
+import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
+import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.coerceToUnit
+import io.paritytech.polkadotapp.common.utils.exponentialRetryDelay
+import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flattenResult
+import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.pendingChatRequestIdOrThrow
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getContactOrThrow
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingChatRequestService
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.delivery.ChatRequestDeliveryKeypairDerivation
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.delivery.ChatRequestDeliverySigner
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.delivery.ChatRequestDeliverySigners
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.delivery.ChatRequestPublisher
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.StoredChatRequestCopy
+import io.paritytech.polkadotapp.feature_chats_impl.domain.error.OutgoingChatRequestNotPending
+import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
+import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.DeleteLocalChatUseCase
+import io.paritytech.polkadotapp.feature_statement_store_api.data.StatementSubmitError
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.StatementStoreMessageProver
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationStatementAccountAllocator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.time.Duration.Companion.seconds
+
+private const val CANCEL_ATTEMPTS = 10
+private val CANCEL_RETRY_DELAY = exponentialRetryDelay(initialDelay = 1.seconds, maxDelay = 256.seconds)
+private const val CANCEL_CONNECTION_TAG = "ChatRequestCancel"
+
+@Singleton
+class OutgoingChatRequestCancelService @Inject constructor(
+    private val contactsRepository: ContactsRepository,
+    private val chatRequestRepository: ChatRequestRepository,
+    private val deleteLocalChat: DeleteLocalChatUseCase,
+    private val chatSigners: ContactChatSigners,
+    private val publisher: ChatRequestPublisher,
+    private val outgoingChatRequestService: OutgoingChatRequestService,
+    private val keypairDerivation: ChatRequestDeliveryKeypairDerivation,
+    private val signers: ChatRequestDeliverySigners,
+    private val allocator: NotificationStatementAccountAllocator,
+    private val chainConnectionRefCounter: ChainConnectionRefCounter,
+    private val knownChains: KnownChains,
+    dispatchers: CoroutineDispatchers,
+) : CoroutineScope {
+    override val coroutineContext = dispatchers.io + SupervisorJob()
+
+    suspend fun cancel(contactAccountId: AccountId): Result<Unit> {
+        return runCancellableCatching {
+            val contact = contactsRepository.getContactOrThrow(contactAccountId)
+            contact to chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestIdOrThrow())
+        }.flatMap { (contact, request) ->
+            markCancelledAndRemoveChat(contact, request.id).map {
+                releaseChatSigner(contact, request.id)
+                launch { publishCancelInBackground(contact, request) }
+            }
+        }.coerceToUnit()
+    }
+
+    private suspend fun markCancelledAndRemoveChat(contact: Contact, requestId: ChatRequestId): Result<Unit> {
+        return runCancellableCatching {
+            contactsRepository.withTransaction {
+                val marked = chatRequestRepository.markOutgoingCancelled(requestId)
+                if (marked) deleteLocalChat(ChatId.fromContact(contact.accountId))
+                marked
+            }
+        }.flatMap { marked ->
+            if (marked) Result.success(Unit) else Result.failure(OutgoingChatRequestNotPending(requestId))
+        }
+    }
+
+    private suspend fun releaseChatSigner(contact: Contact, requestId: ChatRequestId) {
+        chatSigners.release(contact.accountId).logFailure("Failed to release chat signer after request $requestId was cancelled")
+    }
+
+    private suspend fun publishCancelInBackground(contact: Contact, request: ChatRequest) {
+        chainConnectionRefCounter.withConnectionEnabled(knownChains.people, CANCEL_CONNECTION_TAG) {
+            publisher.awaitPublishing(request.id)
+
+            retryingTransientFailures { findOwnCopies(contact, request) }
+                .onSuccess { copies -> cancelCopies(contact, request, copies) }
+                .onFailure { error -> Timber.w(error, "chatRequestCancel: copies of request ${request.id} were not fetched; nothing was cancelled") }
+        }
+    }
+
+    private suspend fun findOwnCopies(contact: Contact, request: ChatRequest): Result<List<OwnRequestCopy>> {
+        return outgoingChatRequestService.fetchStoredCopies(contact).flatMap { copies ->
+            candidateSigners(contact, request).map { candidates ->
+                copies.mapNotNull { copy ->
+                    val signer = candidates.find { it.accountId == copy.signerAccountId }
+                    if (signer == null) Timber.w("chatRequestCancel: skipping a copy of request ${request.id} from an unknown account")
+
+                    signer?.let { OwnRequestCopy(copy, it.prover) }
+                }
+            }
+        }
+    }
+
+    private suspend fun candidateSigners(contact: Contact, request: ChatRequest): Result<List<ChatRequestDeliverySigner>> {
+        val period = allocator.currentPeriod()
+        val oneShotPeriods = if (period > 0u) listOf(period, period - 1u) else listOf(period)
+        val oneShotSigners = oneShotPeriods.map { oneShotPeriod ->
+            keypairDerivation.deliveryAccount(request.id, oneShotPeriod).map(signers::anonymousSigner)
+        }
+
+        return (oneShotSigners + signers.usernameSigner(contact, period)).flattenResult()
+    }
+
+    private suspend fun cancelCopies(contact: Contact, request: ChatRequest, copies: List<OwnRequestCopy>) {
+        for (copy in copies) {
+            retryingTransientFailures { submitCancel(contact, request, copy) }
+                .onSuccess { Timber.i("chatRequestCancel: a copy of request ${request.id} was cancelled") }
+                .onFailure { error ->
+                    if (error is StatementSubmitError.NoAllowance) {
+                        Timber.i("chatRequestCancel: a copy of request ${request.id} has no allowance left; the store drops it")
+                    } else {
+                        Timber.w(error, "chatRequestCancel: a copy of request ${request.id} was not cancelled")
+                    }
+                }
+        }
+    }
+
+    private suspend fun submitCancel(contact: Contact, request: ChatRequest, copy: OwnRequestCopy): Result<Unit> {
+        val expiry = StatementExpiry.nextAfter(copy.stored.expiry)
+
+        return outgoingChatRequestService.deliverChatRequestCancel(request, contact, copy.prover, expiry)
+    }
+
+    private suspend fun <T> retryingTransientFailures(action: suspend () -> Result<T>): Result<T> {
+        var attempt = 1
+
+        while (true) {
+            val result = action()
+            val error = result.exceptionOrNull()
+            if (error == null || !error.allowsCancelRetry() || attempt == CANCEL_ATTEMPTS) return result
+
+            delay(CANCEL_RETRY_DELAY.delayFor(attempt))
+            attempt++
+        }
+    }
+
+    private fun Throwable.allowsCancelRetry(): Boolean {
+        return when (this) {
+            is StatementSubmitError.ChannelPriorityTooLow -> true
+            is StatementSubmitError -> false
+            else -> true
+        }
+    }
+}
+
+private class OwnRequestCopy(val stored: StoredChatRequestCopy, val prover: StatementStoreMessageProver)

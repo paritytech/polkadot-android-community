@@ -184,6 +184,26 @@ sealed interface CoinagePaymentStatusLocal {
     @Serializable
     @EnumIndex(5)
     class PartiallyClaimed(val claimed: Balance) : CoinagePaymentStatusLocal
+
+    @Serializable
+    @EnumIndex(6)
+    object Unclaimed : CoinagePaymentStatusLocal
+
+    @Serializable
+    @EnumIndex(7)
+    object Reclaiming : CoinagePaymentStatusLocal
+
+    @Serializable
+    @EnumIndex(8)
+    class Reclaimed(val reclaimed: Balance) : CoinagePaymentStatusLocal
+
+    @Serializable
+    @EnumIndex(9)
+    object ReclaimFailed : CoinagePaymentStatusLocal
+
+    @Serializable
+    @EnumIndex(10)
+    object ReturnedToSender : CoinagePaymentStatusLocal
 }
 
 @JvmInline

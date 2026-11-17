@@ -80,10 +80,11 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
         var settled: List<CoinageTransactionState>
         var chainAnswered = false
+        var nothingOnChain = false
         val rejected = mutableSetOf<AccountId>()
 
         while (true) {
-            settled = awaitKnownOperationsSettled(groupId, keys.keys, report = ::send)
+            settled = awaitKnownOperationsSettled(groupId, keys.keys, nothingOnChain, report = ::send)
 
             // Each coin is registered once. Rebuilding a claim that failed is its submission policy's job, into
             // the coin it recorded; a second claim here would mint into a coin nothing would ever wait on.
@@ -101,6 +102,12 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
             }
 
             val claimable = look?.own.orEmpty()
+
+            if (look != null) {
+                val absent = claimable.isEmpty() && foreign.isEmpty() && settled.isEmpty()
+                if (absent && !nothingOnChain) reportDetection(groupId, CoinageTransferDetection.Absent, ::send)
+                nothingOnChain = absent
+            }
 
             when {
                 // Coin detected => register its claim
@@ -140,15 +147,21 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     private suspend fun awaitKnownOperationsSettled(
         groupId: CoinageOperationGroupId,
         coins: Set<AccountId>,
+        nothingOnChain: Boolean,
         report: suspend (CoinageTransferDetection) -> Unit,
     ): List<CoinageTransactionState> {
         return transactionService.subscribeOperationGroupStatuses(groupId)
-            .onEach { states ->
-                val detection = states.toProgress(coins)
-                logDetection(groupId, detection)
-                report(detection)
-            }
+            .onEach { states -> reportDetection(groupId, states.toProgress(coins, nothingOnChain), report) }
             .first { states -> states.none { it.status.isLive } }
+    }
+
+    private suspend fun reportDetection(
+        groupId: CoinageOperationGroupId,
+        detection: CoinageTransferDetection,
+        send: suspend (CoinageTransferDetection) -> Unit,
+    ) {
+        logDetection(groupId, detection)
+        send(detection)
     }
 
     /**
@@ -232,7 +245,10 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
      * Nothing here may say claiming is over — only the caller's loop knows that — so a shortfall is never
      * announced while another attempt could still make it up.
      */
-    private suspend fun List<CoinageTransactionState>.toProgress(coins: Set<AccountId>): CoinageTransferDetection {
+    private suspend fun List<CoinageTransactionState>.toProgress(
+        coins: Set<AccountId>,
+        nothingOnChain: Boolean,
+    ): CoinageTransferDetection {
         val arrived = filter { it.status.isArrived }
         val outstanding = coins - arrivedCoins()
 
@@ -246,7 +262,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
             arrived.isNotEmpty() && outstanding.any { it in failedCoins() } ->
                 CoinageTransferDetection.ClaimingRest(valueMintedBy(arrived))
 
-            isEmpty() -> CoinageTransferDetection.Detecting
+            isEmpty() -> if (nothingOnChain) CoinageTransferDetection.Absent else CoinageTransferDetection.Detecting
 
             else -> CoinageTransferDetection.Claiming
         }
@@ -282,6 +298,7 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
 
         when (detection) {
             is CoinageTransferDetection.Detecting -> coinageLogD("Claim detecting group=$group")
+            is CoinageTransferDetection.Absent -> coinageLogD("Claim absent group=$group")
             is CoinageTransferDetection.Claiming -> coinageLogD("Claim claiming group=$group")
 
             is CoinageTransferDetection.ClaimingRest ->

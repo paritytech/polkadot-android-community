@@ -19,7 +19,6 @@ import io.paritytech.polkadotapp.feature_calls_api.domain.CallController
 import io.paritytech.polkadotapp.feature_calls_api.domain.CallStateTracker
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSessionManager
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
-import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatFooterRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatHeaderRenderer
 import io.paritytech.polkadotapp.feature_chats_api.domain.middleware.bot.CustomChatMenuRenderer
@@ -32,13 +31,17 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageReaction
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageReactionContent
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatVariant
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactWithChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.MessageRevision
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.OpenChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.contactOrNull
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.isIncoming
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.isOutgoing
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.onContact
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.paymentContentOrNull
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.userDeclinedIncomingRequest
 import io.paritytech.polkadotapp.feature_chats_api.presentation.model.CustomChatAppearance
 import io.paritytech.polkadotapp.feature_chats_impl.data.AttachmentMetaBuilder
@@ -47,6 +50,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadSt
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotificationPublisher
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileUploadRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getContactResult
@@ -56,7 +61,10 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatActiveTrackerInte
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatDisplay.ChatDisplayGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingChatRequestProcessor
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.OutgoingChatRequestCancelService
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.ChatRequestError
+import io.paritytech.polkadotapp.feature_chats_impl.domain.extension.coinAccountIds
+import io.paritytech.polkadotapp.feature_chats_impl.domain.extension.reclaimGroupOf
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsent
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsentUseCase
@@ -67,10 +75,14 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.models.MessageEditHis
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.DmChatMessageOriginDisplayResolver
 import io.paritytech.polkadotapp.feature_chats_impl.domain.originDisplay.MessageOriginDisplayResolver
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
+import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.DeleteLocalChatUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
@@ -78,6 +90,8 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.flowOf as flowOfValue
 
 private val MAX_ATTACHMENT_SIZE = 128.megabytes
+
+private class ContactSnapshot(val current: ContactWithChatRequest?, val lastKnown: ContactWithChatRequest?)
 
 class ChatFeedInteractor @Inject internal constructor(
     private val chatMessageRepository: ChatMessageRepository,
@@ -92,7 +106,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private val dmChatMessageOriginDisplayResolver: DmChatMessageOriginDisplayResolver.Factory,
     private val accountRepository: AccountRepository,
     private val addContactUseCase: AddContactUseCase,
-    private val removeContactUseCase: RemoveContactUseCase,
+    private val deleteLocalChat: DeleteLocalChatUseCase,
     private val incomingChatRequestProcessor: IncomingChatRequestProcessor,
     private val callController: CallController,
     private val callStateTracker: CallStateTracker,
@@ -101,8 +115,12 @@ class ChatFeedInteractor @Inject internal constructor(
     private val attachmentMetaBuilder: AttachmentMetaBuilder,
     private val attachmentFileStorage: AttachmentFileStorage,
     private val hopNodeUrlProvider: HopNodeUrlProvider,
+    private val reclaimHandedOffCoinsUseCase: ReclaimHandedOffCoinsUseCase,
     private val chatSigners: ContactChatSigners,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
+    private val chatSeenRepository: ChatSeenRepository,
+    private val chatRequestRepository: ChatRequestRepository,
+    private val outgoingChatRequestCancelService: OutgoingChatRequestCancelService,
 ) {
     fun initiateCall(chatId: ChatId, callerName: String, withVideo: Boolean): InitiateCallResult {
         val activeCall = callStateTracker.getActiveCall()
@@ -180,6 +198,13 @@ class ChatFeedInteractor @Inject internal constructor(
     }
 
     fun subscribeMessages(chatId: ChatId) = chatEngine.subscribeMessagesFeed(chatId)
+
+    fun subscribePeerSeenOrder(chatId: ChatId): Flow<Long> {
+        return when (chatId.chatVariant()) {
+            is ChatVariant.Extension -> flowOfValue(Long.MAX_VALUE)
+            is ChatVariant.Contact -> chatSeenRepository.subscribePeerSeenOrder(chatId).inBackground()
+        }
+    }
 
     suspend fun sendTextMessage(
         chatId: ChatId,
@@ -335,7 +360,7 @@ class ChatFeedInteractor @Inject internal constructor(
         tryNotifyPeerLeftChat(chatId)
         chatId.onContact { contactChat -> releaseChatSigner(contactChat.contactAccountId) }
 
-        return deleteContactChatLocalData(chatId)
+        return runCancellableCatching { deleteLocalChat(chatId) }
     }
 
     fun subscribeIsIdentitySigningAllowed(chatId: ChatId): Flow<Boolean> {
@@ -380,6 +405,15 @@ class ChatFeedInteractor @Inject internal constructor(
         return chatEngine.getEditHistory(chatId, messageId)
     }
 
+    suspend fun reclaimPayment(chatId: ChatId, messageId: ChatMessageId): Result<Unit> {
+        return withContext(coroutineDispatchers.io) {
+            val payment = chatEngine.getMessageById(chatId, messageId)?.paymentContentOrNull()
+                ?: return@withContext Result.failure(IllegalStateException("No payment message $messageId to reclaim"))
+
+            reclaimHandedOffCoinsUseCase.reclaim(payment.coinAccountIds(), reclaimGroupOf(messageId))
+        }
+    }
+
     suspend fun acceptIncomingRequest(contactAccountId: AccountId): Result<Unit> {
         return withContext(coroutineDispatchers.io) {
             contactsRepository.getContactResult(contactAccountId)
@@ -393,6 +427,12 @@ class ChatFeedInteractor @Inject internal constructor(
             contactsRepository.getContactResult(contactAccountId)
                 .mapError { ChatRequestError.ContactNotFound }
                 .flatMap { incomingChatRequestProcessor.declineIncomingRequest(it) }
+        }
+    }
+
+    suspend fun cancelOutgoingRequest(contactAccountId: AccountId): Result<Unit> {
+        return withContext(coroutineDispatchers.io) {
+            outgoingChatRequestCancelService.cancel(contactAccountId)
         }
     }
 
@@ -431,11 +471,14 @@ class ChatFeedInteractor @Inject internal constructor(
 
     private fun subscribeUserInputStateForContact(contactId: AccountId): Flow<ChatUserInputState> {
         return combine(
-            contactsRepository.subscribeContactWithChatRequest(contactId),
+            subscribeContactWithLastKnown(contactId),
             identitySigningConsent.subscribe(contactId),
-        ) { contactWithRequest, consent ->
+        ) { contactSnapshot, consent ->
+            val contactWithRequest = contactSnapshot.current
+            val lastKnown = contactSnapshot.lastKnown
+
             when {
-                contactWithRequest == null -> ChatUserInputState.SendChatRequest
+                contactWithRequest == null -> if (lastKnown == null) ChatUserInputState.SendChatRequest else removedContactInputState(lastKnown)
 
                 consent == IdentitySigningConsent.REQUESTED -> ChatUserInputState.IdentitySigningConsentRequired
 
@@ -457,28 +500,27 @@ class ChatFeedInteractor @Inject internal constructor(
         }
     }
 
+    private fun subscribeContactWithLastKnown(contactId: AccountId): Flow<ContactSnapshot> {
+        return contactsRepository.subscribeContactWithChatRequest(contactId)
+            .scan(ContactSnapshot(current = null, lastKnown = null)) { previous, current ->
+                ContactSnapshot(current = current, lastKnown = current ?: previous.lastKnown)
+            }
+            .drop(1)
+    }
+
+    private suspend fun removedContactInputState(lastKnown: ContactWithChatRequest): ChatUserInputState {
+        val incomingRequest = lastKnown.pendingChatRequest?.takeIf { it.isIncoming() } ?: return ChatUserInputState.ChatRemoved
+        val cancelled = chatRequestRepository.getById(incomingRequest.id)?.status == ChatRequest.Status.CANCELLED
+
+        return if (cancelled) ChatUserInputState.ChatRequestCancelled else ChatUserInputState.ChatRemoved
+    }
+
     private fun Contact.constructUserInputStatePayment(): ChatUserInputState.SendMessage.Payment {
         val paymentAvailable = chatEngine.findOriginConfiguration(origin)?.paymentAvailable() ?: true
         return if (paymentAvailable) {
             ChatUserInputState.SendMessage.Payment.Available(accountId)
         } else {
             ChatUserInputState.SendMessage.Payment.NotAvailable
-        }
-    }
-
-    private suspend fun deleteContactChatLocalData(chatId: ChatId): Result<Unit> = runCatching {
-        deleteLocalMessages(chatId)
-        deleteLocalContact(chatId)
-        chatDraftRepository.deleteDraft(chatId)
-    }
-
-    private suspend fun deleteLocalMessages(chatId: ChatId) {
-        chatMessageRepository.deleteAllChatMessages(chatId)
-    }
-
-    private suspend fun deleteLocalContact(chatId: ChatId) {
-        chatId.onContact { contactChat ->
-            removeContactUseCase.removeContact(contactChat.contactAccountId)
         }
     }
 

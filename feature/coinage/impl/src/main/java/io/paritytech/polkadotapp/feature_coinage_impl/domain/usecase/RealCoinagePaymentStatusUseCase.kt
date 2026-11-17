@@ -80,6 +80,12 @@ class RealCoinagePaymentStatusUseCase @Inject constructor(
 }
 
 private fun TrackedCoin.paymentStatus(atFinalized: Map<AccountId, Boolean>): CoinagePaymentStatus = when {
+    state.consumerStatus == FINALIZED_SUCCESS -> CoinagePaymentStatus.Reclaimed(finalized = true)
+
+    state.consumerStatus == DurableTxStatus.PENDING_SUCCESS -> CoinagePaymentStatus.Reclaimed(finalized = false)
+
+    state.consumerStatus?.isLive == true -> CoinagePaymentStatus.Reclaiming
+
     // Finalized minter and absence at finalized is guaranteed finalized claim
     state.minterStatus == FINALIZED_SUCCESS && atFinalized[coin.accountId] == false
     -> CoinagePaymentStatus.Claimed(finalized = true)

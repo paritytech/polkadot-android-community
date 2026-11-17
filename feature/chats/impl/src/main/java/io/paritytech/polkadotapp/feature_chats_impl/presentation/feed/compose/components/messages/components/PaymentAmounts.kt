@@ -21,6 +21,7 @@ import io.paritytech.polkadotapp.feature_tokens_api.presentation.model.TokenAmou
 internal fun PaymentAmounts(
     amount: TokenAmountModel,
     differingAmount: TokenAmountModel?,
+    struckThrough: Boolean,
     maxWidthPx: Int,
     primaryTextColor: Color,
     secondaryTextColor: Color
@@ -40,6 +41,7 @@ internal fun PaymentAmounts(
 
         PaymentAmountLine(
             amount = differingAmount ?: amount,
+            struckThrough = struckThrough,
             maxWidthPx = maxWidthPx,
             primaryTextColor = primaryTextColor,
             tickerColor = secondaryTextColor
@@ -50,11 +52,13 @@ internal fun PaymentAmounts(
 @Composable
 private fun PaymentAmountLine(
     amount: TokenAmountModel,
+    struckThrough: Boolean,
     maxWidthPx: Int,
     primaryTextColor: Color,
     tickerColor: Color
 ) {
-    val style = PolkadotTheme.typography.headline.large
+    val headline = PolkadotTheme.typography.headline.large
+    val style = if (struckThrough) headline.copy(textDecoration = TextDecoration.LineThrough) else headline
     val minFontSize = PolkadotTheme.typography.body.medium.fontSize
     val formatter = LocalTokenAmountFormatter.current
     val text = formatter.formatFiatSigned(amount, withSymbol = true)

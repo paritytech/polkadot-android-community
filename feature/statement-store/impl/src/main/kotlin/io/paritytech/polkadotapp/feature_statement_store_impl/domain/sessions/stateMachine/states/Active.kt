@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
@@ -16,6 +17,7 @@ data class Active(
     private val expiry: ULong,
     override val maxStatementSize: InformationSize,
     override val canCompact: Boolean,
+    override val replacementPolicy: PendingMessageReplacementPolicy,
     private val isCompacting: Boolean,
 ) : CommunicationState() {
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
@@ -32,6 +34,13 @@ data class Active(
                 }
 
                 if (checkAlreadyPendingMessage(event.message, pendingMessages, outgoingPendingRequest)) return
+
+                val requestMessages = outgoingPendingRequest?.messages.orEmpty()
+                when (val outcome = decideAgainstPending(event.message, requestMessages + pendingMessages)) {
+                    PendingMessageOutcome.Drop -> return
+                    is PendingMessageOutcome.Replace -> if (tryReplacePendingMessage(outcome.pendingMessage, event.message)) return
+                    PendingMessageOutcome.Add -> Unit
+                }
 
                 when {
                     isCompacting || pendingMessages.isNotEmpty() -> {
@@ -174,10 +183,34 @@ data class Active(
 
             is CommunicationStateEvent.InvalidateSession -> {
                 transition.emitSideEffect(CommunicationSideEffect.StopPolling)
-                transition.emitState(Initialization(pendingMessages, maxStatementSize, canCompact))
+                transition.emitState(Initialization(pendingMessages, maxStatementSize, canCompact, replacementPolicy))
                 transition.emitSideEffect(CommunicationSideEffect.FetchInitialData)
             }
         }
+    }
+
+    context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
+    private suspend fun tryReplacePendingMessage(replaced: EncodedMessage, message: EncodedMessage): Boolean {
+        val request = outgoingPendingRequest
+
+        if (request == null || request.messages.none { it.contentEquals(replaced) }) {
+            transition.emitState(copy(pendingMessages = pendingMessages.replaceMessage(replaced, message)))
+            return true
+        }
+
+        val newRequestMessages = request.messages.replaceMessage(replaced, message)
+        if (splitMessagesToFitRequest(newRequestMessages).remaining.isNotEmpty()) return false
+
+        val newExpiry = StatementExpiry.nextAfter(expiry)
+        val newRequest = StatementTransportEvent.Request(
+            requestId = generateNewRequestId(),
+            expiry = newExpiry,
+            messages = newRequestMessages
+        )
+
+        transition.emitState(copy(outgoingPendingRequest = newRequest, expiry = newExpiry))
+        transition.emitSideEffect(CommunicationSideEffect.SubmitRequest(newRequest))
+        return true
     }
 
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
