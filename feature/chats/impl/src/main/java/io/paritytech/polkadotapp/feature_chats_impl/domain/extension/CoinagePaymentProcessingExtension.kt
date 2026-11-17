@@ -84,14 +84,14 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             val outcome = if (message.isIncoming) {
                 claimStatuses(message, content, coinKeys)
             } else {
-                handoffStatuses(coinKeys)
+                handoffStatuses(coinKeys).map { Result.success(it) }
             }
                 .distinctUntilChanged()
-                .onEach { status -> modifyPaymentContent(message, status) }
+                .onEach { result -> result.onSuccess { status -> modifyPaymentContent(message, status) } }
                 .lastOrNull()
 
-            if (message.isIncoming && !outcome.isFinal()) {
-                Timber.tag(COINAGE_LOG_TAG).w("Payment claim ended without a verdict message=${message.id} last=$outcome")
+            if (outcome?.isFailure == true) {
+                Timber.tag(COINAGE_LOG_TAG).w("Payment claim could not be valued message=${message.id}")
                 return@launch
             }
 
@@ -99,7 +99,7 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             // payment's claim keeps retrying while a coin is still there to be claimed, so a partial
             // Transferred is a progress report; treating it as the end is what settled a 1.00 payment as
             // 0.12. A claim cut short by shutdown throws instead, leaving the message for the next launch.
-            logSettled(message, outcome)
+            logSettled(message, outcome?.getOrNull())
             with(chatExtensionContext) { markMessageProcessed(message) }
         }
     }
@@ -114,7 +114,7 @@ class CoinagePaymentProcessingExtension @Inject constructor(
         message: ChatMessage,
         content: CoinagePayment,
         coinKeys: List<CoinPrivateKey>,
-    ): Flow<Status> {
+    ): Flow<Result<Status>> {
         val groupId = claimGroupOf(message.id)
         // TODO: this deadline is persisted in every durable claim's submission params. If it is ever changed,
         //  add a migration that updates the stored deadlines too
@@ -124,7 +124,7 @@ class CoinagePaymentProcessingExtension @Inject constructor(
             .i("Payment claiming message=${message.id} group=${groupId.value} coins=${coinKeys.size} until=$retryUntil")
 
         return claimReceivedCoinsUseCase.claim(coinKeys, groupId, retryUntil)
-            .map { it.toPaymentStatus(expected = content.totalValue) }
+            .map { detection -> detection.map { it.toPaymentStatus(expected = content.totalValue) } }
     }
 
     /**
@@ -240,5 +240,3 @@ private fun CoinageTransferDetection.toPaymentStatus(expected: Balance): Status 
 
     is CoinageTransferDetection.NotClaimed -> Status.FailedTransfer
 }
-
-private fun Status?.isFinal() = this is Status.Transferred || this is Status.FailedTransfer

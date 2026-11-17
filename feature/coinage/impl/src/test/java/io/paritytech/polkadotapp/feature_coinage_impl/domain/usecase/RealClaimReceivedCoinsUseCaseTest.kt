@@ -589,15 +589,16 @@ class RealClaimReceivedCoinsUseCaseTest {
     }
 
     @Test
-    fun `a claim whose coins cannot be valued ends without a verdict`() = runTest {
+    fun `a claim whose coins cannot be valued ends with a failure`() = runTest {
         val coin = key(1)
-        coEvery { assetValueUseCase.valueOf(any()) } returns Result.failure(IllegalStateException("no metadata"))
+        val noMetadata = IllegalStateException("no metadata")
+        coEvery { assetValueUseCase.valueOf(any()) } returns Result.failure(noMetadata)
         givenChainSees(listOf(coin.accountId))
         givenGroupReports(listOf(entry(FINALIZED_SUCCESS, claiming = coin.accountId)))
 
-        val reported = reportsOfCompleted(coin)
+        val reported = resultsOfCompleted(coin)
 
-        assertEquals(listOf(CoinageTransferDetection.Detecting), reported)
+        assertEquals(noMetadata, reported.last().exceptionOrNull())
     }
 
     // ---- harness ----
@@ -616,7 +617,7 @@ class RealClaimReceivedCoinsUseCaseTest {
         coVerify(exactly = 1) { submissionUseCase(keys, any(), groupId, RETRY_UNTIL) }
     }
 
-    private fun claimOf(vararg coins: PeerCoin): Flow<CoinageTransferDetection> =
+    private fun claimOf(vararg coins: PeerCoin): Flow<Result<CoinageTransferDetection>> =
         useCase.claim(coins.map { it.privateKey }, groupId, RETRY_UNTIL)
 
     /**
@@ -628,14 +629,17 @@ class RealClaimReceivedCoinsUseCaseTest {
     private suspend fun reportsOf(vararg coins: PeerCoin): List<CoinageTransferDetection> {
         val reported = mutableListOf<CoinageTransferDetection>()
 
-        withTimeoutOrNull(IDLE) { claimOf(*coins).collect { reported += it } }
+        withTimeoutOrNull(IDLE) { claimOf(*coins).collect { reported += it.getOrThrow() } }
 
         return reported
     }
 
+    private suspend fun reportsOfCompleted(vararg coins: PeerCoin): List<CoinageTransferDetection> =
+        resultsOfCompleted(*coins).map { it.getOrThrow() }
+
     /** Drains the claim and insists it actually finished — that nothing more would ever be attempted. */
-    private suspend fun reportsOfCompleted(vararg coins: PeerCoin): List<CoinageTransferDetection> {
-        val reported = mutableListOf<CoinageTransferDetection>()
+    private suspend fun resultsOfCompleted(vararg coins: PeerCoin): List<Result<CoinageTransferDetection>> {
+        val reported = mutableListOf<Result<CoinageTransferDetection>>()
 
         val completed = withTimeoutOrNull(IDLE) {
             claimOf(*coins).collect { reported += it }

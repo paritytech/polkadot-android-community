@@ -64,8 +64,8 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
         coinKeys: List<CoinPrivateKey>,
         groupId: CoinageOperationGroupId,
         retryUntil: Instant,
-    ): Flow<CoinageTransferDetection> = channelFlow {
-        send(CoinageTransferDetection.Detecting)
+    ): Flow<Result<CoinageTransferDetection>> = channelFlow {
+        send(Result.success(CoinageTransferDetection.Detecting))
 
         val keys = coinKeys.associateBy { key -> key.deriveKeypair().accountId() }
 
@@ -113,11 +113,9 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
         // Nothing further will be attempted, so this is the last word — and the only place a shortfall
         // may be called final. Logged like any other report: how a claim ended is the line worth having
         // when someone says they were paid less than they were sent.
-        settled.toVerdict(keys.keys)
-            .onSuccess { verdict ->
-                logDetection(groupId, verdict)
-                send(verdict)
-            }
+        val verdict = settled.toVerdict(keys.keys)
+        verdict.onSuccess { logDetection(groupId, it) }
+        send(verdict)
 
         // The chain subscription never ends by itself, and this flow does not finish while a child of its
         // scope is still running — so without this a finished claim would hang instead of completing, and
@@ -133,15 +131,13 @@ class RealClaimReceivedCoinsUseCase @Inject constructor(
     private suspend fun awaitKnownOperationsSettled(
         groupId: CoinageOperationGroupId,
         coins: Set<AccountId>,
-        report: suspend (CoinageTransferDetection) -> Unit,
+        report: suspend (Result<CoinageTransferDetection>) -> Unit,
     ): List<CoinageTransactionState> {
         return transactionService.subscribeOperationGroupStatuses(groupId)
             .onEach { states ->
-                states.toProgress(coins)
-                    .onSuccess { detection ->
-                        logDetection(groupId, detection)
-                        report(detection)
-                    }
+                val detection = states.toProgress(coins)
+                detection.onSuccess { logDetection(groupId, it) }
+                report(detection)
             }
             .first { states -> states.none { it.status.isLive } }
     }

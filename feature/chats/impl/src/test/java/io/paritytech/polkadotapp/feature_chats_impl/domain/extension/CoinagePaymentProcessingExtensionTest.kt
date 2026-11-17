@@ -576,7 +576,7 @@ class CoinagePaymentProcessingExtensionTest {
         andThen: suspend () -> Unit = {},
     ) {
         every { claimReceivedCoinsUseCase.claim(any(), any(), any()) } returns flow {
-            reports.forEach { emit(it) }
+            reports.forEach { emit(Result.success(it)) }
             andThen()
         }
     }
