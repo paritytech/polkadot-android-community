@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.interactors
 
 import io.novasama.substrate_sdk_android.extensions.toHexString
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.domain.model.AccountId
@@ -8,6 +9,7 @@ import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
 import io.paritytech.polkadotapp.common.domain.model.requireX25519PublicKey
 import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
+import io.paritytech.polkadotapp.common.utils.decodeFromByteArrayCatching
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
@@ -20,6 +22,8 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactOrigins
@@ -28,6 +32,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRoomRepo
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.newOutgoingChatRequest
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.Username
 import io.paritytech.polkadotapp.tools_push_notifications_api.PushNotificationsHelper
 import kotlinx.coroutines.flow.Flow
@@ -50,6 +55,10 @@ class RealAddContactUseCase @Inject constructor(
     private val knownChains: KnownChains,
     private val currentTimeContext: CurrentTimeContext,
 ) : AddContactUseCase {
+    private companion object {
+        const val UNKNOWN_DELIVERY_PERIOD = 0u
+    }
+
     override suspend fun addContactWithChatRequest(
         contactAccountId: AccountId,
         username: Username?,
@@ -75,31 +84,29 @@ class RealAddContactUseCase @Inject constructor(
         )
 
         Timber.i("addContact: recording chat request to ${contact.accountId} for background delivery")
-        createPendingContactChat(contact, newOutgoingChatRequest(), welcomeMessage)
+        createPendingContactChat(contact, newOutgoingChatRequest(contact.accountId), welcomeMessage)
     }
 
     override suspend fun addAlreadyEstablishedContactsById(accountIds: List<AccountId>): Result<Unit> {
-        if (accountIds.isEmpty()) return Result.success(Unit)
+        return saveContactsResolvedOnChain(accountIds) { consumerInfo, ourMetaAccountId, now ->
+            val contact = consumerInfo.toContact(ourMetaAccountId, addedAt = now, establishedAt = now, pendingChatRequestId = null)
+            contactsRepository.saveContact(contact)
+            chatRoomRepository.createRoomIfNotExists(ChatId.fromContact(contact.accountId))
+        }
+    }
 
-        val peopleChain = chainRegistry.getChain(knownChains.people)
-        return resourcesRepository.resolveConsumers(peopleChain.id, accountIds).flatMap { consumerInfoByAccount ->
-            runCatching {
-                val walletAccount = accountRepository.getWalletAccount()
-                val now = currentTimeContext.currentTime()
+    suspend fun addContactsWithPendingRequests(requests: List<ChatStateForSync.OutgoingRequest>): Result<Unit> {
+        val requestsByPeer = requests.filter { contactsRepository.getContact(it.peer) == null }.associateBy { it.peer }
 
-                accountIds.forEach { accountId ->
-                    val consumerInfo = consumerInfoByAccount[accountId] ?: run {
-                        Timber.w("addAlreadyEstablishedContactsById: no ConsumerInfo for 0x%s", accountId.value.toHexString())
-                        return@forEach
-                    }
-                    runCatching {
-                        val contact = consumerInfo.toAlreadyEstablishedContact(walletAccount.id, now)
-                        contactsRepository.saveContact(contact)
-                        chatRoomRepository.createRoomIfNotExists(ChatId.fromContact(contact.accountId))
-                    }.onFailure {
-                        Timber.w(it, "addAlreadyEstablishedContactsById: save failed for 0x${accountId.value.toHexString()}")
-                    }
-                }
+        return saveContactsResolvedOnChain(requestsByPeer.keys.toList()) { consumerInfo, ourMetaAccountId, now ->
+            val request = requestsByPeer.getValue(consumerInfo.accountId)
+            val contact = consumerInfo.toContact(ourMetaAccountId, addedAt = now, establishedAt = null, pendingChatRequestId = request.id)
+
+            contactsRepository.withTransaction {
+                chatRequestRepository.saveFromSync(request.toChatRequest())
+                chatRoomRepository.createRoomIfNotExists(ChatId.fromContact(contact.accountId))
+                request.toWelcomeMessage()?.let { chatEngine.saveMessage(it) }
+                contactsRepository.saveContact(contact)
             }
         }
     }
@@ -119,7 +126,37 @@ class RealAddContactUseCase @Inject constructor(
 
     override fun observeContactsChanged(): Flow<Unit> = contactsRepository.observeContactsChanged()
 
-    private fun ConsumerInfo.toAlreadyEstablishedContact(ourMetaAccountId: Long, addedAt: Instant): Contact {
+    private suspend fun saveContactsResolvedOnChain(
+        accountIds: List<AccountId>,
+        save: suspend (consumerInfo: ConsumerInfo, ourMetaAccountId: Long, now: Instant) -> Unit,
+    ): Result<Unit> {
+        if (accountIds.isEmpty()) return Result.success(Unit)
+
+        val peopleChain = chainRegistry.getChain(knownChains.people)
+        return resourcesRepository.resolveConsumers(peopleChain.id, accountIds).flatMap { consumerInfoByAccount ->
+            runCatching {
+                val walletAccount = accountRepository.getWalletAccount()
+                val now = currentTimeContext.currentTime()
+
+                accountIds.forEach { accountId ->
+                    val consumerInfo = consumerInfoByAccount[accountId] ?: run {
+                        Timber.w("saveContactsResolvedOnChain: no ConsumerInfo for 0x%s", accountId.value.toHexString())
+                        return@forEach
+                    }
+                    runCatching { save(consumerInfo, walletAccount.id, now) }.onFailure {
+                        Timber.w(it, "saveContactsResolvedOnChain: save failed for 0x${accountId.value.toHexString()}")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun ConsumerInfo.toContact(
+        ourMetaAccountId: Long,
+        addedAt: Instant,
+        establishedAt: Instant?,
+        pendingChatRequestId: ChatRequestId?,
+    ): Contact {
         return Contact(
             accountId = accountId,
             username = username,
@@ -128,8 +165,40 @@ class RealAddContactUseCase @Inject constructor(
             avatarUrl = null,
             sharedSecretDerivationDomain = SharedSecretDerivationDomain.CHAT,
             origin = ContactOrigins.CONTACT_CHAT,
+            pendingChatRequestId = pendingChatRequestId,
             addedAt = addedAt,
-            establishedAt = addedAt,
+            establishedAt = establishedAt,
+        )
+    }
+
+    private fun ChatStateForSync.OutgoingRequest.toChatRequest(): ChatRequest {
+        return ChatRequest(
+            welcomeMessageId = id,
+            peer = peer,
+            timestamp = timestamp,
+            direction = ChatRequest.Direction.OUTGOING,
+            status = ChatRequest.Status.PENDING,
+            delivery = ChatRequest.Delivery.DeliveredAnonymously(period = UNKNOWN_DELIVERY_PERIOD),
+        )
+    }
+
+    private fun ChatStateForSync.OutgoingRequest.toWelcomeMessage(): ChatMessage? {
+        val content = BinaryScale.decodeFromByteArrayCatching<VersionedRequestContent>(encodedContent)
+            .onFailure { Timber.w(it, "Failed to decode the content of synced outgoing request $id") }
+            .getOrNull()
+        val welcome = when (content) {
+            is VersionedRequestContent.V1 -> content.content.welcomeMessage
+            is VersionedRequestContent.V2 -> content.content.welcomeMessage
+            null -> null
+        } ?: return null
+
+        return ChatMessage(
+            id = id,
+            chatId = ChatId.fromContact(peer),
+            timestamp = timestamp,
+            content = ChatMessage.Content.ChatRequest(ChatMessage.Content.RichText(text = welcome.text, attachments = emptyList())),
+            origin = ChatMessageOrigin.User,
+            status = ChatMessage.Status.IS_SENT,
         )
     }
 

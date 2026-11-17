@@ -21,14 +21,15 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigi
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ContactDevice
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.pendingChatRequestIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestMessage
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccountId
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatAcceptanceRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRoomRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
@@ -36,6 +37,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.acceptanc
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenPlatform
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.DeviceInfo
 import timber.log.Timber
@@ -73,6 +75,8 @@ sealed class IncomingRequestProcessingResult {
     /** Request was ignored (e.g., already exists with same or newer timestamp) */
     sealed class Ignored : IncomingRequestProcessingResult() {
         data object ChatRequestAlreadyProcessed : Ignored()
+
+        data object SenderBlocked : Ignored()
     }
 
     /** New contact and request were created */
@@ -101,13 +105,13 @@ interface IncomingChatRequestProcessor {
     suspend fun processIncomingRequestForOutgoingRequest(
         data: IncomingChatRequestData,
         contact: Contact
-    ): Result<IncomingRequestProcessingResult.AutoAccepted>
+    ): Result<IncomingRequestProcessingResult>
 
     suspend fun acceptIncomingRequest(contact: Contact): Result<Unit>
 
     suspend fun declineIncomingRequest(contact: Contact): Result<Unit>
 
-    suspend fun markOutgoingRequestAccepted(contact: Contact, ourRequest: ChatRequest): Result<Unit>
+    suspend fun markOutgoingRequestAccepted(contact: Contact, ourRequest: ChatRequest, isFromSync: Boolean): Result<Unit>
 }
 
 @Singleton
@@ -124,6 +128,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val knownChains: KnownChains,
     private val currentTimeContext: CurrentTimeContext,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
+    private val contactDevicesRepository: ContactDevicesRepository,
 ) : IncomingChatRequestProcessor {
     override suspend fun processIncomingRequest(
         data: IncomingChatRequestData
@@ -160,7 +165,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     override suspend fun processIncomingRequestForOutgoingRequest(
         data: IncomingChatRequestData,
         contact: Contact
-    ): Result<IncomingRequestProcessingResult.AutoAccepted> {
+    ): Result<IncomingRequestProcessingResult> {
         return runCatching {
             val existingRequest = chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestId!!)
             autoAcceptMutualRequest(contact, existingRequest, data)
@@ -194,6 +199,8 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact,
         data: IncomingChatRequestData
     ): IncomingRequestProcessingResult {
+        if (contact.isBlocked) return IncomingRequestProcessingResult.Ignored.SenderBlocked
+
         // Known contact re-invited (left + came back): recreate the request + auto-accept so both reconnect.
         val created = createNewIncomingRequestChat(data, contact.username, contact.chatKey)
         require(created is IncomingRequestProcessingResult.NewContactCreated)
@@ -207,13 +214,17 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact,
         ourRequest: ChatRequest,
         incomingData: IncomingChatRequestData
-    ): IncomingRequestProcessingResult.AutoAccepted {
+    ): IncomingRequestProcessingResult {
+        if (contact.isBlocked) return IncomingRequestProcessingResult.Ignored.SenderBlocked
+
         val updatedContact = contactsRepository.withTransaction {
             markChatAccepted(contact.accountId)
             chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
+            chatRequestRepository.save(createNewChatRequest(incomingData, ChatRequest.Status.ACCEPTED))
+            saveWelcomeMessage(contact.accountId, incomingData)
             val updated = updateContactFromRequest(contact, incomingData)
             markOurWelcomeMessageAsRead(ourRequest.welcomeMessageId)
-            recordAcceptance(contact.accountId, ourRequest.id)
+            recordAcceptance(contact.accountId, incomingData.chatRequestId)
             updated
         }
 
@@ -245,13 +256,19 @@ class RealIncomingChatRequestProcessor @Inject constructor(
 
     override suspend fun markOutgoingRequestAccepted(
         contact: Contact,
-        ourRequest: ChatRequest
+        ourRequest: ChatRequest,
+        isFromSync: Boolean,
     ): Result<Unit> = runCatching {
         // One transaction, so the session manager never sees "pending request with non-PENDING status" and tears
         // the session down mid-handshake ("Wait for peer to accept" would stick forever).
         contactsRepository.withTransaction {
-            markChatAccepted(contact.accountId)
-            chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
+            if (isFromSync) {
+                contactsRepository.markChatRequestAccepted(contact.accountId, currentTimeContext.currentTime())
+                chatRequestRepository.updateStatusFromSync(ourRequest.id, ChatRequest.Status.ACCEPTED)
+            } else {
+                markChatAccepted(contact.accountId)
+                chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
+            }
         }
     }.also {
         // Welcome row lives on the receiver, not here — swallow the miss.
@@ -261,6 +278,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
 
     private suspend fun markChatAccepted(contactAccountId: AccountId) {
         contactsRepository.markChatRequestAccepted(contactAccountId, currentTimeContext.currentTime())
+        contactDevicesRepository.markDevicesModified(contactAccountId)
     }
 
     private suspend fun updateIfNewer(
@@ -268,7 +286,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         existingRequest: ChatRequest,
         incomingData: IncomingChatRequestData
     ): IncomingRequestProcessingResult {
-        val newRequest = createNewChatRequest(incomingData)
+        val newRequest = createNewChatRequest(incomingData, ChatRequest.Status.PENDING)
 
         return if (newRequest.timestamp > existingRequest.timestamp) {
             // We do explicit update in case messageId (and thus request id) has changed
@@ -291,12 +309,13 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         }
     }
 
-    private fun createNewChatRequest(incomingData: IncomingChatRequestData): ChatRequest {
+    private fun createNewChatRequest(incomingData: IncomingChatRequestData, status: ChatRequest.Status): ChatRequest {
         return ChatRequest(
             welcomeMessageId = incomingData.chatRequestId,
+            peer = incomingData.request.peerIdentityAccountId(),
             timestamp = incomingData.request.message.timestamp.toLong(),
             direction = ChatRequest.Direction.INCOMING,
-            status = ChatRequest.Status.PENDING,
+            status = status,
             delivery = ChatRequest.Delivery.DeliveredUntracked,
         )
     }
@@ -324,6 +343,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
 
         val request = ChatRequest(
             welcomeMessageId = data.request.message.messageId,
+            peer = peerAccountId,
             timestamp = data.request.message.timestamp.toLong(),
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.PENDING,
@@ -350,7 +370,12 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contactsRepository.saveContact(contact)
         chatRoomRepository.createRoomIfNotExists(ChatId.fromContact(peerAccountId))
 
-        savePeerDevice(peerAccountId, peerStatementAccountId = data.request.proof.signerAccountId(), content.peerDeviceEncPubKey)
+        savePeerDevice(
+            contactAccountId = peerAccountId,
+            peerStatementAccountId = data.request.proof.signerAccountId(),
+            peerDeviceEncPubKey = content.peerDeviceEncPubKey,
+            changedAt = data.request.message.timestamp.toLong(),
+        )
 
         // Save welcome message if provided
         saveWelcomeMessage(peerAccountId, data)
@@ -364,7 +389,12 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     ): Contact {
         val content = extractContent(data.request.message)
 
-        savePeerDevice(contact.accountId, peerStatementAccountId = data.request.proof.signerAccountId(), content.peerDeviceEncPubKey)
+        savePeerDevice(
+            contactAccountId = contact.accountId,
+            peerStatementAccountId = data.request.proof.signerAccountId(),
+            peerDeviceEncPubKey = content.peerDeviceEncPubKey,
+            changedAt = data.request.message.timestamp.toLong(),
+        )
 
         if (content.pushToken != null) {
             val pushToken = content.pushToken.token.toDataByteArray()
@@ -454,26 +484,15 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         }
     }
 
-    // Routed through a synthetic DeviceAdded chat message so the device-sync pipeline
-    // (which reads from messages, not ContactDevicesRepository) picks it up; the local
-    // device-roster write is then handled by DeviceLifecycleMessageProcessor downstream.
     private suspend fun savePeerDevice(
         contactAccountId: AccountId,
         peerStatementAccountId: AccountId,
         peerDeviceEncPubKey: X25519PublicKey?,
+        changedAt: Long,
     ) {
         if (peerDeviceEncPubKey == null) return
 
-        val message = ChatMessage.new(
-            chatId = ChatId.fromContact(contactAccountId),
-            content = ChatMessage.Content.DeviceAdded(
-                statementAccountId = peerStatementAccountId,
-                encryptionPublicKey = peerDeviceEncPubKey,
-            ),
-            origin = ChatMessageOrigin.Contact(contactAccountId),
-            status = ChatMessage.Status.NEW,
-        )
-        chatEngine.get().saveMessage(message)
+        contactDevicesRepository.addDevice(ContactDevice(contactAccountId, peerStatementAccountId, peerDeviceEncPubKey), changedAt)
     }
 
     private data class NormalizedRequestContent(

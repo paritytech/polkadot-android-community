@@ -88,7 +88,7 @@ class ChatPushNotificationHandlerTest {
     fun setUp() {
         every { appLifecycleObserver.getCurrentState() } returns AppLifecycleState.BACKGROUND
         every { chatActiveTracker.getActive() } returns null
-        coEvery { chatEngine.saveMessage(any(), any(), any(), any()) } returns true
+        coEvery { chatEngine.saveMessage(any(), any(), any(), any(), any()) } returns true
     }
 
     @Test
@@ -152,8 +152,8 @@ class ChatPushNotificationHandlerTest {
         handler.handle(NEW_SPEC_PUSH)
 
         coVerifyOrder {
-            chatEngine.saveMessage(match { it.id == OLDER_ID }, ChatMessageSaveConflictStrategy.IGNORE, ChatMessagePlacement.Latest, any())
-            chatEngine.saveMessage(match { it.id == NEWER_ID }, ChatMessageSaveConflictStrategy.IGNORE, ChatMessagePlacement.Latest, any())
+            chatEngine.saveMessage(match { it.id == OLDER_ID }, ChatMessageSaveConflictStrategy.IGNORE, ChatMessagePlacement.Latest, any(), any())
+            chatEngine.saveMessage(match { it.id == NEWER_ID }, ChatMessageSaveConflictStrategy.IGNORE, ChatMessagePlacement.Latest, any(), any())
         }
     }
 
@@ -204,11 +204,11 @@ class ChatPushNotificationHandlerTest {
     }
 
     private fun verifyMessageSaved() {
-        coVerify(exactly = 1) { chatEngine.saveMessage(match { it.id == MESSAGE_ID }, any(), any(), any()) }
+        coVerify(exactly = 1) { chatEngine.saveMessage(match { it.id == MESSAGE_ID }, any(), any(), any(), any()) }
     }
 
     private fun verifyNothingSaved() {
-        coVerify(exactly = 0) { chatEngine.saveMessage(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { chatEngine.saveMessage(any(), any(), any(), any(), any()) }
     }
 
     private fun verifyNotificationPublished(text: String) {

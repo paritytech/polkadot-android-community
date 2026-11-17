@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 
 fun outgoingRequest(id: String, delivery: ChatRequest.Delivery): ChatRequest = ChatRequest(
     welcomeMessageId = id,
+    peer = null,
     timestamp = 1_000L,
     direction = ChatRequest.Direction.OUTGOING,
     status = ChatRequest.Status.PENDING,

@@ -11,11 +11,14 @@ import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogE
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogI
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.coinageLogW
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.InstallationStatus
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxState
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.feature_usernames_api.domain.usecase.ObserveAccountOnboardingStatusUseCase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -27,8 +30,10 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.transformLatest
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration
@@ -49,6 +54,7 @@ class CoinageInstallationRegistrar @Inject constructor(
     private val submitter: InstallationRegistrationSubmitter,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val knownChains: KnownChains,
+    private val activeInstallationManager: ActiveInstallationManager,
     dispatchers: CoroutineDispatchers,
 ) : CoroutineScope by CoroutineScope(dispatchers.io + SupervisorJob()) {
     private val registration: SharedFlow<CoinageAccountBackupStatus> = flow {
@@ -67,7 +73,7 @@ class CoinageInstallationRegistrar @Inject constructor(
             val target = awaitTarget(installation)
             if (target != finalizedBefore) emit(false)
 
-            registerUntilFinalized(target)
+            registerWhileActive(target)
             emit(true)
         }
         emitAll(combine(completed, overdueAfter(EXPECTED_REGISTRATION_TIME), ::statusOf))
@@ -80,6 +86,15 @@ class CoinageInstallationRegistrar @Inject constructor(
 
     fun start() {
         registration.launchIn(this)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun registerWhileActive(target: InstallationRegistrationTarget) {
+        activeInstallationManager.status
+            .map { it == InstallationStatus.Active }
+            .distinctUntilChanged()
+            .transformLatest { isActive -> if (isActive) emit(registerUntilFinalized(target)) }
+            .first()
     }
 
     private suspend fun registerUntilFinalized(target: InstallationRegistrationTarget) {

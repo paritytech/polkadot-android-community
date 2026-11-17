@@ -21,6 +21,20 @@ class SyncEntityChunker(private val maxPayloadSize: InformationSize) {
             is SyncEntityScale.ChatsAdded -> splitItems(entity.chats).map(SyncEntityScale::ChatsAdded)
             is SyncEntityScale.ChatsRemoved -> splitItems(entity.chats).map(SyncEntityScale::ChatsRemoved)
             is SyncEntityScale.Messages -> splitItems(entity.messages).map(SyncEntityScale::Messages)
+            is SyncEntityScale.ChatsBlocked -> splitItems(entity.states).map(SyncEntityScale::ChatsBlocked)
+            is SyncEntityScale.IncomingRequestsAdded ->
+                splitItems(entity.requests).map(SyncEntityScale::IncomingRequestsAdded)
+            is SyncEntityScale.IncomingRequestsStatusUpdated ->
+                splitItems(entity.updates).map(SyncEntityScale::IncomingRequestsStatusUpdated)
+            is SyncEntityScale.OutgoingRequestsAdded ->
+                splitItems(entity.requests).map(SyncEntityScale::OutgoingRequestsAdded)
+            is SyncEntityScale.OutgoingRequestsStatusUpdated ->
+                splitItems(entity.updates).map(SyncEntityScale::OutgoingRequestsStatusUpdated)
+            is SyncEntityScale.CoinsHandedOff -> splitItems(entity.coins).map(SyncEntityScale::CoinsHandedOff)
+            is SyncEntityScale.CoinageMessagesStatusUpdated ->
+                splitItems(entity.updates).map(SyncEntityScale::CoinageMessagesStatusUpdated)
+            is SyncEntityScale.ContactDevicesChanged ->
+                splitItems(entity.changes).map(SyncEntityScale::ContactDevicesChanged)
         }
     }
 

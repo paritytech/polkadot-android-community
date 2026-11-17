@@ -10,6 +10,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageAccount
 import io.paritytech.polkadotapp.feature_coinage_impl.TEST_INSTALLATION
 import io.paritytech.polkadotapp.feature_coinage_impl.data.dataStore.AccountDataStoreConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.data.installation.CoinageInstallationRepository
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.InstallationStatus
 import io.paritytech.polkadotapp.feature_transactions.api.data.EnrichedSendableExtrinsic
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableSubmission
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
@@ -346,6 +348,9 @@ class CoinageInstallationRegistrarTest {
             submitter = submitter,
             chainConnectionRefCounter = mockk<ChainConnectionRefCounter>(relaxed = true),
             knownChains = KnownChains(people = "people", assetHub = "asset-hub", bulletIn = "bullet-in", hydration = null),
+            activeInstallationManager = mockk<ActiveInstallationManager> {
+                every { status } returns MutableStateFlow(InstallationStatus.Active)
+            },
             dispatchers = testDispatchers(),
         )
 

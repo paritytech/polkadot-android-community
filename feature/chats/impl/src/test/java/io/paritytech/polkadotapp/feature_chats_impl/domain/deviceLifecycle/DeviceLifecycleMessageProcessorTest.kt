@@ -31,7 +31,7 @@ class DeviceLifecycleMessageProcessorTest {
 
     @Test
     fun `an acceptance from a contact adds the accepting device`() = runTest {
-        processor.onMessageSaved(acceptance(origin = ChatMessageOrigin.Contact(contactAccountId)))
+        processor.onMessageSaved(acceptance(origin = ChatMessageOrigin.Contact(contactAccountId)), isFromSync = false)
 
         coVerify {
             contactDevicesRepository.addDevice(
@@ -39,16 +39,17 @@ class DeviceLifecycleMessageProcessorTest {
                     contactAccountId = contactAccountId,
                     statementAccountId = acceptorDevice.statementAccountId,
                     encryptionPublicKey = acceptorDevice.encryptionPublicKey,
-                )
+                ),
+                changedAt = 0,
             )
         }
     }
 
     @Test
     fun `our own acceptance does not touch the contact's devices`() = runTest {
-        processor.onMessageSaved(acceptance(origin = ChatMessageOrigin.User))
+        processor.onMessageSaved(acceptance(origin = ChatMessageOrigin.User), isFromSync = false)
 
-        coVerify(exactly = 0) { contactDevicesRepository.addDevice(any()) }
+        coVerify(exactly = 0) { contactDevicesRepository.addDevice(any(), any()) }
     }
 
     private fun acceptance(origin: ChatMessageOrigin) = ChatMessage(

@@ -19,6 +19,8 @@ import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.acceptance.ChatAcceptanceRenewer
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.renewal.ChatRequestRenewer
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.isActive
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTransactionService
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -33,8 +35,14 @@ class ChatRequestRenewalWorker @AssistedInject constructor(
     private val durableTransactionService: DurableTransactionService,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val knownChains: KnownChains,
+    private val activeInstallationManager: ActiveInstallationManager,
 ) : CoroutineWorker(appContext, parameters) {
     override suspend fun doWork(): Result {
+        if (!activeInstallationManager.isActive()) {
+            Timber.i("chatRequestRenewal: skipped, this installation is not active")
+            return Result.success()
+        }
+
         val outcome = runCancellableCatching {
             chainConnectionRefCounter.withConnectionEnabled(knownChains.people, WORK_NAME) {
                 // Slot claims are built by the durable executor, which a worker started after process death must start.

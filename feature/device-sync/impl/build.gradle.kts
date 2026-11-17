@@ -12,12 +12,13 @@ dependencies {
 
     implementation(libs.nova.substrate.serialization)
 
-    implementation(project(":feature:device-sync:api"))
+    api(project(":feature:device-sync:api"))
     implementation(project(":feature:sso:api"))
     implementation(project(":feature:chats:api"))
     implementation(project(":feature:chats:transport-protocol"))
     implementation(project(":feature:statement-store:api"))
     implementation(project(":feature:account:api"))
+    implementation(project(":feature:coinage:api"))
     implementation(project(":tools:media-connection:api"))
     implementation(project(":chains"))
 

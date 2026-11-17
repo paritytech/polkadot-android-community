@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationStateEvent
@@ -17,6 +18,7 @@ internal val PROTOCOL_ACK_CODE: UByte = 0u
 sealed class CommunicationState : StateMachine.State<CommunicationState, CommunicationSideEffect, CommunicationStateEvent> {
     abstract val maxStatementSize: InformationSize
     abstract val canCompact: Boolean
+    abstract val statementLifetime: StatementLifetime
 
     protected val maxRequestSize: InformationSize get() = maxStatementSize - STATEMENT_OVERHEAD
 

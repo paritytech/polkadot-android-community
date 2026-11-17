@@ -32,6 +32,7 @@ class ContactLocal(
     @ColumnInfo(defaultValue = "0")
     val addedAt: Long,
     val establishedAt: Long? = null,
+    val blockChangedAt: Long?,
 ) {
     enum class OperatingSystem {
         ANDROID,

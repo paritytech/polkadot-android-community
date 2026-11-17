@@ -12,6 +12,8 @@ import io.paritytech.polkadotapp.database.model.ChatMessageSearchRow
 import io.paritytech.polkadotapp.database.model.TransferRetryStateLocal
 import kotlinx.coroutines.flow.Flow
 
+private const val UPDATED_AT_OR_TIMESTAMP = "(CASE WHEN updatedAt > 0 THEN updatedAt ELSE timestamp END)"
+
 @Dao
 abstract class ChatMessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -137,6 +139,34 @@ abstract class ChatMessageDao {
     @Query("SELECT * FROM chat_messages WHERE updatedAt > :after ORDER BY updatedAt ASC")
     abstract suspend fun getMessagesUpdatedAfter(after: Long): List<ChatMessageLocal>
 
+    @Query(
+        """
+        SELECT * FROM chat_messages
+        WHERE $UPDATED_AT_OR_TIMESTAMP > :updatedAfter AND $UPDATED_AT_OR_TIMESTAMP <= :updatedUpTo
+        AND (
+            :afterSortOrder IS NULL
+            OR sortOrder > :afterSortOrder
+            OR (sortOrder = :afterSortOrder AND timestamp > :afterTimestamp)
+            OR (sortOrder = :afterSortOrder AND timestamp = :afterTimestamp AND id > :afterId)
+        )
+        ORDER BY sortOrder ASC, timestamp ASC, id ASC
+        LIMIT :limit
+        """
+    )
+    abstract suspend fun getMessagesUpdatedInRange(
+        updatedAfter: Long,
+        updatedUpTo: Long,
+        afterSortOrder: Long?,
+        afterTimestamp: Long?,
+        afterId: String?,
+        limit: Int,
+    ): List<ChatMessageLocal>
+
+    @Query(
+        "SELECT COUNT(*) FROM chat_messages WHERE $UPDATED_AT_OR_TIMESTAMP > :updatedAfter AND $UPDATED_AT_OR_TIMESTAMP <= :updatedUpTo"
+    )
+    abstract suspend fun countMessagesUpdatedInRange(updatedAfter: Long, updatedUpTo: Long): Int
+
     @Query("SELECT * FROM chat_messages WHERE id = :messageId")
     abstract suspend fun getMessage(messageId: String): ChatMessageLocal?
 
@@ -240,6 +270,18 @@ abstract class ChatMessageDao {
 
     @Query("SELECT * FROM chat_messages WHERE chatId = :chatId AND type = 'UNSUPPORTED'")
     abstract suspend fun getUnsupportedMessages(chatId: ByteArray): List<ChatMessageLocal>
+
+    @Query("SELECT * FROM chat_messages WHERE type = 'RICH_TEXT' ORDER BY timestamp DESC")
+    abstract suspend fun getRichTextMessages(): List<ChatMessageLocal>
+
+    @Query(
+        """
+        SELECT * FROM chat_messages
+        WHERE type = 'PAYMENT'
+          AND (:updatedAfter IS NULL OR updatedAt > :updatedAfter)
+        """
+    )
+    abstract suspend fun getPaymentsUpdatedAfter(updatedAfter: Long?): List<ChatMessageLocal>
 
     @Query("DELETE FROM chat_messages WHERE chatId = :chatId")
     abstract suspend fun deleteAllMessageRows(chatId: ByteArray)

@@ -188,7 +188,7 @@ class CoinageEntryDaoTest {
         val paid = coin(1)
         dao.insertHandoffs(listOf(handoff(paid, committed = false)))
 
-        dao.commitHandoffs(listOf(paid.onChainKey))
+        dao.commitHandoffs(listOf(paid.onChainKey), committedAt = 1)
         dao.deleteUncommittedHandoffs()
 
         assertTrue(assetState(AssetKind.COIN, 1).handedOff)
@@ -335,6 +335,7 @@ class CoinageEntryDaoTest {
         installationId = asset.installation,
         derivationIndex = asset.derivationIndex,
         committed = committed,
+        committedAt = null,
     )
 
     private class Asset(val kind: AssetKind, val derivationIndex: Int, val installation: ByteArray) {
