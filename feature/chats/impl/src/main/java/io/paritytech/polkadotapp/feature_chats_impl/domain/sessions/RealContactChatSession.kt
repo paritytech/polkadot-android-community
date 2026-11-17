@@ -20,7 +20,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageR
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessagePlacement
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatMessageSaveConflictStrategy
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageSender
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageProvider
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
@@ -30,6 +30,7 @@ import io.paritytech.polkadotapp.tools_push_notifications_api.NotifyType
 import io.paritytech.polkadotapp.tools_push_notifications_api.PushRule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -55,7 +56,7 @@ class RealContactChatSession(
     private val syncContactUsernameUseCase: SyncContactUsernameUseCase,
     private val incomingChatMessageProcessor: IncomingChatMessageProcessor,
     private val notificationPayloadEncoder: ChatNotificationPayloadEncoder,
-    private val seenMessageSender: SeenMessageSender,
+    private val seenMessageProvider: SeenMessageProvider,
     private val transientMessageProcessor: TransientMessageProcessor,
 ) : ContactChatSession, CoroutineScope by scope {
     private val mainCommunicationSession get() = communicationSessions.main
@@ -85,7 +86,6 @@ class RealContactChatSession(
 
         subscribeMessagesUpdates()
         subscribeUsernameUpdates()
-        sendSeenMessages()
 
         launch { tryReparseUnsupportedMessages() }
     }
@@ -96,9 +96,9 @@ class RealContactChatSession(
             .launchIn(this)
     }
 
-    private fun sendSeenMessages() {
-        seenMessageSender.sendSeenMessages(contact.accountId, mainCommunicationSession::sendMessage)
-            .launchIn(this)
+    fun sendSeenMessages(): Flow<EncodedMessage> {
+        return seenMessageProvider.subscribeMessagesToSend(contact.accountId)
+            .onEach(mainCommunicationSession::sendMessage)
     }
 
     override suspend fun sendToken(token: String) {

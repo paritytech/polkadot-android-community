@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 71,
-    "identityHash": "90252ed7ff334d628ee94da0f33c1e01",
+    "identityHash": "3e7dbb61f88b305279e50963ed1c684a",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -3114,7 +3114,7 @@
       },
       {
         "tableName": "chat_seen_states",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `peerSeenOrder` INTEGER NOT NULL, `lastSentSeenOrder` INTEGER NOT NULL, `lastSentSeenTimestamp` INTEGER NOT NULL, PRIMARY KEY(`contactAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `peerSeenOrder` INTEGER NOT NULL, `lastSentSeenMessageId` TEXT, `lastSentSeenOrder` INTEGER NOT NULL, `lastSentSeenTimestamp` INTEGER NOT NULL, PRIMARY KEY(`contactAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "contactAccountId",
@@ -3127,6 +3127,11 @@
             "columnName": "peerSeenOrder",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "lastSentSeenMessageId",
+            "columnName": "lastSentSeenMessageId",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "lastSentSeenOrder",
@@ -3164,7 +3169,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '90252ed7ff334d628ee94da0f33c1e01')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3e7dbb61f88b305279e50963ed1c684a')"
     ]
   }
 }

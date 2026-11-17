@@ -8,7 +8,7 @@ interface PendingMessageReplacementPolicy {
     enum class Decision { KEEP_BOTH, DROP_NEW, REPLACE_PENDING }
 
     companion object {
-        val Never = object : PendingMessageReplacementPolicy {
+        val AlwaysKeep = object : PendingMessageReplacementPolicy {
             override fun isReplaceable(message: EncodedMessage) = false
 
             override fun decide(newMessage: EncodedMessage, pendingMessage: EncodedMessage) = Decision.KEEP_BOTH

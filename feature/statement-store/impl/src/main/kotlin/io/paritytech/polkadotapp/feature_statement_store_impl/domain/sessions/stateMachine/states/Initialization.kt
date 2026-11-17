@@ -3,8 +3,6 @@ package io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.s
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
@@ -12,10 +10,9 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.st
 import kotlin.collections.orEmpty
 
 class Initialization(
-    private val pendingMessages: List<EncodedMessage>,
+    private val pendingMessages: PendingMessages,
     override val maxStatementSize: InformationSize,
     override val canCompact: Boolean,
-    override val replacementPolicy: PendingMessageReplacementPolicy,
 ) : CommunicationState() {
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
     override suspend fun bootstrap() {
@@ -31,20 +28,18 @@ class Initialization(
                     return
                 }
 
-                if (checkAlreadyPendingMessage(event.message, pendingMessages, null)) return
-
-                val newPendingMessages = when (val outcome = decideAgainstPending(event.message, pendingMessages)) {
-                    PendingMessageOutcome.Drop -> return
-                    is PendingMessageOutcome.Replace -> pendingMessages.replaceMessage(outcome.pendingMessage, event.message)
-                    PendingMessageOutcome.Add -> pendingMessages + event.message
+                val placement = pendingMessages.placeNewMessage(event.message, requestMessages = emptyList())
+                val newPendingMessages = when (placement) {
+                    NewMessagePlacement.Skip -> return
+                    is NewMessagePlacement.ReplacePending -> placement.pendingMessages
+                    NewMessagePlacement.Append, is NewMessagePlacement.ReplaceInRequest -> pendingMessages + event.message
                 }
 
                 transition.emitState(
                     Initialization(
                         pendingMessages = newPendingMessages,
                         maxStatementSize = maxStatementSize,
-                        canCompact = canCompact,
-                        replacementPolicy = replacementPolicy
+                        canCompact = canCompact
                     )
                 )
             }
@@ -75,7 +70,7 @@ class Initialization(
 
                 if (pendingMessages.isEmpty()) {
                     transition.emitState(
-                        activeState(event.outgoingPendingRequest, incomingRequests, emptyList(), expiry, isCompacting = false)
+                        activeState(event.outgoingPendingRequest, incomingRequests, pendingMessages, expiry, isCompacting = false)
                     )
 
                     transition.emitSideEffect(CommunicationSideEffect.StartPolling)
@@ -83,7 +78,7 @@ class Initialization(
                 }
 
                 val alreadySentMessages = event.outgoingPendingRequest?.messages.orEmpty()
-                val combinedMessages = alreadySentMessages + pendingMessages
+                val combinedMessages = alreadySentMessages + pendingMessages.messages
                 val split = splitMessagesToFitRequest(combinedMessages)
 
                 if (canCompact && split.remaining.isNotEmpty()) {
@@ -95,15 +90,15 @@ class Initialization(
                     return
                 }
 
-                val merge = mergeIntoRestoredRequest(alreadySentMessages)
-                val mergedSplit = splitMessagesToFitRequest(merge.requestMessages + merge.pendingMessages)
-                val shouldCreateNewRequest = merge.isRequestChanged || mergedSplit.fitsInRequest.size > alreadySentMessages.size
+                val update = pendingMessages.applyReplacementsToRestoredRequest(alreadySentMessages)
+                val updatedSplit = splitMessagesToFitRequest(update.requestMessages + update.pendingMessages.messages)
+                val shouldCreateNewRequest = update.isRequestChanged || updatedSplit.fitsInRequest.size > alreadySentMessages.size
 
                 if (shouldCreateNewRequest) {
-                    createAndSubmitNewRequest(event.outgoingPendingRequest, incomingRequests, expiry, mergedSplit)
+                    createAndSubmitNewRequest(event.outgoingPendingRequest, incomingRequests, expiry, updatedSplit)
                 } else {
                     transition.emitState(
-                        activeState(event.outgoingPendingRequest, incomingRequests, merge.pendingMessages, expiry, isCompacting = false)
+                        activeState(event.outgoingPendingRequest, incomingRequests, update.pendingMessages, expiry, isCompacting = false)
                     )
                 }
 
@@ -135,7 +130,7 @@ class Initialization(
         )
 
         transition.emitState(
-            activeState(newRequest, incomingRequests, split.remaining, newExpiry, isCompacting = false)
+            activeState(newRequest, incomingRequests, pendingMessages.withMessages(split.remaining), newExpiry, isCompacting = false)
         )
 
         transition.emitSideEffect(
@@ -143,35 +138,10 @@ class Initialization(
         )
     }
 
-    private fun mergeIntoRestoredRequest(restoredMessages: List<EncodedMessage>): RestoredRequestMerge {
-        var requestMessages = restoredMessages
-        var isRequestChanged = false
-        val remainingPendingMessages = mutableListOf<EncodedMessage>()
-
-        for (message in pendingMessages) {
-            when (val outcome = decideAgainstPending(message, requestMessages)) {
-                PendingMessageOutcome.Drop -> Unit
-                is PendingMessageOutcome.Replace -> {
-                    requestMessages = requestMessages.replaceMessage(outcome.pendingMessage, message)
-                    isRequestChanged = true
-                }
-                PendingMessageOutcome.Add -> remainingPendingMessages += message
-            }
-        }
-
-        return RestoredRequestMerge(requestMessages, remainingPendingMessages, isRequestChanged)
-    }
-
-    private class RestoredRequestMerge(
-        val requestMessages: List<EncodedMessage>,
-        val pendingMessages: List<EncodedMessage>,
-        val isRequestChanged: Boolean,
-    )
-
     private fun activeState(
         outgoingPendingRequest: StatementTransportEvent.Request?,
         incomingRequests: Set<RequestId>,
-        pendingMessages: List<EncodedMessage>,
+        pendingMessages: PendingMessages,
         expiry: ULong,
         isCompacting: Boolean
     ): Active {
@@ -182,7 +152,6 @@ class Initialization(
             expiry = expiry,
             maxStatementSize = maxStatementSize,
             canCompact = canCompact,
-            replacementPolicy = replacementPolicy,
             isCompacting = isCompacting
         )
     }

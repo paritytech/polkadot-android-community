@@ -6,7 +6,7 @@ import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
-import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastSentSeen
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.LastSeenMessage
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.TransientMessage
 import javax.inject.Inject
 
@@ -46,6 +46,7 @@ class TransientMessageProcessor @Inject constructor(
     private suspend fun recordDeliveredSeen(chatId: ChatId, seen: TransientMessage.Seen) {
         val order = chatSeenRepository.getIncomingOrder(chatId, seen.messageId) ?: return
 
-        chatSeenRepository.raiseLastSentSeen(chatId, LastSentSeen(sortOrder = order, timestamp = seen.timestamp))
+        val lastSentSeen = LastSeenMessage(id = seen.messageId, sortOrder = order, timestamp = seen.timestamp)
+        chatSeenRepository.raiseLastSentSeen(chatId, lastSentSeen)
     }
 }

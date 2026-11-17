@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.hasR
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationStateEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.states.Initialization
+import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.states.PendingMessages
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -50,7 +51,7 @@ class RealCommunicationSession(
     override val incomingSessionId = deriveCommunicationTopic(sender = remoteAccount, receiver = localAccount, encryption)
 
     private val stateMachine = StateMachine(
-        initialState = Initialization(emptyList(), maxStatementSize, canCompact = compactor != null, replacementPolicy = replacementPolicy),
+        initialState = Initialization(PendingMessages(emptyList(), replacementPolicy), maxStatementSize, canCompact = compactor != null),
         coroutineScope = this
     )
 
@@ -252,14 +253,14 @@ class RealCommunicationSession(
     }
 
     private fun compactMessages(messages: List<EncodedMessage>) = launch {
-        val compactableMessages = messages.filterNot(replacementPolicy::isReplaceable)
+        val compactor = checkNotNull(compactor) { "Compact side effect emitted without a compactor" }
+        val compactableMessages = messages.filter(compactor::canCompact)
         if (compactableMessages.isEmpty()) {
             stateMachine.onEvent(CommunicationStateEvent.CompactionFailed)
             return@launch
         }
 
-        checkNotNull(compactor) { "Compact side effect emitted without a compactor" }
-            .compact(compactableMessages)
+        compactor.compact(compactableMessages)
             .logFailure("Failed to compact messages")
             .onSuccess { batches ->
                 stateMachine.onEvent(CommunicationStateEvent.CompactionCompleted(batches))

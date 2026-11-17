@@ -4,7 +4,6 @@ import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
@@ -13,11 +12,10 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.st
 data class Active(
     private val outgoingPendingRequest: StatementTransportEvent.Request?,
     private val incomingRequests: Set<RequestId>,
-    private val pendingMessages: List<EncodedMessage>,
+    private val pendingMessages: PendingMessages,
     private val expiry: ULong,
     override val maxStatementSize: InformationSize,
     override val canCompact: Boolean,
-    override val replacementPolicy: PendingMessageReplacementPolicy,
     private val isCompacting: Boolean,
 ) : CommunicationState() {
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
@@ -33,13 +31,15 @@ data class Active(
                     return
                 }
 
-                if (checkAlreadyPendingMessage(event.message, pendingMessages, outgoingPendingRequest)) return
-
                 val requestMessages = outgoingPendingRequest?.messages.orEmpty()
-                when (val outcome = decideAgainstPending(event.message, requestMessages + pendingMessages)) {
-                    PendingMessageOutcome.Drop -> return
-                    is PendingMessageOutcome.Replace -> if (tryReplacePendingMessage(outcome.pendingMessage, event.message)) return
-                    PendingMessageOutcome.Add -> Unit
+                when (val placement = pendingMessages.placeNewMessage(event.message, requestMessages)) {
+                    NewMessagePlacement.Skip -> return
+                    is NewMessagePlacement.ReplacePending -> {
+                        transition.emitState(copy(pendingMessages = placement.pendingMessages))
+                        return
+                    }
+                    is NewMessagePlacement.ReplaceInRequest -> if (tryResubmitRequest(placement.requestMessages)) return
+                    NewMessagePlacement.Append -> Unit
                 }
 
                 when {
@@ -71,7 +71,7 @@ data class Active(
                 if (!isCompacting) return
 
                 val inFlight = outgoingPendingRequest?.messages.orEmpty().minusByContent(event.allOriginals)
-                val remainingPending = pendingMessages.minusByContent(event.allOriginals)
+                val remainingPending = pendingMessages.messages.minusByContent(event.allOriginals)
                 val split = splitMessagesToFitRequest(inFlight + event.allCommits + remainingPending)
                 val compactable = split.remaining.minusByContent(event.allCommits)
 
@@ -91,7 +91,7 @@ data class Active(
             is CommunicationStateEvent.CompactionFailed -> {
                 if (!isCompacting) return
 
-                val (oversized, sendable) = pendingMessages.partition { checkSizeLimitExceeded(it) }
+                val (oversized, sendable) = pendingMessages.messages.partition { checkSizeLimitExceeded(it) }
 
                 oversized.forEach { message ->
                     transition.emitSideEffect(CommunicationSideEffect.NotifyMessageTooLarge(message, maxRequestSize))
@@ -109,14 +109,14 @@ data class Active(
                             submitSplitAsRequest(split)
                         } else {
                             transition.emitState(
-                                copy(pendingMessages = sendable, isCompacting = false)
+                                copy(pendingMessages = pendingMessages.withMessages(sendable), isCompacting = false)
                             )
                         }
                     }
 
                     else -> {
                         transition.emitState(
-                            copy(pendingMessages = sendable, isCompacting = false)
+                            copy(pendingMessages = pendingMessages.withMessages(sendable), isCompacting = false)
                         )
                     }
                 }
@@ -161,12 +161,12 @@ data class Active(
                         return
                     }
 
-                    val split = splitMessagesToFitRequest(pendingMessages)
+                    val split = splitMessagesToFitRequest(pendingMessages.messages)
 
                     if (canCompact && split.remaining.isNotEmpty()) {
                         startCompaction(
-                            messagesToCompact = pendingMessages,
-                            newPendingMessages = pendingMessages,
+                            messagesToCompact = pendingMessages.messages,
+                            newPendingMessages = pendingMessages.messages,
                             newOutgoingPendingRequest = null
                         )
                     } else {
@@ -183,22 +183,14 @@ data class Active(
 
             is CommunicationStateEvent.InvalidateSession -> {
                 transition.emitSideEffect(CommunicationSideEffect.StopPolling)
-                transition.emitState(Initialization(pendingMessages, maxStatementSize, canCompact, replacementPolicy))
+                transition.emitState(Initialization(pendingMessages, maxStatementSize, canCompact))
                 transition.emitSideEffect(CommunicationSideEffect.FetchInitialData)
             }
         }
     }
 
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
-    private suspend fun tryReplacePendingMessage(replaced: EncodedMessage, message: EncodedMessage): Boolean {
-        val request = outgoingPendingRequest
-
-        if (request == null || request.messages.none { it.contentEquals(replaced) }) {
-            transition.emitState(copy(pendingMessages = pendingMessages.replaceMessage(replaced, message)))
-            return true
-        }
-
-        val newRequestMessages = request.messages.replaceMessage(replaced, message)
+    private suspend fun tryResubmitRequest(newRequestMessages: List<EncodedMessage>): Boolean {
         if (splitMessagesToFitRequest(newRequestMessages).remaining.isNotEmpty()) return false
 
         val newExpiry = StatementExpiry.nextAfter(expiry)
@@ -239,7 +231,7 @@ data class Active(
 
             else -> {
                 transition.emitState(
-                    copy(pendingMessages = listOf(newMessage))
+                    copy(pendingMessages = pendingMessages.withMessages(listOf(newMessage)))
                 )
             }
         }
@@ -254,7 +246,7 @@ data class Active(
         transition.emitState(
             copy(
                 outgoingPendingRequest = newOutgoingPendingRequest,
-                pendingMessages = newPendingMessages,
+                pendingMessages = pendingMessages.withMessages(newPendingMessages),
                 isCompacting = true
             )
         )
@@ -283,7 +275,7 @@ data class Active(
             copy(
                 outgoingPendingRequest = request,
                 expiry = newExpiry,
-                pendingMessages = split.remaining,
+                pendingMessages = pendingMessages.withMessages(split.remaining),
                 isCompacting = false
             )
         )
@@ -307,7 +299,7 @@ data class Active(
             copy(
                 outgoingPendingRequest = request,
                 expiry = newExpiry,
-                pendingMessages = split.remaining,
+                pendingMessages = pendingMessages.withMessages(split.remaining),
                 isCompacting = true
             )
         )

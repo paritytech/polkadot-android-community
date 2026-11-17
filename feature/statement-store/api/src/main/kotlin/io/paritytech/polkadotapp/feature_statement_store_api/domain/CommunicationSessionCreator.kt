@@ -41,7 +41,7 @@ interface CommunicationSessionCreator {
         maxStatementSize: InformationSize,
         compactor: MessageCompactor? = null,
         responsePolicy: IncomingRequestResponsePolicy = IncomingRequestResponsePolicy.Always,
-        replacementPolicy: PendingMessageReplacementPolicy = PendingMessageReplacementPolicy.Never,
+        replacementPolicy: PendingMessageReplacementPolicy = PendingMessageReplacementPolicy.AlwaysKeep,
     ): CommunicationSession
 
     /**
@@ -58,6 +58,6 @@ interface CommunicationSessionCreator {
         maxStatementSize: InformationSize,
         compactor: MessageCompactor? = null,
         responsePolicy: IncomingRequestResponsePolicy = IncomingRequestResponsePolicy.Always,
-        replacementPolicy: PendingMessageReplacementPolicy = PendingMessageReplacementPolicy.Never,
+        replacementPolicy: PendingMessageReplacementPolicy = PendingMessageReplacementPolicy.AlwaysKeep,
     ): CommunicationSession
 }

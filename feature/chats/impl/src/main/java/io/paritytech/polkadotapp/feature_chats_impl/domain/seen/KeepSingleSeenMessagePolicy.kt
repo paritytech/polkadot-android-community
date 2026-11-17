@@ -7,7 +7,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.Pendi
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy.Decision
 import javax.inject.Inject
 
-class SeenMessageReplacementPolicy @Inject constructor() : PendingMessageReplacementPolicy {
+class KeepSingleSeenMessagePolicy @Inject constructor() : PendingMessageReplacementPolicy {
     override fun isReplaceable(message: EncodedMessage): Boolean {
         return message.toSeenOrNull() != null
     }

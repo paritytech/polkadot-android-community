@@ -15,11 +15,13 @@ import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
+import io.paritytech.polkadotapp.feature_chats_api.domain.ChatActiveTracker
 import io.paritytech.polkadotapp.feature_chats_api.domain.ChatPushId
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSession
 import io.paritytech.polkadotapp.feature_chats_api.domain.ContactChatSessionManager
 import io.paritytech.polkadotapp.feature_chats_api.domain.isMultiDeviceChatSupported
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageId
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatVariant
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.sessions.ContactChatSessionRefCounter
 import io.paritytech.polkadotapp.feature_chats_api.domain.sessions.withSessionsEnabled
@@ -33,8 +35,8 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.compaction.ChatMessag
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ContactWithDevicePresence
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.ChatPushNotificationsSender
 import io.paritytech.polkadotapp.feature_chats_impl.domain.notifications.PushSubscriptionSynchronizer
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageReplacementPolicy
-import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageSender
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.KeepSingleSeenMessagePolicy
+import io.paritytech.polkadotapp.feature_chats_impl.domain.seen.SeenMessageProvider
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.SyncContactUsernameUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.utils.ChatPushTokenUtils
@@ -46,12 +48,16 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.Sessi
 import io.paritytech.polkadotapp.tools_push_notifications_api.PushNotificationsHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
@@ -115,9 +121,10 @@ internal class RealContactChatSessionManager @Inject constructor(
     private val proverFactory: StatementStoreMessageProver.Factory,
     private val chatSigners: ContactChatSigners,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
-    private val seenMessageSender: SeenMessageSender,
-    private val seenMessageReplacementPolicy: SeenMessageReplacementPolicy,
+    private val seenMessageProvider: SeenMessageProvider,
+    private val keepSingleSeenMessagePolicy: KeepSingleSeenMessagePolicy,
     private val transientMessageProcessor: TransientMessageProcessor,
+    private val chatActiveTracker: ChatActiveTracker,
     dispatchers: CoroutineDispatchers
 ) : ContactChatSessionManager, ContactChatSessionRestarter, CoroutineScope, ChatSessionCallbacks {
     companion object {
@@ -161,6 +168,7 @@ internal class RealContactChatSessionManager @Inject constructor(
         subscribeToEnabledContacts()
         subscribeToEstablishedChats()
         subscribeToTokenUpdates()
+        subscribeToOpenChatSeenMessages()
     }
 
     override suspend fun restartSession(accountId: AccountId) {
@@ -218,6 +226,23 @@ internal class RealContactChatSessionManager @Inject constructor(
                 }
             }
             .launchIn(this)
+    }
+
+    private fun subscribeToOpenChatSeenMessages() {
+        chatActiveTracker.subscribe()
+            .map { chatId -> (chatId?.chatVariant() as? ChatVariant.Contact)?.contactAccountId }
+            .distinctUntilChanged()
+            .flatMapLatest(::subscribeRunningSession)
+            .flatMapLatest { session -> session?.sendSeenMessages() ?: emptyFlow() }
+            .launchIn(this)
+    }
+
+    private fun subscribeRunningSession(contactAccountId: AccountId?): Flow<RealContactChatSession?> {
+        if (contactAccountId == null) return flowOf(null)
+
+        return sessionsFlow
+            .map { sessions -> sessions[contactAccountId]?.session }
+            .distinctUntilChanged()
     }
 
     private fun subscribeToEnabledContacts() {
@@ -297,7 +322,7 @@ internal class RealContactChatSessionManager @Inject constructor(
             syncContactUsernameUseCase = syncContactUsernameUseCase,
             incomingChatMessageProcessor = incomingChatMessageProcessor,
             notificationPayloadEncoder = notificationPayloadEncoder,
-            seenMessageSender = seenMessageSender,
+            seenMessageProvider = seenMessageProvider,
             transientMessageProcessor = transientMessageProcessor,
         )
 
@@ -402,7 +427,7 @@ internal class RealContactChatSessionManager @Inject constructor(
                     identityChatDomain = contact.sharedSecretDerivationDomain,
                     maxStatementSize = MAX_STATEMENT_SIZE,
                     compactor = chatMessageCompactor,
-                    replacementPolicy = seenMessageReplacementPolicy,
+                    replacementPolicy = keepSingleSeenMessagePolicy,
                 )
 
                 // Never signs an acceptance: ours go out as one-shot statements and incoming ones are not acknowledged.
@@ -428,7 +453,7 @@ internal class RealContactChatSessionManager @Inject constructor(
                     maxStatementSize = MAX_STATEMENT_SIZE,
                     compactor = chatMessageCompactor,
                     responsePolicy = ACCEPTANCES_UNACKNOWLEDGED,
-                    replacementPolicy = seenMessageReplacementPolicy,
+                    replacementPolicy = keepSingleSeenMessagePolicy,
                 )
                 CommunicationSessions.Pairwise(session)
             }

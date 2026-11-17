@@ -98,11 +98,11 @@ fun List<EncodedMessage>.partitionTransient(): Pair<List<TransientMessage>, List
     return transientMessages to chatMessages
 }
 
-fun LastSeenMessage.toEncodedSeenMessage(): Result<EncodedMessage> {
+fun LastSeenMessage.createSeenMessage(): Result<EncodedMessage> {
     val message = ChatMessageStatement(
         id = UUID.randomUUID().toString(),
         timestamp = System.currentTimeMillis().toULong(),
-        versioned = VersionedChatMessage.V1(ChatMessageV1(ChatMessageStatementContent.Seen(id.lowercase(), timestamp.toULong())))
+        versioned = VersionedChatMessage.V1(ChatMessageV1(ChatMessageStatementContent.Seen(id, timestamp.toULong())))
     )
     return BinaryScale.encodeToByteArrayCatching(message)
 }

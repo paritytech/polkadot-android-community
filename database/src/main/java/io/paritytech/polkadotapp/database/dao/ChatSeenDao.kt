@@ -6,16 +6,9 @@ import io.paritytech.polkadotapp.database.model.ChatMessageLocal
 import io.paritytech.polkadotapp.database.model.ChatSeenStateLocal
 import kotlinx.coroutines.flow.Flow
 
-private const val LAST_SEEN_INCOMING_MESSAGE_QUERY = """
-    SELECT id, sortOrder, timestamp FROM chat_messages
-    WHERE chatId = :chatId AND origintype != 'USER' AND status = 'IS_READ' AND type IN (:types)
-    ORDER BY sortOrder DESC, timestamp DESC
-    LIMIT 1
-"""
-
 @Dao
 abstract class ChatSeenDao {
-    @Query("SELECT sortOrder FROM chat_messages WHERE chatId = :chatId AND origintype = 'USER' AND LOWER(id) = LOWER(:messageId)")
+    @Query("SELECT sortOrder FROM chat_messages WHERE chatId = :chatId AND origintype = 'USER' AND id = :messageId")
     abstract suspend fun getOutgoingOrder(chatId: ByteArray, messageId: String): Long?
 
     @Query(
@@ -26,17 +19,22 @@ abstract class ChatSeenDao {
     )
     abstract suspend fun getHighestSentOutgoingOrderUpTo(chatId: ByteArray, timestamp: Long): Long?
 
-    @Query("SELECT sortOrder FROM chat_messages WHERE chatId = :chatId AND origintype != 'USER' AND LOWER(id) = LOWER(:messageId)")
+    @Query("SELECT sortOrder FROM chat_messages WHERE chatId = :chatId AND origintype != 'USER' AND id = :messageId")
     abstract suspend fun getIncomingOrder(chatId: ByteArray, messageId: String): Long?
 
     @Query(
         """
-        INSERT OR REPLACE INTO chat_seen_states (contactAccountId, peerSeenOrder, lastSentSeenOrder, lastSentSeenTimestamp)
-        VALUES (
+        INSERT OR REPLACE INTO chat_seen_states
+            (contactAccountId, peerSeenOrder, lastSentSeenMessageId, lastSentSeenOrder, lastSentSeenTimestamp)
+        SELECT
             :contactAccountId,
-            MAX(:order, COALESCE((SELECT peerSeenOrder FROM chat_seen_states WHERE contactAccountId = :contactAccountId), 0)),
+            :order,
+            (SELECT lastSentSeenMessageId FROM chat_seen_states WHERE contactAccountId = :contactAccountId),
             COALESCE((SELECT lastSentSeenOrder FROM chat_seen_states WHERE contactAccountId = :contactAccountId), 0),
             COALESCE((SELECT lastSentSeenTimestamp FROM chat_seen_states WHERE contactAccountId = :contactAccountId), 0)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM chat_seen_states
+            WHERE contactAccountId = :contactAccountId AND peerSeenOrder >= :order
         )
         """
     )
@@ -44,10 +42,12 @@ abstract class ChatSeenDao {
 
     @Query(
         """
-        INSERT OR REPLACE INTO chat_seen_states (contactAccountId, peerSeenOrder, lastSentSeenOrder, lastSentSeenTimestamp)
+        INSERT OR REPLACE INTO chat_seen_states
+            (contactAccountId, peerSeenOrder, lastSentSeenMessageId, lastSentSeenOrder, lastSentSeenTimestamp)
         SELECT
             :contactAccountId,
             COALESCE((SELECT peerSeenOrder FROM chat_seen_states WHERE contactAccountId = :contactAccountId), 0),
+            :messageId,
             :order,
             :timestamp
         WHERE NOT EXISTS (
@@ -57,15 +57,19 @@ abstract class ChatSeenDao {
         )
         """
     )
-    abstract suspend fun raiseLastSentSeen(contactAccountId: ByteArray, order: Long, timestamp: Long)
+    abstract suspend fun raiseLastSentSeen(contactAccountId: ByteArray, messageId: String, order: Long, timestamp: Long)
 
     @Query("SELECT * FROM chat_seen_states WHERE contactAccountId = :contactAccountId")
     abstract suspend fun getSeenState(contactAccountId: ByteArray): ChatSeenStateLocal?
 
-    @Query(LAST_SEEN_INCOMING_MESSAGE_QUERY)
-    abstract suspend fun getLastSeenIncomingMessage(chatId: ByteArray, types: List<ChatMessageLocal.Type>): LastSeenMessageProjection?
-
-    @Query(LAST_SEEN_INCOMING_MESSAGE_QUERY)
+    @Query(
+        """
+        SELECT id, sortOrder, timestamp FROM chat_messages
+        WHERE chatId = :chatId AND origintype != 'USER' AND status = 'IS_READ' AND type IN (:types)
+        ORDER BY sortOrder DESC, timestamp DESC
+        LIMIT 1
+        """
+    )
     abstract fun subscribeLastSeenIncomingMessage(chatId: ByteArray, types: List<ChatMessageLocal.Type>): Flow<LastSeenMessageProjection?>
 
     @Query("SELECT peerSeenOrder FROM chat_seen_states WHERE contactAccountId = :contactAccountId")
