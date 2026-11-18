@@ -146,7 +146,9 @@ class RealContactChatSession(
             message.content::class !in ONE_SHOT_CONTENT_TYPES
     }
 
-    private fun shouldNotify(message: ChatMessage): Boolean = message.content.isDisplayableAsPush()
+    private fun shouldNotify(message: ChatMessage): Boolean {
+        return message.content !is ChatMessage.Content.ChatRequest && message.content.isDisplayableAsPush()
+    }
 
     private fun subscribeSessionEvents(roledSession: RoledCommunicationSession) {
         val session = roledSession.session
