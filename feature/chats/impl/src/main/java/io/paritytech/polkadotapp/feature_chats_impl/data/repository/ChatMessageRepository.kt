@@ -419,7 +419,7 @@ class RealChatMessageRepository @Inject constructor(
     }
 
     override suspend fun propagateStatusToCompactedMessages(commitId: ChatMessageId, status: ChatMessage.Status) {
-        if (status != ChatMessage.Status.IS_SENT && status != ChatMessage.Status.IS_READ) return
+        if (status != ChatMessage.Status.IS_SENT && status != ChatMessage.Status.IS_DELIVERED) return
 
         val upgradableFrom = ChatMessage.Status.entries.filter { it.deliveryRank < status.deliveryRank }
 

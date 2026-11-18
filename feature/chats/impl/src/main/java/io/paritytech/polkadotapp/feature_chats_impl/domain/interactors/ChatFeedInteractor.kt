@@ -50,6 +50,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotif
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileUploadRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getContactResult
@@ -112,6 +113,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private val hopNodeUrlProvider: HopNodeUrlProvider,
     private val chatSigners: ContactChatSigners,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
+    private val chatSeenRepository: ChatSeenRepository,
     private val chatRequestRepository: ChatRequestRepository,
     private val outgoingChatRequestCanceller: OutgoingChatRequestCanceller,
 ) {
@@ -191,6 +193,13 @@ class ChatFeedInteractor @Inject internal constructor(
     }
 
     fun subscribeMessages(chatId: ChatId) = chatEngine.subscribeMessagesFeed(chatId)
+
+    fun subscribePeerSeenOrder(chatId: ChatId): Flow<Long> {
+        return when (chatId.chatVariant()) {
+            is ChatVariant.Extension -> flowOfValue(Long.MAX_VALUE)
+            is ChatVariant.Contact -> chatSeenRepository.subscribePeerSeenOrder(chatId).inBackground()
+        }
+    }
 
     suspend fun sendTextMessage(
         chatId: ChatId,
@@ -426,7 +435,7 @@ class ChatFeedInteractor @Inject internal constructor(
 
             withTimeout(LEFT_CHAT_SENT_TIMEOUT) {
                 chatMessageRepository.subscribeMessageStatus(message.id)
-                    .first { it == ChatMessage.Status.IS_SENT || it == ChatMessage.Status.IS_READ }
+                    .first { it == ChatMessage.Status.IS_SENT || it == ChatMessage.Status.IS_DELIVERED }
             }
         }.logFailure("Failed to notify peer about leaving chat")
     }
