@@ -150,7 +150,7 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
     private suspend fun reportsOf(vararg coins: PeerCoin): List<CoinageTransferDetection> {
         val reported = mutableListOf<CoinageTransferDetection>()
 
-        withTimeoutOrNull(IDLE) { claimOf(*coins).collect { reported += it } }
+        withTimeoutOrNull(IDLE) { claimOf(*coins).collect { reported += it.getOrThrow() } }
 
         return reported
     }
@@ -159,7 +159,7 @@ class RealClaimReceivedCoinsUseCaseInstanceTest {
         val reported = mutableListOf<CoinageTransferDetection>()
 
         val completed = withTimeoutOrNull(IDLE) {
-            claimOf(*coins).collect { reported += it }
+            claimOf(*coins).collect { reported += it.getOrThrow() }
             true
         }
 
