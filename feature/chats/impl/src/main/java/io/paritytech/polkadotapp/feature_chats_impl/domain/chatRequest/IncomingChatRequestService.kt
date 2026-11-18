@@ -6,10 +6,10 @@ import io.paritytech.polkadotapp.feature_account_api.domain.model.MetaAccount
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.hasPendingOutgoingRequest
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccountId
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.IncomingChatRequestCancelProcessor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTopic
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTransport
 import kotlinx.coroutines.coroutineScope
@@ -39,6 +39,7 @@ class RealIncomingChatRequestService @Inject constructor(
     private val chatRequestRepository: ChatRequestRepository,
     private val chatRequestTransport: ChatRequestTransport,
     private val processor: IncomingChatRequestProcessor,
+    private val cancelProcessor: IncomingChatRequestCancelProcessor,
 ) : IncomingChatRequestService {
     companion object {
         private val POLLING_FREQUENCY = 5.seconds
@@ -100,14 +101,15 @@ class RealIncomingChatRequestService @Inject constructor(
                 )
             }
 
-            val requestData = IncomingChatRequestData(request, metaAccount.id, contact.sharedSecretDerivationDomain)
+            when (val statement = request.toIncomingStatement()) {
+                is IncomingChatRequestStatement.Request -> {
+                    val requestData = IncomingChatRequestData(statement, metaAccount.id, contact.sharedSecretDerivationDomain)
+                    processor.processIncomingRequestForOutgoingRequest(requestData, contact)
+                        .logFailure("Failed to process request: $request")
+                }
 
-            if (request.message.content is VersionedRequestContent.Cancel) {
-                processor.processIncomingRequest(requestData)
+                is IncomingChatRequestStatement.Cancel -> cancelProcessor.process(statement)
                     .logFailure("Failed to process request cancel: $request")
-            } else {
-                processor.processIncomingRequestForOutgoingRequest(requestData, contact)
-                    .logFailure("Failed to process request: $request")
             }
         }
     }

@@ -21,11 +21,10 @@ import io.paritytech.polkadotapp.common.R as RCommon
 @Composable
 internal fun WaitingForAcceptFooter(
     username: String,
-    onCancelRequest: () -> Unit,
-    modifier: Modifier = Modifier
+    onCancelRequest: () -> Unit
 ) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .padding(
                 start = PolkadotTheme.spacings.mediumIncreased,

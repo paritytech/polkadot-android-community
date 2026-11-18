@@ -59,9 +59,11 @@ class ChatRequestMessage(
 
 @Serializable
 sealed class VersionedRequestContent {
+    sealed interface RequestVersion
+
     @Serializable
     @EnumIndex(0)
-    class V1(val content: RequestContentV1) : VersionedRequestContent() {
+    class V1(val content: RequestContentV1) : VersionedRequestContent(), RequestVersion {
         companion object {
             fun new(
                 pushToken: TokenContent?,
@@ -79,7 +81,7 @@ sealed class VersionedRequestContent {
 
     @Serializable
     @EnumIndex(1)
-    class V2(val content: RequestContentV2) : VersionedRequestContent() {
+    class V2(val content: RequestContentV2) : VersionedRequestContent(), RequestVersion {
         companion object {
             fun new(
                 identityProof: IdentityProofScale,

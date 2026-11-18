@@ -3,9 +3,10 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.ChainConnectionRefCounter
 import io.paritytech.polkadotapp.chains.multiNetwork.connection.withConnectionEnabled
+import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.presentation.AppInitializer
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
-import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.exponentialRetryDelay
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flattenResult
@@ -33,9 +34,11 @@ import io.paritytech.polkadotapp.feature_statement_store_api.data.StatementSubmi
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.StatementStoreMessageProver
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationStatementAccountAllocator
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -47,7 +50,7 @@ private val CANCEL_RETRY_DELAY = exponentialRetryDelay(initialDelay = 1.seconds,
 private const val CANCEL_CONNECTION_TAG = "ChatRequestCancel"
 
 @Singleton
-class OutgoingChatRequestCancelService @Inject constructor(
+class OutgoingChatRequestCanceller @Inject constructor(
     private val contactsRepository: ContactsRepository,
     private val chatRequestRepository: ChatRequestRepository,
     private val deleteLocalChat: DeleteLocalChatUseCase,
@@ -59,20 +62,30 @@ class OutgoingChatRequestCancelService @Inject constructor(
     private val allocator: NotificationStatementAccountAllocator,
     private val chainConnectionRefCounter: ChainConnectionRefCounter,
     private val knownChains: KnownChains,
-    dispatchers: CoroutineDispatchers,
-) : CoroutineScope {
-    override val coroutineContext = dispatchers.io + SupervisorJob()
+    private val coroutineDispatchers: CoroutineDispatchers,
+) : AppInitializer {
+    private val cancelledRequests = Channel<CancelledRequest>(Channel.UNLIMITED)
+
+    context(scope: ComputationalScope)
+    override fun initialize(): Result<Unit> = runCancellableCatching {
+        cancelledRequests.receiveAsFlow()
+            .onEach { cancelled -> scope.launch(coroutineDispatchers.io) { finishCancel(cancelled) } }
+            .launchIn(scope)
+    }
 
     suspend fun cancel(contactAccountId: AccountId): Result<Unit> {
         return runCancellableCatching {
             val contact = contactsRepository.getContactOrThrow(contactAccountId)
             contact to chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestIdOrThrow())
         }.flatMap { (contact, request) ->
-            markCancelledAndRemoveChat(contact, request.id).map {
-                releaseChatSigner(contact, request.id)
-                launch { publishCancelInBackground(contact, request) }
-            }
-        }.coerceToUnit()
+            markCancelledAndRemoveChat(contact, request.id)
+                .onSuccess { cancelledRequests.trySend(CancelledRequest(contact, request)) }
+        }
+    }
+
+    private suspend fun finishCancel(cancelled: CancelledRequest) {
+        releaseChatSigner(cancelled.contact, cancelled.request.id)
+        publishCancelInBackground(cancelled.contact, cancelled.request)
     }
 
     private suspend fun markCancelledAndRemoveChat(contact: Contact, requestId: ChatRequestId): Result<Unit> {
@@ -167,3 +180,5 @@ class OutgoingChatRequestCancelService @Inject constructor(
 }
 
 private class OwnRequestCopy(val stored: StoredChatRequestCopy, val prover: StatementStoreMessageProver)
+
+private class CancelledRequest(val contact: Contact, val request: ChatRequest)

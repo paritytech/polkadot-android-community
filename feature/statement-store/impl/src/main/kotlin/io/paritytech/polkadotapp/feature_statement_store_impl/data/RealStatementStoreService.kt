@@ -84,11 +84,7 @@ class RealStatementStoreService @Inject constructor(
         val error = when ((this as? SubmitStatementResult.Rejected)?.reason) {
             RejectionReason.NoAllowance -> StatementSubmitError.NoAllowance()
             is RejectionReason.ChannelPriorityTooLow -> StatementSubmitError.ChannelPriorityTooLow()
-            else -> if (determineOutcome() == SubmitStatementOutcome.FATAL_FAILURE) {
-                StatementSubmitError.Rejected(toString())
-            } else {
-                IllegalStateException("Single-attempt statement submit failed: $this")
-            }
+            else -> StatementSubmitError.Rejected(toString())
         }
         return Result.failure(error)
     }

@@ -148,8 +148,6 @@ class ChatFeedViewModel @Inject constructor(
         .map { it is ChatUserInputState.AcceptChatRequest || it is ChatUserInputState.ChatRequestCancelled }
         .distinctUntilChanged()
 
-    private var isClosing = false
-
     private val gatedDomainMessages = combine(
         interactor.subscribeMessages(chatId).withLastContentKept(keepsLastContent) { it.isNotEmpty() },
         animatesMessageReveal,
@@ -418,7 +416,6 @@ class ChatFeedViewModel @Inject constructor(
 
     override fun onLeaveChatConfirm() = launchUnit {
         interactor.leaveChat(chatId)
-            .onSuccess { closeScreen() }
             .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
@@ -429,7 +426,7 @@ class ChatFeedViewModel @Inject constructor(
 
     override fun onBlockUserConfirm() = launchUnit {
         interactor.blockUser(chatId)
-            .onSuccess { closeScreen() }
+            .onSuccess { router.back() }
             .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
@@ -562,7 +559,7 @@ class ChatFeedViewModel @Inject constructor(
         chatRequestAnswerProgress.value = ChatRequestAnswerProgress.Declining
 
         interactor.declineIncomingRequest(contactAccountId)
-            .onSuccess { closeScreen() }
+            .onSuccess { router.back() }
             .onFailure {
                 chatRequestAnswerProgress.value = ChatRequestAnswerProgress.None
                 showPresentationError(it.asChatRequestError().toPresentationError())
@@ -579,7 +576,6 @@ class ChatFeedViewModel @Inject constructor(
 
         menuState.update { it.copy(isVisible = false) }
         interactor.cancelOutgoingRequest(contactAccountId)
-            .onSuccess { closeScreen() }
             .onFailure { showPresentationError(UnexpectedPresentationError(it)) }
     }
 
@@ -793,15 +789,8 @@ class ChatFeedViewModel @Inject constructor(
     private fun closeScreenWhenChatRemoved() {
         chatInputStateType
             .filter { it is ChatUserInputState.ChatRemoved }
-            .onEach { closeScreen() }
+            .onEach { router.back() }
             .launchIn(this)
-    }
-
-    private fun closeScreen() {
-        if (isClosing) return
-        isClosing = true
-
-        router.back()
     }
 
     private fun markNonDisplayableMessagesAsRead() = launchUnit {

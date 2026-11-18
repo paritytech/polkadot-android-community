@@ -22,8 +22,6 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.pendingChatRequestIdOrThrow
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestMessage
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccountId
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatAcceptanceRepository
@@ -33,7 +31,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepo
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getByIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.acceptance.ChatAcceptance
-import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.IncomingChatRequestCancelProcessor
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenPlatform
@@ -47,7 +44,7 @@ import javax.inject.Singleton
  * Incoming chat request with all necessary data for processing.
  */
 data class IncomingChatRequestData(
-    val request: ChatRequestDecrypted,
+    val request: IncomingChatRequestStatement.Request,
     val ourMetaAccountId: Long,
     val derivationDomain: SharedSecretDerivationDomain,
 )
@@ -61,11 +58,10 @@ data class IncomingChatRequestData(
  * carried separately in the request body as `RequestContentV2.identityAccountId`,
  * and that is what contact resolution + chain lookups must use.
  */
-private fun ChatRequestDecrypted.peerIdentityAccountId(): AccountId =
-    when (val content = message.content) {
+private fun IncomingChatRequestStatement.Request.peerIdentityAccountId(): AccountId =
+    when (val content = content) {
         is VersionedRequestContent.V1 -> proof.signerAccountId()
         is VersionedRequestContent.V2 -> content.content.identityProof.identityAccountId.toDataByteArray()
-        is VersionedRequestContent.Cancel -> content.content.identityProof.identityAccountId.toDataByteArray()
     }
 
 /**
@@ -76,12 +72,8 @@ sealed class IncomingRequestProcessingResult {
     sealed class Ignored : IncomingRequestProcessingResult() {
         data object ChatRequestAlreadyProcessed : Ignored()
 
-        data object ChatRequestCancelled : Ignored()
-
-        data object CancelNotApplicable : Ignored()
+        data object RequestAlreadyCancelled : Ignored()
     }
-
-    data class RequestCancelled(val requestId: ChatRequestId) : IncomingRequestProcessingResult()
 
     /** New contact and request were created */
     data class NewContactCreated(val contact: Contact, val request: ChatRequest) : IncomingRequestProcessingResult()
@@ -132,20 +124,12 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val knownChains: KnownChains,
     private val currentTimeContext: CurrentTimeContext,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
-    private val cancelProcessor: IncomingChatRequestCancelProcessor,
 ) : IncomingChatRequestProcessor {
     override suspend fun processIncomingRequest(
         data: IncomingChatRequestData
     ): Result<IncomingRequestProcessingResult> = runCatching {
         verifier.verify(data.request).getOrThrow()
-        if (data.request.message.content is VersionedRequestContent.Cancel) {
-            return@runCatching cancelProcessor.process(
-                senderAccountId = data.request.peerIdentityAccountId(),
-                requestId = data.chatRequestId,
-                cancelTimestamp = data.request.message.timestamp.toLong(),
-            )
-        }
-        if (isCancelled(data.chatRequestId)) return@runCatching IncomingRequestProcessingResult.Ignored.ChatRequestCancelled
+        if (isCancelled(data.chatRequestId)) return@runCatching IncomingRequestProcessingResult.Ignored.RequestAlreadyCancelled
 
         val senderAccountId = data.request.peerIdentityAccountId()
         val existingContact = contactsRepository.getContact(senderAccountId)
@@ -180,7 +164,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact
     ): Result<IncomingRequestProcessingResult> {
         return runCatching {
-            if (isCancelled(data.chatRequestId)) return@runCatching IncomingRequestProcessingResult.Ignored.ChatRequestCancelled
+            if (isCancelled(data.chatRequestId)) return@runCatching IncomingRequestProcessingResult.Ignored.RequestAlreadyCancelled
 
             val existingRequest = chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestId!!)
             autoAcceptMutualRequest(contact, existingRequest, data)
@@ -318,7 +302,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private fun createNewChatRequest(incomingData: IncomingChatRequestData): ChatRequest {
         return ChatRequest(
             welcomeMessageId = incomingData.chatRequestId,
-            timestamp = incomingData.request.message.timestamp.toLong(),
+            timestamp = incomingData.request.timestamp,
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.PENDING,
             delivery = ChatRequest.Delivery.DeliveredUntracked,
@@ -326,7 +310,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     }
 
     private val IncomingChatRequestData.chatRequestId: ChatRequestId
-        get() = request.message.messageId
+        get() = request.requestId
 
     private suspend fun createNewIncomingRequestChat(
         data: IncomingChatRequestData
@@ -347,15 +331,15 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         val peerAccountId = data.request.peerIdentityAccountId()
 
         val request = ChatRequest(
-            welcomeMessageId = data.request.message.messageId,
-            timestamp = data.request.message.timestamp.toLong(),
+            welcomeMessageId = data.request.requestId,
+            timestamp = data.request.timestamp,
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.PENDING,
             delivery = ChatRequest.Delivery.DeliveredUntracked,
         )
         chatRequestRepository.save(request)
 
-        val content = extractContent(data.request.message)
+        val content = extractContent(data.request.content)
 
         // TODO: We have to set Contact.pendingDevicesFanOut as false here and set it as true after accepting chat request to run fan out
         val contact = Contact(
@@ -386,7 +370,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact,
         data: IncomingChatRequestData
     ): Contact {
-        val content = extractContent(data.request.message)
+        val content = extractContent(data.request.content)
 
         savePeerDevice(contact.accountId, peerStatementAccountId = data.request.proof.signerAccountId(), content.peerDeviceEncPubKey)
 
@@ -404,13 +388,13 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         senderAccountId: AccountId,
         data: IncomingChatRequestData
     ) {
-        val content = extractContent(data.request.message)
+        val content = extractContent(data.request.content)
         val welcomeMessage = content.welcomeMessage?.toWelcomeContent() ?: return
 
         val chatMessage = ChatMessage(
-            id = data.request.message.messageId,
+            id = data.request.requestId,
             chatId = ChatId.fromContact(senderAccountId),
-            timestamp = data.request.message.timestamp.toLong(),
+            timestamp = data.request.timestamp,
             content = ChatMessage.Content.ChatRequest(welcomeMessage),
             origin = ChatMessageOrigin.Contact(senderAccountId),
             status = ChatMessage.Status.NEW
@@ -462,8 +446,8 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         )
     }
 
-    private fun extractContent(message: ChatRequestMessage): NormalizedRequestContent {
-        return when (val content = message.content) {
+    private fun extractContent(content: VersionedRequestContent.RequestVersion): NormalizedRequestContent {
+        return when (content) {
             is VersionedRequestContent.V1 -> NormalizedRequestContent(
                 pushToken = content.content.pushToken,
                 welcomeMessage = content.content.welcomeMessage,
@@ -475,8 +459,6 @@ class RealIncomingChatRequestProcessor @Inject constructor(
                 welcomeMessage = content.content.welcomeMessage,
                 peerDeviceEncPubKey = content.content.deviceEncPubKey.toDomain().getOrThrow(),
             )
-
-            is VersionedRequestContent.Cancel -> error("A chat request cancel carries no request content")
         }
     }
 

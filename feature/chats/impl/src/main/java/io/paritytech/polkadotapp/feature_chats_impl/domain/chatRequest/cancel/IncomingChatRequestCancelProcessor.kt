@@ -1,7 +1,9 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel
 
 import io.paritytech.polkadotapp.common.domain.model.AccountId
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
@@ -10,13 +12,15 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatAcceptan
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
-import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingRequestProcessingResult
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingChatRequestStatement
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingChatRequestVerifier
 import io.paritytech.polkadotapp.feature_chats_impl.domain.sessions.signer.ContactChatSigners
 import io.paritytech.polkadotapp.feature_chats_impl.domain.usecase.DeleteLocalChatUseCase
 import timber.log.Timber
 import javax.inject.Inject
 
 class IncomingChatRequestCancelProcessor @Inject constructor(
+    private val verifier: IncomingChatRequestVerifier,
     private val chatRequestRepository: ChatRequestRepository,
     private val contactsRepository: ContactsRepository,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
@@ -24,33 +28,36 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
     private val deleteLocalChat: DeleteLocalChatUseCase,
     private val chatSigners: ContactChatSigners,
 ) {
-    suspend fun process(
-        senderAccountId: AccountId,
-        requestId: ChatRequestId,
-        cancelTimestamp: Long,
-    ): IncomingRequestProcessingResult {
-        val request = chatRequestRepository.getById(requestId)
-            ?: return rememberCancelledRequest(requestId, cancelTimestamp)
-
-        if (!request.isIncoming() || cancelTimestamp <= request.timestamp || !isSentBy(request, senderAccountId)) {
-            Timber.d("chatRequestCancel: cancel of request $requestId does not apply (status=${request.status}, direction=${request.direction})")
-            return IncomingRequestProcessingResult.Ignored.CancelNotApplicable
+    suspend fun process(cancel: IncomingChatRequestStatement.Cancel): Result<Unit> {
+        return verifier.verifyCancel(cancel).flatMap {
+            runCancellableCatching { applyCancel(cancel) }
         }
-
-        return removeRequestChat(senderAccountId, requestId)
     }
 
-    private suspend fun rememberCancelledRequest(requestId: ChatRequestId, cancelTimestamp: Long): IncomingRequestProcessingResult {
+    private suspend fun applyCancel(cancel: IncomingChatRequestStatement.Cancel) {
+        val senderAccountId = cancel.identityProof.identityAccountId
+        val request = chatRequestRepository.getById(cancel.requestId)
+            ?: return rememberCancelledRequest(cancel)
+
+        if (!request.isIncoming() || cancel.timestamp <= request.timestamp || !isSentBy(request, senderAccountId)) {
+            Timber.d("chatRequestCancel: cancel of request ${cancel.requestId} does not apply (status=${request.status}, direction=${request.direction})")
+            return
+        }
+
+        removeRequestChat(senderAccountId, cancel.requestId)
+    }
+
+    private suspend fun rememberCancelledRequest(cancel: IncomingChatRequestStatement.Cancel) {
         val request = ChatRequest(
-            welcomeMessageId = requestId,
-            timestamp = cancelTimestamp,
+            welcomeMessageId = cancel.requestId,
+            timestamp = cancel.timestamp,
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.CANCELLED,
             delivery = ChatRequest.Delivery.DeliveredUntracked,
         )
         chatRequestRepository.save(request)
 
-        return IncomingRequestProcessingResult.RequestCancelled(requestId)
+        Timber.i("chatRequestCancel: remembered cancelled request ${cancel.requestId} before its copy arrived")
     }
 
     private suspend fun isSentBy(request: ChatRequest, senderAccountId: AccountId): Boolean {
@@ -62,7 +69,7 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
         }
     }
 
-    private suspend fun removeRequestChat(senderAccountId: AccountId, requestId: ChatRequestId): IncomingRequestProcessingResult {
+    private suspend fun removeRequestChat(senderAccountId: AccountId, requestId: ChatRequestId) {
         val chatId = ChatId.fromContact(senderAccountId)
 
         val removed = contactsRepository.withTransaction {
@@ -74,10 +81,10 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
         }
         if (!removed) {
             Timber.i("chatRequestCancel: chat of request $requestId already has messages; keeping it")
-            return IncomingRequestProcessingResult.Ignored.CancelNotApplicable
+            return
         }
 
+        Timber.i("chatRequestCancel: request $requestId was cancelled by its sender")
         chatSigners.release(senderAccountId).logFailure("Failed to release chat signer after request $requestId was cancelled")
-        return IncomingRequestProcessingResult.RequestCancelled(requestId)
     }
 }

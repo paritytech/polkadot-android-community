@@ -12,13 +12,12 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingC
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingChatRequestService
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.OutgoingChatRequestNotPending
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NOTIFICATION_STATEMENT_MAX_SIZE
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val PUBLISH_LOCK_COUNT = 16
 
 /** Puts a recorded outgoing chat request on the statement store and records how it got there. */
 @Singleton
@@ -28,7 +27,7 @@ class ChatRequestPublisher @Inject constructor(
     private val contactsRepository: ContactsRepository,
     private val chatEngine: ChatEngine,
 ) {
-    private val publishLocks = List(PUBLISH_LOCK_COUNT) { Mutex() }
+    private val activePublishCountByRequestId = MutableStateFlow<Map<ChatRequestId, Int>>(emptyMap())
 
     suspend fun fitsNotificationStatement(request: ChatRequest, payload: OutgoingChatRequestPayload): Result<Boolean> {
         return outgoingChatRequestService.fitsStatementSize(request, payload, NOTIFICATION_STATEMENT_MAX_SIZE)
@@ -71,7 +70,7 @@ class ChatRequestPublisher @Inject constructor(
     }
 
     suspend fun awaitPublishing(requestId: ChatRequestId) {
-        publishLockFor(requestId).withLock { }
+        activePublishCountByRequestId.first { counts -> requestId !in counts }
     }
 
     private suspend fun submitWhilePending(
@@ -80,15 +79,19 @@ class ChatRequestPublisher @Inject constructor(
         signer: ChatRequestDeliverySigner,
         recordDelivery: suspend () -> Unit,
     ): Result<Unit> {
-        return publishLockFor(request.id).withLock {
-            ensurePending(request.id)
+        activePublishCountByRequestId.update { counts -> counts + (request.id to (counts[request.id] ?: 0) + 1) }
+        try {
+            return ensurePending(request.id)
                 .flatMap { submit(request, payload, signer) }
                 .flatMap { runCancellableCatching { recordDelivery() } }
+        } finally {
+            activePublishCountByRequestId.update { counts -> counts.withOnePublishLess(request.id) }
         }
     }
 
-    private fun publishLockFor(requestId: ChatRequestId): Mutex {
-        return publishLocks[Math.floorMod(requestId.hashCode(), PUBLISH_LOCK_COUNT)]
+    private fun Map<ChatRequestId, Int>.withOnePublishLess(requestId: ChatRequestId): Map<ChatRequestId, Int> {
+        val left = getValue(requestId) - 1
+        return if (left == 0) this - requestId else this + (requestId to left)
     }
 
     private suspend fun ensurePending(requestId: ChatRequestId): Result<Unit> {

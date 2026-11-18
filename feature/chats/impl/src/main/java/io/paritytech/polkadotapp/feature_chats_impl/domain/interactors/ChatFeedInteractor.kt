@@ -59,7 +59,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatActiveTrackerInte
 import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatDisplay.ChatDisplayGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingChatRequestProcessor
-import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.OutgoingChatRequestCancelService
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.OutgoingChatRequestCanceller
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.ChatRequestError
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsent
@@ -113,7 +113,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private val chatSigners: ContactChatSigners,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
     private val chatRequestRepository: ChatRequestRepository,
-    private val outgoingChatRequestCancelService: OutgoingChatRequestCancelService,
+    private val outgoingChatRequestCanceller: OutgoingChatRequestCanceller,
 ) {
     fun initiateCall(chatId: ChatId, callerName: String, withVideo: Boolean): InitiateCallResult {
         val activeCall = callStateTracker.getActiveCall()
@@ -409,7 +409,7 @@ class ChatFeedInteractor @Inject internal constructor(
 
     suspend fun cancelOutgoingRequest(contactAccountId: AccountId): Result<Unit> {
         return withContext(coroutineDispatchers.io) {
-            outgoingChatRequestCancelService.cancel(contactAccountId)
+            outgoingChatRequestCanceller.cancel(contactAccountId)
         }
     }
 
