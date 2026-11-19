@@ -559,7 +559,6 @@ class ChatFeedViewModel @Inject constructor(
         chatRequestAnswerProgress.value = ChatRequestAnswerProgress.Declining
 
         interactor.declineIncomingRequest(contactAccountId)
-            .onSuccess { router.back() }
             .onFailure {
                 chatRequestAnswerProgress.value = ChatRequestAnswerProgress.None
                 showPresentationError(it.asChatRequestError().toPresentationError())
