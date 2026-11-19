@@ -613,7 +613,7 @@ class CoinagePaymentProcessingExtensionTest {
         every {
             claimReceivedCoinsUseCase.claim(any(), CoinageOperationGroupId("chat-claim:${failedClaim.id}"), any())
         } returns flow {
-            emit(CoinageTransferDetection.Detecting)
+            emit(Result.success(CoinageTransferDetection.Detecting))
             throw IllegalStateException("ledger unavailable")
         }
 
@@ -669,7 +669,7 @@ class CoinagePaymentProcessingExtensionTest {
             val keys = firstArg<List<CoinPrivateKey>>()
             flow {
                 keys.forEach { it.deriveKeypair() }
-                reports.forEach { emit(it) }
+                reports.forEach { emit(Result.success(it)) }
                 andThen()
             }
         }

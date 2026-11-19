@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.domain.model.x25519OrNull
 import io.paritytech.polkadotapp.common.utils.logFailure
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_account_api.domain.model.SharedSecretDerivationDomain
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.repository.ResourcesRepository
@@ -22,6 +23,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.pendingChatRequestIdOrThrow
+import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.DeleteRoomUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccountId
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatAcceptanceRepository
@@ -89,9 +91,9 @@ sealed class IncomingRequestProcessingResult {
  * Handles the coordination logic for processing incoming chat requests.
  *
  * Resolution rules:
- * 1. Existing pending outgoing request -> auto-accept (mutual)
- * 2. Existing pending incoming request -> update if newer timestamp
- * 3. Already-seen request id -> ignore (already processed)
+ * 1. Already-seen request id -> ignore (already processed)
+ * 2. Existing pending outgoing request -> auto-accept (mutual)
+ * 3. Existing pending incoming request -> update if newer timestamp
  * 4. Established contact re-invites (new request id) -> re-establish / auto-accept (reconnect)
  * 5. No contact -> create new contact with pending request
  */
@@ -124,6 +126,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private val knownChains: KnownChains,
     private val currentTimeContext: CurrentTimeContext,
     private val chatAcceptanceRepository: ChatAcceptanceRepository,
+    private val deleteRoomUseCase: DeleteRoomUseCase,
 ) : IncomingChatRequestProcessor {
     override suspend fun processIncomingRequest(
         data: IncomingChatRequestData
@@ -137,14 +140,14 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         Timber.d("Processing incoming request ${data.chatRequestId}, existingContact=${existingContact?.username}, pendingRequestId=${existingContact?.pendingChatRequestId}, hasPushToken=${existingContact?.pushToken != null}")
 
         when {
-            // Existing contact with a pending request
-            existingContact != null && existingContact.pendingChatRequestId != null -> {
-                handleExistingContactWithRequest(existingContact, data)
-            }
-
             // This chat request has already been processed previously, ignore the request
             chatRequestRepository.getById(data.chatRequestId) != null -> {
                 IncomingRequestProcessingResult.Ignored.ChatRequestAlreadyProcessed
+            }
+
+            // Existing contact with a pending request
+            existingContact != null && existingContact.pendingChatRequestId != null -> {
+                handleExistingContactWithRequest(existingContact, data)
             }
 
             // Established contact re-invites (new request id) -> reconnect, don't ignore.
@@ -163,11 +166,15 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         data: IncomingChatRequestData,
         contact: Contact
     ): Result<IncomingRequestProcessingResult> {
-        return runCatching {
-            if (isCancelled(data.chatRequestId)) return@runCatching IncomingRequestProcessingResult.Ignored.RequestAlreadyCancelled
+        return runCancellableCatching {
+            if (isCancelled(data.chatRequestId)) return@runCancellableCatching IncomingRequestProcessingResult.Ignored.RequestAlreadyCancelled
 
-            val existingRequest = chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestId!!)
-            autoAcceptMutualRequest(contact, existingRequest, data)
+            if (chatRequestRepository.getById(data.chatRequestId) != null) {
+                IncomingRequestProcessingResult.Ignored.ChatRequestAlreadyProcessed
+            } else {
+                val existingRequest = chatRequestRepository.getByIdOrThrow(contact.pendingChatRequestId!!)
+                autoAcceptMutualRequest(contact, existingRequest, data)
+            }
         }
     }
 
@@ -219,6 +226,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         val updatedContact = contactsRepository.withTransaction {
             markChatAccepted(contact.accountId)
             chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
+            chatRequestRepository.save(createNewChatRequest(incomingData).copy(status = ChatRequest.Status.ACCEPTED))
             val updated = updateContactFromRequest(contact, incomingData)
             markOurWelcomeMessageAsRead(ourRequest.welcomeMessageId)
             recordAcceptance(contact.accountId, ourRequest.id)
@@ -245,9 +253,14 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     }
 
     override suspend fun declineIncomingRequest(contact: Contact): Result<Unit> {
-        return runCatching {
+        return runCancellableCatching {
             val chatRequestId = contact.pendingChatRequestIdOrThrow()
-            chatRequestRepository.updateStatus(chatRequestId, ChatRequest.Status.DECLINED)
+
+            contactsRepository.withTransaction {
+                chatRequestRepository.updateStatus(chatRequestId, ChatRequest.Status.DECLINED)
+                contactsRepository.deleteContact(contact.accountId)
+                deleteRoomUseCase.invoke(ChatId.fromContact(contact.accountId))
+            }
         }
     }
 
