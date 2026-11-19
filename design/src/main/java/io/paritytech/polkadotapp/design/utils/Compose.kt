@@ -8,7 +8,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 
 @Composable
-fun String.withBold(text: String, fontWeight: FontWeight = FontWeight.Bold): AnnotatedString = remember(this, text, fontWeight) {
+fun String.withBold(text: String): AnnotatedString = remember(this, text) {
     buildAnnotatedString {
         append(this@withBold)
 
@@ -16,7 +16,7 @@ fun String.withBold(text: String, fontWeight: FontWeight = FontWeight.Bold): Ann
         val endIndex = startIndex + text.length
 
         addStyle(
-            style = SpanStyle(fontWeight = fontWeight),
+            style = SpanStyle(fontWeight = FontWeight.Bold),
             start = startIndex,
             end = endIndex
         )

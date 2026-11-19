@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import io.paritytech.polkadotapp.design.components.button.common.PolkadotButtonStyle
@@ -15,7 +16,7 @@ import io.paritytech.polkadotapp.design.components.button.default.PolkadotTextBu
 import io.paritytech.polkadotapp.design.components.spacer.VerticalSpacer
 import io.paritytech.polkadotapp.design.components.text.NovaText
 import io.paritytech.polkadotapp.design.theme.PolkadotTheme
-import io.paritytech.polkadotapp.design.utils.withBold
+import io.paritytech.polkadotapp.design.utils.withSpanStyle
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatMenuType
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -42,7 +43,7 @@ fun DeclineRequestConfirmationContent(
 
         NovaText(
             text = stringResource(RCommon.string.chat_request_decline_message, type.username)
-                .withBold(type.username, FontWeight.SemiBold),
+                .withSpanStyle(SpanStyle(fontWeight = FontWeight.SemiBold), type.username),
             style = PolkadotTheme.typography.body.large,
             color = PolkadotTheme.colors.fg.secondary,
             textAlign = TextAlign.Center

@@ -394,13 +394,7 @@ class ChatFeedViewModel @Inject constructor(
     }
 
     override fun onCloseMenu() {
-        val type = menuState.value.type
         menuState.update { it.copy(isVisible = false) }
-
-        if (type is ChatMenuType.DeclineRequestConfirmation && type.isConfirmed) {
-            menuState.update { it.copy(type = type.copy(isConfirmed = false)) }
-            declineChatRequest()
-        }
     }
 
     override fun onLeaveChatRequest() = launchUnit {
@@ -550,20 +544,14 @@ class ChatFeedViewModel @Inject constructor(
 
     override fun onDeclineChatRequest() = launchUnit {
         val username = chatDisplay.awaitLoaded().username
-        menuState.update {
-            it.copy(isVisible = true, type = ChatMenuType.DeclineRequestConfirmation(username, isConfirmed = false))
-        }
+        menuState.update { it.copy(isVisible = true, type = ChatMenuType.DeclineRequestConfirmation(username)) }
     }
 
-    override fun onDeclineChatRequestConfirm() {
+    override fun onDeclineChatRequestConfirm() = launchUnit {
         val menu = menuState.value
-        val type = menu.type
-        if (!menu.isVisible || type !is ChatMenuType.DeclineRequestConfirmation) return
+        if (!menu.isVisible || menu.type !is ChatMenuType.DeclineRequestConfirmation) return@launchUnit
+        onCloseMenu()
 
-        menuState.update { it.copy(isVisible = false, type = type.copy(isConfirmed = true)) }
-    }
-
-    private fun declineChatRequest() = launchUnit {
         val contactAccountId = chatId.contactOrNull()?.contactAccountId ?: return@launchUnit
 
         chatRequestAnswerProgress.value = ChatRequestAnswerProgress.Declining

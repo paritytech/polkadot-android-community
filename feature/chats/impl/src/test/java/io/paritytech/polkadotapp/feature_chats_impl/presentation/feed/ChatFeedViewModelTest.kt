@@ -74,16 +74,14 @@ class ChatFeedViewModelTest {
     }
 
     @Test
-    fun `decline asks first and declines only after the sheet has closed`() = runBlocking<Unit> {
+    fun `decline asks first and declines once on confirm`() = runBlocking<Unit> {
         viewModel.onDeclineChatRequest()
         assertDeclineConfirmationShown()
         verifyNotDeclined()
 
         viewModel.onDeclineChatRequestConfirm()
-        verifyNotDeclined()
+        viewModel.onDeclineChatRequestConfirm()
 
-        viewModel.onCloseMenu()
-        viewModel.onCloseMenu()
         verify(interactor).declineIncomingRequest(eq(contactAccountId))
         verify(router).back()
     }
@@ -95,7 +93,7 @@ class ChatFeedViewModelTest {
 
     private suspend fun assertDeclineConfirmationShown() {
         val state = withTimeout(STATE_TIMEOUT) { viewModel.menuState.first { it.isVisible } }
-        assertEquals(ChatMenuType.DeclineRequestConfirmation(USERNAME, isConfirmed = false), state.type)
+        assertEquals(ChatMenuType.DeclineRequestConfirmation(USERNAME), state.type)
     }
 
     private suspend fun verifyNotDeclined() {
