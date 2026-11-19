@@ -40,10 +40,11 @@ import kotlin.reflect.KClass
 
 private val PUSH_ID_PREFIX = "notification".toByteArray(Charsets.UTF_8)
 
-// Content delivered as one-shot statements outside the sessions (acceptances, by ChatAcceptanceDeliveryService):
+// Delivered as one-shot statements outside the sessions, by ChatRequestDeliveryService and ChatAcceptanceDeliveryService:
 // sessions neither send it nor reset its status when their own statements are missing.
 private val ONE_SHOT_CONTENT_TYPES = listOf<KClass<out ChatMessage.Content>>(
-    ChatMessage.Content.DeviceChatAccepted::class
+    ChatMessage.Content.ChatRequest::class,
+    ChatMessage.Content.DeviceChatAccepted::class,
 )
 
 class RealContactChatSession(
@@ -140,13 +141,14 @@ class RealContactChatSession(
     }
 
     private fun shouldSend(message: ChatMessage): Boolean {
-        return message.content !is ChatMessage.Content.ChatRequest &&
-            // compaction message is sent internally in Active state of CommunicationSession state machine
-            message.content !is ChatMessage.Content.CompactionCommit &&
+        // compaction message is sent internally in Active state of CommunicationSession state machine
+        return message.content !is ChatMessage.Content.CompactionCommit &&
             message.content::class !in ONE_SHOT_CONTENT_TYPES
     }
 
-    private fun shouldNotify(message: ChatMessage): Boolean = message.content.isDisplayableAsPush()
+    private fun shouldNotify(message: ChatMessage): Boolean {
+        return message.content !is ChatMessage.Content.ChatRequest && message.content.isDisplayableAsPush()
+    }
 
     private fun subscribeSessionEvents(roledSession: RoledCommunicationSession) {
         val session = roledSession.session
