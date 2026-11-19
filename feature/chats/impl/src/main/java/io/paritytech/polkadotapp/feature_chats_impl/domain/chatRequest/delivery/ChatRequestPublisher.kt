@@ -1,5 +1,6 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.delivery
 
+import io.paritytech.polkadotapp.common.utils.Counter
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
@@ -12,9 +13,6 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingC
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingChatRequestService
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.OutgoingChatRequestNotPending
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NOTIFICATION_STATEMENT_MAX_SIZE
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,7 +25,7 @@ class ChatRequestPublisher @Inject constructor(
     private val contactsRepository: ContactsRepository,
     private val chatEngine: ChatEngine,
 ) {
-    private val activePublishCountByRequestId = MutableStateFlow<Map<ChatRequestId, Int>>(emptyMap())
+    private val activePublishes = Counter<ChatRequestId>()
 
     suspend fun fitsNotificationStatement(request: ChatRequest, payload: OutgoingChatRequestPayload): Result<Boolean> {
         return outgoingChatRequestService.fitsStatementSize(request, payload, NOTIFICATION_STATEMENT_MAX_SIZE)
@@ -70,7 +68,7 @@ class ChatRequestPublisher @Inject constructor(
     }
 
     suspend fun awaitPublishing(requestId: ChatRequestId) {
-        activePublishCountByRequestId.first { counts -> requestId !in counts }
+        activePublishes.awaitZero(requestId)
     }
 
     private suspend fun submitWhilePending(
@@ -79,19 +77,14 @@ class ChatRequestPublisher @Inject constructor(
         signer: ChatRequestDeliverySigner,
         recordDelivery: suspend () -> Unit,
     ): Result<Unit> {
-        activePublishCountByRequestId.update { counts -> counts + (request.id to (counts[request.id] ?: 0) + 1) }
+        activePublishes.increment(request.id)
         try {
             return ensurePending(request.id)
                 .flatMap { submit(request, payload, signer) }
                 .flatMap { runCancellableCatching { recordDelivery() } }
         } finally {
-            activePublishCountByRequestId.update { counts -> counts.withOnePublishLess(request.id) }
+            activePublishes.decrement(request.id)
         }
-    }
-
-    private fun Map<ChatRequestId, Int>.withOnePublishLess(requestId: ChatRequestId): Map<ChatRequestId, Int> {
-        val left = getValue(requestId) - 1
-        return if (left == 0) this - requestId else this + (requestId to left)
     }
 
     private suspend fun ensurePending(requestId: ChatRequestId): Result<Unit> {

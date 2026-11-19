@@ -128,6 +128,8 @@ interface ChatMessageRepository {
 
     suspend fun hasConversationMessages(chatId: ChatId): Boolean
 
+    suspend fun hasChatAcceptedMessage(chatId: ChatId, requestId: ChatRequestId): Boolean
+
     suspend fun getMessageStatuses(messageIds: List<ChatMessageId>): Map<ChatMessageId, ChatMessage.Status>
 
     suspend fun commitCompaction(commitId: ChatMessageId, originalIds: List<ChatMessageId>)
@@ -391,6 +393,12 @@ class RealChatMessageRepository @Inject constructor(
 
     override suspend fun hasConversationMessages(chatId: ChatId): Boolean {
         return chatMessageDao.hasConversationMessages(chatId.toLocal())
+    }
+
+    override suspend fun hasChatAcceptedMessage(chatId: ChatId, requestId: ChatRequestId): Boolean {
+        val decoder = AlwaysFailCustomContentDecoder()
+        return chatMessageDao.getChatAcceptedMessages(chatId.toLocal())
+            .any { (it.toDomain(decoder).content as? ChatMessage.Content.DeviceChatAccepted)?.requestId == requestId }
     }
 
     override suspend fun getMessageStatuses(messageIds: List<ChatMessageId>): Map<ChatMessageId, ChatMessage.Status> {

@@ -67,13 +67,13 @@ interface OutgoingChatRequestService {
 
     suspend fun isStoredBy(contact: Contact, signer: AccountId): Result<Boolean>
 
-    suspend fun fetchStoredCopies(contact: Contact): Result<List<StoredChatRequestCopy>>
+    suspend fun fetchCopiesToCancel(contact: Contact): Result<List<StoredChatRequestCopy>>
 
     suspend fun deliverChatRequestCancel(
         request: ChatRequest,
         contact: Contact,
         statementProver: StatementStoreMessageProver,
-        expiry: ULong,
+        replacedCopyExpiry: ULong,
     ): Result<Unit>
 }
 
@@ -117,10 +117,10 @@ class RealOutgoingChatRequestService @Inject constructor(
         }
     }
 
-    override suspend fun fetchStoredCopies(contact: Contact): Result<List<StoredChatRequestCopy>> {
+    override suspend fun fetchCopiesToCancel(contact: Contact): Result<List<StoredChatRequestCopy>> {
         return identityAccountOf(contact).flatMap { identityAccount ->
             val session = constructChatRequestTopics(contact, identityAccount.defaultAccountId()).session
-            chatRequestTransport.fetchChatRequestCopies(session, contact.sharedSecretDerivationDomain)
+            chatRequestTransport.fetchChatRequestCopiesToCancel(session, contact.sharedSecretDerivationDomain)
         }
     }
 
@@ -128,7 +128,7 @@ class RealOutgoingChatRequestService @Inject constructor(
         request: ChatRequest,
         contact: Contact,
         statementProver: StatementStoreMessageProver,
-        expiry: ULong,
+        replacedCopyExpiry: ULong,
     ): Result<Unit> {
         return identityAccountOf(contact).flatMap { identityAccount ->
             constructCancelMessage(request, contact)
@@ -137,12 +137,12 @@ class RealOutgoingChatRequestService @Inject constructor(
                         .map { proof -> ChatRequestDecrypted(cancel, proof) }
                 }
                 .flatMap { decrypted ->
-                    chatRequestTransport.submitChatRequestOnce(
+                    chatRequestTransport.submitChatRequestCancel(
                         topics = constructChatRequestTopics(contact, identityAccount.defaultAccountId()),
-                        request = decrypted,
+                        cancel = decrypted,
                         derivationDomain = contact.sharedSecretDerivationDomain,
                         statementProver = statementProver,
-                        expiry = expiry,
+                        replacedCopyExpiry = replacedCopyExpiry,
                     )
                 }
         }

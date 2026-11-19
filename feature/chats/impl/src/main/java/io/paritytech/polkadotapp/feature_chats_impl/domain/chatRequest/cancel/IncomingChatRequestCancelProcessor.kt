@@ -8,7 +8,7 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.isIncoming
-import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatAcceptanceRepository
+import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.DeleteRoomUseCase
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
@@ -23,9 +23,9 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
     private val verifier: IncomingChatRequestVerifier,
     private val chatRequestRepository: ChatRequestRepository,
     private val contactsRepository: ContactsRepository,
-    private val chatAcceptanceRepository: ChatAcceptanceRepository,
     private val chatMessageRepository: ChatMessageRepository,
     private val deleteLocalChat: DeleteLocalChatUseCase,
+    private val deleteRoomUseCase: DeleteRoomUseCase,
     private val chatSigners: ContactChatSigners,
 ) {
     suspend fun process(cancel: IncomingChatRequestStatement.Cancel): Result<Unit> {
@@ -39,12 +39,12 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
         val request = chatRequestRepository.getById(cancel.requestId)
             ?: return rememberCancelledRequest(cancel)
 
-        if (!request.isIncoming() || cancel.timestamp <= request.timestamp || !isSentBy(request, senderAccountId)) {
-            Timber.d("chatRequestCancel: cancel of request ${cancel.requestId} does not apply (status=${request.status}, direction=${request.direction})")
-            return
+        val removed = request.isIncoming() && cancel.timestamp > request.timestamp && removeRequestChat(request, senderAccountId)
+        if (removed) {
+            Timber.i("chatRequestCancel: request ${request.id} was cancelled by its sender")
+        } else {
+            Timber.d("chatRequestCancel: cancel of request ${request.id} does not apply (status=${request.status}, direction=${request.direction})")
         }
-
-        removeRequestChat(senderAccountId, cancel.requestId)
     }
 
     private suspend fun rememberCancelledRequest(cancel: IncomingChatRequestStatement.Cancel) {
@@ -60,19 +60,32 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
         Timber.i("chatRequestCancel: remembered cancelled request ${cancel.requestId} before its copy arrived")
     }
 
-    private suspend fun isSentBy(request: ChatRequest, senderAccountId: AccountId): Boolean {
+    private suspend fun removeRequestChat(request: ChatRequest, senderAccountId: AccountId): Boolean {
         return when (request.status) {
-            ChatRequest.Status.PENDING -> contactsRepository.getContact(senderAccountId)?.pendingChatRequestId == request.id
-            ChatRequest.Status.ACCEPTED -> chatAcceptanceRepository.get(senderAccountId)?.requestId == request.id
+            ChatRequest.Status.PENDING -> removePendingRequestChat(request.id, senderAccountId)
+            ChatRequest.Status.ACCEPTED -> removeAcceptedRequestChat(request.id, senderAccountId)
             ChatRequest.Status.DECLINED,
             ChatRequest.Status.CANCELLED -> false
         }
     }
 
-    private suspend fun removeRequestChat(senderAccountId: AccountId, requestId: ChatRequestId) {
+    private suspend fun removePendingRequestChat(requestId: ChatRequestId, senderAccountId: AccountId): Boolean {
+        return contactsRepository.withTransaction {
+            val contact = contactsRepository.getContact(senderAccountId)
+            if (contact == null || contact.pendingChatRequestId != requestId || contact.isBlocked) return@withTransaction false
+
+            chatRequestRepository.updateStatus(requestId, ChatRequest.Status.CANCELLED)
+            contactsRepository.deleteContact(senderAccountId)
+            deleteRoomUseCase.invoke(ChatId.fromContact(senderAccountId))
+            true
+        }
+    }
+
+    private suspend fun removeAcceptedRequestChat(requestId: ChatRequestId, senderAccountId: AccountId): Boolean {
         val chatId = ChatId.fromContact(senderAccountId)
 
         val removed = contactsRepository.withTransaction {
+            if (!chatMessageRepository.hasChatAcceptedMessage(chatId, requestId)) return@withTransaction false
             if (contactsRepository.getContact(senderAccountId)?.isBlocked == true) return@withTransaction false
             if (chatMessageRepository.hasConversationMessages(chatId)) return@withTransaction false
 
@@ -80,12 +93,9 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
             deleteLocalChat(chatId)
             true
         }
-        if (!removed) {
-            Timber.i("chatRequestCancel: keeping chat of request $requestId because the contact is blocked or the chat has messages")
-            return
+        if (removed) {
+            chatSigners.release(senderAccountId).logFailure("Failed to release chat signer after request $requestId was cancelled")
         }
-
-        Timber.i("chatRequestCancel: request $requestId was cancelled by its sender")
-        chatSigners.release(senderAccountId).logFailure("Failed to release chat signer after request $requestId was cancelled")
+        return removed
     }
 }
