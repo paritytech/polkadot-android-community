@@ -73,6 +73,7 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
         val chatId = ChatId.fromContact(senderAccountId)
 
         val removed = contactsRepository.withTransaction {
+            if (contactsRepository.getContact(senderAccountId)?.isBlocked == true) return@withTransaction false
             if (chatMessageRepository.hasConversationMessages(chatId)) return@withTransaction false
 
             chatRequestRepository.updateStatus(requestId, ChatRequest.Status.CANCELLED)
@@ -80,7 +81,7 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
             true
         }
         if (!removed) {
-            Timber.i("chatRequestCancel: chat of request $requestId already has messages; keeping it")
+            Timber.i("chatRequestCancel: keeping chat of request $requestId because the contact is blocked or the chat has messages")
             return
         }
 
