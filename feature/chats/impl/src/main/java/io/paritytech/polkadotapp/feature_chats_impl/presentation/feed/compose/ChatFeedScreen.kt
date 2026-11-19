@@ -133,7 +133,8 @@ fun ChatFeedScreen(contract: ChatFeedContract) {
         onLeaveChatRequest = contract::onLeaveChatRequest,
         onLeaveChatConfirm = contract::onLeaveChatConfirm,
         onBlockUserRequest = contract::onBlockUserRequest,
-        onBlockUserConfirm = contract::onBlockUserConfirm
+        onBlockUserConfirm = contract::onBlockUserConfirm,
+        onDeclineChatRequestConfirm = contract::onDeclineChatRequestConfirm
     )
 
     when (popupState) {
