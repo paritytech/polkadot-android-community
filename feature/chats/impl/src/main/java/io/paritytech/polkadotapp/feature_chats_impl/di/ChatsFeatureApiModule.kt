@@ -99,6 +99,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.RealIncom
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.RealIncomingChatRequestVerifier
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.RealOutgoingChatRequestService
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.acceptance.ChatAcceptanceDeliveryService
+import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.cancel.OutgoingChatRequestCanceller
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.delivery.ChatRequestDeliveryService
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.ChatRequestTransport
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.transport.RealChatRequestTransport
@@ -168,6 +169,10 @@ internal interface ChatsFeatureApiModule {
     @Binds
     @IntoSet
     fun bindChatRequestDeliveryService(impl: ChatRequestDeliveryService): AppInitializer
+
+    @Binds
+    @IntoSet
+    fun bindOutgoingChatRequestCanceller(impl: OutgoingChatRequestCanceller): AppInitializer
 
     @Binds
     @IntoSet

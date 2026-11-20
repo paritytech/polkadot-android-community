@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.ChatsRouter
 import io.paritytech.polkadotapp.feature_chats_impl.domain.interactors.ChatFeedInteractor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatAvatar
 import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatDisplay
+import io.paritytech.polkadotapp.feature_chats_impl.domain.models.ChatUserInputState
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.draft.ChatDraftController
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.mappers.ChatMessageUiMapper
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.ChatMenuType
@@ -25,6 +26,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -50,6 +52,7 @@ private val STATE_TIMEOUT = 1.seconds
 class ChatFeedViewModelTest {
     private val contactAccountId: AccountId = ByteArray(32) { 7 }.toDataByteArray()
     private val chatDisplay = MutableSharedFlow<Result<ChatDisplay>>(replay = 1)
+    private val userInputState = MutableStateFlow<ChatUserInputState>(ChatUserInputState.AcceptChatRequest)
 
     private val router: ChatsRouter = mock(ChatsRouter::class.java)
     private val interactor: ChatFeedInteractor = mockWithIdleFlows()
@@ -61,6 +64,7 @@ class ChatFeedViewModelTest {
     fun setUp() = runBlocking<Unit> {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         whenever(interactor.observeChatDisplay(any())).thenReturn(chatDisplay)
+        whenever(interactor.subscribeUserInputState(any())).thenReturn(userInputState)
         whenever(interactor.declineIncomingRequest(any())).thenReturn(Result.success(Unit))
         whenever(draftControllerFactory.create(any(), any(), any())).thenReturn(mock(ChatDraftController::class.java))
         viewModel = createViewModel()
@@ -83,6 +87,8 @@ class ChatFeedViewModelTest {
         viewModel.onDeclineChatRequestConfirm()
 
         verify(interactor).declineIncomingRequest(eq(contactAccountId))
+
+        userInputState.value = ChatUserInputState.ChatRemoved
         verify(router).back()
     }
 
