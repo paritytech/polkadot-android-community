@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 71,
-    "identityHash": "29d3283f21db67d98ed4a2e4365122ac",
+    "identityHash": "3e7dbb61f88b305279e50963ed1c684a",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -1654,7 +1654,7 @@
       },
       {
         "tableName": "recycler_vouchers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `enteredAt` INTEGER, `recyclerFungibility` INTEGER NOT NULL DEFAULT 0, `maxRecyclerFungibility` INTEGER, `recyclerUnloaded` INTEGER, PRIMARY KEY(`installationId`, `ringVrfKeyIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `enteredAt` INTEGER, `recyclerFungibility` INTEGER NOT NULL DEFAULT 0, `maxRecyclerFungibility` INTEGER, PRIMARY KEY(`installationId`, `ringVrfKeyIndex`))",
         "fields": [
           {
             "fieldPath": "installationId",
@@ -1705,11 +1705,6 @@
           {
             "fieldPath": "maxRecyclerFungibility",
             "columnName": "maxRecyclerFungibility",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "recyclerUnloaded",
-            "columnName": "recyclerUnloaded",
             "affinity": "INTEGER"
           }
         ],
@@ -3116,11 +3111,65 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "chat_seen_states",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`contactAccountId` BLOB NOT NULL, `peerSeenOrder` INTEGER NOT NULL, `lastSentSeenMessageId` TEXT, `lastSentSeenOrder` INTEGER NOT NULL, `lastSentSeenTimestamp` INTEGER NOT NULL, PRIMARY KEY(`contactAccountId`), FOREIGN KEY(`contactAccountId`) REFERENCES `contacts`(`accountId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "contactAccountId",
+            "columnName": "contactAccountId",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "peerSeenOrder",
+            "columnName": "peerSeenOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSentSeenMessageId",
+            "columnName": "lastSentSeenMessageId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastSentSeenOrder",
+            "columnName": "lastSentSeenOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSentSeenTimestamp",
+            "columnName": "lastSentSeenTimestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "contactAccountId"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactAccountId"
+            ],
+            "referencedColumns": [
+              "accountId"
+            ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '29d3283f21db67d98ed4a2e4365122ac')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3e7dbb61f88b305279e50963ed1c684a')"
     ]
   }
 }

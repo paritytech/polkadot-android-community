@@ -47,6 +47,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.data.hop.upload.FileUploadSt
 import io.paritytech.polkadotapp.feature_chats_impl.data.notifications.ChatNotificationPublisher
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatDraftRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatSeenRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.FileUploadRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.getContactResult
@@ -57,6 +58,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.ChatEngine
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatDisplay.ChatDisplayGenerator
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.IncomingChatRequestProcessor
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.ChatRequestError
+import io.paritytech.polkadotapp.feature_chats_impl.domain.error.LeftChatNotSentError
 import io.paritytech.polkadotapp.feature_chats_impl.domain.hop.FileUpload
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsent
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsentUseCase
@@ -72,7 +74,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.flowOf as flowOfValue
@@ -103,6 +105,7 @@ class ChatFeedInteractor @Inject internal constructor(
     private val hopNodeUrlProvider: HopNodeUrlProvider,
     private val chatSigners: ContactChatSigners,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
+    private val chatSeenRepository: ChatSeenRepository,
 ) {
     fun initiateCall(chatId: ChatId, callerName: String, withVideo: Boolean): InitiateCallResult {
         val activeCall = callStateTracker.getActiveCall()
@@ -180,6 +183,13 @@ class ChatFeedInteractor @Inject internal constructor(
     }
 
     fun subscribeMessages(chatId: ChatId) = chatEngine.subscribeMessagesFeed(chatId)
+
+    fun subscribePeerSeenOrder(chatId: ChatId): Flow<Long> {
+        return when (chatId.chatVariant()) {
+            is ChatVariant.Extension -> flowOfValue(Long.MAX_VALUE)
+            is ChatVariant.Contact -> chatSeenRepository.subscribePeerSeenOrder(chatId).inBackground()
+        }
+    }
 
     suspend fun sendTextMessage(
         chatId: ChatId,
@@ -332,10 +342,11 @@ class ChatFeedInteractor @Inject internal constructor(
 
     suspend fun leaveChat(chatId: ChatId): Result<Unit> {
         // LeftChat is signed by the chat signer, so the slot is released only after it was sent.
-        tryNotifyPeerLeftChat(chatId)
-        chatId.onContact { contactChat -> releaseChatSigner(contactChat.contactAccountId) }
-
-        return deleteContactChatLocalData(chatId)
+        return notifyPeerLeftChat(chatId)
+            .flatMap {
+                chatId.onContact { contactChat -> releaseChatSigner(contactChat.contactAccountId) }
+                deleteContactChatLocalData(chatId)
+            }
     }
 
     fun subscribeIsIdentitySigningAllowed(chatId: ChatId): Flow<Boolean> {
@@ -396,22 +407,26 @@ class ChatFeedInteractor @Inject internal constructor(
         }
     }
 
-    private suspend fun tryNotifyPeerLeftChat(chatId: ChatId) {
-        val contactId = chatId.contactOrNull()?.contactAccountId ?: return
+    private suspend fun notifyPeerLeftChat(chatId: ChatId): Result<Unit> {
+        val contact = chatId.contactOrNull()?.let { contactsRepository.getContact(it.contactAccountId) }
 
-        chatSessionManager.getSession(contactId) ?: return
+        if (contact == null || contact.isPeerLeft || chatSessionManager.getSession(contact.accountId) == null) {
+            return Result.success(Unit)
+        }
 
-        runCancellableCatching {
+        return runCancellableCatching {
             val message = chatEngine.sendUserMessage(
                 chatId = chatId,
                 content = ChatMessage.Content.LeftChat
             )
 
-            withTimeout(LEFT_CHAT_SENT_TIMEOUT) {
+            withTimeoutOrNull(LEFT_CHAT_SENT_TIMEOUT) {
                 chatMessageRepository.subscribeMessageStatus(message.id)
-                    .first { it == ChatMessage.Status.IS_SENT || it == ChatMessage.Status.IS_READ }
+                    .first { it == ChatMessage.Status.IS_SENT || it == ChatMessage.Status.IS_DELIVERED }
             }
-        }.logFailure("Failed to notify peer about leaving chat")
+        }
+            .flatMap { sentStatus -> if (sentStatus != null) Result.success(Unit) else Result.failure(LeftChatNotSentError()) }
+            .logFailure("Failed to notify peer about leaving chat")
     }
 
     private fun getChatDisplay(startNewContact: OpenChatRequest.StartChatWithContact): ChatDisplay {

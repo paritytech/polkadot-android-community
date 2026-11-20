@@ -133,7 +133,8 @@ fun ChatFeedScreen(contract: ChatFeedContract) {
         onLeaveChatRequest = contract::onLeaveChatRequest,
         onLeaveChatConfirm = contract::onLeaveChatConfirm,
         onBlockUserRequest = contract::onBlockUserRequest,
-        onBlockUserConfirm = contract::onBlockUserConfirm
+        onBlockUserConfirm = contract::onBlockUserConfirm,
+        onDeclineChatRequestConfirm = contract::onDeclineChatRequestConfirm
     )
 
     when (popupState) {
@@ -322,7 +323,7 @@ private fun ChatFeedPreview() {
                                     direction = ChatMessageUiModel.Direction.OUTGOING,
                                     text = "Hi there!",
                                     timestamp = 1625247600000,
-                                    status = ChatMessageUiModel.Status.READ,
+                                    status = ChatMessageUiModel.Status.SEEN,
                                     reactions = persistentListOf(),
                                     origin = ChatMessageOrigin.User,
                                     replyPreview = null,

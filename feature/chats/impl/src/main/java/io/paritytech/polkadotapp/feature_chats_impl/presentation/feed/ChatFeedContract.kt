@@ -76,6 +76,7 @@ interface ChatFeedContract {
 
     fun onAcceptChatRequest()
     fun onDeclineChatRequest()
+    fun onDeclineChatRequestConfirm()
 
     fun onAttachClick()
 }
