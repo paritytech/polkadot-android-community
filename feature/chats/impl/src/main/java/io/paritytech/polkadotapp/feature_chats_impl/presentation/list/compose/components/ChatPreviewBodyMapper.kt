@@ -90,18 +90,26 @@ private fun LastMessageUiModel.toPreviewBody(username: String): ChatPreviewBody 
 
         is LastMessageUiModel.Payment -> {
             val value = LocalTokenAmountFormatter.current.formatTokenAmount(
-                tokenAmount = tokenAmount,
+                tokenAmount = (paymentStatus as? ChatMessageUiModel.CoinagePayment.Status.Reclaimed)?.reclaimed ?: tokenAmount,
                 precision = RoundPrecision.DEFAULT
             )
-            val text = if (isIncoming) {
-                val incomingRes = if (paymentStatus.isClaimInFlight) {
-                    R.string.chat_last_message_payment_incoming_sending
-                } else {
-                    R.string.chat_last_message_payment_incoming
+            val text = when {
+                isIncoming && paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired ->
+                    stringResource(R.string.chat_last_message_payment_claim_window_expired, username, value)
+
+                isIncoming -> {
+                    val incomingRes = if (paymentStatus.isClaimInFlight) {
+                        R.string.chat_last_message_payment_incoming_sending
+                    } else {
+                        R.string.chat_last_message_payment_incoming
+                    }
+                    stringResource(incomingRes, username, value)
                 }
-                stringResource(incomingRes, username, value)
-            } else {
-                stringResource(R.string.chat_last_message_payment_outgoing, value)
+
+                paymentStatus is ChatMessageUiModel.CoinagePayment.Status.Reclaimed ->
+                    stringResource(R.string.chat_last_message_payment_reclaimed, value)
+
+                else -> stringResource(R.string.chat_last_message_payment_outgoing, value)
             }.withBold(value).withCurrencyTickerStyle(PolkadotTheme.typography.paragraph.medium)
             text.asPlainBody()
         }

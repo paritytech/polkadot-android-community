@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresent
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.AttachmentError
 import io.paritytech.polkadotapp.feature_chats_impl.domain.error.ChatRequestError
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ReclaimHandedOffCoinsError
 import io.paritytech.polkadotapp.common.R as RCommon
 
 fun AttachmentError.toPresentationError(): PresentationThrowable = when (this) {
@@ -22,6 +23,16 @@ fun ChatRequestError.toPresentationError(): PresentationThrowable = when (this) 
 
     is ChatRequestError.Unknown -> UnexpectedPresentationError(this)
 }
+
+fun ReclaimHandedOffCoinsError.toPresentationError(): PresentationThrowable = when (this) {
+    ReclaimHandedOffCoinsError.NothingToReclaim -> NothingToReclaimPresentationError(this)
+
+    is ReclaimHandedOffCoinsError.Unknown -> UnexpectedPresentationError(this)
+}
+
+class NothingToReclaimPresentationError(cause: Throwable) :
+    PresentationThrowable(cause),
+    PresentationError by StringResPresentationError(RCommon.string.chat_payment_reclaim_error_nothing_to_reclaim)
 
 class ContactNotFoundPresentationError(cause: Throwable) :
     PresentationThrowable(cause),
