@@ -69,6 +69,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.sen
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.toUi
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.utils.AttachmentExecutor
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.utils.AttachmentResult
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.asReclaimHandedOffCoinsError
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.SendEnterAmountPayload
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.TransferMethodPayload
 import kotlinx.collections.immutable.persistentListOf
@@ -538,7 +539,14 @@ class ChatFeedViewModel @Inject constructor(
             is MessageAction.DismissActionMenu -> {
                 messagePopupSection.update { null }
             }
+
+            is MessageAction.ReclaimPayment -> reclaimPayment(action.message.id)
         }
+    }
+
+    private fun reclaimPayment(messageId: ChatMessageId) = launchUnit {
+        interactor.reclaimPayment(chatId, messageId)
+            .onFailure { showPresentationError(it.asReclaimHandedOffCoinsError().toPresentationError()) }
     }
 
     override fun onAcceptChatRequest() = launchUnit {

@@ -467,6 +467,28 @@ class RealClaimReceivedCoinsUseCaseTest {
         assertEquals(CoinageTransferDetection.Detecting, reported.first())
     }
 
+    @Test
+    fun `a claim the chain answers with none of the coins reports them absent`() = runTest {
+        val coin = key(1)
+        givenChainSees(emptyList())
+        givenGroupReports(noEntries())
+
+        val reported = reportsOf(coin)
+
+        assertEquals(CoinageTransferDetection.NoCoinsOnChain, reported.last())
+    }
+
+    @Test
+    fun `a chain that never answered is not taken to say the coins are absent`() = runTest {
+        val coin = key(1)
+        givenChainReads(listOf(Result.failure(IllegalStateException("no connection"))))
+        givenGroupReports(noEntries())
+
+        val reported = reportsOf(coin)
+
+        assertFalse(CoinageTransferDetection.NoCoinsOnChain in reported)
+    }
+
     /**
      * A payment of several coins arriving one at a time, with nothing wrong.
      *

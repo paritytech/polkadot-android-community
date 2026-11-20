@@ -201,7 +201,7 @@ class ChatMessageUiMapper @Inject constructor(
                     direction = direction,
                     status = status,
                     amount = tokenAmount,
-                    paymentStatus = helper.mapPaymentStatus(latestContent.status),
+                    paymentStatus = helper.mapPaymentStatus(latestContent),
                     origin = origin,
                     reactions = messageReactions
                 )

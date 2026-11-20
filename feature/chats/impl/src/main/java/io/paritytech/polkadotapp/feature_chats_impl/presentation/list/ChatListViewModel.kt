@@ -192,13 +192,13 @@ class ChatListViewModel @Inject constructor(
             )
 
             is ChatMessage.Content.CoinagePayment -> {
-                val tokenAmount = messageMappingHelper.extractTokenAmount(content)
+                val shownAmount = (content.status as? ChatMessage.Content.CoinagePayment.Status.Reclaimed)?.amount ?: content.totalValue
 
                 Payment(
                     timestamp = timestamp,
                     isIncoming = isIncoming,
-                    tokenAmount = tokenAmount,
-                    paymentStatus = messageMappingHelper.mapPaymentStatus(content.status)
+                    tokenAmount = messageMappingHelper.extractTokenAmount(shownAmount),
+                    paymentStatus = messageMappingHelper.mapPaymentStatus(content)
                 )
             }
 

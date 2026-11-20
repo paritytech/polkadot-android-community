@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,7 +61,9 @@ fun ChatMessageSurface(
     }
 
     PolkadotSurface(
-        modifier = modifier.then(clickModifier),
+        modifier = modifier
+            .then(clickModifier)
+            .alpha(style.alpha),
         shape = shape,
         color = style.backgroundColor,
         border = style.border,

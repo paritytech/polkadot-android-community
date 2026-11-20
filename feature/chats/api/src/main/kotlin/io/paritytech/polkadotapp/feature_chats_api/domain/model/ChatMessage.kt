@@ -76,6 +76,10 @@ data class ChatMessage(
                 data class Transferred(val amount: Balance) : Status
                 data object FailedDetection : Status
                 data object FailedTransfer : Status
+                data object ClaimWindowExpired : Status
+                data object Reclaiming : Status
+                data class Reclaimed(val amount: Balance) : Status
+                data object ReclaimFailed : Status
             }
         }
 
