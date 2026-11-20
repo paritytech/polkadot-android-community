@@ -21,8 +21,10 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
+import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.BUNDLED_PRIVACY_CONFIG
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FakeCoinagePrivacyConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.ForcedRecyclingAgeProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
@@ -84,6 +86,7 @@ class RealTotalBalanceUseCaseTest {
             evaluator = evaluator,
             usabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider, timeProvider),
             readinessUpdates = mock(),
+            privacyConfigProvider = FakeCoinagePrivacyConfigProvider(),
         )
     }
 
@@ -327,6 +330,7 @@ class RealTotalBalanceUseCaseTest {
             vouchers = vouchers.zip(voucherStates, ::TrackedVoucher),
             strategyType = strategyType,
             verdicts = verdicts,
+            privacyConfig = BUNDLED_PRIVACY_CONFIG,
         ).getOrThrow()
     }
 
@@ -344,7 +348,7 @@ class RealTotalBalanceUseCaseTest {
     private fun stateWithMinter(status: DurableTxStatus) =
         CoinageAssetState(handedOff = false, minterStatus = status, consumerStatus = null)
 
-    private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members, enteredAt = null)
+    private fun inRecycler(members: Int) = Location.InRecycler(RecyclerIndex(BigInteger.ONE), members, enteredAt = null, recyclerUnloaded = null)
 
     private fun coinOf(exponent: Int, age: Int?, onChain: Boolean = true, derivationIndex: Int = 0) = Coin(
         derivationIndex = testKey(derivationIndex),

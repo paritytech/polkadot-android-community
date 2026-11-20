@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
@@ -26,20 +27,17 @@ class VoucherReadinessUpdates @Inject constructor(
         inputs: Flow<Input>,
         vouchers: (Input) -> List<TrackedVoucher>,
         strategy: (Input) -> RecyclingStrategyType,
+        privacyConfig: (Input) -> CoinagePrivacyConfig,
     ): Flow<Input> = inputs.combine(clockChangesSource.changes().onStart { emit(Unit) }) { input, _ -> input }
         .flatMapLatest { input ->
             flow {
                 val now = timeProvider.now()
-                val readiness = strategy(input).params.voucherReadiness.memberAndAgeRequirements
-                val deadlines = if (readiness == null) emptyList() else vouchers(input).mapNotNull { tracked ->
+                val readiness = strategy(input).params(privacyConfig(input)).voucherReadiness
+                val deadlines = vouchers(input).mapNotNull { tracked ->
                     if (!tracked.state.isFree) return@mapNotNull null
                     val location = tracked.voucher.location as? RecyclerVoucher.Location.InRecycler
-                    val enteredAt = location?.enteredAt
-                    if (enteredAt != null && location.recyclerMembers >= readiness.minimumMembers) {
-                        (enteredAt + readiness.delay).takeIf { it > now }
-                    } else {
-                        null
-                    }
+                        ?: return@mapNotNull null
+                    readiness.anonymityReadyAt(location)?.takeIf { it > now }
                 }.distinct().sorted()
 
                 emit(input)
@@ -58,4 +56,5 @@ fun <Input> Flow<Input>.withReadinessUpdates(
     readinessUpdates: VoucherReadinessUpdates,
     vouchers: (Input) -> List<TrackedVoucher>,
     strategy: (Input) -> RecyclingStrategyType,
-): Flow<Input> = readinessUpdates.observe(this, vouchers, strategy)
+    privacyConfig: (Input) -> CoinagePrivacyConfig,
+): Flow<Input> = readinessUpdates.observe(this, vouchers, strategy, privacyConfig)

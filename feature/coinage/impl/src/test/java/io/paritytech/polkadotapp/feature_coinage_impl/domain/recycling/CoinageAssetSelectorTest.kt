@@ -51,6 +51,7 @@ class CoinageAssetSelectorTest {
         settings = settings,
         evaluator = evaluator,
         voucherUsabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider, timeProvider),
+        privacyConfigProvider = FakeCoinagePrivacyConfigProvider(),
     )
 
     private val spendable = coinOf(derivationIndex = 1)
@@ -207,7 +208,7 @@ class CoinageAssetSelectorTest {
         ringVrfKeyIndex = testKey(ringVrfKeyIndex),
         ringVrfPublicKey = mock(),
         recyclerValue = ValueExponent(1),
-        location = Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = members, enteredAt = enteredAt),
+        location = Location.InRecycler(RecyclerIndex(BigInteger.ONE), recyclerMembers = members, enteredAt = enteredAt, recyclerUnloaded = 0),
         recyclerFungibility = RecyclerFungibility.NONE,
         maxRecyclerFungibility = RecyclerFungibility.NONE,
     )
