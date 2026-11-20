@@ -1,8 +1,8 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.domain.model
 
-import io.paritytech.polkadotapp.common.domain.model.DataByteArray
+import io.paritytech.polkadotapp.chains.util.signing.MessageSigningContext
 
 class AccountSigningContexts(
-    val peopleLite: DataByteArray?,
-    val dotNsGateway: DataByteArray?
+    val peopleLite: MessageSigningContext,
+    val dotNsGateway: MessageSigningContext
 )

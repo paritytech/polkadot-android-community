@@ -1,20 +1,20 @@
 package io.paritytech.polkadotapp.feature_usernames_impl.data.signing
 
-import io.novasama.substrate_sdk_android.runtime.metadata.module.Module
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.Scale
+import io.novasama.substrate_sdk_android.koltinx_serialization_scale.decode
 import io.novasama.substrate_sdk_android.runtime.metadata.moduleOrNull
 import io.paritytech.polkadotapp.chains.multiNetwork.ChainRegistry
 import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.ChainId
-import io.paritytech.polkadotapp.chains.multiNetwork.withRuntime
-import io.paritytech.polkadotapp.chains.storage.source.query.api.QueryableModule
-import io.paritytech.polkadotapp.chains.storage.source.query.api.constantOrNull
+import io.paritytech.polkadotapp.chains.multiNetwork.getRuntime
 import io.paritytech.polkadotapp.chains.util.Modules
-import io.paritytech.polkadotapp.chains.util.WithRuntime
+import io.paritytech.polkadotapp.chains.util.constantOrNull
+import io.paritytech.polkadotapp.chains.util.decoded
+import io.paritytech.polkadotapp.chains.util.signing.MessageSigningContext
+import io.paritytech.polkadotapp.chains.util.signing.PrefixedSigningContext
 import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.AccountSigningContexts
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 
 interface AccountSigningContextRepository {
@@ -26,24 +26,18 @@ class RealAccountSigningContextRepository @Inject constructor(
     private val knownChains: KnownChains
 ) : AccountSigningContextRepository {
     override suspend fun getContexts(): Result<AccountSigningContexts> = runCancellableCatching {
-        coroutineScope {
-            val peopleLite = async { signingContext(knownChains.people, Modules.PEOPLE_LITE) }
-            val dotNsGateway = async { signingContext(knownChains.assetHub, Modules.DOTNS_GATEWAY) }
-
-            AccountSigningContexts(peopleLite = peopleLite.await(), dotNsGateway = dotNsGateway.await())
-        }
+        AccountSigningContexts(
+            peopleLite = signingContext(knownChains.people, Modules.PEOPLE_LITE),
+            dotNsGateway = signingContext(knownChains.assetHub, Modules.DOTNS_GATEWAY)
+        )
     }
 
-    private suspend fun signingContext(chainId: ChainId, palletName: String): DataByteArray? {
-        return chainRegistry.withRuntime(chainId) {
-            runtime.metadata.moduleOrNull(palletName)?.let(::VerifyingPallet)?.signingContext
-        }
+    private suspend fun signingContext(chainId: ChainId, palletName: String): MessageSigningContext {
+        val runtime = chainRegistry.getRuntime(chainId)
+        val prefix = runtime.metadata.moduleOrNull(palletName)
+            ?.constantOrNull("SigningContext")
+            ?.let { Scale.decode<DataByteArray>(it.decoded(runtime)) }
+
+        return prefix?.let { PrefixedSigningContext(it.value) } ?: MessageSigningContext.trustedContent()
     }
 }
-
-@JvmInline
-private value class VerifyingPallet(override val module: Module) : QueryableModule
-
-context(withRuntime: WithRuntime)
-private val VerifyingPallet.signingContext: DataByteArray?
-    get() = constantOrNull("SigningContext")

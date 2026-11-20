@@ -7,7 +7,6 @@ import io.paritytech.polkadotapp.chains.util.signing.MessageSigningContext
 import io.paritytech.polkadotapp.common.domain.model.AccountEcdhKey
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
-import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.domain.model.hexToDataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
@@ -84,7 +83,7 @@ class RealCreateClaimParamsUseCase @Inject constructor(
         attester: String,
         reservedUsername: String,
         signedAt: Long,
-        signingContext: DataByteArray?
+        signingContext: MessageSigningContext
     ): Result<ByteArray> {
         val payload = dotNsGatewayRepository.reservationSigningPayload(
             candidate = getAccountId(),
@@ -95,7 +94,7 @@ class RealCreateClaimParamsUseCase @Inject constructor(
             signedAt = signedAt
         )
 
-        return bytesSigner.signRawBytesByWallet(payload, usernamesChainProvider.chainId, prefixedWith(signingContext))
+        return bytesSigner.signRawBytesByWallet(payload, usernamesChainProvider.chainId, signingContext)
             .map { it.signature }
     }
 
@@ -134,7 +133,7 @@ class RealCreateClaimParamsUseCase @Inject constructor(
         username: Username,
         attester: String,
         reservedUsername: String,
-        signingContext: DataByteArray?
+        signingContext: MessageSigningContext
     ): Result<ByteArray> {
         val publicKey = getPublicKey()
         val chatPublicKey = getChatPublicKey()
@@ -147,22 +146,18 @@ class RealCreateClaimParamsUseCase @Inject constructor(
             reservedUsername = reservedUsername.encodeToByteArray()
         ).scaleEncodeBinary()
 
-        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, prefixedWith(signingContext))
+        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, signingContext)
             .map { it.signature }
     }
 
-    private suspend fun getCandidateSignature(signingContext: DataByteArray?): Result<ByteArray> {
+    private suspend fun getCandidateSignature(signingContext: MessageSigningContext): Result<ByteArray> {
         val data = getLitePersonSignatureData()
-        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, prefixedWith(signingContext))
+        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, signingContext)
             .map { it.signature }
     }
 
     private suspend fun getLitePersonSignatureData() =
         MESSAGE_PREFIX.encodeToByteArray() + getPublicKey() + getMemberKeyBytes()
-
-    private fun prefixedWith(signingContext: DataByteArray?) = MessageSigningContext { message ->
-        signingContext?.value?.plus(message) ?: message
-    }
 }
 
 @Serializable
