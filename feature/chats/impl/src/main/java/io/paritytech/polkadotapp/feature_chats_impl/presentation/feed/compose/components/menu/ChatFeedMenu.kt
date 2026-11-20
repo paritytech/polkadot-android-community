@@ -19,6 +19,7 @@ fun ChatFeedMenu(
     onLeaveChatConfirm: () -> Unit,
     onBlockUserRequest: () -> Unit,
     onBlockUserConfirm: () -> Unit,
+    onDeclineChatRequestConfirm: () -> Unit,
     onCancelChatRequestConfirm: () -> Unit
 ) {
     NovaModalBottomSheet(
@@ -54,6 +55,14 @@ fun ChatFeedMenu(
                             type = it,
                             onConfirm = onBlockUserConfirm,
                             onCancel = onDismiss
+                        )
+                    }
+
+                    is ChatMenuType.DeclineRequestConfirmation -> {
+                        DeclineRequestConfirmationContent(
+                            type = it,
+                            onConfirm = onDeclineChatRequestConfirm,
+                            onKeep = onDismiss
                         )
                     }
 

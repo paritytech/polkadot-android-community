@@ -554,6 +554,15 @@ class ChatFeedViewModel @Inject constructor(
     }
 
     override fun onDeclineChatRequest() = launchUnit {
+        val username = chatDisplay.awaitLoaded().username
+        menuState.update { it.copy(isVisible = true, type = ChatMenuType.DeclineRequestConfirmation(username)) }
+    }
+
+    override fun onDeclineChatRequestConfirm() = launchUnit {
+        val menu = menuState.value
+        if (!menu.isVisible || menu.type !is ChatMenuType.DeclineRequestConfirmation) return@launchUnit
+        onCloseMenu()
+
         val contactAccountId = chatId.contactOrNull()?.contactAccountId ?: return@launchUnit
 
         chatRequestAnswerProgress.value = ChatRequestAnswerProgress.Declining

@@ -135,6 +135,7 @@ fun ChatFeedScreen(contract: ChatFeedContract) {
         onLeaveChatConfirm = contract::onLeaveChatConfirm,
         onBlockUserRequest = contract::onBlockUserRequest,
         onBlockUserConfirm = contract::onBlockUserConfirm,
+        onDeclineChatRequestConfirm = contract::onDeclineChatRequestConfirm,
         onCancelChatRequestConfirm = contract::onCancelChatRequestConfirm
     )
 

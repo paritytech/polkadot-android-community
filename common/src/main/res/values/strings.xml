@@ -559,6 +559,9 @@
     <string name="chat_request_pending">Pending</string>
     <string name="chat_request_welcome_message_hint">Add a welcome message (optional)</string>
     <string name="chat_request_decline_dialog_title">Decline message request?</string>
+    <string name="chat_request_decline_title">Decline chat request?</string>
+    <string name="chat_request_decline_message">%1$s will not be notified. The chat will be removed.</string>
+    <string name="chat_request_decline_keep">Keep request</string>
     <string name="chat_request_you_approved">You approved the request</string>
     <string name="chat_request_accept_title">Accept chat request from %s</string>
     <string name="chat_request_wait_accept_title">Wait for %s to accept your message request.</string>
