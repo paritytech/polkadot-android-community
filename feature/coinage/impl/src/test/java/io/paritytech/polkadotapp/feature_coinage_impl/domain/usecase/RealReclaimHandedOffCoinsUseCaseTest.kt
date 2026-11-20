@@ -37,6 +37,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -69,7 +70,7 @@ class RealReclaimHandedOffCoinsUseCaseTest {
         coEvery { transactionService.scheduleTransactions(capture(scheduled), any()) } returns
             Result.success(listOf(CoinageTransactionId(1)))
 
-        val result = useCase.reclaim(listOf(waiting.accountId), GROUP)
+        val result = useCase.reclaim(listOf(waiting.accountId), GROUP, HANDED_OFF_AT)
 
         assertTrue(result.isSuccess)
         verify(exactly = 1) { transaction.reclaimCoin(waiting) }
@@ -85,7 +86,7 @@ class RealReclaimHandedOffCoinsUseCaseTest {
     fun `reclaim fails with nothing to reclaim and schedules nothing when no coin is left`() = runTest {
         givenCoins(TrackedCoin(coin(1, onChain = false), handedOff(consumer = null)))
 
-        val result = useCase.reclaim(listOf(coin(1, onChain = false).accountId), GROUP)
+        val result = useCase.reclaim(listOf(coin(1, onChain = false).accountId), GROUP, HANDED_OFF_AT)
 
         assertEquals(ReclaimHandedOffCoinsError.NothingToReclaim, result.exceptionOrNull())
         coVerify(exactly = 0) { transactionService.scheduleTransactions(any(), any()) }
@@ -146,5 +147,6 @@ class RealReclaimHandedOffCoinsUseCaseTest {
     private companion object {
         val GROUP = CoinageOperationGroupId("chat-reclaim:message-1")
         val NOW = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+        val HANDED_OFF_AT = NOW - 7.hours
     }
 }

@@ -115,28 +115,24 @@ internal fun PaymentStatusIndicator(
                 color = PolkadotTheme.colors.fg.warning
             }
 
-            ChatMessageUiModel.CoinagePayment.Status.Unclaimed -> {
-                icon = null
-                text = stringResource(RCommon.string.chat_payment_status_unclaimed)
-                color = PolkadotTheme.colors.fg.warning
-            }
-
             ChatMessageUiModel.CoinagePayment.Status.Reclaiming -> {
                 icon = NovaIcons.Retry
                 text = stringResource(RCommon.string.chat_payment_status_reclaiming)
                 color = baseStatusColor
             }
 
-            is ChatMessageUiModel.CoinagePayment.Status.Reclaimed -> {
+            ChatMessageUiModel.CoinagePayment.Status.Reclaimed -> {
                 icon = null
-                text = if (status.reclaimed.amount.compareTo(amount.amount) == 0) {
-                    stringResource(RCommon.string.chat_payment_status_reclaimed)
-                } else {
-                    stringResource(
-                        RCommon.string.chat_payment_status_reclaimed_partially,
-                        formatter.formatTokenAmount(status.reclaimed, RoundPrecision.DEFAULT)
-                    )
-                }
+                text = stringResource(RCommon.string.chat_payment_status_reclaimed)
+                color = baseStatusColor
+            }
+
+            is ChatMessageUiModel.CoinagePayment.Status.PartiallyReclaimed -> {
+                icon = null
+                text = stringResource(
+                    RCommon.string.chat_payment_status_reclaimed_partially,
+                    formatter.formatTokenAmount(status.reclaimed, RoundPrecision.DEFAULT)
+                )
                 color = baseStatusColor
             }
 
@@ -148,7 +144,13 @@ internal fun PaymentStatusIndicator(
 
             ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired -> {
                 icon = null
-                text = stringResource(RCommon.string.chat_payment_status_claim_window_expired)
+                text = stringResource(
+                    if (isIncoming) {
+                        RCommon.string.chat_payment_status_claim_window_expired_recipient
+                    } else {
+                        RCommon.string.chat_payment_status_claim_window_expired_sender
+                    }
+                )
                 color = PolkadotTheme.colors.fg.warning
             }
         }

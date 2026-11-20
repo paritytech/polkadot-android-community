@@ -77,21 +77,12 @@ sealed interface ChatMessageUiModel {
                     is Transferred,
                     is FailedDetection,
                     is FailedTransfer,
-                    is Unclaimed,
                     is Reclaiming,
                     is Reclaimed,
+                    is PartiallyReclaimed,
                     is ReclaimFailed,
                     is ClaimWindowExpired -> false
                 }
-
-            val canReclaim: Boolean
-                get() = this is Unclaimed || this is ReclaimFailed
-
-            val isAmountStruckThrough: Boolean
-                get() = this is Reclaimed || this is ClaimWindowExpired
-
-            val isBubbleDimmed: Boolean
-                get() = this is Reclaimed
 
             data object Detecting : Status
             data class Detected(val detected: TokenAmountModel) : Status
@@ -99,9 +90,9 @@ sealed interface ChatMessageUiModel {
             data class Transferred(val transferred: TokenAmountModel) : Status
             data object FailedDetection : Status
             data object FailedTransfer : Status
-            data object Unclaimed : Status
             data object Reclaiming : Status
-            data class Reclaimed(val reclaimed: TokenAmountModel) : Status
+            data object Reclaimed : Status
+            data class PartiallyReclaimed(val reclaimed: TokenAmountModel) : Status
             data object ReclaimFailed : Status
             data object ClaimWindowExpired : Status
         }

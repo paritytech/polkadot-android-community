@@ -23,9 +23,9 @@ class ChatMessageMappingHelper @Inject constructor(
     }
 
     suspend fun mapPaymentStatus(
-        status: ChatMessage.Content.CoinagePayment.Status
+        payment: ChatMessage.Content.CoinagePayment
     ): ChatMessageUiModel.CoinagePayment.Status {
-        return when (status) {
+        return when (val status = payment.status) {
             is ChatMessage.Content.CoinagePayment.Status.Detecting -> ChatMessageUiModel.CoinagePayment.Status.Detecting
             is ChatMessage.Content.CoinagePayment.Status.Detected ->
                 ChatMessageUiModel.CoinagePayment.Status.Detected(dollarAssetProvider.extractAmount(status.amount))
@@ -37,11 +37,13 @@ class ChatMessageMappingHelper @Inject constructor(
                 ChatMessageUiModel.CoinagePayment.Status.Transferred(dollarAssetProvider.extractAmount(status.amount))
             is ChatMessage.Content.CoinagePayment.Status.FailedDetection -> ChatMessageUiModel.CoinagePayment.Status.FailedDetection
             is ChatMessage.Content.CoinagePayment.Status.FailedTransfer -> ChatMessageUiModel.CoinagePayment.Status.FailedTransfer
-            is ChatMessage.Content.CoinagePayment.Status.Unclaimed -> ChatMessageUiModel.CoinagePayment.Status.Unclaimed
             is ChatMessage.Content.CoinagePayment.Status.Reclaiming -> ChatMessageUiModel.CoinagePayment.Status.Reclaiming
 
-            is ChatMessage.Content.CoinagePayment.Status.Reclaimed ->
-                ChatMessageUiModel.CoinagePayment.Status.Reclaimed(dollarAssetProvider.extractAmount(status.amount))
+            is ChatMessage.Content.CoinagePayment.Status.Reclaimed -> if (status.amount == payment.totalValue) {
+                ChatMessageUiModel.CoinagePayment.Status.Reclaimed
+            } else {
+                ChatMessageUiModel.CoinagePayment.Status.PartiallyReclaimed(dollarAssetProvider.extractAmount(status.amount))
+            }
             is ChatMessage.Content.CoinagePayment.Status.ReclaimFailed -> ChatMessageUiModel.CoinagePayment.Status.ReclaimFailed
             is ChatMessage.Content.CoinagePayment.Status.ClaimWindowExpired -> ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired
         }

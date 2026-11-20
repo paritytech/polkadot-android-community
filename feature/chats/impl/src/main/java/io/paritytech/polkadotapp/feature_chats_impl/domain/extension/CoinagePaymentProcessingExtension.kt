@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.common.formatCoinsTo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinPrivateKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageTransferDetection
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoinsClaimWindow
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.ClaimReceivedCoinsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
@@ -224,7 +225,7 @@ class CoinagePaymentProcessingExtension @Inject constructor(
     }
 
     private fun claimWindowClosesAt(message: ChatMessage): Instant =
-        Instant.fromEpochMilliseconds(message.timestamp) + CoinagePayment.CLAIM_WINDOW
+        HandedOffCoinsClaimWindow.closesAt(Instant.fromEpochMilliseconds(message.timestamp))
 
     /**
      * Whether anything about this payment could still change.
@@ -266,7 +267,7 @@ class CoinagePaymentProcessingExtension @Inject constructor(
 
             awaiting.any { it.accountId in failedReclaims } -> Status.ReclaimFailed
 
-            claimWindowClosed && awaiting.isNotEmpty() -> Status.Unclaimed
+            claimWindowClosed && awaiting.isNotEmpty() -> Status.ClaimWindowExpired
 
             reclaimed.isNotEmpty() -> Status.Reclaimed(valueOf(reclaimed))
 

@@ -25,10 +25,16 @@ fun ChatRequestError.toPresentationError(): PresentationThrowable = when (this) 
 }
 
 fun ReclaimHandedOffCoinsError.toPresentationError(): PresentationThrowable = when (this) {
+    ReclaimHandedOffCoinsError.ClaimWindowOpen -> ClaimWindowOpenPresentationError(this)
+
     ReclaimHandedOffCoinsError.NothingToReclaim -> NothingToReclaimPresentationError(this)
 
     is ReclaimHandedOffCoinsError.Unknown -> UnexpectedPresentationError(this)
 }
+
+class ClaimWindowOpenPresentationError(cause: Throwable) :
+    PresentationThrowable(cause),
+    PresentationError by StringResPresentationError(RCommon.string.chat_payment_reclaim_error_claim_window_open)
 
 class NothingToReclaimPresentationError(cause: Throwable) :
     PresentationThrowable(cause),

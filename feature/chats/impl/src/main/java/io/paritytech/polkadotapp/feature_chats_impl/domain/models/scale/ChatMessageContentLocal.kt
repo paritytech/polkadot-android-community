@@ -187,7 +187,7 @@ sealed interface CoinagePaymentStatusLocal {
 
     @Serializable
     @EnumIndex(6)
-    object Unclaimed : CoinagePaymentStatusLocal
+    object ClaimWindowExpired : CoinagePaymentStatusLocal
 
     @Serializable
     @EnumIndex(7)
@@ -200,10 +200,6 @@ sealed interface CoinagePaymentStatusLocal {
     @Serializable
     @EnumIndex(9)
     object ReclaimFailed : CoinagePaymentStatusLocal
-
-    @Serializable
-    @EnumIndex(10)
-    object ClaimWindowExpired : CoinagePaymentStatusLocal
 }
 
 @JvmInline

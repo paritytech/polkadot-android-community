@@ -95,12 +95,15 @@ fun PaymentMessage(
 private fun paymentSurfaceStyle(message: ChatMessageUiModel.CoinagePayment): ChatMessageSurfaceStyle {
     val default = ChatMessageSurfaceStyle.default(message.direction)
 
-    return if (message.paymentStatus.isBubbleDimmed) {
+    return if (message.paymentStatus.isReclaimed()) {
         default.copy(alpha = DIMMED_BUBBLE_ALPHA)
     } else {
         default
     }
 }
+
+private fun ChatMessageUiModel.CoinagePayment.Status.isReclaimed() =
+    this is ChatMessageUiModel.CoinagePayment.Status.Reclaimed || this is ChatMessageUiModel.CoinagePayment.Status.PartiallyReclaimed
 
 @Composable
 private fun PaymentMessageContent(
@@ -164,7 +167,8 @@ private fun PaymentMessageContent(
                 PaymentAmounts(
                     amount = message.amount,
                     differingAmount = differingAmount,
-                    struckThrough = message.paymentStatus.isAmountStruckThrough,
+                    struckThrough = message.paymentStatus.isReclaimed() ||
+                        isIncoming && message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired,
                     maxWidthPx = amountMaxWidthPx,
                     primaryTextColor = primaryTextColor,
                     secondaryTextColor = secondaryTextColor
@@ -182,7 +186,10 @@ private fun PaymentMessageContent(
             differingAmount = differingAmount
         )
 
-        if (!isIncoming && message.paymentStatus.canReclaim) {
+        val canReclaim = message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired ||
+            message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ReclaimFailed
+
+        if (!isIncoming && canReclaim) {
             VerticalSpacer { small }
 
             PolkadotTextButton(
@@ -294,24 +301,22 @@ private fun MessagesPreview(direction: ChatMessageUiModel.Direction) {
                     paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Detected(TokenAmountModel.mock),
                     deliveryStatus = ChatMessageUiModel.Status.FAILED,
                 )
-                if (direction == ChatMessageUiModel.Direction.INCOMING) {
-                    PaymentMessagePreview(
-                        direction = direction,
-                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired,
-                    )
-                }
+                PaymentMessagePreview(
+                    direction = direction,
+                    paymentStatus = ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired,
+                )
                 if (direction == ChatMessageUiModel.Direction.OUTGOING) {
-                    PaymentMessagePreview(
-                        direction = direction,
-                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Unclaimed,
-                    )
                     PaymentMessagePreview(
                         direction = direction,
                         paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Reclaiming,
                     )
                     PaymentMessagePreview(
                         direction = direction,
-                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Reclaimed(TokenAmountModel.mock),
+                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.Reclaimed,
+                    )
+                    PaymentMessagePreview(
+                        direction = direction,
+                        paymentStatus = ChatMessageUiModel.CoinagePayment.Status.PartiallyReclaimed(TokenAmountModel.mock),
                     )
                     PaymentMessagePreview(
                         direction = direction,

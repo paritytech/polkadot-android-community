@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.flattenResult
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoinsClaimWindow
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.plusHop
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.transferHop
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.CoinageTransactionService
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 private val RECLAIM_RETRY_WINDOW = 5.minutes
 
@@ -43,7 +45,15 @@ class RealReclaimHandedOffCoinsUseCase @Inject constructor(
     private val coinageTransactionFactory: CoinageTransaction.Factory,
     private val timeProvider: TimeProvider,
 ) : ReclaimHandedOffCoinsUseCase {
-    override suspend fun reclaim(coins: List<AccountId>, groupId: CoinageOperationGroupId): Result<Unit> {
+    override suspend fun reclaim(
+        coins: List<AccountId>,
+        groupId: CoinageOperationGroupId,
+        handedOffAt: Instant,
+    ): Result<Unit> {
+        if (timeProvider.now() < HandedOffCoinsClaimWindow.closesAt(handedOffAt)) {
+            return Result.failure(ReclaimHandedOffCoinsError.ClaimWindowOpen)
+        }
+
         val reclaimable = coinageAssetsUseCase.subscribeCoinsBy(coins).first()
             .filter { it.isReclaimable() }
             .map { it.coin }

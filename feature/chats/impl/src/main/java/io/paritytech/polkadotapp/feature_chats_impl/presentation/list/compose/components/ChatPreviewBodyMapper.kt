@@ -90,7 +90,7 @@ private fun LastMessageUiModel.toPreviewBody(username: String): ChatPreviewBody 
 
         is LastMessageUiModel.Payment -> {
             val value = LocalTokenAmountFormatter.current.formatTokenAmount(
-                tokenAmount = (paymentStatus as? ChatMessageUiModel.CoinagePayment.Status.Reclaimed)?.reclaimed ?: tokenAmount,
+                tokenAmount = tokenAmount,
                 precision = RoundPrecision.DEFAULT
             )
             val text = when {
@@ -106,7 +106,8 @@ private fun LastMessageUiModel.toPreviewBody(username: String): ChatPreviewBody 
                     stringResource(incomingRes, username, value)
                 }
 
-                paymentStatus is ChatMessageUiModel.CoinagePayment.Status.Reclaimed ->
+                paymentStatus is ChatMessageUiModel.CoinagePayment.Status.Reclaimed ||
+                    paymentStatus is ChatMessageUiModel.CoinagePayment.Status.PartiallyReclaimed ->
                     stringResource(R.string.chat_last_message_payment_reclaimed, value)
 
                 else -> stringResource(R.string.chat_last_message_payment_outgoing, value)

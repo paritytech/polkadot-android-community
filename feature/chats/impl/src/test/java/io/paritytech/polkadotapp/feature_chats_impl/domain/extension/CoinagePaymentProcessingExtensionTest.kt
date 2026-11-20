@@ -538,11 +538,11 @@ class CoinagePaymentProcessingExtensionTest {
         val message = outgoingPayment()
         startWork(message, scheduler = testScheduler)
 
-        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.Unclaimed)) }
+        coVerify(exactly = 0) { context.modifyMessage(any(), any(), paymentWith(CoinagePayment.Status.ClaimWindowExpired)) }
 
         advanceTimeBy(2.minutes)
 
-        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Unclaimed)) }
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ClaimWindowExpired)) }
     }
 
     @Test
@@ -553,7 +553,7 @@ class CoinagePaymentProcessingExtensionTest {
         val message = outgoingPayment()
         startWork(message)
 
-        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.Unclaimed)) }
+        coVerify { context.modifyMessage(message.chatId, message.id, paymentWith(CoinagePayment.Status.ClaimWindowExpired)) }
         coVerify(exactly = 0) { context.markMessageProcessed(any(), any()) }
     }
 

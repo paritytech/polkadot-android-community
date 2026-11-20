@@ -79,10 +79,9 @@ class ChatMessageContentLocalEncodingTest {
             (BinaryScale.decodeFromByteArray<ChatMessageContentLocal>((payment + encodedStatus).fromHex()) as ChatMessageContentLocal.CoinagePayment)
                 .status
 
-        assertTrue(statusOf("06") is CoinagePaymentStatusLocal.Unclaimed)
+        assertTrue(statusOf("06") is CoinagePaymentStatusLocal.ClaimWindowExpired)
         assertTrue(statusOf("07") is CoinagePaymentStatusLocal.Reclaiming)
         assertTrue(statusOf("09") is CoinagePaymentStatusLocal.ReclaimFailed)
-        assertTrue(statusOf("0a") is CoinagePaymentStatusLocal.ClaimWindowExpired)
 
         val reclaimed = statusOf("08070088526a74")
         assertTrue(reclaimed is CoinagePaymentStatusLocal.Reclaimed)

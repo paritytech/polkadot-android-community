@@ -81,6 +81,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.flowOf as flowOfValue
 
 private val MAX_ATTACHMENT_SIZE = 128.megabytes
@@ -396,12 +398,20 @@ class ChatFeedInteractor @Inject internal constructor(
         return chatEngine.getEditHistory(chatId, messageId)
     }
 
+    @OptIn(ExperimentalTime::class)
     suspend fun reclaimPayment(chatId: ChatId, messageId: ChatMessageId): Result<Unit> {
         return withContext(coroutineDispatchers.io) {
-            val payment = chatEngine.getMessageById(chatId, messageId)?.paymentContentOrNull()
-                ?: return@withContext Result.failure(IllegalStateException("No payment message $messageId to reclaim"))
+            val message = chatEngine.getMessageById(chatId, messageId)
+            val payment = message?.paymentContentOrNull()
+            if (message == null || payment == null) {
+                return@withContext Result.failure(IllegalStateException("No payment message $messageId to reclaim"))
+            }
 
-            reclaimHandedOffCoinsUseCase.reclaim(payment.toUsableCoinKeys().map { it.accountId }, reclaimGroupOf(messageId))
+            reclaimHandedOffCoinsUseCase.reclaim(
+                coins = payment.toUsableCoinKeys().map { it.accountId },
+                groupId = reclaimGroupOf(messageId),
+                handedOffAt = Instant.fromEpochMilliseconds(message.timestamp),
+            )
         }
     }
 

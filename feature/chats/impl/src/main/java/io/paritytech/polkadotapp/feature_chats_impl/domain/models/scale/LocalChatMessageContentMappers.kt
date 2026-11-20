@@ -212,7 +212,6 @@ private fun CoinagePaymentStatusLocal.toDomain(): ChatMessage.Content.CoinagePay
     is CoinagePaymentStatusLocal.Transferred -> ChatMessage.Content.CoinagePayment.Status.Transferred(transferred)
     is CoinagePaymentStatusLocal.FailedDetection -> ChatMessage.Content.CoinagePayment.Status.FailedDetection
     is CoinagePaymentStatusLocal.FailedTransfer -> ChatMessage.Content.CoinagePayment.Status.FailedTransfer
-    is CoinagePaymentStatusLocal.Unclaimed -> ChatMessage.Content.CoinagePayment.Status.Unclaimed
     is CoinagePaymentStatusLocal.Reclaiming -> ChatMessage.Content.CoinagePayment.Status.Reclaiming
     is CoinagePaymentStatusLocal.Reclaimed -> ChatMessage.Content.CoinagePayment.Status.Reclaimed(reclaimed)
     is CoinagePaymentStatusLocal.ReclaimFailed -> ChatMessage.Content.CoinagePayment.Status.ReclaimFailed
@@ -240,7 +239,6 @@ private fun ChatMessage.Content.CoinagePayment.Status.toLocal(): CoinagePaymentS
     is ChatMessage.Content.CoinagePayment.Status.Transferred -> CoinagePaymentStatusLocal.Transferred(amount)
     is ChatMessage.Content.CoinagePayment.Status.FailedDetection -> CoinagePaymentStatusLocal.FailedDetection
     is ChatMessage.Content.CoinagePayment.Status.FailedTransfer -> CoinagePaymentStatusLocal.FailedTransfer
-    is ChatMessage.Content.CoinagePayment.Status.Unclaimed -> CoinagePaymentStatusLocal.Unclaimed
     is ChatMessage.Content.CoinagePayment.Status.Reclaiming -> CoinagePaymentStatusLocal.Reclaiming
     is ChatMessage.Content.CoinagePayment.Status.Reclaimed -> CoinagePaymentStatusLocal.Reclaimed(amount)
     is ChatMessage.Content.CoinagePayment.Status.ReclaimFailed -> CoinagePaymentStatusLocal.ReclaimFailed
