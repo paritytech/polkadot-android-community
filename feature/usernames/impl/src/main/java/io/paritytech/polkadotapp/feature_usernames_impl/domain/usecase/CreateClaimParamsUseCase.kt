@@ -7,10 +7,12 @@ import io.paritytech.polkadotapp.chains.util.signing.MessageSigningContext
 import io.paritytech.polkadotapp.common.domain.model.AccountEcdhKey
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
+import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.common.domain.model.EncodedPublicKey
 import io.paritytech.polkadotapp.common.domain.model.hexToDataByteArray
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.combineResults
+import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.common.utils.scale.AccountEcdhKeyScaleSerializer
 import io.paritytech.polkadotapp.common.utils.scale.encodeOnChain
 import io.paritytech.polkadotapp.common.utils.scale.toScale
@@ -23,6 +25,7 @@ import io.paritytech.polkadotapp.feature_account_api.domain.usecase.SharedSecret
 import io.paritytech.polkadotapp.feature_dotns_gateway_api.data.repository.DotNsGatewayRepository
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.Username
 import io.paritytech.polkadotapp.feature_usernames_api.domain.model.encoded
+import io.paritytech.polkadotapp.feature_usernames_impl.data.signing.AccountSigningContextRepository
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.UsernamesChainProvider
 import io.paritytech.polkadotapp.feature_usernames_impl.domain.model.ClaimUsernameParams
 import kotlinx.serialization.Serializable
@@ -39,7 +42,8 @@ class RealCreateClaimParamsUseCase @Inject constructor(
     private val sharedSecretDerivationUseCase: SharedSecretDerivationUseCase,
     private val bandersnatchSecretsStorage: BandersnatchSecretsStorage,
     private val currentTimeContext: CurrentTimeContext,
-    private val dotNsGatewayRepository: DotNsGatewayRepository
+    private val dotNsGatewayRepository: DotNsGatewayRepository,
+    private val accountSigningContextRepository: AccountSigningContextRepository
 ) : CreateClaimParamsUseCase {
     companion object {
         private const val MESSAGE_PREFIX = "pop:people-lite:register using"
@@ -47,28 +51,31 @@ class RealCreateClaimParamsUseCase @Inject constructor(
 
     override suspend fun invoke(username: Username, attester: String, preferredDigits: String): Result<ClaimUsernameParams> {
         val reservedUsername = username.base
-        val signedAt = currentTimeContext.currentTime().epochSeconds
 
-        return combineResults(
-            getCandidateSignature(),
-            getResourcesSignature(username, attester, reservedUsername),
-            getMembershipSignature(),
-            getDotNsSignature(username, attester, reservedUsername, signedAt),
-            ::ClaimSignatures
-        ).mapCatching { signatures ->
-            ClaimUsernameParams(
-                username = username.getDisplayUsername(),
-                preferredDigits = preferredDigits,
-                ringVrfKey = getMemberKeyBytes(),
-                candidateAddress = getUserAddress(),
-                candidateSignature = signatures.candidate,
-                consumerSignature = signatures.consumer,
-                membershipSignature = signatures.membership,
-                identifierKey = getChatPublicKey(),
-                dotNsSignature = signatures.dotNs,
-                dotNsSignedAt = signedAt,
-                dotNsReservedUsername = reservedUsername
-            )
+        return accountSigningContextRepository.getContexts().flatMap { contexts ->
+            val signedAt = currentTimeContext.currentTime().epochSeconds
+
+            combineResults(
+                getCandidateSignature(contexts.peopleLite),
+                getResourcesSignature(username, attester, reservedUsername, contexts.peopleLite),
+                getMembershipSignature(),
+                getDotNsSignature(username, attester, reservedUsername, signedAt, contexts.dotNsGateway),
+                ::ClaimSignatures
+            ).mapCatching { signatures ->
+                ClaimUsernameParams(
+                    username = username.getDisplayUsername(),
+                    preferredDigits = preferredDigits,
+                    ringVrfKey = getMemberKeyBytes(),
+                    candidateAddress = getUserAddress(),
+                    candidateSignature = signatures.candidate,
+                    consumerSignature = signatures.consumer,
+                    membershipSignature = signatures.membership,
+                    identifierKey = getChatPublicKey(),
+                    dotNsSignature = signatures.dotNs,
+                    dotNsSignedAt = signedAt,
+                    dotNsReservedUsername = reservedUsername
+                )
+            }
         }
     }
 
@@ -76,7 +83,8 @@ class RealCreateClaimParamsUseCase @Inject constructor(
         username: Username,
         attester: String,
         reservedUsername: String,
-        signedAt: Long
+        signedAt: Long,
+        signingContext: DataByteArray?
     ): Result<ByteArray> {
         val payload = dotNsGatewayRepository.reservationSigningPayload(
             candidate = getAccountId(),
@@ -87,7 +95,7 @@ class RealCreateClaimParamsUseCase @Inject constructor(
             signedAt = signedAt
         )
 
-        return bytesSigner.signRawBytesByWallet(payload, usernamesChainProvider.chainId, MessageSigningContext.trustedContent())
+        return bytesSigner.signRawBytesByWallet(payload, usernamesChainProvider.chainId, prefixedWith(signingContext))
             .map { it.signature }
     }
 
@@ -125,7 +133,8 @@ class RealCreateClaimParamsUseCase @Inject constructor(
     private suspend fun getResourcesSignature(
         username: Username,
         attester: String,
-        reservedUsername: String
+        reservedUsername: String,
+        signingContext: DataByteArray?
     ): Result<ByteArray> {
         val publicKey = getPublicKey()
         val chatPublicKey = getChatPublicKey()
@@ -138,18 +147,22 @@ class RealCreateClaimParamsUseCase @Inject constructor(
             reservedUsername = reservedUsername.encodeToByteArray()
         ).scaleEncodeBinary()
 
-        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, MessageSigningContext.trustedContent())
+        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, prefixedWith(signingContext))
             .map { it.signature }
     }
 
-    private suspend fun getCandidateSignature(): Result<ByteArray> {
+    private suspend fun getCandidateSignature(signingContext: DataByteArray?): Result<ByteArray> {
         val data = getLitePersonSignatureData()
-        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, MessageSigningContext.trustedContent())
+        return bytesSigner.signRawBytesByWallet(data, usernamesChainProvider.chainId, prefixedWith(signingContext))
             .map { it.signature }
     }
 
     private suspend fun getLitePersonSignatureData() =
         MESSAGE_PREFIX.encodeToByteArray() + getPublicKey() + getMemberKeyBytes()
+
+    private fun prefixedWith(signingContext: DataByteArray?) = MessageSigningContext { message ->
+        signingContext?.value?.plus(message) ?: message
+    }
 }
 
 @Serializable

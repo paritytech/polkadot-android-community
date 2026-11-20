@@ -27,6 +27,8 @@ import io.paritytech.polkadotapp.feature_usernames_api.presentation.address.User
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.RealUsernameRepository
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.UsernameRepository
 import io.paritytech.polkadotapp.feature_usernames_impl.data.claim.network.api.UsernameApi
+import io.paritytech.polkadotapp.feature_usernames_impl.data.signing.AccountSigningContextRepository
+import io.paritytech.polkadotapp.feature_usernames_impl.data.signing.RealAccountSigningContextRepository
 import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.QueuedClaimStorage
 import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.fullUsernameStorage
 import io.paritytech.polkadotapp.feature_usernames_impl.data.storage.queuedClaimStorage
@@ -135,6 +137,9 @@ interface UsernamesFeatureApiModule {
 
     @Binds
     fun bindUsernameClaimRepository(impl: RealUsernameRepository): UsernameRepository
+
+    @Binds
+    fun bindAccountSigningContextRepository(impl: RealAccountSigningContextRepository): AccountSigningContextRepository
 
     @Binds
     @Singleton
