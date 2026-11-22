@@ -18,6 +18,7 @@ import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningConte
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ParsedSigningContent
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.TransactionSignInteractor
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
+import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +34,7 @@ class TransactionSignViewModel @Inject constructor(
     private val interactor: TransactionSignInteractor,
     private val signingContextHolder: SigningContextHolder,
     private val signingContext: SigningContext,
+    private val biometricsService: BiometricsService,
 ) : BaseViewModel(), TransactionSignContract {
     private val signing = MutableStateFlow(false)
     private val showingDetails = MutableStateFlow(false)
@@ -73,7 +75,8 @@ class TransactionSignViewModel @Inject constructor(
 
         Timber.d("Approve clicked for ${signingContext.requesterName}")
 
-        interactor.sign()
+        biometricsService.performOneTimeAuthentication()
+            .flatMap { interactor.sign() }
             .flatMap { signingContext.deliverSignedResult(it) }
             .onSuccess {
                 showMessage(RCommon.string.sign_transaction_signed)

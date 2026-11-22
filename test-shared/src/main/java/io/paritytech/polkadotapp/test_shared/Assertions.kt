@@ -4,10 +4,13 @@ import io.novasama.substrate_sdk_android.extensions.toHexString
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModelEvent
 import io.paritytech.polkadotapp.common.utils.hasTheSaveValueAs
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import java.math.BigDecimal
 import kotlin.time.Duration.Companion.seconds
@@ -67,3 +70,13 @@ fun assertFailure(result: Result<*>) {
 inline fun <reified E : Throwable> assertFailureOf(result: Result<*>) {
     assertTrue("Expected a ${E::class.simpleName}, got ${result.exceptionOrNull()}", result.exceptionOrNull() is E)
 }
+
+suspend fun assertNeverCompletes(message: String, block: suspend () -> Any?) = coroutineScope {
+    val result = async { block() }
+    settle()
+    assertFalse(message, result.isCompleted)
+    result.cancel()
+}
+
+suspend fun assertNothingShown(viewModel: BaseViewModel) =
+    assertNeverCompletes("expected no message or error") { viewModel.events.first() }

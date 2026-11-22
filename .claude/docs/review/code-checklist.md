@@ -154,6 +154,12 @@ Walk this for every file the diff touches. Cite the rule's doc and section. Tag 
 
 ---
 
+## Device authentication (`architecture/device-auth.md`)
+
+- **major** — New confirm control for signing, payment, pairing or secret export runs its action without a `BiometricsService.performOneTimeAuthentication()` gate.
+
+---
+
 ## Git / PR hygiene (always minor)
 
 - **minor** — PR mixes 2+ unrelated tasks without a justification in the description.

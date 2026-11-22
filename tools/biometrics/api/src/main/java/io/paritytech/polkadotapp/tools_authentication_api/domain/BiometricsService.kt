@@ -7,5 +7,9 @@ interface BiometricsService {
      */
     suspend fun performSessionAuthentication(): Result<Unit>
 
+    /**
+     * Shows the prompt on every call, whatever happened before in the session.
+     * Fails at once with [AuthenticationCancelledException] while another prompt is live, and never throws.
+     */
     suspend fun performOneTimeAuthentication(): Result<Unit>
 }

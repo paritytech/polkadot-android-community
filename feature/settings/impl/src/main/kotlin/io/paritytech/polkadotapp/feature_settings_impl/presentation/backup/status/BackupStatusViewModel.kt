@@ -37,16 +37,18 @@ class BackupStatusViewModel @Inject constructor(
     }
 
     override fun onCreateBackup() = launchUnit {
-        state.value = BackupStatusUiState.BackupInProgress
+        interactor.performOneTimeAuthentication().onSuccess {
+            state.value = BackupStatusUiState.BackupInProgress
 
-        interactor.saveBackup()
-            .onSuccess {
-                state.value = BackupStatusUiState.BackupExists
-            }
-            .onFailure {
-                showPresentationError(UnexpectedPresentationError(it))
-                state.value = BackupStatusUiState.NoBackup
-            }
+            interactor.saveBackup()
+                .onSuccess {
+                    state.value = BackupStatusUiState.BackupExists
+                }
+                .onFailure {
+                    showPresentationError(UnexpectedPresentationError(it))
+                    state.value = BackupStatusUiState.NoBackup
+                }
+        }
     }
 
     override fun onAllowGoogleDrive() {

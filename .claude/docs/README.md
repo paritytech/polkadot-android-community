@@ -16,6 +16,7 @@ This tree is **lazy-loaded** by the `/architect`, `/implementer`, and `/reviewer
 │   ├── coinage.md
 │   ├── statement-store-communication.md
 │   ├── data-transport.md
+│   ├── device-auth.md
 │   └── maintainability.md
 ├── code/                ← concrete coding patterns and ✗/✓ examples
 │   ├── results-and-errors.md
@@ -48,6 +49,7 @@ This tree is **lazy-loaded** by the `/architect`, `/implementer`, and `/reviewer
 | Coins, denominations, transfer planner, RFC-0006 payments | `architecture/coinage.md` |
 | Statement-store messaging, CommunicationSession, SSO / chat rendezvous | `architecture/statement-store-communication.md` |
 | WebRTC, peer channels, DataTransport, calls/games P2P | `architecture/data-transport.md` |
+| Device authentication, confirmation gates on sign / pay / pair / backup controls | `architecture/device-auth.md` |
 | "Is this proposal clean?" / boundaries / SRP | `architecture/maintainability.md` |
 | Writing a ViewModel, derived flow, single-state pattern | `code/state-management.md` |
 | Using `Result<T>`, handling errors, logging failures | `code/results-and-errors.md` |

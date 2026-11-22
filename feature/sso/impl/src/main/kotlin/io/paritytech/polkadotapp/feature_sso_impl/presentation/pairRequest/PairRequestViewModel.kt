@@ -15,6 +15,7 @@ import io.paritytech.polkadotapp.feature_chain_resources_api.domain.slotAllocato
 import io.paritytech.polkadotapp.feature_sso_api.domain.model.HandshakeOffer
 import io.paritytech.polkadotapp.feature_sso_impl.SsoRouter
 import io.paritytech.polkadotapp.feature_sso_impl.domain.pairRequest.PairRequestInteractor
+import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,7 @@ class PairRequestViewModel @Inject constructor(
     private val interactor: PairRequestInteractor,
     private val appNotifier: AppNotifier,
     private val contextManager: ContextManager,
+    private val biometricsService: BiometricsService,
 ) : BaseViewModel(), PairRequestContract {
     private val payload: PairRequestPayload = savedStateHandle.getPayload()
     private val offer: HandshakeOffer = payload.toDomain()
@@ -54,18 +56,20 @@ class PairRequestViewModel @Inject constructor(
         if (phase.value !is Phase.Confirm) return
 
         launchWithDiagnostics(stalenessReport) {
-            phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
+            biometricsService.performOneTimeAuthentication().onSuccess {
+                phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
 
-            interactor.approveHandshake(offer).collect { progress ->
-                when (progress) {
-                    DeviceOnboardingProgress.Verifying -> phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
-                    DeviceOnboardingProgress.Registering -> phase.value = Phase.Connecting(ConnectingStep.REGISTERING)
-                    DeviceOnboardingProgress.Syncing -> phase.value = Phase.Connecting(ConnectingStep.SYNCING)
-                    DeviceOnboardingProgress.Done -> {
-                        appNotifier.success(contextManager.applicationContext.getString(RCommon.string.device_connected_notification))
-                        router.back()
+                interactor.approveHandshake(offer).collect { progress ->
+                    when (progress) {
+                        DeviceOnboardingProgress.Verifying -> phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
+                        DeviceOnboardingProgress.Registering -> phase.value = Phase.Connecting(ConnectingStep.REGISTERING)
+                        DeviceOnboardingProgress.Syncing -> phase.value = Phase.Connecting(ConnectingStep.SYNCING)
+                        DeviceOnboardingProgress.Done -> {
+                            appNotifier.success(contextManager.applicationContext.getString(RCommon.string.device_connected_notification))
+                            router.back()
+                        }
+                        is DeviceOnboardingProgress.Failed -> handleApproveFailure(progress.error)
                     }
-                    is DeviceOnboardingProgress.Failed -> handleApproveFailure(progress.error)
                 }
             }
         }
