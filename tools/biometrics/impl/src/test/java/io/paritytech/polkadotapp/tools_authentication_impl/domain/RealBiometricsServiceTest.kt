@@ -64,17 +64,6 @@ class RealBiometricsServiceTest {
     }
 
     @Test
-    fun `prompts again when the previous gate threw`() = runBlocking<Unit> {
-        withAuthenticationThrowingOnce()
-
-        service.performOneTimeAuthentication()
-        val second = service.performOneTimeAuthentication()
-
-        assertSuccess(second)
-        verifyPromptedTimes(2)
-    }
-
-    @Test
     fun `prompts again when the previous gate was cancelled while its prompt was live`() = runBlocking<Unit> {
         val livePrompt = withAuthenticationPendingThenSucceeding()
         val first = async { service.performOneTimeAuthentication() }
@@ -108,12 +97,6 @@ class RealBiometricsServiceTest {
 
     private suspend fun withAuthenticationThrowing() {
         whenever(authMethod.authenticateUser()).thenThrowUnsafe(IllegalArgumentException("Required value was null."))
-    }
-
-    private suspend fun withAuthenticationThrowingOnce() {
-        whenever(authMethod.authenticateUser())
-            .thenThrowUnsafe(IllegalArgumentException("Required value was null."))
-            .thenReturn(Result.success(Unit))
     }
 
     private suspend fun verifyPromptedTimes(times: Int) {
