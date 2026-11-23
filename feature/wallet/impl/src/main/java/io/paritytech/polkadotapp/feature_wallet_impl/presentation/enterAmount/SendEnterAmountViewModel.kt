@@ -10,6 +10,7 @@ import io.paritytech.polkadotapp.common.domain.validation.onError
 import io.paritytech.polkadotapp.common.domain.validation.onSuccess
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.presentation.validation.ValidationMixin
 import io.paritytech.polkadotapp.common.utils.gate
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport
@@ -172,7 +173,9 @@ class SendEnterAmountViewModel @Inject constructor(
 
             val validationResult = sendValidationMixin.runValidation(interactor.sendValidation, payload)
             validationResult.onSuccess { validated ->
-                biometricsService.performOneTimeAuthentication().onSuccess { sendValidatedTransfer(validated) }
+                biometricsService.performOneTimeAuthentication()
+                    .onSuccess { sendValidatedTransfer(validated) }
+                    .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
             }
             validationResult.onError { showPresentationError(it.asSendError().toPresentationError()) }
 

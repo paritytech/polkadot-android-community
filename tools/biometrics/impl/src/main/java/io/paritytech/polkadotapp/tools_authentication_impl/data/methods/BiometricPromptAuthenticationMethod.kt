@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
+import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationFailedException
 import io.paritytech.polkadotapp.tools_authentication_impl.data.AuthenticationMethod
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -25,6 +26,12 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
 ) : AuthenticationMethod {
     companion object {
         private const val ALLOWED_BIOMETRICS = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
+
+        private val CANCEL_ERROR_CODES = setOf(
+            BiometricPrompt.ERROR_USER_CANCELED,
+            BiometricPrompt.ERROR_NEGATIVE_BUTTON,
+            BiometricPrompt.ERROR_CANCELED,
+        )
     }
 
     private val executor = ContextCompat.getMainExecutor(contextManager.requireActivity())
@@ -69,8 +76,12 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
                             errorCode: Int,
                             errString: CharSequence,
                         ) {
-                            val exception =
-                                AuthenticationCancelledException("$errorCode: $errString")
+                            val message = "$errorCode: $errString"
+                            val exception = if (errorCode in CANCEL_ERROR_CODES) {
+                                AuthenticationCancelledException(message)
+                            } else {
+                                AuthenticationFailedException(message)
+                            }
                             continuation.resume(Result.failure(exception))
                         }
 
@@ -93,16 +104,16 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
             BiometricManager.BIOMETRIC_SUCCESS -> Result.success(Unit)
 
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ->
-                Result.failure(AuthenticationCancelledException("No matching hardware found to perform authentication"))
+                Result.failure(AuthenticationFailedException("No matching hardware found to perform authentication"))
 
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
-                Result.failure(AuthenticationCancelledException("Hardware to perform authentication is currently unavailable. Try again later."))
+                Result.failure(AuthenticationFailedException("Hardware to perform authentication is currently unavailable. Try again later."))
 
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
                 BiometricExecutor(contextManager).execute()
             }
 
-            else -> Result.failure(AuthenticationCancelledException("Unknown authentication hardware state"))
+            else -> Result.failure(AuthenticationFailedException("Unknown authentication hardware state"))
         }
     }
 }

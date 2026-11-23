@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.common.presentation.notification.error
 import io.paritytech.polkadotapp.common.presentation.notification.success
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.utils.findInCauseChain
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport
 import io.paritytech.polkadotapp.common.utils.progressStallReport.launchWithDiagnostics
@@ -56,22 +57,24 @@ class PairRequestViewModel @Inject constructor(
         if (phase.value !is Phase.Confirm) return
 
         launchWithDiagnostics(stalenessReport) {
-            biometricsService.performOneTimeAuthentication().onSuccess {
-                phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
+            biometricsService.performOneTimeAuthentication()
+                .onSuccess {
+                    phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
 
-                interactor.approveHandshake(offer).collect { progress ->
-                    when (progress) {
-                        DeviceOnboardingProgress.Verifying -> phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
-                        DeviceOnboardingProgress.Registering -> phase.value = Phase.Connecting(ConnectingStep.REGISTERING)
-                        DeviceOnboardingProgress.Syncing -> phase.value = Phase.Connecting(ConnectingStep.SYNCING)
-                        DeviceOnboardingProgress.Done -> {
-                            appNotifier.success(contextManager.applicationContext.getString(RCommon.string.device_connected_notification))
-                            router.back()
+                    interactor.approveHandshake(offer).collect { progress ->
+                        when (progress) {
+                            DeviceOnboardingProgress.Verifying -> phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
+                            DeviceOnboardingProgress.Registering -> phase.value = Phase.Connecting(ConnectingStep.REGISTERING)
+                            DeviceOnboardingProgress.Syncing -> phase.value = Phase.Connecting(ConnectingStep.SYNCING)
+                            DeviceOnboardingProgress.Done -> {
+                                appNotifier.success(contextManager.applicationContext.getString(RCommon.string.device_connected_notification))
+                                router.back()
+                            }
+                            is DeviceOnboardingProgress.Failed -> handleApproveFailure(progress.error)
                         }
-                        is DeviceOnboardingProgress.Failed -> handleApproveFailure(progress.error)
                     }
                 }
-            }
+                .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
         }
     }
 

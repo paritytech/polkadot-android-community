@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_products_impl.presentation.signTransac
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.presentation.ui.errors.SigningFailedPresentationError
 import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.combineResults
@@ -76,7 +77,14 @@ class TransactionSignViewModel @Inject constructor(
         Timber.d("Approve clicked for ${signingContext.requesterName}")
 
         biometricsService.performOneTimeAuthentication()
-            .flatMap { interactor.sign() }
+            .onSuccess { signAndDeliver() }
+            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
+
+        signing.value = false
+    }
+
+    private suspend fun signAndDeliver() {
+        interactor.sign()
             .flatMap { signingContext.deliverSignedResult(it) }
             .onSuccess {
                 showMessage(RCommon.string.sign_transaction_signed)
@@ -84,8 +92,6 @@ class TransactionSignViewModel @Inject constructor(
                 router.back()
             }
             .onFailure { showPresentationError(SigningFailedPresentationError(it)) }
-
-        signing.value = false
     }
 
     override fun onRejectClicked() = launchUnit {

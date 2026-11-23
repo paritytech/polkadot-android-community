@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_products_impl.presentation.crossProduc
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.domain.model.asUtf8OrHex
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_account_api.domain.derivation.asDisplayString
 import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofContext
@@ -31,10 +32,12 @@ class CrossProductProofViewModel @Inject constructor(
         )
 
     fun onApproveClicked() = launchUnit {
-        biometricsService.performOneTimeAuthentication().onSuccess {
-            context.deliverApproved()
-            router.back()
-        }
+        biometricsService.performOneTimeAuthentication()
+            .onSuccess {
+                context.deliverApproved()
+                router.back()
+            }
+            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
     }
 
     fun onRejectClicked() = launchUnit {

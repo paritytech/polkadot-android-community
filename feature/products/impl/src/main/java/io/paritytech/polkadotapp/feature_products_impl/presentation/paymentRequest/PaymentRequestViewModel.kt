@@ -4,6 +4,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.chains.multiNetwork.chain.model.withAmount
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.utils.inBackground
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.common.utils.withLoading
@@ -46,14 +47,16 @@ class PaymentRequestViewModel @Inject constructor(
         .stateIn(this, SharingStarted.Eagerly, LoadingState.Loading)
 
     override fun onApproveClicked() = launchUnit {
-        authorizeStep(context.steps[stepIndex.value]).onSuccess {
-            if (stepIndex.value < context.steps.lastIndex) {
-                stepIndex.value += 1
-            } else {
-                context.deliverApproved()
-                router.back()
+        authorizeStep(context.steps[stepIndex.value])
+            .onSuccess {
+                if (stepIndex.value < context.steps.lastIndex) {
+                    stepIndex.value += 1
+                } else {
+                    context.deliverApproved()
+                    router.back()
+                }
             }
-        }
+            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
     }
 
     override fun onRejectClicked() = launchUnit {

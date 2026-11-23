@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.conf
 import androidx.lifecycle.SavedStateHandle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
+import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictPayload
@@ -29,19 +30,21 @@ class BackupConflictViewModel @Inject constructor(
     }
 
     override fun confirmOverride() = launchUnit {
-        biometricsService.performOneTimeAuthentication().onSuccess {
-            step.value = BackupConflictStep.Override(inProgress = true)
+        biometricsService.performOneTimeAuthentication()
+            .onSuccess {
+                step.value = BackupConflictStep.Override(inProgress = true)
 
-            interactor
-                .overrideBackup()
-                .onSuccess {
-                    router.backWithResult(BackupConflictBottomSheet.REQUEST_KEY, true)
-                }
-                .onFailure {
-                    step.value = BackupConflictStep.Override(inProgress = false)
-                    showPresentationError(UnexpectedPresentationError(it))
-                }
-        }
+                interactor
+                    .overrideBackup()
+                    .onSuccess {
+                        router.backWithResult(BackupConflictBottomSheet.REQUEST_KEY, true)
+                    }
+                    .onFailure {
+                        step.value = BackupConflictStep.Override(inProgress = false)
+                        showPresentationError(UnexpectedPresentationError(it))
+                    }
+            }
+            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
     }
 
     override fun cancelOverride() {

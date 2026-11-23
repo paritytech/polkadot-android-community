@@ -42,7 +42,7 @@ private const val SUCCESS_DISPLAY_MS = 2_500L
 private const val ERROR_DISPLAY_MS = 4_000L
 
 @Composable
-fun AppNotificationHost(notifier: AppNotifier) {
+fun AppNotificationHost(modifier: Modifier = Modifier, notifier: AppNotifier) {
     var visible by remember { mutableStateOf<AppNotification?>(null) }
 
     LaunchedEffect(notifier) {
@@ -59,7 +59,7 @@ fun AppNotificationHost(notifier: AppNotifier) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         AnimatedVisibility(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

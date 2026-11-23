@@ -10,7 +10,7 @@ import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.utils.ActivityResultExecutor
-import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
+import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationFailedException
 
 class BiometricExecutor(
     private val contextManager: ContextManager,
@@ -36,7 +36,7 @@ class BiometricExecutor(
         return if (keyguardManager.isDeviceSecure) {
             Result.success(Unit)
         } else {
-            Result.failure(AuthenticationCancelledException("Cannot use the app without device lock set"))
+            Result.failure(AuthenticationFailedException("Cannot use the app without device lock set"))
         }
     }
 }
