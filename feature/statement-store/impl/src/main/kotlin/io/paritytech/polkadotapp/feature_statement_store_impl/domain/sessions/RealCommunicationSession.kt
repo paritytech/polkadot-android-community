@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.MessageCompa
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.CommunicationSessionEvent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.IncomingRequestResponsePolicy
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionIdParams
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
@@ -24,6 +25,7 @@ import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.hasR
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationStateEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.states.Initialization
+import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.states.PendingMessages
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -41,6 +43,7 @@ class RealCommunicationSession(
     private val maxStatementSize: InformationSize,
     private val compactor: MessageCompactor?,
     private val responsePolicy: IncomingRequestResponsePolicy,
+    private val replacementPolicy: PendingMessageReplacementPolicy,
     private val statementLifetime: StatementLifetime,
     scope: CoroutineScope
 ) : CommunicationSession, CoroutineScope by scope {
@@ -50,7 +53,7 @@ class RealCommunicationSession(
     override val incomingSessionId = deriveCommunicationTopic(sender = remoteAccount, receiver = localAccount, encryption)
 
     private val stateMachine = StateMachine(
-        initialState = Initialization(emptyList(), maxStatementSize, canCompact = compactor != null, statementLifetime),
+        initialState = Initialization(PendingMessages(emptyList(), replacementPolicy), maxStatementSize, canCompact = compactor != null, statementLifetime),
         coroutineScope = this
     )
 
@@ -252,8 +255,14 @@ class RealCommunicationSession(
     }
 
     private fun compactMessages(messages: List<EncodedMessage>) = launch {
-        checkNotNull(compactor) { "Compact side effect emitted without a compactor" }
-            .compact(messages)
+        val compactor = checkNotNull(compactor) { "Compact side effect emitted without a compactor" }
+        val compactableMessages = messages.filter(compactor::canCompact)
+        if (compactableMessages.isEmpty()) {
+            stateMachine.onEvent(CommunicationStateEvent.CompactionFailed)
+            return@launch
+        }
+
+        compactor.compact(compactableMessages)
             .logFailure("Failed to compact messages")
             .onSuccess { batches ->
                 stateMachine.onEvent(CommunicationStateEvent.CompactionCompleted(batches))

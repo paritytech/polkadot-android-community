@@ -5,7 +5,6 @@ import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
-import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationStateEvent
 import java.util.UUID
@@ -42,24 +41,6 @@ sealed class CommunicationState : StateMachine.State<CommunicationState, Communi
     }
 
     protected fun generateNewRequestId(): String = UUID.randomUUID().toString()
-
-    protected fun checkAlreadyPendingMessage(
-        message: EncodedMessage,
-        pendingMessages: List<EncodedMessage>,
-        outgoingPendingRequest: StatementTransportEvent.Request?
-    ): Boolean {
-        if (pendingMessages.any { it.contentEquals(message) }) {
-            return true
-        }
-
-        if (outgoingPendingRequest != null) {
-            if (outgoingPendingRequest.messages.any { it.contentEquals(message) }) {
-                return true
-            }
-        }
-
-        return false
-    }
 
     protected fun checkSizeLimitExceeded(message: EncodedMessage): Boolean {
         return message.size > maxRequestSizeBytes
