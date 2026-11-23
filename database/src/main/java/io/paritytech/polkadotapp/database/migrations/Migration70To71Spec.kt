@@ -5,14 +5,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 class Migration70To71Spec : AutoMigrationSpec {
     override fun onPostMigrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
-            UPDATE chat_requests SET peerAccountId = COALESCE(
-                (SELECT accountId FROM contacts WHERE contacts.chatRequestId = chat_requests.id),
-                (SELECT contactAccountId FROM chat_acceptances WHERE chat_acceptances.requestId = chat_requests.id),
-                (SELECT chatId FROM chat_messages WHERE chat_messages.id = chat_requests.id)
-            )
-            """.trimIndent()
-        )
+        db.execSQL("UPDATE chat_messages SET status = 'IS_DELIVERED' WHERE status = 'IS_READ' AND origintype = 'USER'")
     }
 }

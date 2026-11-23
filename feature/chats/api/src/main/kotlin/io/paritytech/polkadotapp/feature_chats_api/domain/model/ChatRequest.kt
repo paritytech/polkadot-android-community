@@ -20,7 +20,8 @@ data class ChatRequest(
     enum class Status {
         PENDING,
         ACCEPTED,
-        DECLINED
+        DECLINED,
+        CANCELLED
     }
 
     sealed interface Delivery {

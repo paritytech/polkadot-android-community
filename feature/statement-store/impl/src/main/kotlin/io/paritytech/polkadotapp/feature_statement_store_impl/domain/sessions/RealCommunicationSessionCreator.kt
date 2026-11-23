@@ -12,6 +12,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.StatementSto
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.CommunicationSessionId
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.ContactDeviceProvider
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.IncomingRequestResponsePolicy
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.encryption.MultiDeviceEnvelopeEncryption
@@ -70,6 +71,7 @@ class RealCommunicationSessionCreator(
         maxStatementSize: InformationSize,
         compactor: MessageCompactor?,
         responsePolicy: IncomingRequestResponsePolicy,
+        replacementPolicy: PendingMessageReplacementPolicy,
         statementLifetime: StatementLifetime,
     ): CommunicationSession {
         val outgoingTopic = deriveCommunicationTopic(localAccount, remoteAccount, encryption)
@@ -100,6 +102,7 @@ class RealCommunicationSessionCreator(
             maxStatementSize = maxStatementSize,
             compactor = compactor,
             responsePolicy = responsePolicy,
+            replacementPolicy = replacementPolicy,
             statementLifetime = statementLifetime,
         )
     }
@@ -113,6 +116,7 @@ class RealCommunicationSessionCreator(
         maxStatementSize: InformationSize,
         compactor: MessageCompactor?,
         responsePolicy: IncomingRequestResponsePolicy,
+        replacementPolicy: PendingMessageReplacementPolicy,
     ): CommunicationSession {
         val outgoingTopic = deriveCommunicationTopic(localAccount, remoteAccount, perDeviceEncryption)
         val envelopeEncryption = buildEnvelopeEncryption(localAccount)
@@ -145,6 +149,7 @@ class RealCommunicationSessionCreator(
             maxStatementSize = maxStatementSize,
             compactor = compactor,
             responsePolicy = responsePolicy,
+            replacementPolicy = replacementPolicy,
             statementLifetime = StatementLifetime.Permanent,
         )
     }
@@ -168,6 +173,7 @@ class RealCommunicationSessionCreator(
         maxStatementSize: InformationSize,
         compactor: MessageCompactor?,
         responsePolicy: IncomingRequestResponsePolicy,
+        replacementPolicy: PendingMessageReplacementPolicy,
         statementLifetime: StatementLifetime,
     ): CommunicationSession {
         val decoder = StatementDecoder(
@@ -200,6 +206,7 @@ class RealCommunicationSessionCreator(
             maxStatementSize = maxStatementSize,
             compactor = compactor,
             responsePolicy = responsePolicy,
+            replacementPolicy = replacementPolicy,
             statementLifetime = statementLifetime,
             scope = scope,
         )
