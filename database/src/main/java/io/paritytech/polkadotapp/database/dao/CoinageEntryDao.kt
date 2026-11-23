@@ -110,6 +110,9 @@ abstract class CoinageEntryDao {
     @Query("SELECT onChainKey FROM coinage_handoff WHERE onChainKey IN (:onChainKeys)")
     abstract suspend fun filterHandedOff(onChainKeys: List<ByteArray>): List<ByteArray>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM coinage_handoff WHERE installationId = :installationId AND onChainKey IN (:onChainKeys))")
+    abstract suspend fun hasHandoffsFrom(installationId: ByteArray, onChainKeys: List<ByteArray>): Boolean
+
     // ---- assets ----
 
     @Query("SELECT * FROM coinage_entry_input WHERE entryId IN (:entryIds)")
@@ -121,8 +124,26 @@ abstract class CoinageEntryDao {
     @Query("SELECT * FROM coinage_handoff")
     abstract suspend fun getHandoffs(): List<CoinageHandoffLocal>
 
-    @Query("UPDATE coinage_handoff SET committed = 1 WHERE onChainKey IN (:onChainKeys)")
-    abstract suspend fun commitHandoffs(onChainKeys: List<ByteArray>)
+    @Query(
+        """
+        UPDATE coinage_handoff SET committed = 1, committedAt = :committedAt
+        WHERE onChainKey IN (:onChainKeys) AND committed = 0
+        """
+    )
+    abstract suspend fun commitHandoffs(onChainKeys: List<ByteArray>, committedAt: Long)
+
+    @Query(
+        """
+        SELECT h.installationId, h.derivationIndex, c.valueExponent FROM coinage_handoff h
+        INNER JOIN coins c ON c.installationId = h.installationId AND c.derivationIndex = h.derivationIndex
+        WHERE h.committed = 1 AND h.assetKind = 'COIN'
+          AND (:committedAfter IS NULL OR h.committedAt > :committedAfter)
+        """
+    )
+    abstract suspend fun getCommittedCoinHandoffs(committedAfter: Long?): List<CommittedCoinHandoffLocal>
+
+    @Query("SELECT MAX(committedAt) FROM coinage_handoff")
+    abstract fun observeLastHandoffCommittedAt(): Flow<Long?>
 
     /**
      * A provisional mark belongs to a payment that never became durable, so its keys never left. Clearing it
@@ -198,4 +219,10 @@ class CoinageAssetStateProjection(
     val handedOff: Boolean,
     /** Of the at-most-one non-failed consumer — the Unique consumer invariant is what makes LIMIT 1 sound. */
     val consumerStatus: DurableTxLocal.Status?,
+)
+
+class CommittedCoinHandoffLocal(
+    val installationId: ByteArray,
+    val derivationIndex: Int,
+    val valueExponent: Int,
 )

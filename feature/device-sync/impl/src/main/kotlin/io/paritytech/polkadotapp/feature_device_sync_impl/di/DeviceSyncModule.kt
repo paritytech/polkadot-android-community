@@ -9,8 +9,10 @@ import io.paritytech.polkadotapp.common.presentation.AppInitializer
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.DeviceSyncCoordinator
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.SiblingFileFetcher
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.activeInstallation.ActiveInstallationManager
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.transfer.DeviceTransferReceiverCoordinator
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.transfer.DeviceTransferRequestListener
 import io.paritytech.polkadotapp.feature_device_sync_api.domain.transfer.DeviceTransferRequestPublisher
+import io.paritytech.polkadotapp.feature_device_sync_api.domain.transfer.DeviceTransferSenderCoordinator
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.ActiveInstallationRecordRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.activeInstallation.RealActiveInstallationRecordRepository
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.device.DeviceInfoProvider
@@ -26,6 +28,8 @@ import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.Re
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileLocator
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.DeviceTransferKeyScheduleProvider
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.RealDeviceTransferKeyScheduleProvider
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.coordinator.RealDeviceTransferReceiverCoordinator
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.coordinator.RealDeviceTransferSenderCoordinator
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.discovery.RealDeviceTransferRequestListener
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.discovery.RealDeviceTransferRequestPublisher
 import io.paritytech.polkadotapp.feature_device_sync_impl.presentation.initialization.ActiveInstallationInitializer
@@ -72,6 +76,12 @@ internal interface DeviceSyncModule {
 
     @Binds
     fun bindDeviceTransferRequestPublisher(impl: RealDeviceTransferRequestPublisher): DeviceTransferRequestPublisher
+
+    @Binds
+    fun bindDeviceTransferReceiverCoordinator(impl: RealDeviceTransferReceiverCoordinator): DeviceTransferReceiverCoordinator
+
+    @Binds
+    fun bindDeviceTransferSenderCoordinator(impl: RealDeviceTransferSenderCoordinator): DeviceTransferSenderCoordinator
 
     @Binds
     @IntoSet

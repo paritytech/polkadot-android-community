@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.conne
 
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.common.utils.flowOf
+import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.DeviceTransferConstants
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
@@ -81,16 +82,26 @@ class DeviceTransferConnector @Inject constructor(
 
         return try {
             raceFirst(
-                {
-                    useChannel(channel.dataTransport)
-                    ConnectionAttempt.FINISHED
-                },
+                { runChannel(session, channel, useChannel) },
                 { awaitChannelEnd(channel) },
                 { awaitReconnectRequest(session) },
             )
         } finally {
             channel.dispose()
         }
+    }
+
+    private suspend fun runChannel(
+        session: DeviceTransferSession,
+        channel: PeerChannel,
+        useChannel: suspend (DataTransport) -> Unit,
+    ): ConnectionAttempt {
+        return runCancellableCatching { useChannel(channel.dataTransport) }
+            .logFailure("Device transfer ${session.requestId}: the run over the channel failed")
+            .fold(
+                onSuccess = { ConnectionAttempt.FINISHED },
+                onFailure = { if (channel.dataTransport.isOpen()) ConnectionAttempt.DROPPED else ConnectionAttempt.NOT_OPENED },
+            )
     }
 
     private suspend fun awaitChannelEnd(channel: PeerChannel): ConnectionAttempt {
@@ -129,7 +140,7 @@ class DeviceTransferConnector @Inject constructor(
     }
 
     private companion object {
-        val CONNECT_TIMEOUT = 30.seconds
+        val CONNECT_TIMEOUT = 45.seconds
         val RECONNECT_DELAY = 5.seconds
     }
 }

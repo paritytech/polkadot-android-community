@@ -14,6 +14,7 @@ dependencies {
     api(project(":feature:transactions:api"))
     implementation(project(":feature:account:api"))
     implementation(project(":feature:balances:api"))
+    implementation(project(":feature:device-sync:api"))
     implementation(project(":feature:members:api"))
     implementation(project(":feature:people:api"))
     implementation(project(":feature:pgas:api"))

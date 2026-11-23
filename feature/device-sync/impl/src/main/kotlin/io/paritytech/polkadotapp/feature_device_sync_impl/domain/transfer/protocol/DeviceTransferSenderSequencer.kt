@@ -38,13 +38,15 @@ class DeviceTransferSenderSequencer @Inject constructor(
             end = timeProvider.now(),
         )
         var chatState = collectChatState(round)
+        var coinageState = collector.collectCoinageState(round.stateChangedAfter)
         val messageCount = applyRemoteChatMessageUseCase.countMessagesForSync(round.messagesUpdatedAfter, round.messagesUpdatedUpTo)
-        emit(DeviceTransferSenderStep.Started(chatState.itemCount() + messageCount))
+        emit(DeviceTransferSenderStep.Started(chatState.itemCount() + messageCount + coinageState.itemCount()))
 
-        while (emitRound(round, chatState) > 0) {
+        while (emitRound(round, chatState, coinageState) > 0) {
             val end = timeProvider.now()
             round = Round(stateChangedAfter = round.end, messagesUpdatedAfter = round.end, messagesUpdatedUpTo = end, end = end)
             chatState = collectChatState(round)
+            coinageState = collector.collectCoinageState(round.stateChangedAfter)
         }
     }
 
@@ -52,7 +54,11 @@ class DeviceTransferSenderSequencer @Inject constructor(
         return collector.collectChatState(round.stateChangedAfter).filterNot { it is SyncEntityScale.ChatsRemoved }
     }
 
-    private suspend fun FlowCollector<DeviceTransferSenderStep>.emitRound(round: Round, chatState: List<SyncEntityScale>): Int {
+    private suspend fun FlowCollector<DeviceTransferSenderStep>.emitRound(
+        round: Round,
+        chatState: List<SyncEntityScale>,
+        coinageState: List<SyncEntityScale>,
+    ): Int {
         var itemCount = emitChanges(round, chatState)
         var cursor: ChatMessageSyncCursor? = null
 
@@ -67,6 +73,7 @@ class DeviceTransferSenderSequencer @Inject constructor(
             cursor = page.nextCursor
         } while (cursor != null)
 
+        itemCount += emitChanges(round, coinageState)
         emit(DeviceTransferSenderStep.Update(SyncUpdateScale(updateIdProvider.nextId(), emptyList(), round.end.toTimePoint())))
         return itemCount
     }

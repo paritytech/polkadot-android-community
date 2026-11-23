@@ -185,6 +185,7 @@ class LedgerAtomicityTest {
         installationId = INSTALLATION,
         derivationIndex = derivationIndex,
         committed = false,
+        committedAt = null,
     )
 
     private fun keyOf(derivationIndex: Int) = byteArrayOf(derivationIndex.toByte())

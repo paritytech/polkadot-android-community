@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.runningFold
 import timber.log.Timber
-import java.util.UUID
 import javax.inject.Inject
 import kotlin.time.Instant
 
@@ -47,7 +46,7 @@ class RealDeviceTransferRequestListener @Inject constructor(
             .flowOn(dispatchers.io)
     }
 
-    override suspend fun markProcessed(requestId: UUID) {
+    override suspend fun markProcessed(requestId: String) {
         processedRequestStorage.markProcessed(requestId)
     }
 
@@ -78,8 +77,8 @@ class RealDeviceTransferRequestListener @Inject constructor(
     }
 
     private class DiscoveredMessages(
-        private val requests: Map<UUID, ReceivedRequest>,
-        private val cancellations: Map<UUID, Instant>,
+        private val requests: Map<String, ReceivedRequest>,
+        private val cancellations: Map<String, Instant>,
     ) {
         fun with(messages: List<ReceivedDeviceTransferMessage>): DiscoveredMessages {
             val requests = requests.toMutableMap()
@@ -97,7 +96,7 @@ class RealDeviceTransferRequestListener @Inject constructor(
             return DiscoveredMessages(requests, cancellations)
         }
 
-        fun newestLiveRequest(now: Instant, processed: Set<UUID>): DeviceTransferRequest? {
+        fun newestLiveRequest(now: Instant, processed: Set<String>): DeviceTransferRequest? {
             return requests.values
                 .filter { it.isLive(now) && !isCancelled(it.request.requestId, now) }
                 .map { it.request }
@@ -105,7 +104,7 @@ class RealDeviceTransferRequestListener @Inject constructor(
                 .maxByOrNull { it.createdAt }
         }
 
-        private fun isCancelled(requestId: UUID, now: Instant): Boolean {
+        private fun isCancelled(requestId: String, now: Instant): Boolean {
             val cancelExpiresAt = cancellations[requestId] ?: return false
             return cancelExpiresAt > now
         }

@@ -8,10 +8,16 @@ import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SyncS
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SyncSignalingTransport
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.subscribeNewMessages
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.CommunicationSessionEvent
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
@@ -38,8 +44,14 @@ class DeviceTransferSessionTransport(
 
     override fun subscribeEnvelopes(): Flow<SyncSignalingEnvelope> = envelopes.receiveAsFlow()
 
-    fun sendRejection() {
-        send(DeviceTransferSessionMessageScale.Rejected)
+    suspend fun sendRejection(): Result<Unit> = coroutineScope {
+        val rejectionMessage = encode(DeviceTransferSessionMessageScale.Rejected)
+        val sendOutcome = async(start = CoroutineStart.UNDISPATCHED) {
+            communicationSession.subscribeEvents().mapNotNull { event -> event.sendOutcomeOf(rejectionMessage) }.first()
+        }
+
+        communicationSession.sendMessage(rejectionMessage)
+        sendOutcome.await()
     }
 
     suspend fun awaitRejection() {
@@ -47,7 +59,18 @@ class DeviceTransferSessionTransport(
     }
 
     private fun send(message: DeviceTransferSessionMessageScale) {
-        communicationSession.sendMessage(BinaryScale.encodeToByteArray<DeviceTransferSessionMessageScale>(message))
+        communicationSession.sendMessage(encode(message))
+    }
+
+    private fun encode(message: DeviceTransferSessionMessageScale): EncodedMessage {
+        return BinaryScale.encodeToByteArray<DeviceTransferSessionMessageScale>(message)
+    }
+
+    private fun CommunicationSessionEvent.sendOutcomeOf(message: EncodedMessage): Result<Unit>? = when (this) {
+        is CommunicationSessionEvent.MessagesSentSuccessfully -> Result.success(Unit).takeIf { messages.any { it.contentEquals(message) } }
+        is CommunicationSessionEvent.MessagesFailedToSend -> Result.failure<Unit>(error).takeIf { messages.any { it.contentEquals(message) } }
+        is CommunicationSessionEvent.SessionFailed -> Result.failure(error)
+        else -> null
     }
 
     private fun route(message: DeviceTransferSessionMessageScale) {

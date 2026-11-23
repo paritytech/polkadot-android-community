@@ -55,6 +55,10 @@ class RealAddContactUseCase @Inject constructor(
     private val knownChains: KnownChains,
     private val currentTimeContext: CurrentTimeContext,
 ) : AddContactUseCase {
+    private companion object {
+        const val UNKNOWN_DELIVERY_PERIOD = 0u
+    }
+
     override suspend fun addContactWithChatRequest(
         contactAccountId: AccountId,
         username: Username?,
@@ -174,7 +178,7 @@ class RealAddContactUseCase @Inject constructor(
             timestamp = timestamp,
             direction = ChatRequest.Direction.OUTGOING,
             status = ChatRequest.Status.PENDING,
-            delivery = ChatRequest.Delivery.DeliveredUntracked,
+            delivery = ChatRequest.Delivery.DeliveredAnonymously(period = UNKNOWN_DELIVERY_PERIOD),
         )
     }
 

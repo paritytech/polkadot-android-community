@@ -2,12 +2,15 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine
 
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
+import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.scale.toDomain
+import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySyncedChatStateUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledPayment
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
@@ -16,10 +19,17 @@ import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.ChatMess
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.IncomingStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.LocalStatusScale
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.OutgoingStatusScale
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageStateSyncUseCase
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatBlockStateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ChatIdScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.CoinageMessageStatusScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.CoinageMessageStatusUpdateScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceChangeScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.ContactDeviceStatusScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.HandedOffCoinScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingChatRequestScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.IncomingRequestStatusUpdateScale
@@ -41,12 +51,19 @@ class SyncEntityApplier @Inject constructor(
     private val removeContactUseCase: RemoveContactUseCase,
     private val applyRemoteChatMessageUseCase: ApplyRemoteChatMessageUseCase,
     private val applySyncedChatStateUseCase: ApplySyncedChatStateUseCase,
+    private val coinageStateSyncUseCase: CoinageStateSyncUseCase,
 ) {
-    suspend fun apply(update: SyncUpdateScale, messagePlacement: Placement) {
+    suspend fun apply(update: SyncUpdateScale, messagePlacement: Placement): List<SettledPayment> {
+        val waitingPayments = mutableListOf<SettledPayment>()
+
         for (entity in update.entities) {
             runCatching {
                 when (entity) {
                     is SyncEntityScale.Devices -> Unit
+                    is SyncEntityScale.CoinsHandedOff ->
+                        coinageStateSyncUseCase.applyHandedOffCoins(entity.coins.mapNotNull { it.toHandedOffCoin() })
+                    is SyncEntityScale.CoinageMessagesStatusUpdated ->
+                        waitingPayments.addAll(applySettledPayments(entity.updates.mapNotNull { it.toSettledPayment() }))
                     is SyncEntityScale.ChatsAdded -> applyChatsAdded(entity)
                     is SyncEntityScale.ChatsRemoved -> applyChatsRemoved(entity, removedAt = update.timePoint.toLong())
                     is SyncEntityScale.Messages -> applyMessages(entity, messagePlacement)
@@ -68,6 +85,12 @@ class SyncEntityApplier @Inject constructor(
                 Timber.w(error, "SyncEntityApplier: failed to apply entity ${entity::class.simpleName} from update id=${update.id} — skipping")
             }
         }
+
+        return waitingPayments
+    }
+
+    suspend fun applySettledPayments(payments: List<SettledPayment>): List<SettledPayment> {
+        return applySyncedChatStateUseCase.applySettledPayments(payments)
     }
 
     private suspend fun applyChatsAdded(entity: SyncEntityScale.ChatsAdded) {
@@ -165,6 +188,31 @@ private fun ContactDeviceChangeScale.toContactDeviceChange(): ChatStateForSync.C
         device = ContactDevice(contactAccountId, AccountId(statementAccountId), encryptionPublicKey),
         isActive = status == ContactDeviceStatusScale.ACTIVE,
         changedAt = changedAt.toLong(),
+    )
+}
+
+private fun CoinageMessageStatusUpdateScale.toSettledPayment(): SettledPayment? {
+    val contactAccountId = when (val chat = chatId) {
+        is ChatIdScale.Contact -> AccountId(chat.accountId)
+    }
+    val outcome = when (val status = status) {
+        CoinageMessageStatusScale.None -> return null
+        is CoinageMessageStatusScale.Claimed -> SettledPayment.Outcome.Claimed(status.partial?.let(::Balance))
+        CoinageMessageStatusScale.Failed -> SettledPayment.Outcome.Failed
+    }
+
+    return SettledPayment(contactAccountId = contactAccountId, messageId = messageId, outcome = outcome)
+}
+
+private fun HandedOffCoinScale.toHandedOffCoin(): HandedOffCoin? {
+    if (derivationIndex > Int.MAX_VALUE.toULong()) {
+        Timber.w("SyncEntityApplier: derivation index $derivationIndex of a handed-off coin does not fit, skipping")
+        return null
+    }
+
+    return HandedOffCoin(
+        index = CoinageKeyIndex(CoinageInstallationId(installationId.toDataByteArray()), derivationIndex.toInt()),
+        exponent = exponent.toInt(),
     )
 }
 

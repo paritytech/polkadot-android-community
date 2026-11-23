@@ -1,16 +1,26 @@
 package io.paritytech.polkadotapp.feature_chats_impl.domain.interactors
 
+import io.paritytech.polkadotapp.chains.network.binding.Balance
 import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplySyncedChatStateUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase.SettledPayment
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.RemoveContactUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.isIncoming
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.AlwaysFailCustomContentDecoder
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageProcessingRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatMessageRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
+import io.paritytech.polkadotapp.feature_chats_impl.domain.extension.CoinagePaymentProcessingExtension
 import io.paritytech.polkadotapp.feature_chats_impl.domain.identitySigning.IdentitySigningConsentUseCase
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage.Content.CoinagePayment.Status as PaymentStatus
 
 class RealApplySyncedChatStateUseCase @Inject constructor(
     private val contactsRepository: ContactsRepository,
@@ -19,7 +29,11 @@ class RealApplySyncedChatStateUseCase @Inject constructor(
     private val removeContactUseCase: RemoveContactUseCase,
     private val identitySigningConsent: IdentitySigningConsentUseCase,
     private val contactDevicesRepository: ContactDevicesRepository,
+    private val chatMessageRepository: ChatMessageRepository,
+    private val chatMessageProcessingRepository: ChatMessageProcessingRepository,
 ) : ApplySyncedChatStateUseCase {
+    private val customContentDecoder = AlwaysFailCustomContentDecoder()
+
     override suspend fun applyBlockStates(states: List<ChatStateForSync.BlockState>) {
         states.forEach { state ->
             val contact = contactsRepository.getContact(state.accountId) ?: return@forEach
@@ -76,11 +90,42 @@ class RealApplySyncedChatStateUseCase @Inject constructor(
         }
     }
 
+    override suspend fun applySettledPayments(payments: List<SettledPayment>): List<SettledPayment> {
+        return payments.filterNot { applySettledPayment(it) }
+    }
+
+    private suspend fun applySettledPayment(payment: SettledPayment): Boolean {
+        val message = chatMessageRepository.subscribeMessageById(payment.messageId, customContentDecoder).first() ?: return false
+        val content = message.content as? ChatMessage.Content.CoinagePayment ?: return true
+        if (content.status.isSettled()) return true
+
+        contactsRepository.withTransaction {
+            val status = payment.outcome.toPaymentStatus(totalValue = content.totalValue, isIncoming = message.isIncoming)
+            chatMessageRepository.updateMessageContent(message.id, content.copy(status = status), customContentDecoder)
+            chatMessageProcessingRepository.markMessageProcessedByExtension(
+                extensionId = CoinagePaymentProcessingExtension.ID,
+                messageId = message.id,
+                chatId = message.chatId,
+            )
+        }
+        return true
+    }
+
     private suspend fun isLinkedToContact(requestId: ChatRequestId, peer: AccountId): Boolean {
         return contactsRepository.getContact(peer)?.pendingChatRequestId == requestId
     }
 
     private fun incomingStatus(isAccepted: Boolean): ChatRequest.Status {
         return if (isAccepted) ChatRequest.Status.ACCEPTED else ChatRequest.Status.DECLINED
+    }
+
+    private fun PaymentStatus.isSettled(): Boolean = when (this) {
+        is PaymentStatus.Transferred, PaymentStatus.FailedDetection, PaymentStatus.FailedTransfer -> true
+        PaymentStatus.Detecting, is PaymentStatus.Detected, is PaymentStatus.PartiallyClaimed -> false
+    }
+
+    private fun SettledPayment.Outcome.toPaymentStatus(totalValue: Balance, isIncoming: Boolean): PaymentStatus = when (this) {
+        is SettledPayment.Outcome.Claimed -> PaymentStatus.Transferred(partial ?: totalValue)
+        SettledPayment.Outcome.Failed -> if (isIncoming) PaymentStatus.FailedTransfer else PaymentStatus.FailedDetection
     }
 }

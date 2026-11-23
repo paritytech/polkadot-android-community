@@ -2,20 +2,23 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.sessi
 
 import io.paritytech.polkadotapp.common.utils.childScope
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling.SyncPeerChannelSignaling
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
-import java.util.UUID
 
 class DeviceTransferSession(
-    val requestId: UUID,
+    val requestId: String,
     val role: DeviceTransferRole,
     val signaling: SyncPeerChannelSignaling,
     private val transport: DeviceTransferSessionTransport,
     private val scope: CoroutineScope,
+    private val peerFound: CompletableDeferred<Unit>,
 ) {
-    fun sendRejection() {
-        transport.sendRejection()
+    suspend fun awaitPeerFound() {
+        peerFound.await()
     }
+
+    suspend fun sendRejection(): Result<Unit> = transport.sendRejection()
 
     suspend fun awaitRejection() {
         transport.awaitRejection()

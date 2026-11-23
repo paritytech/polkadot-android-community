@@ -23,4 +23,5 @@ class CoinageHandoffLocal(
     val installationId: ByteArray,
     val derivationIndex: Int,
     val committed: Boolean,
+    val committedAt: Long?,
 )

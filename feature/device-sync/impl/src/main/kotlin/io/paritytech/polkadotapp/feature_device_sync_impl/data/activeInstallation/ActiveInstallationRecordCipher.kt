@@ -4,6 +4,7 @@ import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.Bina
 import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.encodeToByteArray
 import io.paritytech.polkadotapp.common.data.encryption.MessageEncryption
 import io.paritytech.polkadotapp.common.data.encryption.chaCha20Poly1305
+import io.paritytech.polkadotapp.common.data.encryption.hkdfSha256
 import io.paritytech.polkadotapp.common.domain.model.AeadKey
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.decodeFromByteArrayCatching
@@ -18,17 +19,21 @@ class ActiveInstallationRecordCipher @Inject constructor() {
         val record = VersionedActiveDeviceScale.V1(installation.toScale())
         val encoded = BinaryScale.encodeToByteArray<VersionedActiveDeviceScale>(record)
 
-        return MessageEncryption.chaCha20Poly1305(key).encrypt(encoded)
+        return encryption(key).encrypt(encoded)
     }
 
     fun open(sealed: ByteArray, key: AeadKey): ActiveInstallation? {
-        val encoded = runCatching { MessageEncryption.chaCha20Poly1305(key).decrypt(sealed) }.getOrNull() ?: return null
+        val encoded = runCatching { encryption(key).decrypt(sealed) }.getOrNull() ?: return null
         val record = BinaryScale.decodeFromByteArrayCatching<VersionedActiveDeviceScale>(encoded).getOrNull()
 
         return when (record) {
             is VersionedActiveDeviceScale.V1 -> record.installation.toDomain()
             null -> null
         }
+    }
+
+    private fun encryption(key: AeadKey): MessageEncryption {
+        return MessageEncryption.chaCha20Poly1305(hkdfSha256(key.bytes.value))
     }
 
     private fun ActiveInstallation.toScale() = ActiveInstallationScale(

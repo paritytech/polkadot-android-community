@@ -1,5 +1,7 @@
 package io.paritytech.polkadotapp.feature_coinage_impl.data.transaction
 
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetStates
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageOperationGroupId
@@ -8,6 +10,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Co
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.OwnAsset
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.RegistrationScope
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.Instant
 
 /** The assets one transaction consumes and mints, as registration supplies them. */
 data class AssetRegistration(
@@ -63,6 +66,14 @@ interface CoinageAssetLedger {
 
     /** Makes the marks on [keys] final. */
     suspend fun commitHandoffs(keys: List<AssetPublicKey>): Result<Unit>
+
+    suspend fun getCommittedCoinHandoffs(committedAfter: Instant?): List<HandedOffCoin>
+
+    suspend fun insertSyncedHandoffs(assets: List<LedgerAsset>)
+
+    suspend fun hasHandoffsFrom(installation: CoinageInstallationId, keys: List<AssetPublicKey>): Boolean
+
+    fun observeLastHandoffCommit(): Flow<Long?>
 
     /** Drops every mark that was never committed — the payments behind them never happened. */
     suspend fun releaseUncommittedHandoffs(): Result<Unit>

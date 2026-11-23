@@ -10,7 +10,9 @@ import io.paritytech.polkadotapp.database.model.CoinageEntryInputLocal
 import io.paritytech.polkadotapp.database.model.CoinageEntryOutputLocal
 import io.paritytech.polkadotapp.database.model.CoinageHandoffLocal
 import io.paritytech.polkadotapp.database.model.DurableTxLocal
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstallationId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageKeyIndex
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetStates
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageInput
@@ -27,6 +29,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.Registr
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
+import kotlin.time.Instant
 
 class RealCoinageAssetLedger @Inject constructor(
     private val dao: CoinageEntryDao,
@@ -107,13 +110,33 @@ class RealCoinageAssetLedger @Inject constructor(
                 throw CoinageRegistrationError.HandoffOfHandedOffAsset(it)
             }
 
-            dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal(committed) })
+            val committedAt = if (committed) System.currentTimeMillis() else null
+            dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal(committed, committedAt) })
         }
     }
 
     override suspend fun commitHandoffs(keys: List<AssetPublicKey>): Result<Unit> = runCatching {
-        dao.commitHandoffs(keys.map { it.value })
+        dao.commitHandoffs(keys.map { it.value }, committedAt = System.currentTimeMillis())
     }
+
+    override suspend fun getCommittedCoinHandoffs(committedAfter: Instant?): List<HandedOffCoin> {
+        return dao.getCommittedCoinHandoffs(committedAfter?.toEpochMilliseconds()).map { handoff ->
+            HandedOffCoin(
+                index = handoff.installationId.toCoinageKeyIndex(handoff.derivationIndex),
+                exponent = handoff.valueExponent,
+            )
+        }
+    }
+
+    override suspend fun insertSyncedHandoffs(assets: List<LedgerAsset>) {
+        dao.insertHandoffs(assets.mapNotNull { it.toHandoffLocal(committed = true, committedAt = null) })
+    }
+
+    override suspend fun hasHandoffsFrom(installation: CoinageInstallationId, keys: List<AssetPublicKey>): Boolean {
+        return dao.hasHandoffsFrom(installation.value.value, keys.map { it.value })
+    }
+
+    override fun observeLastHandoffCommit(): Flow<Long?> = dao.observeLastHandoffCommittedAt()
 
     override suspend fun releaseUncommittedHandoffs(): Result<Unit> = runCatching {
         dao.deleteUncommittedHandoffs()
@@ -214,7 +237,7 @@ private fun RegistrationOutput.toLocal(entryId: Long, position: Int) = CoinageEn
     onChainKey = publicKey.value,
 )
 
-private fun LedgerAsset.toHandoffLocal(committed: Boolean): CoinageHandoffLocal? {
+private fun LedgerAsset.toHandoffLocal(committed: Boolean, committedAt: Long?): CoinageHandoffLocal? {
     val owned = asset ?: return null
 
     return CoinageHandoffLocal(
@@ -223,6 +246,7 @@ private fun LedgerAsset.toHandoffLocal(committed: Boolean): CoinageHandoffLocal?
         installationId = owned.index().installation.value.value,
         derivationIndex = owned.index().item,
         committed = committed,
+        committedAt = committedAt,
     )
 }
 

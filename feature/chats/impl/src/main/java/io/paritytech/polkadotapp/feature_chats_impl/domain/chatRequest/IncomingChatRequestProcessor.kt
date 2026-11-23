@@ -77,6 +77,8 @@ sealed class IncomingRequestProcessingResult {
         data object ChatRequestAlreadyProcessed : Ignored()
 
         data object RequestAlreadyCancelled : Ignored()
+
+        data object SenderBlocked : Ignored()
     }
 
     /** New contact and request were created */
@@ -212,6 +214,8 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact,
         data: IncomingChatRequestData
     ): IncomingRequestProcessingResult {
+        if (contact.isBlocked) return IncomingRequestProcessingResult.Ignored.SenderBlocked
+
         // Known contact re-invited (left + came back): recreate the request + auto-accept so both reconnect.
         val created = createNewIncomingRequestChat(data, contact.username, contact.chatKey)
         require(created is IncomingRequestProcessingResult.NewContactCreated)
@@ -225,14 +229,17 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         contact: Contact,
         ourRequest: ChatRequest,
         incomingData: IncomingChatRequestData
-    ): IncomingRequestProcessingResult.AutoAccepted {
+    ): IncomingRequestProcessingResult {
+        if (contact.isBlocked) return IncomingRequestProcessingResult.Ignored.SenderBlocked
+
         val updatedContact = contactsRepository.withTransaction {
             markChatAccepted(contact.accountId)
             chatRequestRepository.updateStatus(ourRequest.id, ChatRequest.Status.ACCEPTED)
-            chatRequestRepository.save(createNewChatRequest(incomingData).copy(status = ChatRequest.Status.ACCEPTED))
+            chatRequestRepository.save(createNewChatRequest(incomingData, ChatRequest.Status.ACCEPTED))
+            saveWelcomeMessage(contact.accountId, incomingData)
             val updated = updateContactFromRequest(contact, incomingData)
             markOurWelcomeMessageAsRead(ourRequest.welcomeMessageId)
-            recordAcceptance(contact.accountId, ourRequest.id)
+            recordAcceptance(contact.accountId, incomingData.chatRequestId)
             updated
         }
 
@@ -299,7 +306,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         existingRequest: ChatRequest,
         incomingData: IncomingChatRequestData
     ): IncomingRequestProcessingResult {
-        val newRequest = createNewChatRequest(incomingData)
+        val newRequest = createNewChatRequest(incomingData, ChatRequest.Status.PENDING)
 
         return if (newRequest.timestamp > existingRequest.timestamp) {
             // We do explicit update in case messageId (and thus request id) has changed
@@ -322,13 +329,13 @@ class RealIncomingChatRequestProcessor @Inject constructor(
         }
     }
 
-    private fun createNewChatRequest(incomingData: IncomingChatRequestData): ChatRequest {
+    private fun createNewChatRequest(incomingData: IncomingChatRequestData, status: ChatRequest.Status): ChatRequest {
         return ChatRequest(
             welcomeMessageId = incomingData.chatRequestId,
             peer = incomingData.request.peerIdentityAccountId(),
             timestamp = incomingData.request.timestamp,
             direction = ChatRequest.Direction.INCOMING,
-            status = ChatRequest.Status.PENDING,
+            status = status,
             delivery = ChatRequest.Delivery.DeliveredUntracked,
         )
     }

@@ -16,8 +16,8 @@ import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.Device
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSessionCreator
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import java.util.UUID
 import javax.inject.Inject
 
 class DeviceTransferSessionFactory @Inject constructor(
@@ -26,7 +26,7 @@ class DeviceTransferSessionFactory @Inject constructor(
     private val sessionCreatorFactory: CommunicationSessionCreator.Factory,
 ) {
     suspend fun create(
-        requestId: UUID,
+        requestId: String,
         role: DeviceTransferRole,
         parentScope: CoroutineScope,
     ): Result<DeviceTransferSession> {
@@ -39,7 +39,7 @@ class DeviceTransferSessionFactory @Inject constructor(
 
     private suspend fun createSession(
         keys: DeviceTransferKeySchedule,
-        requestId: UUID,
+        requestId: String,
         role: DeviceTransferRole,
         encryption: PresharedKeyEncryption,
         parentScope: CoroutineScope,
@@ -60,14 +60,15 @@ class DeviceTransferSessionFactory @Inject constructor(
             statementLifetime = StatementLifetime.Limited(DeviceTransferConstants.STATEMENT_LIFETIME),
         )
         val transport = DeviceTransferSessionTransport(communicationSession, scope)
-        val signaling = SyncPeerChannelSignaling(transport = transport, scope = scope, onOfferIdDetermined = {})
+        val peerFound = CompletableDeferred<Unit>()
+        val signaling = SyncPeerChannelSignaling(transport = transport, scope = scope, onOfferIdDetermined = { peerFound.complete(Unit) })
 
-        return DeviceTransferSession(requestId, role, signaling, transport, scope)
+        return DeviceTransferSession(requestId, role, signaling, transport, scope, peerFound)
     }
 
     private fun presharedKeyEncryption(
         keys: DeviceTransferKeySchedule,
-        requestId: UUID,
+        requestId: String,
     ): Result<PresharedKeyEncryption> {
         val unusedPublicKey = ByteArray(X25519PublicKey.SIZE_BYTES).toDataByteArray()
 

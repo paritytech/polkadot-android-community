@@ -23,6 +23,11 @@ class DeviceTransferCheckpointStorage @Inject constructor(
         }
     }
 
+    fun clear() {
+        preferences.removeField(KEY_SENDER_INSTALLATION_ID)
+        preferences.removeField(KEY_TIME_POINT)
+    }
+
     private companion object {
         const val KEY_SENDER_INSTALLATION_ID = "device_transfer_checkpoint_sender_installation_id"
         const val KEY_TIME_POINT = "device_transfer_checkpoint_time_point"
