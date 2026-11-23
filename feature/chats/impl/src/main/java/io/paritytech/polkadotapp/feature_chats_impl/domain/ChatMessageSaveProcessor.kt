@@ -7,5 +7,5 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
  * Implementations are called for both incoming and outgoing messages.
  */
 interface ChatMessageSaveProcessor {
-    suspend fun onMessageSaved(message: ChatMessage)
+    suspend fun onMessageSaved(message: ChatMessage, isFromSync: Boolean)
 }

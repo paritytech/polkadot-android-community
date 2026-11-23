@@ -33,11 +33,11 @@ class SyncEntityCollector @Inject constructor(
     private val syncFilter: DeviceSyncFilter,
     private val chatStateCollector: ChatStateEntityCollector,
 ) {
-    suspend fun collect(checkpoint: Instant): List<SyncEntityScale> = listOfNotNull(
-        collectDevices(checkpoint),
-        collectChatsAdded(checkpoint),
-        collectChatsRemoved(checkpoint),
-    ) + chatStateCollector.collect(checkpoint) + listOfNotNull(collectMessages(checkpoint))
+    suspend fun collect(checkpoint: Instant): List<SyncEntityScale> =
+        listOfNotNull(collectDevices(checkpoint)) + collectChatState(checkpoint) + listOfNotNull(collectMessages(checkpoint))
+
+    suspend fun collectChatState(checkpoint: Instant): List<SyncEntityScale> =
+        listOfNotNull(collectChatsAdded(checkpoint), collectChatsRemoved(checkpoint)) + chatStateCollector.collect(checkpoint)
 
     private suspend fun collectDevices(checkpoint: Instant): SyncEntityScale.Devices? {
         val checkpointMillis = checkpoint.toEpochMilliseconds()
@@ -64,7 +64,11 @@ class SyncEntityCollector @Inject constructor(
     }
 
     private suspend fun collectMessages(checkpoint: Instant): SyncEntityScale.Messages? {
-        val messages = applyRemoteChatMessageUseCase.getMessagesUpdatedAfter(checkpoint).mapNotNull { syncMessage ->
+        return toMessagesEntity(applyRemoteChatMessageUseCase.getMessagesUpdatedAfter(checkpoint))
+    }
+
+    fun toMessagesEntity(syncMessages: List<ApplyRemoteChatMessageUseCase.MessageForSync>): SyncEntityScale.Messages? {
+        val messages = syncMessages.mapNotNull { syncMessage ->
             BinaryScale.decodeFromByteArrayCatching<ChatMessageStatement>(syncMessage.encoded)
                 .onFailure { Timber.w(it, "SyncEntityCollector: failed to decode outbound chat message for sync") }
                 .getOrNull()
@@ -73,7 +77,7 @@ class SyncEntityCollector @Inject constructor(
                         remote = remote,
                         peerId = syncMessage.peerAccountId.value,
                         status = syncMessage.toLocalStatusScale(),
-                        order = syncMessage.timestamp.toULong(),
+                        order = syncMessage.order.toULong(),
                     )
                 }
         }

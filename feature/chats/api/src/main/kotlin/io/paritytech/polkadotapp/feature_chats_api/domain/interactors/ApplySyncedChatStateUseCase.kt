@@ -12,4 +12,6 @@ interface ApplySyncedChatStateUseCase {
     suspend fun applyPendingOutgoingRequests(requests: List<ChatStateForSync.OutgoingRequest>): Result<Unit>
 
     suspend fun applyOutgoingRequestUpdates(updates: List<ChatStateForSync.OutgoingRequestUpdate>, removedAt: Long)
+
+    suspend fun applyContactDevices(changes: List<ChatStateForSync.ContactDeviceChange>)
 }

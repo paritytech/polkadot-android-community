@@ -7,10 +7,13 @@ import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.feature_account_api.data.repository.AccountRepository
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.MessageForSync
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.MessagePageForSync
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase.Placement
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessage
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageOrigin
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageReaction
+import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatMessageSyncCursor
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatVariant
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.onEdited
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.onReacted
@@ -46,6 +49,7 @@ class RealApplyRemoteChatMessageUseCase @Inject constructor(
         peerAccountId: AccountId,
         isOutgoing: Boolean,
         status: ChatMessage.Status,
+        placement: Placement,
     ) {
         val authorAccountId = if (isOutgoing) ourAccountId() else peerAccountId
         val chatMessage = encoded.toChatMessageOrUnsupported(
@@ -56,7 +60,12 @@ class RealApplyRemoteChatMessageUseCase @Inject constructor(
             .logFailure("ApplyRemoteChatMessageUseCase: failed to decode remote/synced message; dropping")
             .getOrElse { return }
 
-        val isSavedAsNew = chatEngine.saveMessage(chatMessage, ChatMessageSaveConflictStrategy.IGNORE, ChatMessagePlacement.ByTimestamp)
+        val isSavedAsNew = chatEngine.saveMessage(
+            chatMessage,
+            ChatMessageSaveConflictStrategy.IGNORE,
+            placement.toChatMessagePlacement(),
+            isFromSync = true,
+        )
 
         if (!isSavedAsNew) {
             chatMessageRepository.updateMessageStatus(chatMessage.id, status)
@@ -119,27 +128,54 @@ class RealApplyRemoteChatMessageUseCase @Inject constructor(
     override fun observeLocalMessageChanges(): Flow<Unit> = chatEngine.observeMessagesChanged()
 
     override suspend fun getMessagesUpdatedAfter(after: Instant): List<MessageForSync> {
-        return chatMessageRepository.getMessagesUpdatedAfter(after, customContentDecoder).mapNotNull { message ->
-            val syncable = message.toSyncableMessage() ?: return@mapNotNull null
-            runCatching {
-                val contact = syncable.chatId.chatVariant() as? ChatVariant.Contact
-                    ?: throw IllegalStateException("Non-contact chat — skipping (chatId=${syncable.chatId})")
+        return chatMessageRepository.getMessagesUpdatedAfter(after, customContentDecoder)
+            .mapNotNull { it.toMessageForSync(order = it.timestamp) }
+    }
+
+    override suspend fun getMessagePageForSync(
+        updatedAfter: Instant,
+        updatedUpTo: Instant?,
+        after: ChatMessageSyncCursor?,
+        limit: Int,
+    ): MessagePageForSync {
+        val messages = chatMessageRepository.getMessagesUpdatedInRange(updatedAfter, updatedUpTo, after, limit, customContentDecoder)
+        val nextCursor = messages.lastOrNull()
+            ?.takeIf { messages.size == limit }
+            ?.let { ChatMessageSyncCursor(sortOrder = it.sortOrder, timestamp = it.message.timestamp, messageId = it.message.id) }
+
+        return MessagePageForSync(messages.mapNotNull { it.message.toMessageForSync(order = it.sortOrder) }, nextCursor)
+    }
+
+    override suspend fun countMessagesForSync(updatedAfter: Instant, updatedUpTo: Instant?): Int {
+        return chatMessageRepository.countMessagesUpdatedInRange(updatedAfter, updatedUpTo)
+    }
+
+    private fun ChatMessage.toMessageForSync(order: Long): MessageForSync? {
+        val syncable = toSyncableMessage() ?: return null
+        val contact = syncable.chatId.chatVariant() as? ChatVariant.Contact ?: return null
+
+        return syncable.toEncodedMessage()
+            .map { encoded ->
                 MessageForSync(
-                    encoded = syncable.toEncodedMessage().getOrThrow(),
+                    encoded = encoded,
                     peerAccountId = contact.contactAccountId,
                     isOutgoing = syncable.origin is ChatMessageOrigin.User,
                     status = syncable.status,
-                    timestamp = syncable.timestamp,
+                    order = order,
                 )
             }
-                .logFailure("RealApplyRemoteChatMessageUseCase: failed to map message ${message.id} for sync")
-                .getOrNull()
-        }
+            .logFailure("RealApplyRemoteChatMessageUseCase: failed to map message $id for sync")
+            .getOrNull()
     }
 
     private fun ChatMessage.toSyncableMessage(): ChatMessage? = when (val content = content) {
         is ChatMessage.Content.ChatRequest -> content.welcome?.let { this.copy(content = it) }
         else -> this
+    }
+
+    private fun Placement.toChatMessagePlacement(): ChatMessagePlacement = when (this) {
+        Placement.BY_TIMESTAMP -> ChatMessagePlacement.ByTimestamp
+        Placement.AFTER_EXISTING -> ChatMessagePlacement.Latest
     }
 
     private suspend fun ourAccountId(): AccountId {

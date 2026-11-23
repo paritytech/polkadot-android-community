@@ -1,11 +1,12 @@
 package io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.protocol
 
-import io.paritytech.polkadotapp.common.domain.model.DataByteArray
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.AbortReasonScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.DeviceTransferControlScale
 import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncMessageScale
-import io.paritytech.polkadotapp.feature_device_sync_impl.data.model.scale.SyncUpdateScale
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileChannelRegistry
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileTransfer
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.transfer.raceFirst
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.DataTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -13,16 +14,20 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 class DeviceTransferSender(
-    private val updates: List<SyncUpdateScale>,
-    private val deviceKey: DataByteArray,
+    private val sequencer: DeviceTransferSenderSequencer,
+    private val ourDeviceKeypairProvider: OurDeviceKeypairProvider,
+    private val fileTransferFactory: SyncFileTransfer.Factory,
 ) {
-    private val acknowledgedUpdateIds = mutableSetOf<UInt>()
-    private val cancelRequest = CompletableDeferred<Unit>()
+    private companion object {
+        const val FILE_PEER_LOG_ID = "device-transfer-receiver"
+    }
 
-    val totalChanges: Int = updates.sumOf { it.entities.itemCount() }
+    private val cancelRequest = CompletableDeferred<Unit>()
+    private val fileChannels = SyncFileChannelRegistry()
 
     fun cancel() {
         cancelRequest.complete(Unit)
@@ -30,6 +35,7 @@ class DeviceTransferSender(
 
     suspend fun run(transport: DataTransport): DeviceTransferSenderOutcome = coroutineScope {
         val acks = Channel<UInt>(Channel.UNLIMITED)
+        val resumeCheckpoints = Channel<ULong?>(Channel.UNLIMITED)
         val receiverEnd = CompletableDeferred<DeviceTransferSenderOutcome>()
 
         val ackListening = launch(start = CoroutineStart.UNDISPATCHED) {
@@ -39,13 +45,19 @@ class DeviceTransferSender(
         }
         val controlListening = launch(start = CoroutineStart.UNDISPATCHED) {
             transport.subscribeControls().collect { control ->
+                if (control is DeviceTransferControlScale.Resume) resumeCheckpoints.send(control.fromTimePoint)
                 control.toSenderOutcome()?.let(receiverEnd::complete)
             }
         }
+        val fileServing = launch(start = CoroutineStart.UNDISPATCHED) {
+            fileTransferFactory.createForDeviceTransfer(transport, FILE_PEER_LOG_ID, fileChannels).run()
+        }
+
+        transport.awaitOpen()
 
         val outcome = raceFirst(
             {
-                sendSnapshot(transport, acks)
+                sendSteps(transport, sequencer.stepsFrom(resumeCheckpoints.receive()), acks)
                 awaitCancellation()
             },
             { receiverEnd.await() },
@@ -54,21 +66,30 @@ class DeviceTransferSender(
 
         ackListening.cancel()
         controlListening.cancel()
+        fileServing.cancel()
         outcome
     }
 
-    private suspend fun sendSnapshot(transport: DataTransport, acks: ReceiveChannel<UInt>) {
-        transport.sendControl(DeviceTransferControlScale.Begin(totalChanges.toUInt()))
+    private suspend fun sendSteps(
+        transport: DataTransport,
+        steps: Flow<DeviceTransferSenderStep>,
+        acks: ReceiveChannel<UInt>,
+    ) {
+        steps.collect { step ->
+            when (step) {
+                is DeviceTransferSenderStep.Started -> {
+                    val deviceKey = ourDeviceKeypairProvider.get().privateKey.bytes.value
+                    transport.sendControl(DeviceTransferControlScale.SenderStarted(deviceKey, step.totalChanges.toUInt()))
+                }
 
-        for (update in updates) {
-            if (update.id in acknowledgedUpdateIds) continue
-
-            transport.sendSyncMessage(SyncMessageScale.Update(update))
-            awaitAck(update.id, acks)
-            acknowledgedUpdateIds += update.id
+                is DeviceTransferSenderStep.Update -> {
+                    transport.sendSyncMessage(SyncMessageScale.Update(step.update))
+                    awaitAck(step.update.id, acks)
+                }
+            }
         }
 
-        transport.sendControl(DeviceTransferControlScale.SenderCompleted(deviceKey.value))
+        transport.sendControl(DeviceTransferControlScale.SenderCompleted)
     }
 
     private suspend fun awaitAck(updateId: UInt, acks: ReceiveChannel<UInt>) {
@@ -86,6 +107,8 @@ class DeviceTransferSender(
     private fun DeviceTransferControlScale.toSenderOutcome(): DeviceTransferSenderOutcome? = when (this) {
         DeviceTransferControlScale.ReceiverCompleted -> DeviceTransferSenderOutcome.Completed
         is DeviceTransferControlScale.Abort -> DeviceTransferSenderOutcome.AbortedByReceiver(reason.toDomain())
-        is DeviceTransferControlScale.Begin, is DeviceTransferControlScale.SenderCompleted -> null
+        is DeviceTransferControlScale.SenderStarted,
+        DeviceTransferControlScale.SenderCompleted,
+        is DeviceTransferControlScale.Resume -> null
     }
 }

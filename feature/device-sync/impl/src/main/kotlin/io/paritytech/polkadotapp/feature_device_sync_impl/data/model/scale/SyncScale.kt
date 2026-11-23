@@ -70,6 +70,10 @@ sealed interface SyncEntityScale {
     @Serializable
     @EnumIndex(8)
     class OutgoingRequestsStatusUpdated(val updates: List<OutgoingRequestStatusUpdateScale>) : SyncEntityScale
+
+    @Serializable
+    @EnumIndex(11)
+    class ContactDevicesChanged(val changes: List<ContactDeviceChangeScale>) : SyncEntityScale
 }
 
 @Serializable
@@ -160,3 +164,22 @@ class OutgoingRequestStatusUpdateScale(
     val requestId: String,
     val status: OutgoingRequestStatusScale,
 )
+
+@Serializable
+class ContactDeviceChangeScale(
+    val chatId: ChatIdScale,
+    @FixedLength(32)
+    val statementAccountId: ByteArray,
+    val encryptionPublicKey: X25519PublicKeyScale,
+    val status: ContactDeviceStatusScale,
+    val changedAt: ULong,
+)
+
+@Serializable
+enum class ContactDeviceStatusScale {
+    @EnumIndex(0)
+    ACTIVE,
+
+    @EnumIndex(1)
+    INACTIVE,
+}

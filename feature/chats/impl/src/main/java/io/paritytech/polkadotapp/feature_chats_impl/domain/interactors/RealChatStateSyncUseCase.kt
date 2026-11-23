@@ -9,10 +9,12 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatStateForSync
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.isIncoming
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
+import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactDevicesRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ContactsRepository
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.OutgoingChatRequestService
 import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.delivery.ChatRequestPayloadLoader
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.merge
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Instant
@@ -22,6 +24,7 @@ class RealChatStateSyncUseCase @Inject constructor(
     private val chatRequestRepository: ChatRequestRepository,
     private val payloadLoader: ChatRequestPayloadLoader,
     private val outgoingChatRequestService: OutgoingChatRequestService,
+    private val contactDevicesRepository: ContactDevicesRepository,
 ) : ChatStateSyncUseCase {
     override suspend fun getChatState(changedAfter: Instant?): ChatStateForSync {
         val requests = if (changedAfter == null) chatRequestRepository.getAll() else chatRequestRepository.getStatusChangedAfter(changedAfter)
@@ -35,10 +38,13 @@ class RealChatStateSyncUseCase @Inject constructor(
             processedIncomingRequests = incoming.mapNotNull { it.toProcessedIncomingRequest() },
             pendingOutgoingRequests = pendingOutgoing.mapNotNull { (request, contact) -> toPendingOutgoingRequest(request, contact) },
             outgoingRequestUpdates = settledOutgoing.map { it.toOutgoingRequestUpdate() },
+            contactDevices = contactDevicesRepository.getDevicesForSync(changedAfter),
         )
     }
 
-    override fun observeChatStateChanges(): Flow<Unit> = chatRequestRepository.observeStatusChanges()
+    override fun observeChatStateChanges(): Flow<Unit> {
+        return merge(chatRequestRepository.observeStatusChanges(), contactDevicesRepository.observeModifications())
+    }
 
     private suspend fun blockStates(changedAfter: Instant?): List<ChatStateForSync.BlockState> {
         val contacts = if (changedAfter == null) contactsRepository.getBlockedContacts() else contactsRepository.getBlockChangedAfter(changedAfter)

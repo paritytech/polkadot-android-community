@@ -7,6 +7,7 @@ class ChatStateForSync(
     val processedIncomingRequests: List<IncomingRequest>,
     val pendingOutgoingRequests: List<OutgoingRequest>,
     val outgoingRequestUpdates: List<OutgoingRequestUpdate>,
+    val contactDevices: List<ContactDeviceChange>,
 ) {
     class BlockState(val accountId: AccountId, val isBlocked: Boolean)
 
@@ -17,4 +18,6 @@ class ChatStateForSync(
     class OutgoingRequest(val id: ChatRequestId, val peer: AccountId, val timestamp: Long, val encodedContent: ByteArray)
 
     class OutgoingRequestUpdate(val id: ChatRequestId, val isCancelled: Boolean)
+
+    class ContactDeviceChange(val device: ContactDevice, val isActive: Boolean, val changedAt: Long)
 }

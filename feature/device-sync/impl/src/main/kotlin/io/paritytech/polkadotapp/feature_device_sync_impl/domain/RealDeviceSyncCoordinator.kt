@@ -15,6 +15,7 @@ import io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine.DeviceSy
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine.LocalSyncTrigger
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine.SyncEntityApplier
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine.SyncEntityCollector
+import io.paritytech.polkadotapp.feature_device_sync_impl.domain.fileTransfer.SyncFileTransfer
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.session.DevicesSessionManager
 import io.paritytech.polkadotapp.feature_device_sync_impl.domain.session.OwnDeviceSession
 import io.paritytech.polkadotapp.feature_sso_api.domain.OwnDevicesJournal
@@ -42,6 +43,7 @@ class RealDeviceSyncCoordinator @Inject constructor(
     private val collector: SyncEntityCollector,
     private val applier: SyncEntityApplier,
     private val localSyncTrigger: LocalSyncTrigger,
+    private val fileTransferFactory: SyncFileTransfer.Factory,
     dispatchers: CoroutineDispatchers,
 ) : DeviceSyncCoordinator, CoroutineScope {
     override val coroutineContext = dispatchers.io + SupervisorJob()
@@ -74,6 +76,7 @@ class RealDeviceSyncCoordinator @Inject constructor(
                 collector = collector,
                 applier = applier,
                 localSyncTrigger = localSyncTrigger,
+                fileTransferFactory = fileTransferFactory,
                 scope = engineScope,
             )
             engine.start()
