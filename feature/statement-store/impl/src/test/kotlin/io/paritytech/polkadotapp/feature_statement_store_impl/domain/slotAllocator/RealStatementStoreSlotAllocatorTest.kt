@@ -16,6 +16,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocato
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementSlotsForCollection
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementStoreSlot
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementStoreSlotAllocationError
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementStoreSlotHolder
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementStoreSlots
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.repository.StatementStoreSlotAllocationRepository
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.repository.StatementStoreSlotRepository
@@ -49,6 +50,7 @@ class RealStatementStoreSlotAllocatorTest {
     private val period = 100u
 
     private val target: AccountId = byteArrayOf(0x01).toDataByteArray()
+    private val targetHolder = StatementStoreSlotHolder.Local(target, derivationPath = "//target")
     private val accountHigh: AccountId = byteArrayOf(0x02).toDataByteArray()
     private val accountNormal: AccountId = byteArrayOf(0x03).toDataByteArray()
     private val accountUntracked: AccountId = byteArrayOf(0x04).toDataByteArray()
@@ -68,6 +70,7 @@ class RealStatementStoreSlotAllocatorTest {
     private val allocationRepository: StatementStoreSlotAllocationRepository =
         mock(StatementStoreSlotAllocationRepository::class.java)
     private val renewer: StatementStoreSlotRenewer = mock(StatementStoreSlotRenewer::class.java)
+    private val slotReplacer: StatementStoreSlotReplacer = mock(StatementStoreSlotReplacer::class.java)
     private val lock = StatementStoreSlotRenewalLock()
     private val knownChains = KnownChains(people = chainId, assetHub = "assetHub", bulletIn = "bulletIn", hydration = null)
 
@@ -84,6 +87,7 @@ class RealStatementStoreSlotAllocatorTest {
         renewalLock = lock,
         currentTimeContext = fixedTimeContext,
         currentPeriodProvider = { period },
+        slotReplacer = slotReplacer,
     )
 
     @Before
@@ -180,7 +184,7 @@ class RealStatementStoreSlotAllocatorTest {
 
         assertSuccess(result)
         verifySlotDeletedFor(accountHigh, seq = 0u)
-        verifyAllocationInsertedFor(target, seq = 0u, priority = SlotPriority.Critical)
+        verifyAllocationInsertedFor(targetHolder, seq = 0u, priority = SlotPriority.Critical)
     }
 
     @Test
@@ -195,7 +199,7 @@ class RealStatementStoreSlotAllocatorTest {
 
         assertSuccess(result)
         verifySlotDeletedFor(accountNormal, seq = 0u)
-        verifyAllocationInsertedFor(target, seq = 0u, priority = SlotPriority.Normal)
+        verifyAllocationInsertedFor(targetHolder, seq = 0u, priority = SlotPriority.Normal)
     }
 
     @Test
@@ -210,7 +214,7 @@ class RealStatementStoreSlotAllocatorTest {
 
         assertSuccess(result)
         verifySlotDeletedFor(accountHigh, seq = 0u)
-        verifyAllocationInsertedFor(target, seq = 0u, priority = SlotPriority.High)
+        verifyAllocationInsertedFor(targetHolder, seq = 0u, priority = SlotPriority.High)
     }
 
     @Test
@@ -255,7 +259,7 @@ class RealStatementStoreSlotAllocatorTest {
 
         assertSuccess(result)
         verifyNoEvictionPerformed()
-        verifyAllocationInsertedFor(target, seq = 0u, priority = SlotPriority.High)
+        verifyAllocationInsertedFor(targetHolder, seq = 0u, priority = SlotPriority.High)
     }
 
     @Test
@@ -283,7 +287,7 @@ class RealStatementStoreSlotAllocatorTest {
 
         assertSuccess(result)
         verifyNoEvictionPerformed()
-        verifyAllocationInsertedFor(target, seq = 0u, priority = SlotPriority.High, inCollection = liteCollection)
+        verifyAllocationInsertedFor(targetHolder, seq = 0u, priority = SlotPriority.High, inCollection = liteCollection)
     }
 
     @Test
@@ -322,7 +326,7 @@ class RealStatementStoreSlotAllocatorTest {
         assertSuccess(result)
         verifySlotDeletedFor(accountNormal, seq = 0u, inCollection = liteCollection)
         verifyNoEvictionOf(accountHigh)
-        verifyAllocationInsertedFor(target, seq = 0u, priority = SlotPriority.High, inCollection = liteCollection)
+        verifyAllocationInsertedFor(targetHolder, seq = 0u, priority = SlotPriority.High, inCollection = liteCollection)
     }
 
     // -- setup helpers (every used method gets an explicit stub) --
@@ -378,8 +382,9 @@ class RealStatementStoreSlotAllocatorTest {
         }
     }
 
-    /** Cooldown is zero, so any taken slot is immediately replaceable. */
+    /** The runtime has no replace call and the cooldown is zero, so any taken slot is immediately replaceable. */
     private suspend fun withZeroCooldown() {
+        whenever(slotRepository.supportsSlotReplacement()).thenReturn(Result.success(false))
         whenever(slotRepository.replacementCooldown()).thenReturn(Result.success(0.seconds))
     }
 
@@ -453,7 +458,7 @@ class RealStatementStoreSlotAllocatorTest {
     }
 
     private suspend fun verifyAllocationInsertedFor(
-        account: AccountId,
+        holder: StatementStoreSlotHolder,
         seq: UInt,
         priority: SlotPriority,
         inCollection: PeopleCollection = collection,
@@ -461,7 +466,7 @@ class RealStatementStoreSlotAllocatorTest {
         verify(allocationRepository, times(1)).insert(
             chainId = eq(chainId),
             collection = eq(inCollection),
-            accountId = eq(account),
+            holder = eq(holder),
             seq = eqUInt(seq),
             latestRenewedPeriod = anyUInt(),
             since = any(),
@@ -483,6 +488,6 @@ class RealStatementStoreSlotAllocatorTest {
     )
 
     private suspend fun allocate(strategy: OnExistingAllocationStrategy, priority: SlotPriority): Result<Unit> {
-        return with(StalenessReportCollector.NoOp) { allocator.allocate(target, strategy, priority) }
+        return with(StalenessReportCollector.NoOp) { allocator.allocate(targetHolder, strategy, priority) }
     }
 }
