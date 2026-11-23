@@ -21,15 +21,16 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.common.testConversionContext
-import io.paritytech.polkadotapp.feature_coinage_impl.data.mappers.BUNDLED_PRIVACY_CONFIG
 import io.paritytech.polkadotapp.feature_coinage_impl.data.repository.CoinRepository
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FakeCoinagePrivacyConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.ForcedRecyclingAgeProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingParamsProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.bundledParams
 import io.paritytech.polkadotapp.feature_coinage_impl.testKey
 import io.paritytech.polkadotapp.feature_transactions.api.domain.durable.DurableTxStatus
 import io.paritytech.polkadotapp.test_shared.any
@@ -82,11 +83,10 @@ class RealTotalBalanceUseCaseTest {
             coinageAssetsUseCase = coinageAssetsUseCase,
             coinageBalanceConverterUseCase = coinageBalanceConverterUseCase,
             strategyProvider = strategyProvider,
-            settings = settings,
+            paramsProvider = RecyclingParamsProvider(settings, FakeCoinagePrivacyConfigProvider()),
             evaluator = evaluator,
             usabilityContextFactory = VoucherUsabilityContextFactory(ringCapacityProvider, timeProvider),
             readinessUpdates = mock(),
-            privacyConfigProvider = FakeCoinagePrivacyConfigProvider(),
         )
     }
 
@@ -328,9 +328,8 @@ class RealTotalBalanceUseCaseTest {
         useCase.calculateCoinageBalance(
             coins = coins.zip(coinStates, ::TrackedCoin),
             vouchers = vouchers.zip(voucherStates, ::TrackedVoucher),
-            strategyType = strategyType,
+            params = strategyType.bundledParams,
             verdicts = verdicts,
-            privacyConfig = BUNDLED_PRIVACY_CONFIG,
         ).getOrThrow()
     }
 

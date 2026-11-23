@@ -2,14 +2,13 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.usecase
 
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageHoldings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageHoldingsUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingParamsProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherReadinessUpdates
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
@@ -27,22 +26,20 @@ import javax.inject.Inject
 class RealCoinageHoldingsUseCase @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val strategyProvider: RecyclingStrategyProvider,
-    private val settings: CoinageRecyclingStrategySettings,
+    private val paramsProvider: RecyclingParamsProvider,
     private val evaluator: CoinRecyclingEvaluator,
     private val usabilityContextFactory: VoucherUsabilityContextFactory,
     private val readinessUpdates: VoucherReadinessUpdates,
-    private val privacyConfigProvider: CoinagePrivacyConfigProvider,
 ) : CoinageHoldingsUseCase {
     override fun subscribeHoldings(): Flow<CoinageHoldings> = combine(
         coinageAssetsUseCase.subscribeCoins(),
         coinageAssetsUseCase.subscribeVouchers(),
-        settings.strategyFlow(),
+        paramsProvider.paramsUpdates(),
         evaluator.verdicts,
-        privacyConfigProvider.privacyConfigUpdates(),
         ::CoinageEvaluationInput,
-    ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.strategyType }, { it.privacyConfig })
-        .map { (coins, vouchers, strategyType, verdicts, privacyConfig) ->
-            val strategy = strategyProvider.voucherStrategyFor(strategyType, privacyConfig)
+    ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.params })
+        .map { (coins, vouchers, params, verdicts) ->
+            val strategy = strategyProvider.voucherStrategyFor(params)
 
             // The list must not wait on a ring-capacity fetch before appearing.
             val usability = usabilityContextFactory.create(

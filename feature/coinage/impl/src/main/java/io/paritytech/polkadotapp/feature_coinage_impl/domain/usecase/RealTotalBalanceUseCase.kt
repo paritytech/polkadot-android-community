@@ -4,9 +4,7 @@ import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageBalance
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdicts
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingParams
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.coinageBalanceOf
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
@@ -15,8 +13,8 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalan
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedCoin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
-import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingParamsProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherReadinessUpdates
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.VoucherUsabilityContextFactory
@@ -37,30 +35,27 @@ class RealTotalBalanceUseCase @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val coinageBalanceConverterUseCase: CoinageBalanceConverterUseCase,
     private val strategyProvider: RecyclingStrategyProvider,
-    private val settings: CoinageRecyclingStrategySettings,
+    private val paramsProvider: RecyclingParamsProvider,
     private val evaluator: CoinRecyclingEvaluator,
     private val usabilityContextFactory: VoucherUsabilityContextFactory,
     private val readinessUpdates: VoucherReadinessUpdates,
-    private val privacyConfigProvider: CoinagePrivacyConfigProvider,
 ) : TotalBalanceUseCase {
     override fun subscribeTotalBalance(): Flow<Result<CoinageBalance>> = combine(
         coinageAssetsUseCase.subscribeCoins(),
         coinageAssetsUseCase.subscribeVouchers(),
-        settings.strategyFlow(),
+        paramsProvider.paramsUpdates(),
         evaluator.verdicts,
-        privacyConfigProvider.privacyConfigUpdates(),
         ::CoinageEvaluationInput,
-    ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.strategyType }, { it.privacyConfig })
-        .map { calculateCoinageBalance(it.coins, it.vouchers, it.strategyType, it.verdicts, it.privacyConfig) }
+    ).withReadinessUpdates(readinessUpdates, { it.vouchers }, { it.params })
+        .map { calculateCoinageBalance(it.coins, it.vouchers, it.params, it.verdicts) }
         .distinctUntilChanged()
 
     override suspend fun getBalance(): Result<CoinageBalance> {
         return calculateCoinageBalance(
             coins = coinageAssetsUseCase.getCoins(),
             vouchers = coinageAssetsUseCase.getVouchers(),
-            strategyType = settings.getStrategy(),
+            params = paramsProvider.currentParams(),
             verdicts = evaluator.verdicts.first(),
-            privacyConfig = privacyConfigProvider.privacyConfigOrDefault(),
         )
     }
 
@@ -72,14 +67,13 @@ class RealTotalBalanceUseCase @Inject constructor(
     internal suspend fun calculateCoinageBalance(
         coins: List<TrackedCoin>,
         vouchers: List<TrackedVoucher>,
-        strategyType: RecyclingStrategyType,
+        params: RecyclingParams,
         verdicts: RecyclingVerdicts,
-        privacyConfig: CoinagePrivacyConfig,
     ): Result<CoinageBalance> {
         if (coins.isEmpty() && vouchers.isEmpty()) return Result.success(CoinageBalance.EMPTY)
 
         return coinageBalanceConverterUseCase.create().map { conversionContext ->
-            val strategy = strategyProvider.voucherStrategyFor(strategyType, privacyConfig)
+            val strategy = strategyProvider.voucherStrategyFor(params)
             val denominations = vouchers.mapToSet { it.voucher.recyclerValue }
 
             // We use IMMEDIATE since we don't want to delay balance computation

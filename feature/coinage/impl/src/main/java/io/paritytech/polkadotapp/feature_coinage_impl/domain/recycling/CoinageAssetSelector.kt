@@ -5,12 +5,10 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.Coin
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinRecyclingState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.BalanceEvaluationMode
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherBuckets
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyCoins
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.preClassifyVouchers
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
-import io.paritytech.polkadotapp.feature_coinage_impl.data.config.CoinagePrivacyConfigProvider
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -41,10 +39,9 @@ enum class SpendScope {
 class CoinageAssetSelector @Inject constructor(
     private val coinageAssetsUseCase: CoinageAssetsUseCase,
     private val strategyProvider: RecyclingStrategyProvider,
-    private val settings: CoinageRecyclingStrategySettings,
+    private val paramsProvider: RecyclingParamsProvider,
     private val evaluator: CoinRecyclingEvaluator,
     private val voucherUsabilityContextFactory: VoucherUsabilityContextFactory,
-    private val privacyConfigProvider: CoinagePrivacyConfigProvider,
 ) {
     /** Suspends until the first verdict exists, so nothing is spent before the strategy has judged it. */
     suspend fun getSelectableCoinsByScope(): Map<SpendScope, List<Coin>> {
@@ -97,8 +94,7 @@ class CoinageAssetSelector @Inject constructor(
 
     private suspend fun confirmedSpendAllowed(): Boolean = currentStrategy().allowsConfirmedSpend()
 
-    private suspend fun currentStrategy() =
-        strategyProvider.voucherStrategyFor(settings.getStrategy(), privacyConfigProvider.privacyConfigOrDefault())
+    private suspend fun currentStrategy() = strategyProvider.voucherStrategyFor(paramsProvider.currentParams())
 
     private suspend fun voucherBuckets(): VoucherBuckets {
         val tracked = coinageAssetsUseCase.getVouchers()

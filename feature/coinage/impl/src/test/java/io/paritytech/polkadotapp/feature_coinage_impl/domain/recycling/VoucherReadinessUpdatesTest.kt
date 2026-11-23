@@ -16,8 +16,10 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclingVerdi
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.ValueExponent
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.AnonymityRequirements
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinageRecyclingStrategySettings
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingParams
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
 import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.VoucherReadiness
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
 import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.CoinageAssetState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageAssetsUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinageBalanceConverterUseCase
@@ -104,7 +106,7 @@ class VoucherReadinessUpdatesTest {
         val fixture = SchedulerFixture(this)
         val emissions = mutableListOf<Long>()
         backgroundScope.launch {
-            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY }, { fixture.privacyConfig.config })
+            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { fixture.paramsFor(RecyclingStrategyType.MAX_PRIVACY) })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -126,7 +128,7 @@ class VoucherReadinessUpdatesTest {
         val emissions = mutableListOf<Long>()
         val inputs = combine(fixture.vouchers, fixture.strategy) { vouchers, strategy -> vouchers to strategy }
         backgroundScope.launch {
-            inputs.withReadinessUpdates(fixture.updates, { it.first }, { it.second }, { fixture.privacyConfig.config })
+            inputs.withReadinessUpdates(fixture.updates, { it.first }, { fixture.paramsFor(it.second) })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -147,7 +149,7 @@ class VoucherReadinessUpdatesTest {
         val fixture = SchedulerFixture(this)
         val emissions = mutableListOf<Long>()
         backgroundScope.launch {
-            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY }, { fixture.privacyConfig.config })
+            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { fixture.paramsFor(RecyclingStrategyType.MAX_PRIVACY) })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -166,7 +168,7 @@ class VoucherReadinessUpdatesTest {
         val fixture = SchedulerFixture(this)
         val emissions = mutableListOf<Long>()
         backgroundScope.launch {
-            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { RecyclingStrategyType.MAX_PRIVACY }, { fixture.privacyConfig.config })
+            fixture.vouchers.withReadinessUpdates(fixture.updates, { it }, { fixture.paramsFor(RecyclingStrategyType.MAX_PRIVACY) })
                 .collect { emissions += testScheduler.currentTime }
         }
         runCurrent()
@@ -188,7 +190,7 @@ class VoucherReadinessUpdatesTest {
         val releaseCollector = CompletableDeferred<Unit>()
         val received = mutableListOf<Int>()
         backgroundScope.launch {
-            inputs.withReadinessUpdates(fixture.updates, { emptyList() }, { RecyclingStrategyType.MIN_PRIVACY }, { fixture.privacyConfig.config })
+            inputs.withReadinessUpdates(fixture.updates, { emptyList() }, { fixture.paramsFor(RecyclingStrategyType.MIN_PRIVACY) })
                 .collect { snapshot ->
                     received += snapshot
                     if (snapshot == 0) releaseCollector.await()
@@ -370,7 +372,7 @@ class VoucherReadinessUpdatesTest {
     private fun SchedulerFixture.emissions(scope: TestScope): List<Long> {
         val emissions = mutableListOf<Long>()
         scope.backgroundScope.launch {
-            vouchers.withReadinessUpdates(updates, { it }, { strategy.value }, { privacyConfig.config })
+            vouchers.withReadinessUpdates(updates, { it }, { paramsFor(strategy.value) })
                 .collect { emissions += scope.testScheduler.currentTime }
         }
         scope.runCurrent()
@@ -391,6 +393,8 @@ class VoucherReadinessUpdatesTest {
             clock,
             mock<ClockChangesSource>().also { whenever(it.changes()).thenReturn(clockChanges) },
         )
+
+        fun paramsFor(type: RecyclingStrategyType): RecyclingParams = type.params(privacyConfig.config)
     }
 
     private class WalletFixture(scope: TestScope, type: RecyclingStrategyType) : SchedulerFixture(scope, type) {
@@ -423,8 +427,9 @@ class VoucherReadinessUpdatesTest {
 
         val evaluator =
             CoinRecyclingEvaluator(assets, settings, provider, contextFactory, converter, recycling, dispatchers, updates, privacyConfig)
-        val balance = RealTotalBalanceUseCase(assets, converter, provider, settings, evaluator, contextFactory, updates, privacyConfig)
-        val selector = CoinageAssetSelector(assets, provider, settings, evaluator, contextFactory, privacyConfig)
+        val paramsProvider = RecyclingParamsProvider(settings, privacyConfig)
+        val balance = RealTotalBalanceUseCase(assets, converter, provider, paramsProvider, evaluator, contextFactory, updates)
+        val selector = CoinageAssetSelector(assets, provider, paramsProvider, evaluator, contextFactory)
 
         fun balanceOf(ready: Boolean): CoinageBalance {
             val amount = testConversionContext.formatExponentToBalance(ValueExponent(1))

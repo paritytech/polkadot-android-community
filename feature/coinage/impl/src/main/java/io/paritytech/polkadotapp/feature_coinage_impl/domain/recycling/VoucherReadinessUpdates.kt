@@ -2,9 +2,7 @@ package io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling
 
 import io.paritytech.polkadotapp.common.data.time.TimeProvider
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.CoinagePrivacyConfig
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingStrategyType
-import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.params
+import io.paritytech.polkadotapp.feature_coinage_api.domain.recycling.RecyclingParams
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVoucher
 import io.paritytech.polkadotapp.feature_coinage_impl.data.source.ClockChangesSource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,13 +24,12 @@ class VoucherReadinessUpdates @Inject constructor(
     internal fun <Input> observe(
         inputs: Flow<Input>,
         vouchers: (Input) -> List<TrackedVoucher>,
-        strategy: (Input) -> RecyclingStrategyType,
-        privacyConfig: (Input) -> CoinagePrivacyConfig,
+        params: (Input) -> RecyclingParams,
     ): Flow<Input> = inputs.combine(clockChangesSource.changes().onStart { emit(Unit) }) { input, _ -> input }
         .flatMapLatest { input ->
             flow {
                 val now = timeProvider.now()
-                val readiness = strategy(input).params(privacyConfig(input)).voucherReadiness
+                val readiness = params(input).voucherReadiness
                 val deadlines = vouchers(input).mapNotNull { tracked ->
                     if (!tracked.state.isFree) return@mapNotNull null
                     val location = tracked.voucher.location as? RecyclerVoucher.Location.InRecycler
@@ -55,6 +52,5 @@ class VoucherReadinessUpdates @Inject constructor(
 fun <Input> Flow<Input>.withReadinessUpdates(
     readinessUpdates: VoucherReadinessUpdates,
     vouchers: (Input) -> List<TrackedVoucher>,
-    strategy: (Input) -> RecyclingStrategyType,
-    privacyConfig: (Input) -> CoinagePrivacyConfig,
-): Flow<Input> = readinessUpdates.observe(this, vouchers, strategy, privacyConfig)
+    params: (Input) -> RecyclingParams,
+): Flow<Input> = readinessUpdates.observe(this, vouchers, params)

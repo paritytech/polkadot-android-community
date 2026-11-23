@@ -18,6 +18,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TrackedVouch
 import io.paritytech.polkadotapp.feature_coinage_impl.data.source.ClockChangesSource
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.CoinRecyclingEvaluator
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.FakeCoinagePrivacyConfigProvider
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingParamsProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RecyclingStrategyProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.RingCapacityProvider
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.recycling.UnloadQuotaTracker
@@ -83,11 +84,10 @@ class RealCoinageHoldingsUseCaseTest {
             useCase = RealCoinageHoldingsUseCase(
                 assets,
                 RecyclingStrategyProvider(forcedAgeOf(FORCED_AGE), quota),
-                settings,
+                RecyclingParamsProvider(settings, privacyConfig),
                 evaluator,
                 VoucherUsabilityContextFactory(capacities, clock),
                 VoucherReadinessUpdates(clock, clockChanges),
-                privacyConfig,
             )
         }
 

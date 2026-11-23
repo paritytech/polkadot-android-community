@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.common.utils.exponentialRetryDelay
 import io.paritytech.polkadotapp.common.utils.getOrEmpty
 import io.paritytech.polkadotapp.common.utils.logFailure
 import io.paritytech.polkadotapp.common.utils.mapToSet
+import io.paritytech.polkadotapp.common.utils.resubscribingOnFailure
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.CoinageInstanceId
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerKey
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.RecyclerVoucher
@@ -28,15 +29,12 @@ import io.paritytech.polkadotapp.feature_members_api.data.model.includesKey
 import io.paritytech.polkadotapp.feature_members_api.data.repository.MembersRepository
 import io.paritytech.polkadotapp.feature_tokens_api.di.DigitalDollarChainAssetProvider
 import io.paritytech.polkadotapp.feature_tokens_api.domain.ChainAssetProvider
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -112,8 +110,8 @@ class VoucherLocationService @Inject constructor(
         val ringKeys = positions.distinctRingStatusKeys()
 
         return membersRepository.subscribeRingStatuses(chainId, ringKeys)
+            .resubscribingOnFailure(READ_RESUBSCRIBE_DELAY)
             .map { it.logFailure("Can't fetch ring statuses for voucher locations").getOrNull() }
-            .resubscribingOnFailure()
     }
 
     /**
@@ -123,8 +121,6 @@ class VoucherLocationService @Inject constructor(
      * response an absent recycler genuinely has nothing unloaded. A failure says nothing at all, and
      * treating it as zero would report every ring as untouched — inflating the privacy on screen and, worse,
      * freezing an inflated maximum if the failure happened to land on a voucher's first tick in a ring.
-     *
-     * The wrapped subscription ends on its first error, so the read is retried until one succeeds.
      */
     private fun subscribeUnloadedCountsFor(
         chainId: ChainId,
@@ -132,30 +128,9 @@ class VoucherLocationService @Inject constructor(
     ): Flow<UnloadedCounts?> {
         // Deduplicated per ring: the positions are per voucher, and many vouchers share one recycler.
         val recyclerKeys = located.positions.distinctRingStatusKeys().map { it.toRecyclerKey() }
-        val reads = voucherRepository.subscribeUnloadedCounts(chainId, located.instanceId, recyclerKeys)
+        return voucherRepository.subscribeUnloadedCounts(chainId, located.instanceId, recyclerKeys)
+            .resubscribingOnFailure(READ_RESUBSCRIBE_DELAY)
             .map { it.logFailure("Can't fetch unloaded counts for recyclers").getOrNull() }
-
-        return reads.resubscribingOnFailure()
-    }
-
-    /** [wrapIntoResult] ends a subscription on its first error, so a wrapped read stays failed on its own. */
-    private fun <T : Any> Flow<T?>.resubscribingOnFailure(): Flow<T?> {
-        val reads = this
-
-        return flow {
-            var failures = 0
-            while (true) {
-                var lastReadFailed = false
-                emitAll(
-                    reads.onEach { value ->
-                        lastReadFailed = value == null
-                        if (value != null) failures = 0
-                    }
-                )
-                if (!lastReadFailed) break
-                delay(READ_RESUBSCRIBE_DELAY.delayFor(++failures))
-            }
-        }
     }
 
     private fun VoucherPositions.distinctRingStatusKeys(): List<RingCollectionIdWithIndex> {
