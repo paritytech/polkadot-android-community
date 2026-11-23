@@ -26,12 +26,6 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
 ) : AuthenticationMethod {
     companion object {
         private const val ALLOWED_BIOMETRICS = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
-
-        private val CANCEL_ERROR_CODES = setOf(
-            BiometricPrompt.ERROR_USER_CANCELED,
-            BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-            BiometricPrompt.ERROR_CANCELED,
-        )
     }
 
     private val executor = ContextCompat.getMainExecutor(contextManager.requireActivity())
@@ -76,13 +70,7 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
                             errorCode: Int,
                             errString: CharSequence,
                         ) {
-                            val message = "$errorCode: $errString"
-                            val exception = if (errorCode in CANCEL_ERROR_CODES) {
-                                AuthenticationCancelledException(message)
-                            } else {
-                                AuthenticationFailedException(message)
-                            }
-                            continuation.resume(Result.failure(exception))
+                            continuation.resume(Result.failure(biometricPromptError(errorCode, errString)))
                         }
 
                         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {

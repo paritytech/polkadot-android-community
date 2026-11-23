@@ -15,7 +15,7 @@ The gate sits at the confirm control, not at key access. Keys stay readable with
 
 ### Rule
 
-On a confirm tap, the app shows the device authentication prompt before the action runs. On success the action runs as before. On a cancel or a failure nothing runs and the screen stays in its pre-tap state. A cancel shows nothing. A failure, such as a lockout, missing hardware or no screen lock, shows `AuthenticationFailedPresentationError`.
+On a confirm tap, the app shows the device authentication prompt before the action runs. On success the action runs as before. On a cancel or a failure nothing runs and the screen stays in its pre-tap state. A cancel shows nothing. A failure, such as no screen lock, missing hardware or a prompt error other than a cancel, shows `AuthenticationFailedPresentationError`.
 
 Each gated action prompts every time. A request made while a prompt is live fails at once and runs nothing.
 
@@ -39,7 +39,7 @@ Only the Confirm step of a payment request prompts. A request without a Confirm 
 
 The confirm handler in the ViewModel calls the gate, wraps its existing body in `onSuccess`, and adds `onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }`. The ViewModel injects `BiometricsService` directly. A screen whose interactor already exposes the call, like `BackupStatusInteractor.performOneTimeAuthentication`, keeps using it.
 
-A cancel arrives as `AuthenticationCancelledException`, a `UserCancellation`, which `showPresentationError` drops. Any other prompt error arrives as `AuthenticationFailedException`, which it shows.
+A cancel arrives as `AuthenticationCancelledException`, a `UserCancellation`, which `showPresentationError` drops. The prompt errors that count as a cancel are `ERROR_USER_CANCELED`, `ERROR_NEGATIVE_BUTTON` and `ERROR_CANCELED` (`biometricPromptError`). Any other prompt error arrives as `AuthenticationFailedException`, which it shows.
 
 ### Helper behaviour
 

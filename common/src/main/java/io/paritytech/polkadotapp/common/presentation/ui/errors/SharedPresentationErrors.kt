@@ -20,4 +20,4 @@ class UnexpectedPresentationError(cause: Throwable) :
 
 class AuthenticationFailedPresentationError(cause: Throwable) :
     PresentationThrowable(cause),
-    PresentationError by StringResPresentationError(R.string.backup_error_authentication_failed)
+    PresentationError by StringResPresentationError(R.string.authentication_failed)
