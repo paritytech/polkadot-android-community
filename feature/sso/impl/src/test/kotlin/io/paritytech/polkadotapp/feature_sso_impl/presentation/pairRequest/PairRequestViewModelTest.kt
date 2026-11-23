@@ -75,7 +75,7 @@ class PairRequestViewModelTest {
         viewModel.onApproveClicked()
 
         verifyNoHandshakeStarted()
-        verifyNoInteractions(appNotifier)
+        verifyNoNotificationShown()
     }
 
     @Test
@@ -105,6 +105,10 @@ class PairRequestViewModelTest {
     private fun verifyHandshakeStartedOnce() {
         val verifier = verify(interactor, times(1))
         with(any<StalenessReportCollector>()) { verifier.approveHandshake(offerFromPayload()) }
+    }
+
+    private fun verifyNoNotificationShown() {
+        verifyNoInteractions(appNotifier)
     }
 
     private fun verifyNoHandshakeStarted() {

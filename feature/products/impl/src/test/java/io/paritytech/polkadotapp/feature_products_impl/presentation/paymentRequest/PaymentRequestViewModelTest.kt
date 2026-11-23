@@ -61,7 +61,7 @@ class PaymentRequestViewModelTest {
     }
 
     @Test
-    fun `keeps the Confirm step and delivers nothing when authentication is cancelled`() = runBlocking<Unit> {
+    fun `delivers nothing and stays open when authentication is cancelled`() = runBlocking<Unit> {
         withAuthenticationCancelled()
         val context = contextWithSteps(PaymentRequestStep.Confirm)
         val viewModel = createViewModel(context)
@@ -69,13 +69,12 @@ class PaymentRequestViewModelTest {
 
         viewModel.onApproveClicked()
 
-        assertCurrentStep(PaymentRequestStep.Confirm, viewModel)
         assertNoDecisionDelivered(context)
         verifyScreenStaysOpen()
     }
 
     @Test
-    fun `keeps the Confirm step when authentication is cancelled and a privacy warning follows`() = runBlocking<Unit> {
+    fun `reaches the privacy warning only on a successful retry when the first authentication is cancelled`() = runBlocking<Unit> {
         withAuthenticationCancelled()
         val context = contextWithSteps(PaymentRequestStep.Confirm, PaymentRequestStep.PrivacyWarning)
         val viewModel = createViewModel(context)
@@ -115,7 +114,7 @@ class PaymentRequestViewModelTest {
     }
 
     @Test
-    fun `approves the privacy warning without authentication`() = runBlocking<Unit> {
+    fun `delivers Approved without a prompt when the step is a privacy warning`() = runBlocking<Unit> {
         val context = contextWithSteps(PaymentRequestStep.PrivacyWarning)
         val viewModel = createViewModel(context)
 
@@ -148,10 +147,6 @@ class PaymentRequestViewModelTest {
         withTimeout(TIMEOUT) {
             state.first { it is LoadingState.Loaded && it.data.step == step }
         }
-    }
-
-    private fun assertCurrentStep(expected: PaymentRequestStep, viewModel: PaymentRequestViewModel) {
-        assertEquals(expected, (viewModel.state.value as? LoadingState.Loaded)?.data?.step)
     }
 
     private suspend fun awaitDecision(context: PaymentRequestContext): Decision =

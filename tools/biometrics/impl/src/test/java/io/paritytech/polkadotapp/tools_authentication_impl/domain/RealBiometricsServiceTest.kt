@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.tools_authentication_impl.domain
 
 import io.paritytech.polkadotapp.test_shared.assertFailure
 import io.paritytech.polkadotapp.test_shared.assertFailureOf
+import io.paritytech.polkadotapp.test_shared.assertSuccess
 import io.paritytech.polkadotapp.test_shared.settle
 import io.paritytech.polkadotapp.test_shared.thenSuspend
 import io.paritytech.polkadotapp.test_shared.thenThrowUnsafe
@@ -24,7 +25,7 @@ class RealBiometricsServiceTest {
     private val service = RealBiometricsService(authMethod, InMemoryAuthenticationSession())
 
     @Test
-    fun `prompts on every gate call even after a session authentication`() = runBlocking<Unit> {
+    fun `prompts on every gate call when the session is already authenticated`() = runBlocking<Unit> {
         withAuthenticationSucceeding()
 
         service.performSessionAuthentication()
@@ -63,7 +64,7 @@ class RealBiometricsServiceTest {
     }
 
     @Test
-    fun `prompts again after a previous gate threw`() = runBlocking<Unit> {
+    fun `prompts again when the previous gate threw`() = runBlocking<Unit> {
         withAuthenticationThrowingOnce()
 
         service.performOneTimeAuthentication()
@@ -74,7 +75,7 @@ class RealBiometricsServiceTest {
     }
 
     @Test
-    fun `prompts again after a gate was cancelled while its prompt was live`() = runBlocking<Unit> {
+    fun `prompts again when the previous gate was cancelled while its prompt was live`() = runBlocking<Unit> {
         val livePrompt = withAuthenticationPendingThenSucceeding()
         val first = async { service.performOneTimeAuthentication() }
         settle()
@@ -117,9 +118,5 @@ class RealBiometricsServiceTest {
 
     private suspend fun verifyPromptedTimes(times: Int) {
         verify(authMethod, times(times)).authenticateUser()
-    }
-
-    private fun assertSuccess(result: Result<Unit>) {
-        assertTrue("expected success, got ${result.exceptionOrNull()}", result.isSuccess)
     }
 }

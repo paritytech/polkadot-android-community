@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningConte
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.TransactionSignInteractor
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.test_shared.any
+import io.paritytech.polkadotapp.test_shared.assertNothingShown
 import io.paritytech.polkadotapp.test_shared.cancelScopeAndJoin
 import io.paritytech.polkadotapp.test_shared.whenever
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
@@ -73,7 +74,17 @@ class TransactionSignViewModelTest {
     }
 
     @Test
-    fun `prompts again on a second Approve after a cancelled authentication`() = runBlocking<Unit> {
+    fun `shows no error when authentication is cancelled`() = runBlocking<Unit> {
+        withAuthenticationCancelled()
+        val viewModel = createViewModel()
+
+        viewModel.onApproveClicked()
+
+        assertNothingShown(viewModel)
+    }
+
+    @Test
+    fun `prompts again on a second Approve when the first authentication was cancelled`() = runBlocking<Unit> {
         withAuthenticationCancelled()
         val viewModel = createViewModel()
 

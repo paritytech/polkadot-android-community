@@ -1,7 +1,5 @@
 # Device authentication and confirmation gates
 
-## Overview
-
 Device authentication asks the person holding the phone for biometrics or the device screen lock (PIN, pattern or password). The app uses it at each control that confirms a transfer, a signing, a device pairing, a product approval or a manual backup of the recovery phrase.
 
 Why: an unlocked phone must not be enough to sign, pay, pair or export a secret.
@@ -35,7 +33,7 @@ With no screen lock set, the existing helper opens the system enrolment settings
 | Manual Google Drive backup of the recovery phrase | `BackupStatusViewModel.onCreateBackup` |
 | Overriding a conflicting Drive backup | `BackupConflictViewModel.confirmOverride` |
 
-A product on the payment whitelist has no Confirm step, so its payment request shows no prompt. On release builds this covers the funding products, onramp and offramp included (`WhitelistedProductsProvider`).
+Only the Confirm step of a payment request prompts. A request without a Confirm step shows no prompt.
 
 ### Where the gate goes
 
@@ -50,3 +48,4 @@ The helper is `RealBiometricsService.performOneTimeAuthentication` in `tools/bio
 - A request while a prompt is live fails at once with `AuthenticationCancelledException`.
 - An authenticator that throws, for example with no activity attached, becomes a failure instead of an exception. That failure is not a `UserCancellation`, so a handler with an error path shows it. A tap always has an activity, so this does not happen from a confirm control.
 - If the system cancels a live prompt, for example when the app leaves the foreground, the prompt reports an error, which maps to a cancel. The screen stays in its pre-tap state.
+- A request made after the activity saved its state, for example when validation finishes after the app left the foreground, fails at once as a cancel. `BiometricPrompt` would otherwise drop it without a callback.

@@ -54,8 +54,16 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
     private suspend fun BiometricPrompt.PromptInfo.authenticate(): Result<Unit> {
         return withContext(coroutineDispatchers.main) {
             suspendCancellableCoroutine { continuation ->
+                val activity = contextManager.requireActivity() as FragmentActivity
+
+                if (activity.supportFragmentManager.isStateSaved) {
+                    val exception = AuthenticationCancelledException("BiometricPrompt drops a request made after onSaveInstanceState")
+                    continuation.resume(Result.failure(exception))
+                    return@suspendCancellableCoroutine
+                }
+
                 val biometricPrompt = BiometricPrompt(
-                    contextManager.requireActivity() as FragmentActivity, executor,
+                    activity, executor,
                     object : BiometricPrompt.AuthenticationCallback() {
                         override fun onAuthenticationError(
                             errorCode: Int,

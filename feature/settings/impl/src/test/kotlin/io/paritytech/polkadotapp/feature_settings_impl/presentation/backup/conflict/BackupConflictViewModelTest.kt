@@ -64,8 +64,18 @@ class BackupConflictViewModelTest {
         viewModel.confirmOverride()
 
         verifyNoOverride()
-        assertEquals(BackupConflictStep.Override(inProgress = false), viewModel.step.value)
         assertNothingShown(viewModel)
+    }
+
+    @Test
+    fun `stays on the idle Override step when authentication is cancelled`() = runBlocking<Unit> {
+        withAuthenticationCancelled()
+        val viewModel = createViewModel()
+        viewModel.proceedToOverride()
+
+        viewModel.confirmOverride()
+
+        assertEquals(BackupConflictStep.Override(inProgress = false), viewModel.step.value)
     }
 
     private suspend fun withAuthenticationSucceeding() {
