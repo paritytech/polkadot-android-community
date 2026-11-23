@@ -189,7 +189,7 @@ class RealAddContactUseCase @Inject constructor(
         val welcome = when (content) {
             is VersionedRequestContent.V1 -> content.content.welcomeMessage
             is VersionedRequestContent.V2 -> content.content.welcomeMessage
-            null -> null
+            is VersionedRequestContent.Cancel, null -> null
         } ?: return null
 
         return ChatMessage(
@@ -199,6 +199,7 @@ class RealAddContactUseCase @Inject constructor(
             content = ChatMessage.Content.ChatRequest(ChatMessage.Content.RichText(text = welcome.text, attachments = emptyList())),
             origin = ChatMessageOrigin.User,
             status = ChatMessage.Status.IS_SENT,
+            sortOrder = null,
         )
     }
 
@@ -229,6 +230,7 @@ class RealAddContactUseCase @Inject constructor(
             content = ChatMessage.Content.ChatRequest(welcomeMessage),
             origin = ChatMessageOrigin.User,
             status = ChatMessage.Status.PROCESSING,
+            sortOrder = null,
         )
 
         chatEngine.saveMessage(chatMessage)

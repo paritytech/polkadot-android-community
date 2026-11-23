@@ -63,3 +63,12 @@ class IdentityProofPayloadScale(
     val statementAccountId: ByteArray,
     val context: String,
 )
+
+@Serializable
+@Keep
+class CancelProofPayloadScale(
+    @FixedLength(32)
+    val identityAccountId: ByteArray,
+    val requestId: String,
+    val context: String,
+)

@@ -40,6 +40,8 @@ interface ChatRequestRepository {
 
     suspend fun updateDelivery(id: String, delivery: ChatRequest.Delivery)
 
+    suspend fun markOutgoingCancelled(id: String): Boolean
+
     suspend fun delete(id: String)
 
     suspend fun getLastSyncedDay(metaAccountId: Long): Long?
@@ -106,6 +108,10 @@ class RealChatRequestRepository @Inject constructor(
         )
     }
 
+    override suspend fun markOutgoingCancelled(id: String): Boolean {
+        return chatRequestDao.markOutgoingCancelled(id) > 0
+    }
+
     override suspend fun delete(id: String) {
         chatRequestDao.delete(id)
     }
@@ -128,6 +134,7 @@ class RealChatRequestRepository @Inject constructor(
             ChatRequest.Status.PENDING -> ChatRequestLocal.Status.PENDING
             ChatRequest.Status.ACCEPTED -> ChatRequestLocal.Status.ACCEPTED
             ChatRequest.Status.DECLINED -> ChatRequestLocal.Status.DECLINED
+            ChatRequest.Status.CANCELLED -> ChatRequestLocal.Status.CANCELLED
         }
     }
 }
