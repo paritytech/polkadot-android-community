@@ -10,6 +10,8 @@ import io.paritytech.polkadotapp.common.presentation.navigation.OverlayCoordinat
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationFailedException
 import io.paritytech.polkadotapp.tools_authentication_impl.data.AuthenticationMethod
@@ -33,7 +35,7 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
             ?: return Result.failure(AuthenticationFailedException("No activity attached to show the prompt"))
 
         return overlayCoordinator.forbidOverlays().use {
-            authenticateUseInternal(activity)
+            runCancellableCatching { authenticateUseInternal(activity) }.flatten()
         }
     }
 

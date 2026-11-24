@@ -9,8 +9,8 @@ interface BiometricsService {
 
     /**
      * Prompts on every call and never throws. A cancel, or a call while another prompt is live, fails with
-     * [AuthenticationCancelledException]. A prompt or setup failure, such as no screen lock, fails with
-     * [AuthenticationFailedException].
+     * [AuthenticationCancelledException]. A prompt or setup failure fails with [AuthenticationFailedException], such as
+     * no screen lock, or with the exception that caused it, such as a missing enrolment screen.
      */
     suspend fun performOneTimeAuthentication(): Result<Unit>
 }
