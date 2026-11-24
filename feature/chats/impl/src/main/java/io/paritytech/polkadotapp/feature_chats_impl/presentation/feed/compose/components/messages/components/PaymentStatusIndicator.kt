@@ -144,13 +144,11 @@ internal fun PaymentStatusIndicator(
 
             ChatMessageUiModel.CoinagePayment.Status.ClaimWindowExpired -> {
                 icon = null
-                text = stringResource(
-                    if (isIncoming) {
-                        RCommon.string.chat_payment_status_claim_window_expired_recipient
-                    } else {
-                        RCommon.string.chat_payment_status_claim_window_expired_sender
-                    }
-                )
+                text = if (isIncoming) {
+                    stringResource(RCommon.string.chat_payment_status_claim_window_expired_recipient)
+                } else {
+                    stringResource(RCommon.string.chat_payment_status_claim_window_expired_sender, username)
+                }
                 color = PolkadotTheme.colors.fg.warning
             }
         }
