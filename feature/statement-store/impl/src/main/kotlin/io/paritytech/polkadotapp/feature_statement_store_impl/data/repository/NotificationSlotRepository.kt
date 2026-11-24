@@ -23,5 +23,5 @@ interface NotificationSlotRepository {
         at: BlockHash?,
     ): Result<Map<AccountId, Boolean>>
 
-    suspend fun notificationStatementMaxSize(chainId: ChainId): Result<InformationSize?>
+    suspend fun notificationStatementMaxSize(): Result<InformationSize?>
 }

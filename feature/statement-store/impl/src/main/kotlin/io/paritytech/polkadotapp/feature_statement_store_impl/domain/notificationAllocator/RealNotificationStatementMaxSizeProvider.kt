@@ -1,6 +1,5 @@
 package io.paritytech.polkadotapp.feature_statement_store_impl.domain.notificationAllocator
 
-import io.paritytech.polkadotapp.chains.multiNetwork.KnownChains
 import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.InformationSize.Companion.bytes
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.notificationAllocator.NotificationStatementMaxSizeProvider
@@ -12,10 +11,9 @@ private val RUNTIME_DEFAULT_NOTIFICATION_STATEMENT_MAX_SIZE: InformationSize = 2
 
 class RealNotificationStatementMaxSizeProvider @Inject constructor(
     private val notificationSlotRepository: NotificationSlotRepository,
-    private val knownChains: KnownChains,
 ) : NotificationStatementMaxSizeProvider {
     override suspend fun maxSize(): Result<InformationSize> {
-        return notificationSlotRepository.notificationStatementMaxSize(knownChains.people).map { maxSize ->
+        return notificationSlotRepository.notificationStatementMaxSize().map { maxSize ->
             maxSize ?: RUNTIME_DEFAULT_NOTIFICATION_STATEMENT_MAX_SIZE.also {
                 Timber.i("notificationStatementMaxSize: NotificationAllowance is not set on chain, using the runtime default ${it.inWholeBytes} bytes")
             }

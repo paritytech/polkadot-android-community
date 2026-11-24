@@ -52,6 +52,15 @@ class RealNotificationSlotRepository @Inject constructor(
         peopleViewFunctions().getLiteNotificationSlotsPerPeriod().getOrThrow()
     }
 
+    private val notificationStatementMaxSizeCache = SingleValueCache {
+        storageDataSource.query(knownChains.people) {
+            val allowance = runtime.metadata.statementStoreResources.notificationAllowance
+                ?: runtime.metadata.runtimeParameters.parameters.query(NOTIFICATION_ALLOWANCE_PARAMETER_KEY)?.notificationAllowance()
+
+            allowance?.maxSize?.toLong()?.bytes
+        }
+    }
+
     override suspend fun highestSeqPerPeriod(collection: PeopleCollection): Result<UByte> = when (collection) {
         PeopleCollection.People -> highestSeqCache.getCatching()
         PeopleCollection.LitePeople -> liteHighestSeqCache.getCatching()
@@ -83,14 +92,7 @@ class RealNotificationSlotRepository @Inject constructor(
         }.toMap()
     }
 
-    override suspend fun notificationStatementMaxSize(chainId: ChainId): Result<InformationSize?> = runCancellableCatching {
-        storageDataSource.query(chainId) {
-            val allowance = runtime.metadata.statementStoreResources.notificationAllowance
-                ?: runtime.metadata.runtimeParameters.parameters.query(NOTIFICATION_ALLOWANCE_PARAMETER_KEY)?.notificationAllowance()
-
-            allowance?.maxSize?.toLong()?.bytes
-        }
-    }
+    override suspend fun notificationStatementMaxSize(): Result<InformationSize?> = notificationStatementMaxSizeCache.getCatching()
 
     private fun statementAllowanceKey(account: AccountId): String =
         (STATEMENT_ALLOWANCE_KEY_PREFIX + account.value).toHexString(withPrefix = true).lowercase()
