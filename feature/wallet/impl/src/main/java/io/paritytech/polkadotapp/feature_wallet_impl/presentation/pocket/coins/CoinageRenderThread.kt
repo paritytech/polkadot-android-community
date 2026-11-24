@@ -11,7 +11,6 @@ import android.opengl.GLES30
 import android.os.Handler
 import android.os.HandlerThread
 import android.view.Choreographer
-import io.paritytech.polkadotapp.common.utils.logFailure
 import timber.log.Timber
 
 /**
@@ -94,10 +93,11 @@ class CoinageRenderThread(
 
     private var lastFrame = 0L
 
-    var timings: CoinageFrameTimings?
-        get() = tilt.timings
+    @Volatile
+    var timings: CoinageFrameTimings? = null
         set(value) {
-            tilt.timings = value
+            field = value
+            tilt.onReading = value?.let { it::onReading }
         }
 
     /**
@@ -220,6 +220,8 @@ class CoinageRenderThread(
             synchronized(lock) {
                 while (running && (!awake || !isVisible)) lock.wait()
 
+                if (!running) return
+
                 val seen = vsyncs
 
                 if (!vsyncRequested) {
@@ -243,10 +245,7 @@ class CoinageRenderThread(
     /** Returns whether anything is still moving, which is what keeps the loop awake. */
     private fun frame(): Boolean {
         val ready = renderer ?: bundle?.let { decoded ->
-            runCatching { CoinageGlRenderer.create(decoded) }
-                .logFailure("CoinageRenderThread: could not build the coin renderer")
-                .getOrNull()
-                ?.also { renderer = it }
+            CoinageGlRenderer.create(decoded, ::isShutDown)?.also { renderer = it }
         } ?: return false
 
         val width: Int
@@ -304,7 +303,7 @@ class CoinageRenderThread(
         EGL14.eglSwapBuffers(display, eglSurface)
         drawnWindow = offset
 
-        tilt.timings?.onSwapped(drawn, System.nanoTime(), tookReading = tilt.turn != light)
+        timings?.onSwapped(drawn, System.nanoTime(), tookReading = tilt.turn != light)
 
         return field.isMoving || moved
     }
@@ -413,6 +412,8 @@ class CoinageRenderThread(
         awake = true
         lock.notifyAll()
     }
+
+    private fun isShutDown(): Boolean = synchronized(lock) { !running }
 
     private fun initialiseEgl(): Boolean {
         display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)

@@ -67,7 +67,9 @@ class CoinageStudioBakeTest {
         fun text(name: String) = assets.open("coinage/$name").bufferedReader().use { it.readText() }
 
         val studio = CoinageAssetStore.studio(text("params.json"))
-        val cube = CoinageStudioBake.gpu(studio, text("studio.vert"), text("studio.frag"), SIZE, LEVELS)
+        val cube = checkNotNull(
+            CoinageStudioBake.gpu(studio, text("studio.vert"), text("studio.frag"), SIZE, LEVELS, isCancelled = { false })
+        )
         val expected = studio.bake(SIZE, LEVELS)
 
         for (level in 0 until LEVELS) {

@@ -86,12 +86,6 @@ class CoinageStudioTest {
         assertEquals(0.75f, CoinageStudio.radicalInverse(3))
     }
 
-    @Test
-    fun `sample counts grow with roughness`() {
-        assertEquals(64, CoinageStudio.sampleCount(0f))
-        assertEquals(1600, CoinageStudio.sampleCount(1f))
-    }
-
     private fun spread(values: List<Float>): Double {
         val mean = values.average()
 

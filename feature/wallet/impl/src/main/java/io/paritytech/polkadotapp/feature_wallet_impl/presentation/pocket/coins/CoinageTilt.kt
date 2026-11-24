@@ -119,7 +119,7 @@ class CoinageTilt(context: Context) : SensorEventListener {
     private var target = Turn()
 
     @Volatile
-    var timings: CoinageFrameTimings? = null
+    var onReading: ((sensed: Long, delivered: Long) -> Unit)? = null
 
     @Volatile
     var turn = Turn()
@@ -207,13 +207,13 @@ class CoinageTilt(context: Context) : SensorEventListener {
 
         absorb(Pose.ofSensor(event.values), elapsed)
 
-        val timings = timings
+        val onReading = onReading
 
-        if (timings != null && distance(target, turn) > REST_BAND) {
+        if (onReading != null && distance(target, turn) > REST_BAND) {
             // Sensor time is on the boot clock; the frame timeline is on the monotonic one.
             val now = System.nanoTime()
 
-            timings.onReading(sensed = event.timestamp - SystemClock.elapsedRealtimeNanos() + now, delivered = now)
+            onReading(event.timestamp - SystemClock.elapsedRealtimeNanos() + now, now)
         }
     }
 

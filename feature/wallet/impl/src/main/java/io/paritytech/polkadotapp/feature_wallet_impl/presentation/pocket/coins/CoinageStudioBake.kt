@@ -3,6 +3,7 @@ package io.paritytech.polkadotapp.feature_wallet_impl.presentation.pocket.coins
 import android.opengl.GLES20
 import android.opengl.GLES30
 import android.os.SystemClock
+import io.paritytech.polkadotapp.common.utils.logFailure
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -28,20 +29,20 @@ object CoinageStudioBake {
     private const val LAMP_VECTORS = 6
     private const val MAX_LAMPS = 16
 
-    fun bake(studio: CoinageStudio, vertexSource: String, fragmentSource: String): Cube {
+    fun bake(studio: CoinageStudio, vertexSource: String, fragmentSource: String, isCancelled: () -> Boolean): Cube? {
         val started = SystemClock.elapsedRealtime()
-        val onGpu = if (rendersToFloat()) {
-            runCatching { gpu(studio, vertexSource, fragmentSource, CoinageStudio.SIZE, CoinageStudio.LEVELS) }
-                .onFailure { Timber.e(it, "CoinageStudioBake: GPU bake failed, baking on the CPU") }
-                .getOrNull()
-        } else {
-            null
+
+        if (rendersToFloat()) {
+            runCatching { gpu(studio, vertexSource, fragmentSource, CoinageStudio.SIZE, CoinageStudio.LEVELS, isCancelled) }
+                .logFailure("CoinageStudioBake: GPU bake failed, baking on the CPU")
+                .onSuccess { cube ->
+                    if (cube != null) Timber.i("CoinageStudioBake: GPU bake took ${SystemClock.elapsedRealtime() - started} ms")
+
+                    return cube
+                }
         }
-        val cube = onGpu ?: cpu(studio)
 
-        Timber.i("CoinageStudioBake: ${if (onGpu != null) "GPU" else "CPU"} bake took ${SystemClock.elapsedRealtime() - started} ms")
-
-        return cube
+        return cpu(studio).also { Timber.i("CoinageStudioBake: CPU bake took ${SystemClock.elapsedRealtime() - started} ms") }
     }
 
     fun rendersToFloat(): Boolean {
@@ -51,7 +52,14 @@ object CoinageStudioBake {
     }
 
     /** Exposed at any size so a test can check it against [CoinageStudio.bake] on a device. */
-    fun gpu(studio: CoinageStudio, vertexSource: String, fragmentSource: String, size: Int, levels: Int): Cube {
+    fun gpu(
+        studio: CoinageStudio,
+        vertexSource: String,
+        fragmentSource: String,
+        size: Int,
+        levels: Int,
+        isCancelled: () -> Boolean
+    ): Cube? {
         val program = CoinageGlProgram.link(vertexSource, fragmentSource)
         val texture = cube(size, levels)
         val vertexArray = IntArray(1).also { GLES30.glGenVertexArrays(1, it, 0) }[0]
@@ -82,6 +90,12 @@ object CoinageStudioBake {
                 )
 
                 for (face in 0 until CoinageStudio.FACES) {
+                    if (isCancelled()) {
+                        GLES20.glDeleteTextures(1, intArrayOf(texture), 0)
+
+                        return null
+                    }
+
                     GLES20.glFramebufferTexture2D(
                         GLES20.GL_FRAMEBUFFER,
                         GLES20.GL_COLOR_ATTACHMENT0,

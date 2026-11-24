@@ -306,12 +306,14 @@ class CoinageGlRenderer private constructor(
         /** What the instance buffer starts at. It grows to fit rather than dropping coins on the floor. */
         private const val INITIAL_COINS = 600
 
-        /**
-         * Builds every GL object from an already decoded bundle. Cheap — uploads only — which is why the
-         * decode is shared across contexts and this is not.
-         */
-        fun create(bundle: CoinageAssetBundle): CoinageGlRenderer {
-            val environment = CoinageStudioBake.bake(bundle.studio, bundle.studioVertexSource, bundle.studioFragmentSource)
+        /** Builds every GL object from an already decoded bundle. */
+        fun create(bundle: CoinageAssetBundle, isCancelled: () -> Boolean): CoinageGlRenderer? {
+            val environment = CoinageStudioBake.bake(
+                bundle.studio,
+                bundle.studioVertexSource,
+                bundle.studioFragmentSource,
+                isCancelled
+            ) ?: return null
             val program = try {
                 CoinageGlProgram.link(bundle.vertexSource, bundle.fragmentSource)
             } catch (failure: IllegalStateException) {
