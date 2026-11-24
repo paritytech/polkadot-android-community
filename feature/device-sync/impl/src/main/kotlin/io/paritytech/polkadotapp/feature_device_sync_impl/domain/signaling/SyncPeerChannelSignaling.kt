@@ -1,9 +1,5 @@
 package io.paritytech.polkadotapp.feature_device_sync_impl.domain.signaling
 
-import io.novasama.substrate_sdk_android.koltinx_serialization_scale.binary.BinaryScale
-import io.paritytech.polkadotapp.common.utils.decodeFromByteArrayCatching
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.CommunicationSession
-import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.CommunicationSessionEvent
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.EncodedIceCandidates
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.EncodedSdp
 import io.paritytech.polkadotapp.tools_media_connection_api.domain.PeerChannelSignaling
@@ -13,7 +9,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
@@ -22,22 +17,20 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import timber.log.Timber
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * WebRTC signalling for one own-device peer over [communicationSession]. Every message is wrapped in
+ * WebRTC signalling for one own-device peer over [transport]. Every message is wrapped in
  * a [SyncSignalingEnvelope] carrying a [SyncOfferId] (UUID per connection attempt): the initiator
  * mints it on [sendOffer], the acceptor adopts it from the incoming Offer. [onOfferIdDetermined]
  * persists the id for restart-recovery (acceptor on receiving the Offer; initiator once the Answer
  * arrives).
  */
 class SyncPeerChannelSignaling(
-    private val communicationSession: CommunicationSession,
+    private val transport: SyncSignalingTransport,
     scope: CoroutineScope,
     private val onOfferIdDetermined: suspend (SyncOfferId) -> Unit,
 ) : PeerChannelSignaling {
     private val activeOfferFlow = MutableStateFlow<SyncOfferId?>(null)
-    private val respondedRequestIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     private val offerInbox = Channel<Pair<SyncOfferId, SignalingMessage.Offer>>(Channel.CONFLATED)
     private val answerInbox = Channel<Pair<SyncOfferId, SignalingMessage.Answer>>(Channel.UNLIMITED)
@@ -45,9 +38,8 @@ class SyncPeerChannelSignaling(
     private val reconnectInbox = Channel<SyncOfferId>(Channel.UNLIMITED)
 
     init {
-        communicationSession.subscribeEvents()
-            .filterIsInstance<CommunicationSessionEvent.NewMessagesReceived>()
-            .onEach(::consumeRequest)
+        transport.subscribeEnvelopes()
+            .onEach(::routeToInbox)
             .launchIn(scope)
     }
 
@@ -107,26 +99,9 @@ class SyncPeerChannelSignaling(
         reconnectInbox.receiveAsFlow().filter { it == activeOfferId() }
 
     private fun sendMessage(offerId: SyncOfferId, message: SignalingMessage) {
-        val envelope = SyncSignalingEnvelope(offerId, message)
-        val encoded = BinaryScale.encodeToByteArray(SyncSignalingEnvelope.serializer(), envelope)
-        Timber.d("SyncSignaling: sending ${message::class.simpleName} offerId=$offerId (${encoded.size}b)")
-        communicationSession.sendMessage(encoded)
+        Timber.d("SyncSignaling: sending ${message::class.simpleName} offerId=$offerId")
+        transport.send(SyncSignalingEnvelope(offerId, message))
     }
-
-    private fun consumeRequest(event: CommunicationSessionEvent.NewMessagesReceived) {
-        // A re-delivered request was already routed — skip it entirely.
-        if (!respondedRequestIds.add(event.requestId)) return
-
-        event.messages
-            .mapNotNull(::decode)
-            .forEach(::routeToInbox)
-    }
-
-    private fun decode(encoded: ByteArray): SyncSignalingEnvelope? =
-        BinaryScale.decodeFromByteArrayCatching<SyncSignalingEnvelope>(encoded)
-            .onFailure { Timber.w(it, "SyncSignaling: failed to decode envelope (${encoded.size}b)") }
-            .onSuccess { Timber.d("SyncSignaling: decoded: ${it.message::class.simpleName} ${it.offerId} ") }
-            .getOrNull()
 
     private fun routeToInbox(envelope: SyncSignalingEnvelope) {
         when (val message = envelope.message) {

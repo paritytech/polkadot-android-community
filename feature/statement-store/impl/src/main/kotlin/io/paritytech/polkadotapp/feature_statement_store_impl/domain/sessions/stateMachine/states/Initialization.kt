@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.common.utils.InformationSize
 import io.paritytech.polkadotapp.common.utils.stateMachine.StateMachine
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementExpiry
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationSideEffect
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.CommunicationStateEvent
@@ -13,6 +14,7 @@ class Initialization(
     private val pendingMessages: PendingMessages,
     override val maxStatementSize: InformationSize,
     override val canCompact: Boolean,
+    override val statementLifetime: StatementLifetime,
 ) : CommunicationState() {
     context(transition: StateMachine.Transition<CommunicationState, CommunicationSideEffect>)
     override suspend fun bootstrap() {
@@ -39,7 +41,8 @@ class Initialization(
                     Initialization(
                         pendingMessages = newPendingMessages,
                         maxStatementSize = maxStatementSize,
-                        canCompact = canCompact
+                        canCompact = canCompact,
+                        statementLifetime = statementLifetime,
                     )
                 )
             }
@@ -50,7 +53,7 @@ class Initialization(
 
                 event.incomingRequests.forEach { (request, isResponded) ->
                     if (!isResponded) {
-                        expiry = StatementExpiry.nextAfter(expiry)
+                        expiry = StatementExpiry.nextAfter(expiry, statementLifetime)
 
                         transition.emitSideEffect(CommunicationSideEffect.RequestReceived(request))
                         transition.emitSideEffect(
@@ -122,7 +125,7 @@ class Initialization(
         expiry: ULong,
         split: MessagesSplit
     ) {
-        val newExpiry = StatementExpiry.nextAfter(expiry)
+        val newExpiry = StatementExpiry.nextAfter(expiry, statementLifetime)
         val newRequest = StatementTransportEvent.Request(
             requestId = generateNewRequestId(),
             expiry = newExpiry,
@@ -152,6 +155,7 @@ class Initialization(
             expiry = expiry,
             maxStatementSize = maxStatementSize,
             canCompact = canCompact,
+            statementLifetime = statementLifetime,
             isCompacting = isCompacting
         )
     }

@@ -2,6 +2,7 @@ package io.paritytech.polkadotapp.feature_device_sync_impl.domain.engine
 
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.AddContactUseCase
 import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ApplyRemoteChatMessageUseCase
+import io.paritytech.polkadotapp.feature_chats_api.domain.interactors.ChatStateSyncUseCase
 import io.paritytech.polkadotapp.feature_sso_api.domain.GetActiveSsoSessionsUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
@@ -11,10 +12,12 @@ class LocalSyncTrigger @Inject constructor(
     private val getActiveSsoSessionsUseCase: GetActiveSsoSessionsUseCase,
     private val addContactUseCase: AddContactUseCase,
     private val applyRemoteChatMessageUseCase: ApplyRemoteChatMessageUseCase,
+    private val chatStateSyncUseCase: ChatStateSyncUseCase,
 ) {
     fun observe(): Flow<Unit> = merge(
         addContactUseCase.observeContactsChanged(),
         applyRemoteChatMessageUseCase.observeLocalMessageChanges(),
+        chatStateSyncUseCase.observeChatStateChanges(),
         getActiveSsoSessionsUseCase.observeSessionsChanged(),
     )
 }

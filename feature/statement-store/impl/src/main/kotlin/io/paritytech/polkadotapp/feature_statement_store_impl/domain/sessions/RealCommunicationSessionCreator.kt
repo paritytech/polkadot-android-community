@@ -14,6 +14,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.Conta
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.IncomingRequestResponsePolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.SessionAccount
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.encryption.MultiDeviceEnvelopeEncryption
 import io.paritytech.polkadotapp.feature_statement_store_impl.data.encryption.toEnvelopeRecipients
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.codec.IncomingTopicsProvider
@@ -71,6 +72,7 @@ class RealCommunicationSessionCreator(
         compactor: MessageCompactor?,
         responsePolicy: IncomingRequestResponsePolicy,
         replacementPolicy: PendingMessageReplacementPolicy,
+        statementLifetime: StatementLifetime,
     ): CommunicationSession {
         val outgoingTopic = deriveCommunicationTopic(localAccount, remoteAccount, encryption)
         val envelopeEncryption = buildEnvelopeEncryption(localAccount)
@@ -101,6 +103,7 @@ class RealCommunicationSessionCreator(
             compactor = compactor,
             responsePolicy = responsePolicy,
             replacementPolicy = replacementPolicy,
+            statementLifetime = statementLifetime,
         )
     }
 
@@ -147,6 +150,7 @@ class RealCommunicationSessionCreator(
             compactor = compactor,
             responsePolicy = responsePolicy,
             replacementPolicy = replacementPolicy,
+            statementLifetime = StatementLifetime.Permanent,
         )
     }
 
@@ -170,6 +174,7 @@ class RealCommunicationSessionCreator(
         compactor: MessageCompactor?,
         responsePolicy: IncomingRequestResponsePolicy,
         replacementPolicy: PendingMessageReplacementPolicy,
+        statementLifetime: StatementLifetime,
     ): CommunicationSession {
         val decoder = StatementDecoder(
             encryption = encryption,
@@ -202,6 +207,7 @@ class RealCommunicationSessionCreator(
             compactor = compactor,
             responsePolicy = responsePolicy,
             replacementPolicy = replacementPolicy,
+            statementLifetime = statementLifetime,
             scope = scope,
         )
     }

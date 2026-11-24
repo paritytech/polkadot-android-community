@@ -50,6 +50,7 @@ class IncomingChatRequestCancelProcessor @Inject constructor(
     private suspend fun rememberCancelledRequest(cancel: IncomingChatRequestStatement.Cancel) {
         val request = ChatRequest(
             welcomeMessageId = cancel.requestId,
+            peer = cancel.identityProof.identityAccountId,
             timestamp = cancel.timestamp,
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.CANCELLED,

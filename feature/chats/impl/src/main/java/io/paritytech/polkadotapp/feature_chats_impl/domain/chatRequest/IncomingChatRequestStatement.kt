@@ -3,8 +3,8 @@ package io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.IdentityProof
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.ChatRequestDecrypted
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.toDomain
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_statement_store_api.data.models.StatementProofRemote
 
 sealed interface IncomingChatRequestStatement {

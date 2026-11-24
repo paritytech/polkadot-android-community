@@ -7,6 +7,7 @@ import io.paritytech.polkadotapp.feature_statement_store_api.domain.NOT_RESPONDE
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.RequestId
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.EncodedMessage
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.PendingMessageReplacementPolicy
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.StatementLifetime
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.models.StatementTransportEvent
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.states.Active
 import io.paritytech.polkadotapp.feature_statement_store_impl.domain.sessions.stateMachine.states.CommunicationState
@@ -55,6 +56,7 @@ class ActiveStateTest {
         expiry = 10uL,
         maxStatementSize = MAX_STATEMENT_SIZE,
         canCompact = canCompact,
+        statementLifetime = StatementLifetime.Permanent,
         isCompacting = isCompacting
     )
 
@@ -471,7 +473,7 @@ class ActiveStateTest {
     @Test
     fun `initialization auto-acks restored unresponded requests`() {
         val unresponded = request(message(10, 1), requestId = "unresponded")
-        val initialization = Initialization(pending(emptyList()), MAX_STATEMENT_SIZE, canCompact = true)
+        val initialization = Initialization(pending(emptyList()), MAX_STATEMENT_SIZE, canCompact = true, StatementLifetime.Permanent)
 
         val recorder = recordTransition(
             initialization,
@@ -492,7 +494,7 @@ class ActiveStateTest {
     @Test
     fun `initialization with oversized backlog and canCompact compacts on activation`() {
         val backlog = listOf(message(60, 1), message(60, 2))
-        val initialization = Initialization(pending(backlog), MAX_STATEMENT_SIZE, canCompact = true)
+        val initialization = Initialization(pending(backlog), MAX_STATEMENT_SIZE, canCompact = true, StatementLifetime.Permanent)
 
         val recorder = recordTransition(
             initialization,
@@ -510,7 +512,7 @@ class ActiveStateTest {
     @Test
     fun `initialization without canCompact packs backlog partially as before`() {
         val backlog = listOf(message(60, 1), message(60, 2))
-        val initialization = Initialization(pending(backlog), MAX_STATEMENT_SIZE, canCompact = false)
+        val initialization = Initialization(pending(backlog), MAX_STATEMENT_SIZE, canCompact = false, StatementLifetime.Permanent)
 
         val recorder = recordTransition(
             initialization,

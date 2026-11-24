@@ -24,7 +24,6 @@ import io.paritytech.polkadotapp.feature_chats_api.domain.model.ChatRequestId
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.Contact
 import io.paritytech.polkadotapp.feature_chats_api.domain.model.pendingChatRequestIdOrThrow
 import io.paritytech.polkadotapp.feature_chats_api.domain.usecase.DeleteRoomUseCase
-import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.model.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_chats_impl.data.chatRequest.signerAccountId
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatAcceptanceRepository
 import io.paritytech.polkadotapp.feature_chats_impl.data.repository.ChatRequestRepository
@@ -36,6 +35,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.domain.chatRequest.acceptanc
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.RichTextContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenContent
 import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.TokenPlatform
+import io.paritytech.polkadotapp.feature_chats_transport_protocol.scale.VersionedRequestContent
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.OurDeviceKeypairProvider
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.models.DeviceInfo
 import timber.log.Timber
@@ -315,6 +315,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
     private fun createNewChatRequest(incomingData: IncomingChatRequestData): ChatRequest {
         return ChatRequest(
             welcomeMessageId = incomingData.chatRequestId,
+            peer = incomingData.request.peerIdentityAccountId(),
             timestamp = incomingData.request.timestamp,
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.PENDING,
@@ -345,6 +346,7 @@ class RealIncomingChatRequestProcessor @Inject constructor(
 
         val request = ChatRequest(
             welcomeMessageId = data.request.requestId,
+            peer = peerAccountId,
             timestamp = data.request.timestamp,
             direction = ChatRequest.Direction.INCOMING,
             status = ChatRequest.Status.PENDING,
