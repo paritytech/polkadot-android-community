@@ -36,11 +36,16 @@ open class BaseViewModel : ViewModel(), ComputationalScope, MessageDisplay {
         _events.trySend(BaseViewModelEvent.PresentationError(error))
     }
 
-    protected suspend fun Result<Unit>.onAuthenticated(action: suspend () -> Unit) {
+    protected inline fun Result<Unit>.onAuthenticated(action: () -> Unit) {
         fold(
             onSuccess = { action() },
-            onFailure = { showPresentationError(AuthenticationFailedPresentationError(it)) },
+            onFailure = { showAuthenticationFailed(it) },
         )
+    }
+
+    @PublishedApi
+    internal fun showAuthenticationFailed(cause: Throwable) {
+        showPresentationError(AuthenticationFailedPresentationError(cause))
     }
 
     @Deprecated("Use showPresentationError instead")
