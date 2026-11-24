@@ -28,35 +28,34 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
         private const val ALLOWED_BIOMETRICS = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
     }
 
-    private val executor = ContextCompat.getMainExecutor(contextManager.requireActivity())
-
     override suspend fun authenticateUser(): Result<Unit> {
+        val activity = contextManager.getActivity() as? FragmentActivity
+            ?: return Result.failure(AuthenticationFailedException("No activity attached to show the prompt"))
+
         return overlayCoordinator.forbidOverlays().use {
-            authenticateUseInternal()
+            authenticateUseInternal(activity)
         }
     }
 
-    private suspend fun authenticateUseInternal(): Result<Unit> {
-        val biometricManager = BiometricManager.from(contextManager.requireActivity())
+    private suspend fun authenticateUseInternal(activity: FragmentActivity): Result<Unit> {
+        val biometricManager = BiometricManager.from(activity)
 
         val context = contextManager.applicationContext
 
-        return biometricManager.prepareForAuthentication().flatMap {
+        return biometricManager.prepareForAuthentication(activity).flatMap {
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
                 .setTitle(context.getString(RCommon.string.authentication_title))
                 .setDescription(context.getString(RCommon.string.authentication_description))
                 .setAllowedAuthenticators(ALLOWED_BIOMETRICS)
                 .build()
 
-            promptInfo.authenticate()
+            promptInfo.authenticate(activity)
         }
     }
 
-    private suspend fun BiometricPrompt.PromptInfo.authenticate(): Result<Unit> {
+    private suspend fun BiometricPrompt.PromptInfo.authenticate(activity: FragmentActivity): Result<Unit> {
         return withContext(coroutineDispatchers.main) {
             suspendCancellableCoroutine { continuation ->
-                val activity = contextManager.requireActivity() as FragmentActivity
-
                 if (activity.supportFragmentManager.isStateSaved) {
                     val exception = AuthenticationCancelledException("BiometricPrompt drops a request made after onSaveInstanceState")
                     continuation.resume(Result.failure(exception))
@@ -64,7 +63,7 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
                 }
 
                 val biometricPrompt = BiometricPrompt(
-                    activity, executor,
+                    activity, ContextCompat.getMainExecutor(activity),
                     object : BiometricPrompt.AuthenticationCallback() {
                         override fun onAuthenticationError(
                             errorCode: Int,
@@ -87,7 +86,7 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
         }
     }
 
-    private suspend fun BiometricManager.prepareForAuthentication(): Result<Unit> {
+    private suspend fun BiometricManager.prepareForAuthentication(activity: FragmentActivity): Result<Unit> {
         return when (canAuthenticate(ALLOWED_BIOMETRICS)) {
             BiometricManager.BIOMETRIC_SUCCESS -> Result.success(Unit)
 
@@ -98,7 +97,7 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
                 Result.failure(AuthenticationFailedException("Hardware to perform authentication is currently unavailable. Try again later."))
 
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                BiometricExecutor(contextManager).execute()
+                BiometricExecutor(activity).execute()
             }
 
             else -> Result.failure(AuthenticationFailedException("Unknown authentication hardware state"))

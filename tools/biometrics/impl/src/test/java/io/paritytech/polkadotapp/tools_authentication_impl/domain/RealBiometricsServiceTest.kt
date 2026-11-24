@@ -1,11 +1,9 @@
 package io.paritytech.polkadotapp.tools_authentication_impl.domain
 
-import io.paritytech.polkadotapp.test_shared.assertFailure
 import io.paritytech.polkadotapp.test_shared.assertFailureOf
 import io.paritytech.polkadotapp.test_shared.assertSuccess
 import io.paritytech.polkadotapp.test_shared.settle
 import io.paritytech.polkadotapp.test_shared.thenSuspend
-import io.paritytech.polkadotapp.test_shared.thenThrowUnsafe
 import io.paritytech.polkadotapp.test_shared.whenever
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
 import io.paritytech.polkadotapp.tools_authentication_impl.data.AuthenticationMethod
@@ -55,15 +53,6 @@ class RealBiometricsServiceTest {
     }
 
     @Test
-    fun `returns a failure instead of throwing when no activity is attached`() = runBlocking<Unit> {
-        withAuthenticationThrowing()
-
-        val result = service.performOneTimeAuthentication()
-
-        assertFailure(result)
-    }
-
-    @Test
     fun `prompts again when the previous gate was cancelled while its prompt was live`() = runBlocking<Unit> {
         val livePrompt = withAuthenticationPendingThenSucceeding()
         val first = async { service.performOneTimeAuthentication() }
@@ -93,10 +82,6 @@ class RealBiometricsServiceTest {
             .thenSuspend { livePrompt.await() }
             .thenReturn(Result.success(Unit))
         return livePrompt
-    }
-
-    private suspend fun withAuthenticationThrowing() {
-        whenever(authMethod.authenticateUser()).thenThrowUnsafe(IllegalArgumentException("Required value was null."))
     }
 
     private suspend fun verifyPromptedTimes(times: Int) {

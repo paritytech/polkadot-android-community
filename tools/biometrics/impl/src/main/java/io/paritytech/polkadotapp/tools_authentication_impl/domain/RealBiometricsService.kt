@@ -1,7 +1,5 @@
 package io.paritytech.polkadotapp.tools_authentication_impl.domain
 
-import io.paritytech.polkadotapp.common.utils.flatten
-import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.tools_authentication_api.data.AuthenticationSession
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
 import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
@@ -30,7 +28,7 @@ class RealBiometricsService @Inject constructor(
         }
 
         return try {
-            runCancellableCatching { authMethod.authenticateUser() }.flatten()
+            authMethod.authenticateUser()
         } finally {
             authMutex.unlock()
         }

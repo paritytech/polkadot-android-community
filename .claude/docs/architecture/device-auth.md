@@ -46,6 +46,6 @@ A cancel arrives as `AuthenticationCancelledException`, a `UserCancellation`, wh
 The helper is `RealBiometricsService.performOneTimeAuthentication` in `tools/biometrics/impl`.
 
 - A request while a prompt is live fails at once with `AuthenticationCancelledException`.
-- An authenticator that throws, for example with no activity attached, becomes a failure instead of an exception. That failure is not a `UserCancellation`, so the gate shows it. A tap always has an activity, so this does not happen from a confirm control.
+- With no activity attached, `BiometricPromptAuthenticationMethod` returns `AuthenticationFailedException` instead of throwing, so the gate shows it. A tap always has an activity, so this does not happen from a confirm control.
 - If the system cancels a live prompt, for example when the app leaves the foreground, the prompt reports an error, which maps to a cancel. The screen stays in its pre-tap state.
 - A request made after the activity saved its state, for example when validation finishes after the app left the foreground, fails at once as a cancel. `BiometricPrompt` would otherwise drop it without a callback.
