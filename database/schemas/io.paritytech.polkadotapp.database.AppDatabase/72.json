@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 72,
-    "identityHash": "a37412902b61d4d6117f8599cc46d1d6",
+    "identityHash": "994667420d9966de8832693b1ceaf5c2",
     "entities": [
       {
         "tableName": "product_funding_operations",
@@ -1654,7 +1654,7 @@
       },
       {
         "tableName": "recycler_vouchers",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `enteredAt` INTEGER, `recyclerFungibility` INTEGER NOT NULL DEFAULT 0, `maxRecyclerFungibility` INTEGER, PRIMARY KEY(`installationId`, `ringVrfKeyIndex`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`installationId` BLOB NOT NULL, `ringVrfKeyIndex` INTEGER NOT NULL, `ringVrfPublicKey` BLOB NOT NULL, `recyclerValue` INTEGER NOT NULL, `locationRecyclerIndex` INTEGER, `recyclerMembers` INTEGER, `enteredAt` INTEGER, `recyclerFungibility` INTEGER NOT NULL DEFAULT 0, `maxRecyclerFungibility` INTEGER, `recyclerUnloaded` INTEGER, PRIMARY KEY(`installationId`, `ringVrfKeyIndex`))",
         "fields": [
           {
             "fieldPath": "installationId",
@@ -1705,6 +1705,11 @@
           {
             "fieldPath": "maxRecyclerFungibility",
             "columnName": "maxRecyclerFungibility",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "recyclerUnloaded",
+            "columnName": "recyclerUnloaded",
             "affinity": "INTEGER"
           }
         ],
@@ -2204,7 +2209,7 @@
       },
       {
         "tableName": "statement_store_slot_allocations",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `chainId` TEXT NOT NULL, `collection` TEXT NOT NULL, `accountId` BLOB NOT NULL, `seq` INTEGER NOT NULL, `latestRenewedPeriod` INTEGER NOT NULL, `sinceMillis` INTEGER NOT NULL, `priorityLevel` INTEGER NOT NULL, `tag` TEXT, `signerDerivationPath` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `chainId` TEXT NOT NULL, `collection` TEXT NOT NULL, `accountId` BLOB NOT NULL, `seq` INTEGER NOT NULL, `latestRenewedPeriod` INTEGER NOT NULL, `sinceMillis` INTEGER NOT NULL, `priorityLevel` INTEGER NOT NULL, `tag` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -2257,11 +2262,6 @@
           {
             "fieldPath": "tag",
             "columnName": "tag",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "signerDerivationPath",
-            "columnName": "signerDerivationPath",
             "affinity": "TEXT"
           }
         ],
@@ -3174,7 +3174,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a37412902b61d4d6117f8599cc46d1d6')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '994667420d9966de8832693b1ceaf5c2')"
     ]
   }
 }
