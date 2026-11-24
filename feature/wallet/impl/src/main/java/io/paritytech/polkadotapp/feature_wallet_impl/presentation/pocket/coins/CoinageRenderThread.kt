@@ -92,6 +92,7 @@ class CoinageRenderThread(
     private var bundle: CoinageAssetBundle? = null
 
     private var lastFrame = 0L
+    private var lastShownFrame: ShownFrame? = null
 
     @Volatile
     var timings: CoinageFrameTimings? = null
@@ -283,7 +284,12 @@ class CoinageRenderThread(
 
         for (tap in pending) tap.onResult(CoinageScene.coinAt(tap.x, tap.y, field, set))
 
+        val coinsMove = field.isMoving
         val moved = advance(drawn)
+        val frame = ShownFrame(tilt.turn, offset, width, height, scale, set)
+
+        if (!coinsMove && frame == lastShownFrame) return field.isMoving || moved
+
         val batches = CoinageScene.batches(field, ready.designs, offset, set)
 
         ready.draw(
@@ -293,7 +299,7 @@ class CoinageRenderThread(
             pixelWidth = width,
             pixelHeight = height,
             density = scale,
-            light = tilt.turn,
+            light = frame.light,
             set = set
         )
 
@@ -302,6 +308,7 @@ class CoinageRenderThread(
 
         EGL14.eglSwapBuffers(display, eglSurface)
         drawnWindow = offset
+        lastShownFrame = frame
 
         timings?.onSwapped(drawn, System.nanoTime(), tookReading = tilt.turn != light)
 
@@ -499,6 +506,15 @@ class CoinageRenderThread(
 }
 
 private class Tap(val x: Float, val y: Float, val onResult: (String?) -> Unit)
+
+private data class ShownFrame(
+    val light: CoinageTilt.Turn,
+    val offset: Float,
+    val width: Int,
+    val height: Int,
+    val density: Float,
+    val set: CoinageScene.CoinSet
+)
 
 /**
  * Where the coins came out, so the card can rule their runs and label their blocks.
