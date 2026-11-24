@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.common.presentation.notification.error
 import io.paritytech.polkadotapp.common.presentation.notification.success
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
-import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.utils.findInCauseChain
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReport
 import io.paritytech.polkadotapp.common.utils.progressStallReport.launchWithDiagnostics
@@ -58,7 +57,7 @@ class PairRequestViewModel @Inject constructor(
 
         launchWithDiagnostics(stalenessReport) {
             biometricsService.performOneTimeAuthentication()
-                .onSuccess {
+                .onAuthenticated {
                     phase.value = Phase.Connecting(ConnectingStep.VERIFYING)
 
                     interactor.approveHandshake(offer).collect { progress ->
@@ -74,7 +73,6 @@ class PairRequestViewModel @Inject constructor(
                         }
                     }
                 }
-                .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
         }
     }
 

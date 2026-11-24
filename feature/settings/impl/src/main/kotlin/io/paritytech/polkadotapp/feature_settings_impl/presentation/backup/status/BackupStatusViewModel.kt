@@ -2,7 +2,6 @@ package io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.stat
 
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
-import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.launchUnit
 import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictPayload
@@ -30,15 +29,14 @@ class BackupStatusViewModel @Inject constructor(
 
     override fun onShowMnemonic() = launchUnit {
         interactor.performOneTimeAuthentication()
-            .onSuccess {
+            .onAuthenticated {
                 router.openMnemonic()
             }
-            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
     }
 
     override fun onCreateBackup() = launchUnit {
         interactor.performOneTimeAuthentication()
-            .onSuccess {
+            .onAuthenticated {
                 state.value = BackupStatusUiState.BackupInProgress
 
                 interactor.saveBackup()
@@ -50,7 +48,6 @@ class BackupStatusViewModel @Inject constructor(
                         state.value = BackupStatusUiState.NoBackup
                     }
             }
-            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
     }
 
     override fun onAllowGoogleDrive() {

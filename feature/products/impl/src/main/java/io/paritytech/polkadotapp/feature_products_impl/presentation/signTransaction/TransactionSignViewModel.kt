@@ -3,7 +3,6 @@ package io.paritytech.polkadotapp.feature_products_impl.presentation.signTransac
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.paritytech.polkadotapp.common.presentation.loading.LoadingState
 import io.paritytech.polkadotapp.common.presentation.screens.BaseViewModel
-import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.presentation.ui.errors.SigningFailedPresentationError
 import io.paritytech.polkadotapp.common.presentation.ui.errors.UnexpectedPresentationError
 import io.paritytech.polkadotapp.common.utils.combineResults
@@ -77,8 +76,7 @@ class TransactionSignViewModel @Inject constructor(
         Timber.d("Approve clicked for ${signingContext.requesterName}")
 
         biometricsService.performOneTimeAuthentication()
-            .onSuccess { signAndDeliver() }
-            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
+            .onAuthenticated { signAndDeliver() }
 
         signing.value = false
     }

@@ -37,7 +37,7 @@ Only the Confirm step of a payment request prompts. A request without a Confirm 
 
 ### Where the gate goes
 
-The confirm handler in the ViewModel calls the gate, wraps its existing body in `onSuccess`, and adds `onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }`. The ViewModel injects `BiometricsService` directly. A screen whose interactor already exposes the call, like `BackupStatusInteractor.performOneTimeAuthentication`, keeps using it.
+The confirm handler in the ViewModel calls the gate and wraps its existing body in `BaseViewModel.onAuthenticated`, which runs it on success and shows `AuthenticationFailedPresentationError` on failure. The ViewModel injects `BiometricsService` directly. A screen whose interactor already exposes the call, like `BackupStatusInteractor.performOneTimeAuthentication`, keeps using it.
 
 A cancel arrives as `AuthenticationCancelledException`, a `UserCancellation`, which `showPresentationError` drops. The prompt errors that count as a cancel are `ERROR_USER_CANCELED`, `ERROR_NEGATIVE_BUTTON` and `ERROR_CANCELED` (`biometricPromptError`). Any other prompt error arrives as `AuthenticationFailedException`, which it shows.
 
