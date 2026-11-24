@@ -9,9 +9,11 @@ import io.paritytech.polkadotapp.common.domain.model.AccountId
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.coerceToUnit
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.foldResult
 import io.paritytech.polkadotapp.common.utils.mapToSet
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.common.utils.progressStallReport.markRegion
+import io.paritytech.polkadotapp.common.utils.requireNotNull
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.feature_account_api.domain.usecase.AccountDerivationUseCase
 import io.paritytech.polkadotapp.feature_chain_resources_api.data.api.replaceStatementStoreAccount
@@ -50,52 +52,52 @@ class StatementStoreSlotReplacer @Inject constructor(
         candidates: List<CollectionSlot<StatementStoreSlot.Taken>>,
         newAccount: AccountId,
     ): Result<CollectionSlot<StatementStoreSlot.Taken>> {
+        return candidatesSignedOnThisDevice(context, candidates).flatMap { signable ->
+            Timber.i("allocate: ${signable.size} of ${candidates.size} eviction candidates are held by keys on this device")
+            if (signable.isEmpty()) {
+                Result.failure(StatementStoreSlotAllocationError.NoAllocationAvailable(IllegalStateException("No evictable slot is held by a key on this device")))
+            } else {
+                replaceFirstAllowed(context, signable, newAccount)
+            }
+        }
+    }
+
+    private suspend fun candidatesSignedOnThisDevice(
+        context: AllocateContext,
+        candidates: List<CollectionSlot<StatementStoreSlot.Taken>>,
+    ): Result<List<CandidateWithHolderOrigin>> {
         return runCancellableCatching {
             allocationRepository.signerDerivationPathsFor(context.chain.id, candidates.mapToSet { it.slot.accountId })
         }.flatMap { signerPaths ->
-            replaceFirstAvailable(context, candidates, signerPaths, newAccount, anyNotYetAllowed = false)
+            candidates.foldResult(emptyList()) { signable, candidate ->
+                val signerPath = signerPaths[candidate.slot.accountId] ?: return@foldResult Result.success(signable)
+
+                holderKeypair(signerPath, candidate.slot.accountId).map { keypair ->
+                    if (keypair == null) {
+                        signable
+                    } else {
+                        signable + CandidateWithHolderOrigin(candidate, statementStoreOrigins.asResourcesSlotHolder(keypair))
+                    }
+                }
+            }
         }
     }
 
     context(diagnostics: StalenessReportCollector)
-    private suspend fun replaceFirstAvailable(
+    private suspend fun replaceFirstAllowed(
         context: AllocateContext,
-        candidates: List<CollectionSlot<StatementStoreSlot.Taken>>,
-        signerPaths: Map<AccountId, String>,
+        signable: List<CandidateWithHolderOrigin>,
         newAccount: AccountId,
-        anyNotYetAllowed: Boolean,
     ): Result<CollectionSlot<StatementStoreSlot.Taken>> {
-        val candidate = candidates.firstOrNull() ?: return Result.failure(noReplaceableSlotError(anyNotYetAllowed))
-        val remaining = candidates.drop(1)
+        return signable.foldResult<_, CollectionSlot<StatementStoreSlot.Taken>?>(null) { replaced, signableCandidate ->
+            if (replaced != null) return@foldResult Result.success(replaced)
 
-        return tryReplace(context, candidate, signerPaths[candidate.slot.accountId], newAccount).flatMap { outcome ->
-            Timber.i("allocate: replacing seq=${candidate.slot.seq} in ${candidate.collection}: $outcome")
-            when (outcome) {
-                ReplacementOutcome.REPLACED -> Result.success(candidate)
-                ReplacementOutcome.NOT_YET_ALLOWED ->
-                    replaceFirstAvailable(context, remaining, signerPaths, newAccount, anyNotYetAllowed = true)
-                ReplacementOutcome.HOLDER_KEY_UNAVAILABLE ->
-                    replaceFirstAvailable(context, remaining, signerPaths, newAccount, anyNotYetAllowed)
+            val candidate = signableCandidate.candidate
+            replaceAsHolder(context, candidate, signableCandidate.holderOrigin, newAccount).map { outcome ->
+                Timber.i("allocate: replacing seq=${candidate.slot.seq} in ${candidate.collection}: $outcome")
+                candidate.takeIf { outcome == ReplacementOutcome.REPLACED }
             }
-        }
-    }
-
-    context(diagnostics: StalenessReportCollector)
-    private suspend fun tryReplace(
-        context: AllocateContext,
-        candidate: CollectionSlot<StatementStoreSlot.Taken>,
-        signerDerivationPath: String?,
-        newAccount: AccountId,
-    ): Result<ReplacementOutcome> {
-        if (signerDerivationPath == null) return Result.success(ReplacementOutcome.HOLDER_KEY_UNAVAILABLE)
-
-        return holderKeypair(signerDerivationPath, candidate.slot.accountId).flatMap { keypair ->
-            if (keypair == null) {
-                Result.success(ReplacementOutcome.HOLDER_KEY_UNAVAILABLE)
-            } else {
-                replaceAsHolder(context, candidate, statementStoreOrigins.asResourcesSlotHolder(keypair), newAccount)
-            }
-        }
+        }.requireNotNull { EvictionNotYetAllowedException("No evictable slot this device can sign for may be replaced yet") }
     }
 
     private suspend fun holderKeypair(derivationPath: String, holder: AccountId): Result<Sr25519Keypair?> {
@@ -157,10 +159,14 @@ class StatementStoreSlotReplacer @Inject constructor(
         }
 }
 
+private class CandidateWithHolderOrigin(
+    val candidate: CollectionSlot<StatementStoreSlot.Taken>,
+    val holderOrigin: TransactionOrigin,
+)
+
 private enum class ReplacementOutcome {
     REPLACED,
     NOT_YET_ALLOWED,
-    HOLDER_KEY_UNAVAILABLE,
 }
 
 private sealed interface ReplacementDryRun {
@@ -185,10 +191,4 @@ private fun TransactionValidity.toReplacementDryRun(): ReplacementDryRun = when 
 
 private fun InvalidTransaction.isReplacementNotYetAllowed(): Boolean {
     return this is InvalidTransaction.Payment || this == InvalidTransaction.Custom(REPLACEMENT_TOO_EARLY_VALIDITY_CODE)
-}
-
-private fun noReplaceableSlotError(anyNotYetAllowed: Boolean): Throwable = if (anyNotYetAllowed) {
-    EvictionNotYetAllowedException("No evictable slot this device can sign for may be replaced yet")
-} else {
-    StatementStoreSlotAllocationError.NoAllocationAvailable(IllegalStateException("No evictable slot is held by a key on this device"))
 }

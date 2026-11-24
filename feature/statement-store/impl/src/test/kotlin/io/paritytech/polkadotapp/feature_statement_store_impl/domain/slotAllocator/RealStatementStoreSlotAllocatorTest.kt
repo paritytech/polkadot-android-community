@@ -11,6 +11,7 @@ import io.paritytech.polkadotapp.common.domain.model.CurrentTimeContext
 import io.paritytech.polkadotapp.common.domain.model.toDataByteArray
 import io.paritytech.polkadotapp.common.utils.progressStallReport.StalenessReportCollector
 import io.paritytech.polkadotapp.feature_people_api.domain.PeopleCollection
+import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.CollectionSlot
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.OnExistingAllocationStrategy
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.SlotPriority
 import io.paritytech.polkadotapp.feature_statement_store_api.domain.slotAllocator.StatementSlotsForCollection
@@ -39,6 +40,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -250,6 +252,57 @@ class RealStatementStoreSlotAllocatorTest {
     }
 
     @Test
+    fun `old runtime - evictable slot still in replacement cooldown fails with Unknown`() = runBlocking<Unit> {
+        withNoStaleAllocations()
+        withSlotTakenBy(accountNormal)
+        withReplacementCooldown(2000.seconds)
+
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
+
+        assertTrue(
+            "expected Unknown but was ${result.exceptionOrNull()}",
+            result.exceptionOrNull() is StatementStoreSlotAllocationError.Unknown,
+        )
+        verifyNoEvictionPerformed()
+        verifyNoExtrinsicSubmitted()
+    }
+
+    @Test
+    fun `old runtime - candidate still in cooldown is passed over for an older one past it`() = runBlocking<Unit> {
+        withNoStaleAllocations()
+        withSlotsTakenBy(accountHigh, accountNormal)
+        withTrackedPriorities(
+            accountHigh to SlotPriority.High,
+            accountNormal to SlotPriority.Normal,
+        )
+        withReplacementCooldown(950.seconds)
+        withSuccessfulSubmission()
+
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.High)
+
+        assertSuccess(result)
+        verifySlotDeletedFor(accountHigh, seq = 0u)
+        verifyNoEvictionOf(accountNormal)
+    }
+
+    @Test
+    fun `new runtime - slot handed over by the replacer is recorded without a ring proof submission`() = runBlocking<Unit> {
+        withNoStaleAllocations()
+        withSlotTakenBy(accountNormal)
+        whenever(slotRepository.supportsSlotReplacement()).thenReturn(Result.success(true))
+        val handedOver = CollectionSlot(collection, StatementStoreSlot.Taken(seq = 0u, accountId = accountNormal, since = fixedNow - 1000.seconds))
+        whenever(with(any<StalenessReportCollector>()) { slotReplacer.replaceFirstAvailable(any(), any(), eq(target)) })
+            .thenReturn(Result.success(handedOver))
+
+        val result = allocate(OnExistingAllocationStrategy.INCREASE, SlotPriority.Normal)
+
+        assertSuccess(result)
+        verifySlotDeletedFor(accountNormal, seq = 0u)
+        verifyAllocationInsertedFor(targetHolder, seq = 0u, priority = SlotPriority.Normal)
+        verifyNoExtrinsicSubmitted()
+    }
+
+    @Test
     fun `free seq path - no eviction, just insert target row with caller priority`() = runBlocking<Unit> {
         withNoStaleAllocations()
         withFreeSlot()
@@ -386,6 +439,11 @@ class RealStatementStoreSlotAllocatorTest {
     private suspend fun withZeroCooldown() {
         whenever(slotRepository.supportsSlotReplacement()).thenReturn(Result.success(false))
         whenever(slotRepository.replacementCooldown()).thenReturn(Result.success(0.seconds))
+    }
+
+    private suspend fun withReplacementCooldown(cooldown: Duration) {
+        whenever(slotRepository.supportsSlotReplacement()).thenReturn(Result.success(false))
+        whenever(slotRepository.replacementCooldown()).thenReturn(Result.success(cooldown))
     }
 
     private suspend fun withChainSlots(slots: StatementStoreSlots) {
