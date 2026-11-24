@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_transactions.api.data.origins.SignedOri
 import io.paritytech.polkadotapp.feature_transactions.api.data.origins.TestnetTransactionOrigins
 import io.paritytech.polkadotapp.feature_transactions.api.data.retry.ResubmitWhenValidFactory
 import io.paritytech.polkadotapp.feature_transactions.api.data.tracked.TrackedExtrinsicService
+import io.paritytech.polkadotapp.feature_transactions.api.data.validation.ExtrinsicValidator
 import io.paritytech.polkadotapp.feature_transactions.api.di.ExtrinsicSerializer
 import io.paritytech.polkadotapp.feature_transactions_impl.data.DefaultExtrinsicVersionProvider
 import io.paritytech.polkadotapp.feature_transactions_impl.data.ExtrinsicBuilderFactory
@@ -32,7 +33,6 @@ import io.paritytech.polkadotapp.feature_transactions_impl.data.origins.RealTest
 import io.paritytech.polkadotapp.feature_transactions_impl.data.retry.RealResubmitWhenValidFactory
 import io.paritytech.polkadotapp.feature_transactions_impl.data.signer.RealSignerProvider
 import io.paritytech.polkadotapp.feature_transactions_impl.data.tracked.RealTrackedExtrinsicService
-import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.ExtrinsicValidator
 import io.paritytech.polkadotapp.feature_transactions_impl.data.validation.RealExtrinsicValidator
 import javax.inject.Singleton
 
