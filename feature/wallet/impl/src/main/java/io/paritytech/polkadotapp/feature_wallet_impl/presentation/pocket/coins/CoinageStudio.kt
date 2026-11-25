@@ -144,8 +144,8 @@ class CoinageStudio(val lamps: List<Lamp>, val roomLow: Float, val roomHigh: Flo
 
     companion object {
         /** The sharp level's face size and how many levels of blur follow it; together they set `envMaxLod`. */
-        const val SIZE = 256
-        const val LEVELS = 7
+        const val SIZE = 1024
+        const val LEVELS = 9
         const val FACES = 6
 
         fun faceDirection(face: Int, s: Float, t: Float): Vec = when (face) {
