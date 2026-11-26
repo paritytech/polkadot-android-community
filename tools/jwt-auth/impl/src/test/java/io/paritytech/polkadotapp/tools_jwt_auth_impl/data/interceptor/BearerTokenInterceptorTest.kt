@@ -1,7 +1,9 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.interceptor
 
 import com.google.gson.Gson
+import io.paritytech.polkadotapp.tools_integrity_api.domain.error.IntegrityError
 import io.paritytech.polkadotapp.tools_jwt_auth_api.CallWithBearerToken
+import io.paritytech.polkadotapp.tools_jwt_auth_api.domain.error.AuthError
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.FakeTimeProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.api.AuthTokenApi
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.createFakeTokenStore
@@ -65,6 +67,19 @@ class BearerTokenInterceptorTest {
         assertNotNull("intercept() should have thrown", thrown)
         assertTrue("Expected IOException, got ${thrown!!::class.qualifiedName}", thrown is IOException)
         assertSame(httpException, thrown.cause)
+    }
+
+    @Test
+    fun `wraps attestation rejection as IOException`() {
+        val errorBody = """{"error":"INTEGRITY_FAILED","message":"attestation rejected"}""".toResponseBody()
+        val rejection = HttpException(RetrofitResponse.error<Any>(403, errorBody))
+        val interceptor = BearerTokenInterceptor(providerWithFailingFetch(rejection))
+        val chain = FakeChain(buildRequest(annotated = true))
+
+        val thrown = runCatching { interceptor.intercept(chain) }.exceptionOrNull()
+
+        assertTrue("Expected IOException, got ${thrown?.let { it::class.qualifiedName }}", thrown is IOException)
+        assertEquals(AuthError.Integrity(IntegrityError.AttestationRejected), thrown?.cause)
     }
 
     @Test
