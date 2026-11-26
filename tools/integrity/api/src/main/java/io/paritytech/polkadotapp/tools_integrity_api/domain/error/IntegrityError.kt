@@ -7,7 +7,7 @@ package io.paritytech.polkadotapp.tools_integrity_api.domain.error
  * Variants stay payload-free because this reaches Compose state: a nested [Throwable] would
  * compare by identity and defeat recomposition skipping.
  */
-sealed class IntegrityError(message: String) : Throwable(message) {
+sealed class IntegrityError(message: String) : Exception(message) {
     /**
      * The device cannot attest at all — gp: Play Services/Store missing or outdated;
      * vanilla: keystore attestation unsupported.

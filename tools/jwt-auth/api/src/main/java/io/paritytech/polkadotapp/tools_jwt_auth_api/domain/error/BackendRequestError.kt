@@ -13,7 +13,7 @@ private const val HTTP_UNAUTHORIZED = 401
  * Transport-level failure taxonomy shared by every backend call. Features narrow this into
  * their own domain error rather than surfacing it directly.
  */
-sealed class BackendRequestError(message: String) : Throwable(message) {
+sealed class BackendRequestError(message: String) : Exception(message) {
     data class Auth(val error: AuthError) : BackendRequestError("auth failed")
 
     data object NoConnection : BackendRequestError("no connection")

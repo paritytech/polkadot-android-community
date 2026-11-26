@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.tools_jwt_auth_impl.data.interceptor
 
 import com.google.gson.Gson
+import io.paritytech.polkadotapp.test_shared.any
 import io.paritytech.polkadotapp.tools_jwt_auth_api.CallWithBearerToken
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.FakeTimeProvider
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.api.AuthTokenApi
@@ -10,7 +11,10 @@ import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.manager.JWTTokenProvid
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.model.JwtRequest
 import io.paritytech.polkadotapp.tools_jwt_auth_impl.data.parser.JWTParser
 import kotlinx.coroutines.runBlocking
+import okhttp3.Callback
+import okhttp3.Dispatcher
 import okhttp3.Interceptor
+import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
@@ -22,10 +26,14 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import retrofit2.HttpException
 import retrofit2.Invocation
 import java.io.IOException
+import java.util.concurrent.AbstractExecutorService
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
 import retrofit2.Response as RetrofitResponse
 
 class BearerTokenInterceptorTest {
@@ -65,6 +73,22 @@ class BearerTokenInterceptorTest {
         assertNotNull("intercept() should have thrown", thrown)
         assertTrue("Expected IOException, got ${thrown!!::class.qualifiedName}", thrown is IOException)
         assertSame(httpException, thrown.cause)
+    }
+
+    @Test
+    fun `rejected attestation fails the async call instead of crashing its thread`() {
+        val errorBody = """{"error":"INTEGRITY_FAILED","message":"attestation rejected"}""".toResponseBody()
+        val rejection = HttpException(RetrofitResponse.error<Any>(403, errorBody))
+        val interceptor = BearerTokenInterceptor(providerWithFailingFetch(rejection))
+        val request = buildRequest(annotated = true)
+        val dispatcherThread = CrashRecordingExecutor()
+        val call = clientRunningCallsOn(dispatcherThread, interceptor).newCall(request)
+        val callback = mock(Callback::class.java)
+
+        call.enqueue(callback)
+
+        assertEquals(emptyList<Throwable>(), dispatcherThread.crashes)
+        verify(callback).onFailure(any(), any())
     }
 
     @Test
@@ -125,6 +149,12 @@ class BearerTokenInterceptorTest {
         )
     }
 
+    private fun clientRunningCallsOn(executor: ExecutorService, interceptor: Interceptor): OkHttpClient =
+        OkHttpClient.Builder()
+            .dispatcher(Dispatcher(executor))
+            .addInterceptor(interceptor)
+            .build()
+
     private fun buildRequest(annotated: Boolean): Request {
         val builder = Request.Builder().url("https://example.com/api/test")
         if (annotated) {
@@ -138,6 +168,22 @@ class BearerTokenInterceptorTest {
         @CallWithBearerToken
         fun annotatedMethod()
     }
+}
+
+// OkHttp rethrows a non-IOException from an async call on its dispatcher thread, which kills the
+// app. Runs calls inline and records what would have reached that thread's uncaught handler.
+private class CrashRecordingExecutor : AbstractExecutorService() {
+    val crashes = mutableListOf<Throwable>()
+
+    override fun execute(command: Runnable) {
+        runCatching { command.run() }.onFailure { crashes += it }
+    }
+
+    override fun shutdown() = Unit
+    override fun shutdownNow(): List<Runnable> = emptyList()
+    override fun isShutdown() = false
+    override fun isTerminated() = false
+    override fun awaitTermination(timeout: Long, unit: TimeUnit) = true
 }
 
 private class FakeChain(private val request: Request) : Interceptor.Chain {
