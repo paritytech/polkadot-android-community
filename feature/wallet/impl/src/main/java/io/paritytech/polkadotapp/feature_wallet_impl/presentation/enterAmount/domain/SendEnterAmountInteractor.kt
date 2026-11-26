@@ -30,6 +30,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.submitter.CoinsSubmi
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentState
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatus
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.CoinagePaymentStatusUseCase
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PaymentAuthenticationUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PrepareCoinageTransferUseCase
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.PreparedTransferMemo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.TotalBalanceUseCase
@@ -71,6 +72,8 @@ interface SendEnterAmountInteractor {
 
     suspend fun asset(): Chain.Asset
 
+    suspend fun authenticateIfRequired(value: BigDecimal): Result<Unit>
+
     suspend fun estimateFee(recipient: AccountId, value: BigDecimal): Result<Fee>
 
     /**
@@ -100,6 +103,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
     private val coinageDebugSettings: CoinageDebugSettings,
     private val coroutineDispatchers: CoroutineDispatchers,
     private val timeProvider: TimeProvider,
+    private val paymentAuthenticationUseCase: PaymentAuthenticationUseCase,
     override val sendValidation: SendValidation
 ) : SendEnterAmountInteractor {
     companion object {
@@ -117,6 +121,9 @@ class RealSendEnterAmountInteractor @Inject constructor(
     }
 
     override suspend fun asset(): Chain.Asset = chainAssetProvider.asset()
+
+    override suspend fun authenticateIfRequired(value: BigDecimal): Result<Unit> =
+        paymentAuthenticationUseCase.authenticateIfRequired(asset().planksFromAmount(value))
 
     override fun tokenBalance(): Flow<AvailableToSendAmount> {
         return totalBalanceUseCase.subscribeTotalBalance()

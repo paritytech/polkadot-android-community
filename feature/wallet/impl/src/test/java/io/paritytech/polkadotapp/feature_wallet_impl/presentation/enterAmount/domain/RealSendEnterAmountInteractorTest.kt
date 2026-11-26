@@ -132,6 +132,7 @@ class RealSendEnterAmountInteractorTest {
         coinageDebugSettings = mockk(),
         coroutineDispatchers = mockk<CoroutineDispatchers> { every { computation } returns dispatcher },
         timeProvider = mockk { every { now() } returns Instant.fromEpochMilliseconds(0) },
+        paymentAuthenticationUseCase = mockk(),
         sendValidation = mockk(),
     )
 

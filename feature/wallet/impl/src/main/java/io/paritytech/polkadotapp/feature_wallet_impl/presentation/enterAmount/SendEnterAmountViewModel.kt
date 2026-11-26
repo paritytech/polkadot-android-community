@@ -44,7 +44,6 @@ import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.do
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.SendValidationPayload
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.enterAmount.domain.asSendError
 import io.paritytech.polkadotapp.feature_wallet_impl.presentation.transactionResult.TransactionSuccessPayload
-import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -64,7 +63,6 @@ class SendEnterAmountViewModel @Inject constructor(
     private val walletRouter: PocketRouter,
     private val interactor: SendEnterAmountInteractor,
     private val tokenAmountMapper: TokenAmountMapper,
-    private val biometricsService: BiometricsService,
 ) : BaseViewModel(), SendEnterAmountContract {
     private val sendProgress = MutableStateFlow<SendProgress>(SendProgress.Idle)
 
@@ -172,7 +170,7 @@ class SendEnterAmountViewModel @Inject constructor(
 
             val validationResult = sendValidationMixin.runValidation(interactor.sendValidation, payload)
             validationResult.onSuccess { validated ->
-                biometricsService.performOneTimeAuthentication()
+                interactor.authenticateIfRequired(validated.value)
                     .onAuthenticated { sendValidatedTransfer(validated) }
             }
             validationResult.onError { showPresentationError(it.asSendError().toPresentationError()) }

@@ -17,6 +17,7 @@ import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningConte
 import io.paritytech.polkadotapp.feature_products_api.model.signing.SigningContextHolder
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.ParsedSigningContent
 import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.TransactionSignInteractor
+import io.paritytech.polkadotapp.feature_products_impl.domain.signTransaction.requiresDeviceAuthentication
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
 import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,11 +76,18 @@ class TransactionSignViewModel @Inject constructor(
 
         Timber.d("Approve clicked for ${signingContext.requesterName}")
 
-        biometricsService.performOneTimeAuthentication()
+        authenticateIfRequired()
             .onAuthenticated { signAndDeliver() }
 
         signing.value = false
     }
+
+    private suspend fun authenticateIfRequired(): Result<Unit> =
+        if (interactor.account.requiresDeviceAuthentication()) {
+            biometricsService.performOneTimeAuthentication()
+        } else {
+            Result.success(Unit)
+        }
 
     private suspend fun signAndDeliver() {
         interactor.sign()

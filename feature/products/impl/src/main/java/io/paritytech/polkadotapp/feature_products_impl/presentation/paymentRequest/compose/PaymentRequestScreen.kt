@@ -95,6 +95,7 @@ private fun PaymentRequestConfirmContent(
             modifier = Modifier.fillMaxWidth(),
             text = stringResource(RCommon.string.product_payment_request_approve),
             style = PolkadotButtonStyle.secondary(),
+            loading = state.approving,
             onClick = onApprove,
         )
 
@@ -122,6 +123,7 @@ private fun PaymentRequestScreenPreview() {
                     productId = "alice.dot",
                     amount = TokenAmountModel.mock,
                     step = PaymentRequestStep.Confirm,
+                    approving = false,
                 ),
                 onApprove = {},
                 onReject = {},

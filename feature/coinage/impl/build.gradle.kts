@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":feature:usernames:api"))
 
     implementation(project(":tools:remoteconfig:api"))
+    implementation(project(":tools:biometrics:api"))
 
     implementation(project(":database"))
 

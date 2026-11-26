@@ -156,7 +156,7 @@ Walk this for every file the diff touches. Cite the rule's doc and section. Tag 
 
 ## Device authentication (`architecture/device-auth.md`)
 
-- **major** — New confirm control for signing, payment, pairing or secret export runs its action without a `BiometricsService.performOneTimeAuthentication()` gate.
+- **major** — New confirm control for signing with the identity account, a cross-product proof, pairing or secret export runs its action without a `BiometricsService.performOneTimeAuthentication()` gate, or a control that spends CASH runs without `PaymentAuthenticationUseCase.authenticateIfRequired`.
 
 ---
 
