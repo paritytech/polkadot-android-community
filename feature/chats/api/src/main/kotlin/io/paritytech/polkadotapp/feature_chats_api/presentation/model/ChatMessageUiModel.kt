@@ -50,6 +50,7 @@ sealed interface ChatMessageUiModel {
         override val status: ChatMessageUiModel.Status,
         override val origin: ChatMessageOrigin,
         val paymentStatus: Status,
+        val isReclaimRequested: Boolean,
         val amount: TokenAmountModel,
         val reactions: ImmutableList<Reaction>
     ) : ChatMessageUiModel {

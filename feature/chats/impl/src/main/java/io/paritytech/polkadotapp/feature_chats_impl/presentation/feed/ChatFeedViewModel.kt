@@ -167,6 +167,8 @@ class ChatFeedViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateInBackground(initialValue = false)
 
+    private val reclaimRequestedMessageIds = MutableStateFlow<Set<ChatMessageId>>(emptySet())
+
     private val messages = combine(
         combineToPair(
             gatedDomainMessages.map { it.visibleMessages },
@@ -174,10 +176,19 @@ class ChatFeedViewModel @Inject constructor(
         ),
         combineToPair(reactions, interactor.subscribePeerSeenOrder(chatId)),
         originDisplayResolver,
-        revisions,
+        combineToPair(revisions, reclaimRequestedMessageIds),
         customMessageRenderers
-    ) { (messages, activeCall), (reactions, peerSeenOrder), originDisplayResolver, revisionsMap, customMessageRenderers ->
-        messageUiMapper.map(messages, originDisplayResolver, reactions, revisionsMap, peerSeenOrder, customMessageRenderers, activeCall)
+    ) { (messages, activeCall), (reactions, peerSeenOrder), originDisplayResolver, (revisionsMap, reclaimRequestedIds), customMessageRenderers ->
+        messageUiMapper.map(
+            messages,
+            originDisplayResolver,
+            reactions,
+            revisionsMap,
+            peerSeenOrder,
+            reclaimRequestedIds,
+            customMessageRenderers,
+            activeCall
+        )
     }.shareInBackground()
 
     override val chatDisplay = interactor.observeChatDisplay(openChatRequest)
@@ -540,13 +551,24 @@ class ChatFeedViewModel @Inject constructor(
                 messagePopupSection.update { null }
             }
 
-            is MessageAction.ReclaimPayment -> reclaimPayment(action.message.id)
+            is MessageAction.ReclaimPayment -> reclaimPayment(action.message)
         }
     }
 
-    private fun reclaimPayment(messageId: ChatMessageId) = launchUnit {
-        interactor.reclaimPayment(chatId, messageId)
+    private fun reclaimPayment(message: ChatMessageUiModel.CoinagePayment) = launchUnit {
+        reclaimRequestedMessageIds.update { it + message.id }
+
+        interactor.reclaimPayment(chatId, message.id)
+            .onSuccess { awaitPaymentStatusChange(message) }
             .onFailure { showPresentationError(it.asReclaimHandedOffCoinsError().toPresentationError()) }
+
+        reclaimRequestedMessageIds.update { it - message.id }
+    }
+
+    private suspend fun awaitPaymentStatusChange(message: ChatMessageUiModel.CoinagePayment) {
+        messages.first { messagesList ->
+            messagesList.none { it is ChatMessageUiModel.CoinagePayment && it.id == message.id && it.paymentStatus == message.paymentStatus }
+        }
     }
 
     override fun onAcceptChatRequest() = launchUnit {

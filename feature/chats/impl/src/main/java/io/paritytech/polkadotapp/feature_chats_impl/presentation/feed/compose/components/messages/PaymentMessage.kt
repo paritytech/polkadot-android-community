@@ -196,6 +196,7 @@ private fun PaymentMessageContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = PolkadotTheme.spacings.extraMedium),
+                enabled = !message.isReclaimRequested,
                 text = stringResource(
                     if (message.paymentStatus is ChatMessageUiModel.CoinagePayment.Status.ReclaimFailed) {
                         RCommon.string.chat_payment_reclaim_retry_action
@@ -344,6 +345,7 @@ private fun PaymentMessagePreview(
             timestamp = System.currentTimeMillis(),
             amount = amount,
             paymentStatus = paymentStatus,
+            isReclaimRequested = false,
             origin = ChatMessageOrigin.User,
             reactions = persistentListOf()
         ),
