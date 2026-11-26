@@ -9,10 +9,11 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.common.utils.toWorkerResult
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.HopTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.TransferQueueProcessor
-import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueDelayedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.enqueueExpeditedTransfer
 import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.hopTransferForegroundInfo
+import io.paritytech.polkadotapp.feature_chats_impl.data.hop.transfer.scheduleTransferWakeUp
 import timber.log.Timber
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -30,7 +31,7 @@ class FileDownloadWorker @AssistedInject constructor(
         val processed = runCancellableCatching { transferQueueProcessor.processPending(transferQueue) }
 
         transferQueue.soonestNextAttemptAt()?.let { soonest ->
-            enqueueDelayedTransfer<FileDownloadWorker>(applicationContext, WORK_ID, soonest)
+            scheduleTransferWakeUp(applicationContext, HopTransfer.DOWNLOAD, soonest)
         }
 
         return processed.toWorkerResult(retryOnFailure = true)
