@@ -43,6 +43,7 @@ class ChatMessageUiMapper @Inject constructor(
         reactions: Map<ChatMessageId, List<ChatMessageReaction>>,
         revisions: Map<ChatMessageId, MessageRevision>,
         peerSeenOrder: Long,
+        reclaimRequestedMessageIds: Set<ChatMessageId>,
         customMessageRenderers: Map<String, CustomChatMessageRenderer<*>> = emptyMap(),
         activeCall: ActiveCallState? = null
     ): ImmutableList<ChatMessageUiModel> {
@@ -74,7 +75,8 @@ class ChatMessageUiMapper @Inject constructor(
                 messageReactions = messageReactions,
                 customMessageRenderers = customMessageRenderers,
                 callContext = callContext,
-                isSeenByPeer = message.isSeenByPeer(peerSeenOrder)
+                isSeenByPeer = message.isSeenByPeer(peerSeenOrder),
+                isReclaimRequested = message.id in reclaimRequestedMessageIds
             )
         }.toImmutableList()
     }
@@ -152,7 +154,8 @@ class ChatMessageUiMapper @Inject constructor(
         messageReactions: ImmutableList<ChatMessageUiModel.Reaction>,
         customMessageRenderers: Map<String, CustomChatMessageRenderer<*>>,
         callContext: CallResolutionContext,
-        isSeenByPeer: Boolean
+        isSeenByPeer: Boolean,
+        isReclaimRequested: Boolean
     ): ChatMessageUiModel? {
         val direction = direction.toUi()
         val status = if (isSeenByPeer) ChatMessageUiModel.Status.SEEN else status.toUi()
@@ -201,7 +204,8 @@ class ChatMessageUiMapper @Inject constructor(
                     direction = direction,
                     status = status,
                     amount = tokenAmount,
-                    paymentStatus = helper.mapPaymentStatus(latestContent.status),
+                    paymentStatus = helper.mapPaymentStatus(latestContent),
+                    isReclaimRequested = isReclaimRequested,
                     origin = origin,
                     reactions = messageReactions
                 )

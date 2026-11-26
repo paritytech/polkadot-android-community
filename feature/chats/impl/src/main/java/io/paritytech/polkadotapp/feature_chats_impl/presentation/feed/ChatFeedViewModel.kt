@@ -69,6 +69,7 @@ import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.sen
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.models.toUi
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.utils.AttachmentExecutor
 import io.paritytech.polkadotapp.feature_chats_impl.presentation.feed.utils.AttachmentResult
+import io.paritytech.polkadotapp.feature_coinage_api.domain.usecase.asReclaimHandedOffCoinsError
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.SendEnterAmountPayload
 import io.paritytech.polkadotapp.feature_wallet_api.presentation.enterAmount.TransferMethodPayload
 import kotlinx.collections.immutable.persistentListOf
@@ -166,6 +167,8 @@ class ChatFeedViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateInBackground(initialValue = false)
 
+    private val reclaimRequestedMessageIds = MutableStateFlow<Set<ChatMessageId>>(emptySet())
+
     private val messages = combine(
         combineToPair(
             gatedDomainMessages.map { it.visibleMessages },
@@ -173,10 +176,19 @@ class ChatFeedViewModel @Inject constructor(
         ),
         combineToPair(reactions, interactor.subscribePeerSeenOrder(chatId)),
         originDisplayResolver,
-        revisions,
+        combineToPair(revisions, reclaimRequestedMessageIds),
         customMessageRenderers
-    ) { (messages, activeCall), (reactions, peerSeenOrder), originDisplayResolver, revisionsMap, customMessageRenderers ->
-        messageUiMapper.map(messages, originDisplayResolver, reactions, revisionsMap, peerSeenOrder, customMessageRenderers, activeCall)
+    ) { (messages, activeCall), (reactions, peerSeenOrder), originDisplayResolver, (revisionsMap, reclaimRequestedIds), customMessageRenderers ->
+        messageUiMapper.map(
+            messages,
+            originDisplayResolver,
+            reactions,
+            revisionsMap,
+            peerSeenOrder,
+            reclaimRequestedIds,
+            customMessageRenderers,
+            activeCall
+        )
     }.shareInBackground()
 
     override val chatDisplay = interactor.observeChatDisplay(openChatRequest)
@@ -538,6 +550,24 @@ class ChatFeedViewModel @Inject constructor(
             is MessageAction.DismissActionMenu -> {
                 messagePopupSection.update { null }
             }
+
+            is MessageAction.ReclaimPayment -> reclaimPayment(action.message)
+        }
+    }
+
+    private fun reclaimPayment(message: ChatMessageUiModel.CoinagePayment) = launchUnit {
+        reclaimRequestedMessageIds.update { it + message.id }
+
+        interactor.reclaimPayment(chatId, message.id)
+            .onSuccess { awaitPaymentStatusChange(message) }
+            .onFailure { showPresentationError(it.asReclaimHandedOffCoinsError().toPresentationError()) }
+
+        reclaimRequestedMessageIds.update { it - message.id }
+    }
+
+    private suspend fun awaitPaymentStatusChange(message: ChatMessageUiModel.CoinagePayment) {
+        messages.first { messagesList ->
+            messagesList.none { it is ChatMessageUiModel.CoinagePayment && it.id == message.id && it.paymentStatus == message.paymentStatus }
         }
     }
 

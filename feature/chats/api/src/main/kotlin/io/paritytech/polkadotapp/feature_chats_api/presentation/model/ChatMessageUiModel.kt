@@ -50,6 +50,7 @@ sealed interface ChatMessageUiModel {
         override val status: ChatMessageUiModel.Status,
         override val origin: ChatMessageOrigin,
         val paymentStatus: Status,
+        val isReclaimRequested: Boolean,
         val amount: TokenAmountModel,
         val reactions: ImmutableList<Reaction>
     ) : ChatMessageUiModel {
@@ -76,7 +77,12 @@ sealed interface ChatMessageUiModel {
 
                     is Transferred,
                     is FailedDetection,
-                    is FailedTransfer -> false
+                    is FailedTransfer,
+                    is Reclaiming,
+                    is Reclaimed,
+                    is PartiallyReclaimed,
+                    is ReclaimFailed,
+                    is ClaimWindowExpired -> false
                 }
 
             data object Detecting : Status
@@ -85,6 +91,11 @@ sealed interface ChatMessageUiModel {
             data class Transferred(val transferred: TokenAmountModel) : Status
             data object FailedDetection : Status
             data object FailedTransfer : Status
+            data object Reclaiming : Status
+            data object Reclaimed : Status
+            data class PartiallyReclaimed(val reclaimed: TokenAmountModel) : Status
+            data object ReclaimFailed : Status
+            data object ClaimWindowExpired : Status
         }
     }
 
@@ -273,6 +284,7 @@ sealed interface MessageAction {
     data class ShowReactionDetails(val message: ChatMessageUiModel) : MessageAction
     data class ReplyPreviewTap(val messageId: ChatMessageId) : MessageAction
     data class ViewEditHistory(val message: ChatMessageUiModel) : MessageAction
+    data class ReclaimPayment(val message: ChatMessageUiModel.CoinagePayment) : MessageAction
     data object DismissActionMenu : MessageAction
 }
 

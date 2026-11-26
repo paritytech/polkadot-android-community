@@ -23,7 +23,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.transaction.model.Ow
 import io.paritytech.polkadotapp.feature_coinage_impl.data.model.OnChainCoinInfo
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransaction
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.model.CoinageTransactionAssets
-import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.ClaimExtrinsicBuilder
+import io.paritytech.polkadotapp.feature_coinage_impl.domain.planner.strategies.builders.CoinTransferExtrinsicBuilder
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.COINAGE_CLAIM_POLICY_ID
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.ClaimSubmissionParams
 import io.paritytech.polkadotapp.feature_coinage_impl.domain.transaction.submission.CoinageSubmissionParams
@@ -54,13 +54,13 @@ class RealCoinageTransferSubmissionUseCaseTest {
     fun unmockDerivation() = unmockkStatic(DERIVATION_FILE)
 
     private val chainAssetProvider: ChainAssetProvider = mockk(relaxed = true)
-    private val claimExtrinsicBuilder: ClaimExtrinsicBuilder = mockk()
+    private val coinTransferExtrinsicBuilder: CoinTransferExtrinsicBuilder = mockk()
     private val transactionService: CoinageTransactionService = mockk()
     private val transactionFactory: CoinageTransaction.Factory = mockk()
 
     private val useCase = RealCoinageTransferSubmissionUseCase(
         chainAssetProvider = chainAssetProvider,
-        claimExtrinsicBuilder = claimExtrinsicBuilder,
+        coinTransferExtrinsicBuilder = coinTransferExtrinsicBuilder,
         transactionService = transactionService,
         coinageTransactionFactory = transactionFactory,
     )
@@ -142,7 +142,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
     fun `a claim whose extrinsic cannot be built fails the call`() = runBlocking<Unit> {
         val key = keyOf(1)
         givenTransactionMints(Coin(derivationIndex = testKey(9), valueExponent = ValueExponent(3), age = Coin.Age.Unknown, isOnChain = false, accountId = ACCOUNT, provenance = CoinProvenance.UNKNOWN))
-        coEvery { claimExtrinsicBuilder.build(any(), any(), any()) } returns
+        coEvery { coinTransferExtrinsicBuilder.build(any(), any(), any()) } returns
             Result.failure(IllegalStateException("no runtime"))
 
         val result = useCase(listOf(key), mapOf(key.accountId() to OnChainCoinInfo(instanceId = 0, value = 3, age = 0)), groupId, RETRY_UNTIL)
@@ -195,7 +195,7 @@ class RealCoinageTransferSubmissionUseCaseTest {
     private var consumedKeys: List<AccountId> = emptyList()
 
     private fun givenExtrinsicBuilds() {
-        coEvery { claimExtrinsicBuilder.build(any(), any(), any()) } returns Result.success(mockk())
+        coEvery { coinTransferExtrinsicBuilder.build(any(), any(), any()) } returns Result.success(mockk())
     }
 
     private fun givenSubmissionSucceeds() {

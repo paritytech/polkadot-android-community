@@ -24,6 +24,7 @@ import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.Exte
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentPlanner
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.ExternalPaymentService
 import io.paritytech.polkadotapp.feature_coinage_api.domain.externalPayment.awaitTransferOutcome
+import io.paritytech.polkadotapp.feature_coinage_api.domain.model.HandedOffCoinsClaimWindow
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.TransferMemo
 import io.paritytech.polkadotapp.feature_coinage_api.domain.model.deriveKeypair
 import io.paritytech.polkadotapp.feature_coinage_api.domain.submitter.CoinsSubmitter
@@ -60,7 +61,6 @@ import java.math.BigDecimal
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import io.paritytech.polkadotapp.common.R as RCommon
 
@@ -113,7 +113,7 @@ class RealSendEnterAmountInteractor @Inject constructor(
          * How long a chat payment's transactions keep being rebuilt while their inputs are gone from the chain.
          * The same window the recipient's claim gets, so neither side gives up while the other still tries.
          */
-        private val CHAT_PAYMENT_RETRY_WINDOW = 6.hours
+        private val CHAT_PAYMENT_RETRY_WINDOW = HandedOffCoinsClaimWindow.duration
     }
 
     override suspend fun asset(): Chain.Asset = chainAssetProvider.asset()
