@@ -4,6 +4,7 @@ import io.paritytech.polkadotapp.common.utils.toCanonicalDotHost
 import io.paritytech.polkadotapp.feature_dotns_api.domain.DotNsTldProvider
 import io.paritytech.polkadotapp.feature_dotns_api.presentation.DotNsServingHostResolver
 import io.paritytech.polkadotapp.feature_products_api.model.ProductId
+import io.paritytech.polkadotapp.feature_products_api.model.ResolvedProduct
 import io.paritytech.polkadotapp.feature_products_impl.domain.usecase.ResolveProductUseCase
 import javax.inject.Inject
 
@@ -26,6 +27,8 @@ class ProductServingHostResolver @Inject constructor(
 
         val resolved = resolveProductUseCase.resolve(productId).getOrNull() ?: return host
 
-        return resolved.executables.app?.host?.value ?: host
+        return resolved.appServingHost(fallback = host)
     }
 }
+
+internal fun ResolvedProduct.appServingHost(fallback: String): String = executables.app?.host?.value ?: fallback
