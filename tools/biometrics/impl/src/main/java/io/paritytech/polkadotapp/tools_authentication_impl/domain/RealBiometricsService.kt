@@ -1,6 +1,7 @@
 package io.paritytech.polkadotapp.tools_authentication_impl.domain
 
 import io.paritytech.polkadotapp.tools_authentication_api.data.AuthenticationSession
+import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
 import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
 import io.paritytech.polkadotapp.tools_authentication_impl.data.AuthenticationMethod
 import kotlinx.coroutines.sync.Mutex
@@ -21,7 +22,15 @@ class RealBiometricsService @Inject constructor(
         }
     }
 
-    override suspend fun performOneTimeAuthentication() = authMutex.withLock {
-        authMethod.authenticateUser()
+    override suspend fun performOneTimeAuthentication(): Result<Unit> {
+        if (!authMutex.tryLock()) {
+            return Result.failure(AuthenticationCancelledException("Another authentication is in progress"))
+        }
+
+        return try {
+            authMethod.authenticateUser()
+        } finally {
+            authMutex.unlock()
+        }
     }
 }

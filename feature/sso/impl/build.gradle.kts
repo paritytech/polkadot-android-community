@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":feature:products:api"))
     implementation(project(":feature:chats:api"))
     implementation(project(":feature:chain-resources:api"))
+    implementation(project(":tools:biometrics:api"))
 
     testImplementation(project(":test-shared"))
 }

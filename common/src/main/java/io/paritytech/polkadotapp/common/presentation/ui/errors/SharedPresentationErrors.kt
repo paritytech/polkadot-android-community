@@ -17,3 +17,7 @@ class SigningFailedPresentationError(cause: Throwable) :
 class UnexpectedPresentationError(cause: Throwable) :
     PresentationThrowable(cause),
     PresentationError by StringResPresentationError(R.string.generic_error_notification)
+
+class AuthenticationFailedPresentationError(cause: Throwable) :
+    PresentationThrowable(cause),
+    PresentationError by StringResPresentationError(R.string.authentication_failed)

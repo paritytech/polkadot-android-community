@@ -10,7 +10,10 @@ import io.paritytech.polkadotapp.common.presentation.navigation.OverlayCoordinat
 import io.paritytech.polkadotapp.common.presentation.resources.ContextManager
 import io.paritytech.polkadotapp.common.utils.CoroutineDispatchers
 import io.paritytech.polkadotapp.common.utils.flatMap
+import io.paritytech.polkadotapp.common.utils.flatten
+import io.paritytech.polkadotapp.common.utils.runCancellableCatching
 import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationCancelledException
+import io.paritytech.polkadotapp.tools_authentication_api.domain.AuthenticationFailedException
 import io.paritytech.polkadotapp.tools_authentication_impl.data.AuthenticationMethod
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -27,43 +30,48 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
         private const val ALLOWED_BIOMETRICS = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
     }
 
-    private val executor = ContextCompat.getMainExecutor(contextManager.requireActivity())
-
     override suspend fun authenticateUser(): Result<Unit> {
+        val activity = contextManager.getActivity() as? FragmentActivity
+            ?: return Result.failure(AuthenticationFailedException("No activity attached to show the prompt"))
+
         return overlayCoordinator.forbidOverlays().use {
-            authenticateUseInternal()
+            runCancellableCatching { authenticateUseInternal(activity) }.flatten()
         }
     }
 
-    private suspend fun authenticateUseInternal(): Result<Unit> {
-        val biometricManager = BiometricManager.from(contextManager.requireActivity())
+    private suspend fun authenticateUseInternal(activity: FragmentActivity): Result<Unit> {
+        val biometricManager = BiometricManager.from(activity)
 
         val context = contextManager.applicationContext
 
-        return biometricManager.prepareForAuthentication().flatMap {
+        return biometricManager.prepareForAuthentication(activity).flatMap {
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
                 .setTitle(context.getString(RCommon.string.authentication_title))
                 .setDescription(context.getString(RCommon.string.authentication_description))
                 .setAllowedAuthenticators(ALLOWED_BIOMETRICS)
                 .build()
 
-            promptInfo.authenticate()
+            promptInfo.authenticate(activity)
         }
     }
 
-    private suspend fun BiometricPrompt.PromptInfo.authenticate(): Result<Unit> {
+    private suspend fun BiometricPrompt.PromptInfo.authenticate(activity: FragmentActivity): Result<Unit> {
         return withContext(coroutineDispatchers.main) {
             suspendCancellableCoroutine { continuation ->
+                if (activity.supportFragmentManager.isStateSaved) {
+                    val exception = AuthenticationCancelledException("BiometricPrompt drops a request made after onSaveInstanceState")
+                    continuation.resume(Result.failure(exception))
+                    return@suspendCancellableCoroutine
+                }
+
                 val biometricPrompt = BiometricPrompt(
-                    contextManager.requireActivity() as FragmentActivity, executor,
+                    activity, ContextCompat.getMainExecutor(activity),
                     object : BiometricPrompt.AuthenticationCallback() {
                         override fun onAuthenticationError(
                             errorCode: Int,
                             errString: CharSequence,
                         ) {
-                            val exception =
-                                AuthenticationCancelledException("$errorCode: $errString")
-                            continuation.resume(Result.failure(exception))
+                            continuation.resume(Result.failure(biometricPromptError(errorCode, errString)))
                         }
 
                         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -80,21 +88,21 @@ class BiometricPromptAuthenticationMethod @Inject constructor(
         }
     }
 
-    private suspend fun BiometricManager.prepareForAuthentication(): Result<Unit> {
+    private suspend fun BiometricManager.prepareForAuthentication(activity: FragmentActivity): Result<Unit> {
         return when (canAuthenticate(ALLOWED_BIOMETRICS)) {
             BiometricManager.BIOMETRIC_SUCCESS -> Result.success(Unit)
 
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ->
-                Result.failure(AuthenticationCancelledException("No matching hardware found to perform authentication"))
+                Result.failure(AuthenticationFailedException("No matching hardware found to perform authentication"))
 
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
-                Result.failure(AuthenticationCancelledException("Hardware to perform authentication is currently unavailable. Try again later."))
+                Result.failure(AuthenticationFailedException("Hardware to perform authentication is currently unavailable. Try again later."))
 
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                BiometricExecutor(contextManager).execute()
+                BiometricExecutor(activity).execute()
             }
 
-            else -> Result.failure(AuthenticationCancelledException("Unknown authentication hardware state"))
+            else -> Result.failure(AuthenticationFailedException("Unknown authentication hardware state"))
         }
     }
 }

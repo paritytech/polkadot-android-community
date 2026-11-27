@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.paritytech.polkadotapp.common.data.memory.ComputationalScope
 import io.paritytech.polkadotapp.common.domain.errors.UserCancellation
+import io.paritytech.polkadotapp.common.presentation.ui.errors.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.common.utils.OneShotEventChannel
 import kotlinx.coroutines.flow.receiveAsFlow
 import timber.log.Timber
@@ -33,6 +34,18 @@ open class BaseViewModel : ViewModel(), ComputationalScope, MessageDisplay {
         Timber.e(error)
 
         _events.trySend(BaseViewModelEvent.PresentationError(error))
+    }
+
+    protected inline fun Result<Unit>.onAuthenticated(action: () -> Unit) {
+        fold(
+            onSuccess = { action() },
+            onFailure = { showAuthenticationFailed(it) },
+        )
+    }
+
+    @PublishedApi
+    internal fun showAuthenticationFailed(cause: Throwable) {
+        showPresentationError(AuthenticationFailedPresentationError(cause))
     }
 
     @Deprecated("Use showPresentationError instead")

@@ -166,7 +166,7 @@ class RootActivity : AppCompatActivity(R.layout.activity_root) {
                     PolkadotTheme {
                         ObserveViewModelEvents(viewModel, appNotifier)
 
-                        AppNotificationHost(notifier = appNotifier)
+                        AppNotificationHost(modifier = Modifier.fillMaxSize(), notifier = appNotifier)
                     }
                 }
             }

@@ -13,4 +13,6 @@ dependencies {
     api(project(":tools:biometrics:api"))
 
     implementation(libs.androidx.biometric)
+
+    testImplementation(project(":test-shared"))
 }

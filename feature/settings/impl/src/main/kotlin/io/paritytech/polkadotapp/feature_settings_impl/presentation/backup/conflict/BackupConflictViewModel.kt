@@ -9,6 +9,7 @@ import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictP
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.BackupConflictInteractor
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.conflict.models.BackupConflictStep
+import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
 
@@ -16,6 +17,7 @@ import javax.inject.Inject
 class BackupConflictViewModel @Inject constructor(
     private val router: SettingsRouter,
     private val interactor: BackupConflictInteractor,
+    private val biometricsService: BiometricsService,
     savedStateHandle: SavedStateHandle
 ) : BaseViewModel(), BackupConflictContract {
     private val payload: BackupConflictPayload = savedStateHandle.getPayload()
@@ -27,16 +29,19 @@ class BackupConflictViewModel @Inject constructor(
     }
 
     override fun confirmOverride() = launchUnit {
-        step.value = BackupConflictStep.Override(inProgress = true)
+        biometricsService.performOneTimeAuthentication()
+            .onAuthenticated {
+                step.value = BackupConflictStep.Override(inProgress = true)
 
-        interactor
-            .overrideBackup()
-            .onSuccess {
-                router.backWithResult(BackupConflictBottomSheet.REQUEST_KEY, true)
-            }
-            .onFailure {
-                step.value = BackupConflictStep.Override(inProgress = false)
-                showPresentationError(UnexpectedPresentationError(it))
+                interactor
+                    .overrideBackup()
+                    .onSuccess {
+                        router.backWithResult(BackupConflictBottomSheet.REQUEST_KEY, true)
+                    }
+                    .onFailure {
+                        step.value = BackupConflictStep.Override(inProgress = false)
+                        showPresentationError(UnexpectedPresentationError(it))
+                    }
             }
     }
 

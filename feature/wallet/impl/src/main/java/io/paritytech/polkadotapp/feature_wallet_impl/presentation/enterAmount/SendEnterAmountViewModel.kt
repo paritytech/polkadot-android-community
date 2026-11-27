@@ -169,7 +169,10 @@ class SendEnterAmountViewModel @Inject constructor(
             val payload = SendValidationPayload(amount.amount, transferMethod)
 
             val validationResult = sendValidationMixin.runValidation(interactor.sendValidation, payload)
-            validationResult.onSuccess { sendValidatedTransfer(it) }
+            validationResult.onSuccess { validated ->
+                interactor.authenticateIfRequired(validated.value)
+                    .onAuthenticated { sendValidatedTransfer(validated) }
+            }
             validationResult.onError { showPresentationError(it.asSendError().toPresentationError()) }
 
             sendProgress.value = SendProgress.Idle

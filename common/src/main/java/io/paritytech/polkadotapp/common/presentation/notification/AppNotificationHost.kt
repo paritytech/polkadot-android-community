@@ -8,7 +8,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -42,7 +41,7 @@ private const val SUCCESS_DISPLAY_MS = 2_500L
 private const val ERROR_DISPLAY_MS = 4_000L
 
 @Composable
-fun AppNotificationHost(notifier: AppNotifier) {
+fun AppNotificationHost(modifier: Modifier = Modifier, notifier: AppNotifier) {
     var visible by remember { mutableStateOf<AppNotification?>(null) }
 
     LaunchedEffect(notifier) {
@@ -59,7 +58,7 @@ fun AppNotificationHost(notifier: AppNotifier) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier) {
         AnimatedVisibility(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

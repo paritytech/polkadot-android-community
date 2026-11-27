@@ -17,4 +17,5 @@ data class PaymentRequestUiState(
     val productId: String,
     val amount: TokenAmountModel,
     val step: PaymentRequestStep,
+    val approving: Boolean,
 )

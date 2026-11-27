@@ -23,6 +23,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDE
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import io.paritytech.polkadotapp.common.R
+import io.paritytech.polkadotapp.common.presentation.notification.AppNotificationHost
 import io.paritytech.polkadotapp.common.presentation.notification.AppNotifier
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.LocalPaymentAssetBrand
 import io.paritytech.polkadotapp.common.presentation.paymentAsset.PaymentAssetBrandProvider
@@ -74,6 +75,8 @@ abstract class BaseComposeBottomSheet<T : BaseViewModel> : BottomSheetDialogFrag
                         ObserveViewModelEvents(viewModel, appNotifier)
 
                         Screen()
+
+                        AppNotificationHost(modifier = Modifier.matchParentSize(), notifier = appNotifier)
                     }
                 }
             }

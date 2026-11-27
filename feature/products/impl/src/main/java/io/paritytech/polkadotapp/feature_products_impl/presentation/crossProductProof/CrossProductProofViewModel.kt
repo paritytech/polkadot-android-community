@@ -8,6 +8,7 @@ import io.paritytech.polkadotapp.feature_account_api.domain.derivation.asDisplay
 import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofContext
 import io.paritytech.polkadotapp.feature_products_impl.domain.crossProductProof.CrossProductProofContextHolder
 import io.paritytech.polkadotapp.feature_products_impl.presentation.productBotManagement.ProductsRouter
+import io.paritytech.polkadotapp.tools_authentication_api.domain.BiometricsService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -17,6 +18,7 @@ class CrossProductProofViewModel @Inject constructor(
     private val router: ProductsRouter,
     private val context: CrossProductProofContext,
     private val holder: CrossProductProofContextHolder,
+    private val biometricsService: BiometricsService,
 ) : BaseViewModel() {
     val state: StateFlow<CrossProductProofUiState>
         field = MutableStateFlow(
@@ -29,8 +31,11 @@ class CrossProductProofViewModel @Inject constructor(
         )
 
     fun onApproveClicked() = launchUnit {
-        context.deliverApproved()
-        router.back()
+        biometricsService.performOneTimeAuthentication()
+            .onAuthenticated {
+                context.deliverApproved()
+                router.back()
+            }
     }
 
     fun onRejectClicked() = launchUnit {

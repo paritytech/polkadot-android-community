@@ -8,7 +8,6 @@ import io.paritytech.polkadotapp.feature_backup_api.presentation.BackupConflictP
 import io.paritytech.polkadotapp.feature_settings_impl.SettingsRouter
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.BackupState
 import io.paritytech.polkadotapp.feature_settings_impl.domain.interactors.BackupStatusInteractor
-import io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.error.AuthenticationFailedPresentationError
 import io.paritytech.polkadotapp.feature_settings_impl.presentation.backup.status.models.BackupStatusUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
@@ -30,22 +29,24 @@ class BackupStatusViewModel @Inject constructor(
 
     override fun onShowMnemonic() = launchUnit {
         interactor.performOneTimeAuthentication()
-            .onSuccess {
+            .onAuthenticated {
                 router.openMnemonic()
             }
-            .onFailure { showPresentationError(AuthenticationFailedPresentationError(it)) }
     }
 
     override fun onCreateBackup() = launchUnit {
-        state.value = BackupStatusUiState.BackupInProgress
+        interactor.performOneTimeAuthentication()
+            .onAuthenticated {
+                state.value = BackupStatusUiState.BackupInProgress
 
-        interactor.saveBackup()
-            .onSuccess {
-                state.value = BackupStatusUiState.BackupExists
-            }
-            .onFailure {
-                showPresentationError(UnexpectedPresentationError(it))
-                state.value = BackupStatusUiState.NoBackup
+                interactor.saveBackup()
+                    .onSuccess {
+                        state.value = BackupStatusUiState.BackupExists
+                    }
+                    .onFailure {
+                        showPresentationError(UnexpectedPresentationError(it))
+                        state.value = BackupStatusUiState.NoBackup
+                    }
             }
     }
 
